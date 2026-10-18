@@ -1,6 +1,8 @@
 {% extends "base.html" %}
+{% from "_conn_tabs.html" import conn_tabs %}
 {% block title %}{{ svc.name }}{% endblock %}
 {% block content %}
+{{ conn_tabs("services") }}
 <div class="header">
   <div>
     <div class="small"><a href="/services">← Services</a></div>

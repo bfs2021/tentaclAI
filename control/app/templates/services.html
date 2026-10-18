@@ -1,7 +1,9 @@
 {% extends "base.html" %}
+{% from "_conn_tabs.html" import conn_tabs %}
 {% from "_service_card.html" import service_card %}
 {% block title %}Services{% endblock %}
 {% block content %}
+{{ conn_tabs("services") }}
 <div class="header">
   <div><h1>Services</h1><div class="sub">One file per service in <code>services/</code> – Docker host, API, MCP, git repo, database, web source or files; tokens in <code>.env</code></div></div>
   <div class="row">
@@ -45,13 +47,9 @@
 {% set by_system = {} %}
 {% for s in services %}{% set _ = by_system.setdefault(s.system if s.system in system_names else '', []).append(s) %}{% endfor %}
 <div class="between section-head">
-  <h2 style="margin:0">Systems</h2>
-  <form class="row" hx-post="/systems/new" style="gap:6px">
-    <input type="text" name="name" placeholder="new system, e.g. nas" pattern="[a-z0-9][a-z0-9_-]*" required style="width:220px">
-    <button class="btn">{{ icon('plus') }}Add system</button>
-  </form>
+  <h2 style="margin:0">By system</h2>
+  <a class="btn sm ghost" href="/systems">Manage systems →</a>
 </div>
-<p class="help" style="margin:-4px 0 14px">A system groups the services of one host or appliance (e.g. SSH + docker + API of the same server) with a shared SSH host and rules. Services can also stand alone.</p>
 {% for sysd in systems %}
 <div class="system-block">
   <div class="between system-head">
@@ -70,7 +68,7 @@
   {% else %}<div class="empty small">No services yet – assign them under “Edit”.</div>{% endif %}
 </div>
 {% endfor %}
-{% if not systems %}<div class="empty small" style="margin-bottom:18px">No systems yet – all services stand alone.</div>{% endif %}
+{% if not systems %}<div class="empty small" style="margin-bottom:18px">No systems yet – all services stand alone. <a href="/systems">Create one</a> to group the services of a host.</div>{% endif %}
 {% if by_system.get('') %}
 <h2 class="section-head">{{ 'Standalone services' if systems else 'Services' }}</h2>
 <div class="grid">{% for s in by_system[''] %}{{ service_card(s, systems) }}{% endfor %}</div>

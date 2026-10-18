@@ -25,3 +25,4 @@ placeholders for secrets (prefer `EXAMPLE_…` names – they are renamed per se
 ## Pull requests
 
 Small, focused PRs with a short description of *what* and *why*. PRs are squash-merged.
+Changes in behaviour get an entry under **Unreleased** in `CHANGELOG.md` – including upgrade steps if an existing installation needs any.

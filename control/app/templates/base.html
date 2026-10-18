@@ -17,10 +17,8 @@
     <nav class="nav">
       <a href="/" class="{{ 'active' if nav == 'dashboard' }}">{{ icon('home') }}Overview</a>
       <a href="/terminal" class="{{ 'active' if nav == 'terminal' }}">{{ icon('terminal') }}Terminal</a>
-      <a href="/services" class="{{ 'active' if nav in ('services', 'service_edit', 'system_edit') }}">{{ icon('plug') }}Services</a>
-      <a href="/topology" class="{{ 'active' if nav == 'topology' }}">{{ icon('topology') }}Topology</a>
+      <a href="/services" class="{{ 'active' if nav in ('services', 'service_edit', 'system_edit', 'systems', 'ssh', 'topology') }}">{{ icon('plug') }}Connections</a>
       <a href="/settings" class="{{ 'active' if nav == 'settings' }}">{{ icon('settings') }}Settings</a>
-      <a href="/ssh" class="{{ 'active' if nav == 'ssh' }}">{{ icon('key') }}SSH</a>
       <a href="/updates" class="{{ 'active' if nav in ('updates', 'job') }}">{{ icon('refresh') }}Updates</a>
       <a href="/logs" class="{{ 'active' if nav == 'logs' }}">{{ icon('logs') }}Logs</a>
       <a href="/help" class="{{ 'active' if nav == 'help' }}">{{ icon('help') }}Help</a>

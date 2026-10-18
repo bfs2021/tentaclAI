@@ -1,0 +1,10 @@
+{# tabs of the "Connections" area: everything Claude can reach and how #}
+{% from "_icons.html" import icon %}
+{% macro conn_tabs(active) -%}
+<nav class="conn-tabs" aria-label="Connections">
+  <a href="/services" class="{{ 'active' if active == 'services' }}">{{ icon('plug') }}Services</a>
+  <a href="/ssh" class="{{ 'active' if active == 'ssh' }}">{{ icon('key') }}SSH hosts</a>
+  <a href="/systems" class="{{ 'active' if active == 'systems' }}">{{ icon('server') }}Systems</a>
+  <a href="/topology" class="{{ 'active' if active == 'topology' }}">{{ icon('topology') }}Topology</a>
+</nav>
+{%- endmacro %}

@@ -37,7 +37,7 @@
         <li><strong>Overview → Create &amp; start</strong> (or “Apply now” if the container already runs).</li>
         <li><strong>Overview → Sign in now</strong> (terminal “Claude login”, <code>claude auth login</code>): open the link, sign in with your claude.ai account, paste the code into the terminal.</li>
         <li><strong>Terminal → Remote control session</strong>: confirm the prompts (e.g. trust the folder). The session then shows up in <a href="https://claude.ai/code" target="_blank" rel="noopener">claude.ai/code</a> and the Claude app.</li>
-        <li><strong>Services</strong>: connect your Docker hosts, APIs, MCP servers and repositories from templates, add tokens, then <strong>Test connection</strong> and <strong>Onboard with Claude</strong>.</li>
+        <li><strong>Connections → Services</strong>: connect your Docker hosts, APIs, MCP servers and repositories from templates, add tokens, then <strong>Test connection</strong> and <strong>Onboard with Claude</strong>.</li>
         <li><strong>Overview → System inventory</strong>: Claude gets to know your site and records it in <code>local/CLAUDE.md</code>.</li>
       </ol>
     </section>
@@ -136,7 +136,7 @@
 "docker": { "mode": "ssh", "ssh_host": "vps1", "stacks_dir": "/opt/stacks", "access": "ro" }</pre>
       <ul>
         <li><strong>socket</strong>: socket and stacks directory are mounted into the Claude container (<code>compose.generated.yaml</code>, written automatically) – then “Apply now”. The stacks directory keeps the host path so <code>docker compose</code> resolves relative paths correctly.</li>
-        <li><strong>ssh</strong>: through the SSH host (alias from <a href="/ssh">SSH</a>); the user there must be allowed to run <code>docker</code>. Compose runs on the target host in the stack's directory.</li>
+        <li><strong>ssh</strong>: through the SSH host (alias from <a href="/ssh">Connections → SSH hosts</a>); the user there must be allowed to run <code>docker</code>. Compose runs on the target host in the stack's directory.</li>
         <li><strong>access</strong>: <code>ro</code> only allows read-only commands through <code>svc</code> (ps, logs, inspect, config …); <code>rw</code> allows changes – Claude asks before restarts, updates and deletions.</li>
         <li>Commands: <code>svc docker</code> (overview), <code>svc docker &lt;host&gt; ps</code>, <code>svc compose &lt;host&gt; &lt;stack&gt; logs --tail 50</code>.</li>
       </ul>
@@ -199,7 +199,7 @@
         <li><strong>ro</strong>: push is blocked twice (blocked push URL + pre-push hook). Ideal for public repositories or third-party code as reference.</li>
         <li><strong>rw</strong>: Claude may commit and push – when you ask for it.</li>
         <li>Tokens never end up in <code>.git/config</code>: a credential helper (<code>svc git-credential</code>) reads them from <code>.env</code> when needed.</li>
-        <li>SSH URLs use the tentaclAI key – add it as deploy key in the repository (see <a href="/ssh">SSH</a>).</li>
+        <li>SSH URLs use the tentaclAI key – add it as deploy key in the repository (see <a href="/ssh">Connections → SSH hosts</a>).</li>
         <li>Cloning happens on sync or with the “Clone” button; “Fetch” pulls changes and re-applies ro/rw.</li>
         <li>Usernames per provider: GitHub <code>x-access-token</code>, GitLab <code>oauth2</code>, Gitea/Forgejo any.</li>
       </ul>
@@ -309,7 +309,7 @@ ssh &lt;host&gt;                SSH targets from ssh/config.d</pre>
         <tr><td>“token missing” although it was entered</td><td>compare the variable name in the JSON and in <code>.env</code> (case sensitive).</td></tr>
         <tr><td>API test returns HTTP 401/403</td><td>wrong token or missing permissions; for <code>header</code> auth check the prefix (e.g. <code>Token …</code> vs. <code>Bearer …</code>).</td></tr>
         <tr><td>TLS errors</td><td>own CA → <code>CA_CERT</code>; single self-signed device → <code>"insecure_tls": true</code>.</td></tr>
-        <tr><td>Docker host via SSH fails</td><td>SSH target works? (<a href="/ssh">SSH</a> → Test) Is the user allowed to run docker? Then <code>svc test &lt;host&gt;</code>.</td></tr>
+        <tr><td>Docker host via SSH fails</td><td>SSH target works? (<a href="/ssh">Connections → SSH hosts</a> → Test) Is the user allowed to run docker? Then <code>svc test &lt;host&gt;</code>.</td></tr>
         <tr><td>No remote control session</td><td>Claude signed in? <code>RC_ENABLED</code> on? Open the session in the terminal and confirm the prompts.</td></tr>
         <tr><td>Cloning fails</td><td>check URL/token; private repositories need <code>auth.type = token</code>, SSH URLs a deploy key.</td></tr>
         <tr><td>MCP server missing in Claude</td><td>“Sync”, then <code>/mcp</code> → reconnect in Claude.</td></tr>

@@ -405,6 +405,19 @@ async def topology_docker(name: str):
 
 # ---------------------------------------------------------------- systems (groups of services)
 
+@app.get("/systems", response_class=HTMLResponse)
+async def systems_page(request: Request):
+    systems = systems_store.load_all()
+    services = services_store.load_all()
+    names = {x["name"] for x in systems}
+    members = {}
+    for sv in services:
+        if sv["system"] in names:
+            members.setdefault(sv["system"], []).append(sv)
+    return page(request, "systems.html", systems=systems, members=members,
+                standalone=[sv for sv in services if sv["system"] not in names])
+
+
 @app.post("/systems/new")
 async def systems_new(request: Request, name: str = Form(...)):
     name = name.strip().lower()
@@ -444,7 +457,7 @@ async def system_delete(request: Request, name: str):
     except (ValueError, OSError) as e:
         return PlainTextResponse("", headers=toast(str(e), "err"))
     await sync_services()
-    return respond(request, f"System {name} deleted – its services are standalone now", redirect="/services")
+    return respond(request, f"System {name} deleted – its services are standalone now", redirect="/systems")
 
 
 @app.post("/services/new")

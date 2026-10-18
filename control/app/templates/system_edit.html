@@ -1,10 +1,12 @@
 {% extends "base.html" %}
+{% from "_conn_tabs.html" import conn_tabs %}
 {% block title %}{{ sysd.name }}{% endblock %}
 {% block content %}
+{{ conn_tabs("systems") }}
 <div class="header">
   <div><h1>{{ icon('server') }}{{ sysd.name }}</h1><div class="sub">System – <code>systems/{{ sysd.name }}.json</code></div></div>
   <div class="row">
-    <a class="btn ghost" href="/services">Back</a>
+    <a class="btn ghost" href="/systems">Back</a>
     <button class="btn danger" hx-post="/systems/{{ sysd.name }}/delete" hx-confirm="Delete system {{ sysd.name }}? Its services stay and become standalone.">{{ icon('trash') }}Delete</button>
   </div>
 </div>

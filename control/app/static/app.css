@@ -261,3 +261,14 @@ dialog.modal .card-head { margin-bottom: 12px; }
 .fp-list { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px 12px; display: flex; flex-direction: column; gap: 4px; word-break: break-all; }
 .result-list { display: flex; flex-direction: column; gap: 8px; }
 dialog.modal { max-height: calc(100vh - 40px); overflow-y: auto; }
+/* Connections tabs */
+.conn-tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--border); margin: -6px 0 22px; overflow-x: auto; }
+.conn-tabs a { display: inline-flex; align-items: center; gap: 7px; padding: 9px 14px; color: var(--muted); font-weight: 500;
+  border-bottom: 2px solid transparent; margin-bottom: -1px; white-space: nowrap; }
+.conn-tabs a svg { width: 15px; height: 15px; }
+.conn-tabs a:hover { color: var(--text); text-decoration: none; }
+.conn-tabs a.active { color: var(--accent); border-bottom-color: var(--accent); }
+.system-card h2 { display: flex; align-items: center; gap: 8px; }
+.system-card h2 svg { width: 18px; height: 18px; color: var(--accent); }
+.system-card .kv dd { text-align: left; }
+.sys-rules { margin-top: 12px; padding: 10px 12px; border-radius: var(--radius-sm); background: var(--warn-soft); color: var(--warn); font-size: 12.5px; display: flex; flex-direction: column; gap: 4px; }

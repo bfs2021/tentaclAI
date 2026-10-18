@@ -1,6 +1,8 @@
 {% extends "base.html" %}
+{% from "_conn_tabs.html" import conn_tabs %}
 {% block title %}SSH{% endblock %}
 {% block content %}
+{{ conn_tabs("ssh") }}
 <div class="header">
   <div><h1>SSH targets</h1><div class="sub">One file per host in <code>ssh/config.d/</code>, own key <code>tentaclai_ed25519</code></div></div>
   <div class="row">

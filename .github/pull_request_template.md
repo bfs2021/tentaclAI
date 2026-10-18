@@ -8,3 +8,4 @@
 - [ ] Generic – works for any installation, English texts
 - [ ] Tested in an isolated instance (or explain why not needed)
 - [ ] Docs updated (README / tentacontrol → Help) if behaviour changed
+- [ ] `CHANGELOG.md` entry under *Unreleased*, with upgrade steps if needed

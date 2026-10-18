@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% from "_conn_tabs.html" import conn_tabs %}
+{% block title %}Systems{% endblock %}
+{% block content %}
+{{ conn_tabs("systems") }}
+<div class="header">
+  <div><h1>Systems</h1><div class="sub">A system groups the services of one host or appliance – SSH host, docker host, APIs – with rules that apply to all of them. Services can also stand alone.</div></div>
+</div>
+<div class="card flat" style="margin-bottom:18px">
+  <form class="row" hx-post="/systems/new" style="align-items:flex-end">
+    <div style="flex:1;min-width:220px"><label>New system</label>
+      <input type="text" name="name" placeholder="e.g. nas" pattern="[a-z0-9][a-z0-9_-]*" required></div>
+    <button class="btn primary">{{ icon('plus') }}Add system</button>
+  </form>
+</div>
+{% if systems %}
+<div class="grid two">
+  {% for x in systems %}
+  <div class="card system-card">
+    <div class="between" style="align-items:flex-start">
+      <div><h2 style="margin:0">{{ icon('server') }}{{ x.name }}</h2>
+        <div class="small muted" style="margin-top:4px">{{ x.description or '–' }}</div></div>
+      <a class="btn sm primary" href="/systems/{{ x.name }}">Edit</a>
+    </div>
+    <dl class="kv" style="margin-top:12px">
+      <dt>SSH host</dt>
+      <dd>{% if x.ssh_host %}<span class="row" style="gap:8px;justify-content:flex-start;flex-wrap:nowrap">
+          <span class="ssh-dot" hx-get="/ssh/{{ x.ssh_host }}/status" hx-trigger="load" hx-swap="innerHTML"><span class="dot"></span></span>
+          <span class="mono small">{{ x.ssh_host }}</span></span>{% else %}<span class="faint">–</span>{% endif %}</dd>
+      <dt>Services</dt>
+      <dd>{% set ms = members.get(x.name, []) %}{% if ms %}<span class="row" style="gap:6px;justify-content:flex-start">
+        {% for s in ms %}<a class="pill {{ s.state }}" href="/services/{{ s.name }}" title="{{ s.label }} · {{ s.kinds | join('+') }}">{{ s.name }}</a>{% endfor %}</span>
+        {% else %}<span class="faint">none yet</span>{% endif %}</dd>
+    </dl>
+    {% if x.notes %}<div class="sys-rules">{% for n in x.notes %}<div>⚠ {{ n }}</div>{% endfor %}</div>{% endif %}
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="empty">No systems yet. Create one above, then assign services and an SSH host.</div>
+{% endif %}
+{% if standalone %}
+<p class="help" style="margin-top:16px">Standalone services: {% for s in standalone %}<a href="/services/{{ s.name }}">{{ s.name }}</a>{{ ', ' if not loop.last }}{% endfor %}</p>
+{% endif %}
+{% endblock %}
