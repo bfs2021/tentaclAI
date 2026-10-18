@@ -278,7 +278,7 @@ What it does **not** (yet) do – keep it in mind:
 - **Security:** hardened sandbox (non-root, read-only root filesystem, egress allowlist, secret broker, Docker socket proxy,
   prompt-injection safeguards) · audit log of all write actions · access mode `confirm` (approve writes with a click)
 - **Automation:** scheduled Claude jobs · monitoring per service with status and recommendations
-- **tentacontrol:** AI assistant for the configuration · OAuth with browser login · export/import of configuration and templates
+- **tentacontrol:** AI assistant for the configuration · OAuth with browser login · export/import of configuration and templates · update notice in the sidebar when a new release is out
 - **Topology:** connections between systems and containers (reverse proxy → container, tunnels) · monitoring status
 
 ## License

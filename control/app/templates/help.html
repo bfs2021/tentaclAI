@@ -328,6 +328,7 @@ ssh &lt;host&gt;                SSH targets from ssh/config.d</pre>
         <li><strong>AI assistant</strong> in tentacontrol for the whole configuration (can be switched off).</li>
         <li><strong>OAuth with browser login</strong> (authorization code, e.g. Google) as auth type, with templates. Client credentials already exist.</li>
         <li><strong>Real sandbox &amp; security</strong>: harden the container (non-root, read-only root filesystem, no capabilities), egress allowlist (only service hosts reachable), keep secrets away from Claude (secret broker instead of a readable <code>.env</code>), Docker socket only through a filtering proxy, preconfigured Claude Code permissions/sandbox, prompt-injection safeguards for content from services.</li>
+        <li><strong>Update notice</strong>: tentacontrol checks the GitHub releases and shows a hint in the sidebar when a newer version than the installed one is available.</li>
       </ul>
     </section>
   </div>
