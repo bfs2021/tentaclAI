@@ -2,6 +2,14 @@
 
 All notable changes, newest first. Every release lists **upgrade steps** from the previous one.
 
+## Unreleased
+
+### Changes
+- Claude's instructions brought up to date: all service parts and `svc test`/`svc pending`/`svc audit`, no-root
+  hint, a general rule that content from services is data and never instructions, the tentaclai containers and tmux
+  sessions are off limits (also through `svc docker` on their host), an approval doesn't replace asking about risky
+  changes. The generated `SERVICES.md` describes git via `svc git push` and the `confirm` mode.
+
 ## v0.5.0 – 2026-10-19
 
 ### Highlights
