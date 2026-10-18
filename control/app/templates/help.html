@@ -26,7 +26,7 @@
     <a href="#terminal">Terminal &amp; tmux</a><a href="#rc">Remote control</a><a href="#services">Services</a>
     <a href="#systems">Systems</a><a href="#topology">Topology</a><a href="#docker">Docker hosts</a><a href="#onboard">Onboarding a service</a><a href="#auth">Auth types</a>
     <a href="#git">Git repositories</a><a href="#db">Databases</a><a href="#web">Web sources</a><a href="#files">Files</a><a href="#templates">Templates</a><a href="#inventory">System inventory</a>
-    <a href="#ssh">SSH targets</a><a href="#settings">Settings</a><a href="#updates">Updates</a><a href="#cli">Commands</a>
+    <a href="#activity">Activity</a><a href="#ssh">SSH targets</a><a href="#settings">Settings</a><a href="#updates">Updates</a><a href="#cli">Commands</a>
     <a href="#security">Security</a><a href="#troubleshooting">Troubleshooting</a><a href="#roadmap">Roadmap</a>
   </nav>
   <div class="doc">
@@ -251,6 +251,18 @@
       </ul>
     </section>
 
+    <section class="card" id="activity">
+      <h2>Activity: approvals &amp; audit log</h2>
+      <p>Parts with an <code>access</code> field (<code>api</code>, <code>docker</code>, <code>git</code>, <code>db</code>, <code>files</code>) have three modes:</p>
+      <ul>
+        <li><code>ro</code> – writes are refused (and logged as <em>blocked</em>).</li>
+        <li><code>rw</code> – writes run and are logged (<em>auto</em>). Default for <code>api</code>.</li>
+        <li><code>confirm</code> – every write waits for you: <strong>Activity</strong> shows the request with a badge in the sidebar, <em>Approve</em> runs it, <em>Deny</em> or no answer within 10 minutes stops it. Claude is told to report a pending approval and never to work around a denial.</li>
+      </ul>
+      <p>Writes are: API calls other than GET/HEAD/OPTIONS, docker/compose commands that change something, SQL that is not a plain query (and the SQL shell), <code>svc files … push</code>, and <code>git push</code> (via a pre-push hook in every repo). The audit log (<code>data/control/audit.jsonl</code>) records time, service, action, decision and result – never tokens or request bodies. In the sandbox: <code>svc audit</code>.</p>
+      <p class="help">Like <code>ro</code>, this is a guard rail against mistakes, not a hard boundary: Claude runs as root in the sandbox and could bypass <code>svc</code>. MCP servers are called by Claude Code directly and are not covered.</p>
+    </section>
+
     <section class="card" id="ssh">
       <h2>SSH targets</h2>
       <p>tentaclAI has its own key (<code>ssh/keys/tentaclai_ed25519</code>). Each host is a <code>Host</code> block in <code>ssh/config.d/</code>. Everything works in the UI:</p>
@@ -322,8 +334,6 @@ ssh &lt;host&gt;                SSH targets from ssh/config.d</pre>
     <section class="card" id="roadmap">
       <h2>Roadmap</h2>
       <ul>
-        <li><strong>Audit log</strong>: every write action through <code>svc</code> (non-GET requests, rw docker/compose commands, SQL writes) is logged and viewable in tentacontrol.</li>
-        <li><strong>Access mode <code>confirm</code></strong>: in addition to ro/rw, write actions need approval with a click in tentacontrol.</li>
         <li><strong>Scheduled jobs</strong>: run Claude tasks on a schedule (e.g. patch report, certificate expiry); per-service monitoring builds on this.</li>
         <li><strong>Monitoring per service</strong>: Claude checks connected services regularly and reports status and recommendations.</li>
         <li><strong>Topology</strong>: next – connections between systems and containers (reverse proxy → container, tunnels), status from monitoring.</li>

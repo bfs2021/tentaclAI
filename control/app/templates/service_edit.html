@@ -74,7 +74,7 @@
     {% if svc.docker %}
     <div class="card">
       <div class="card-head"><h2>Docker host</h2>
-        <span class="pill {{ 'accent' if svc.docker.access == 'rw' else 'info' }}">{{ 'manage (rw)' if svc.docker.access == 'rw' else 'read only (ro)' }}</span></div>
+        <span class="pill {{ {'rw':'accent','confirm':'warn'}.get(svc.docker.access, 'info') }}">{{ {'rw':'read + write (rw)','confirm':'confirm writes'}.get(svc.docker.access, 'read only (ro)') }}</span></div>
       <dl class="kv">
         <dt>Connection</dt><dd>{{ 'local socket' if svc.docker.mode == 'socket' else 'SSH' }}</dd>
         <dt>{{ 'Socket' if svc.docker.mode == 'socket' else 'SSH host' }}</dt><dd class="mono small">{{ svc.docker.target }}</dd>
@@ -88,7 +88,7 @@
     {% if svc.git %}
     <div class="card">
       <div class="card-head"><h2>Git repository</h2>
-        <span class="pill {{ 'accent' if svc.git.access == 'rw' else 'info' }}">{{ 'read + write (rw)' if svc.git.access == 'rw' else 'read only (ro)' }}</span></div>
+        <span class="pill {{ {'rw':'accent','confirm':'warn'}.get(svc.git.access, 'info') }}">{{ {'rw':'read + write (rw)','confirm':'confirm writes'}.get(svc.git.access, 'read only (ro)') }}</span></div>
       <dl class="kv">
         <dt>URL</dt><dd class="mono small" style="word-break:break-all">{{ svc.git.url }}</dd>
         <dt>Branch</dt><dd class="mono">{{ svc.git.branch or "default" }}</dd>

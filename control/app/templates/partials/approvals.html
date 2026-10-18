@@ -1,0 +1,29 @@
+{% from "_icons.html" import icon %}
+<div id="approvals" hx-get="/partials/approvals" hx-trigger="every 3s" hx-swap="outerHTML">
+  {% if pending %}
+  <div class="approval-list">
+    {% for a in pending %}
+    <div class="card approval">
+      <div class="between" style="align-items:flex-start;gap:12px">
+        <div style="min-width:0">
+          <div class="row" style="gap:8px"><strong>{{ a.service }}</strong><span class="tag">{{ a.part }}</span>
+            <span class="small faint">#{{ a.id }} · {{ ((now - a.created) // 60) | int }} min ago · expires in {{ ((600 - (now - a.created)) // 60) | int }} min</span></div>
+          <pre class="rc approval-action">{{ a.action }}</pre>
+        </div>
+      </div>
+      <div class="row" style="margin-top:10px">
+        <button class="btn primary" hx-post="/approvals/{{ a.id }}/approve" hx-target="#approvals" hx-swap="outerHTML">{{ icon('check') }}Approve</button>
+        <button class="btn danger" hx-post="/approvals/{{ a.id }}/deny" hx-target="#approvals" hx-swap="outerHTML">Deny</button>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="empty small">No pending approvals. Services with <code>"access": "confirm"</code> wait here before every write.</div>
+  {% endif %}
+  {% if recent %}
+  <div class="small muted" style="margin-top:10px">Recent decisions:
+    {% for a in recent %}<span class="pill {{ 'ok' if a.status == 'approved' else ('off' if a.status == 'expired' else 'err') }}" title="{{ a.action }}">#{{ a.id }} {{ a.service }} {{ a.status }}</span> {% endfor %}
+  </div>
+  {% endif %}
+</div>

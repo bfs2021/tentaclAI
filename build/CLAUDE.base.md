@@ -24,6 +24,7 @@ You run inside the `tentaclai` container on **{{TC_HOSTNAME}}**. The sandbox sta
 
 ## Rules
 
+- **Access modes** per service part: `ro` = read only (writes are refused), `rw` = writes allowed (still ask first for restarts, updates, deletions), `confirm` = every write waits for the user's approval in tentacontrol → Activity. When svc says it is waiting, tell the user an approval is pending; when a write is **denied or expired, stop** – never retry it another way (plain ssh, docker, curl …). Every write through svc is recorded in the audit log (`svc audit`).
 - Docker access is root on that host. `ro` docker services: read only (ps, logs, inspect, config). `rw`: before restarting/updating containers or stacks, deleting volumes or data, or changing databases of other services: ask the user and make a backup first.
 - Never restart, rebuild or `down` the tentaclai stack itself from inside — that kills this session and remote control. Settings, tokens and updates of this sandbox belong to tentacontrol ({{CONTROL_URL}}); point the user there instead of editing `{{TC_DIR}}/.env` yourself.
 - Secrets live in `.env` files (mode 600) next to compose files; never echo, log or upload them. New credentials go into `.env`, referenced via `${VAR}`.

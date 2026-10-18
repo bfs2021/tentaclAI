@@ -12,7 +12,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
 
-from . import auth, dockerops, jobs, services_store, sshhosts, sshops, systems_store, topology, updatecheck
+from . import activity, auth, dockerops, jobs, services_store, sshhosts, sshops, systems_store, topology, updatecheck
 from .config import CLAUDE_SERVICE, COMPOSE, DATA_DIR, RC_VARS, RESTART_VARS, SETTINGS_GROUPS, is_secret, site
 from .envfile import read_env, update_env
 from .terminal import PROFILES, bridge, onboard_cmd
@@ -32,7 +32,7 @@ templates.env.globals["asset_v"] = str(int(max(os.path.getmtime(os.path.join(BAS
 app.mount("/static", StaticFiles(directory=os.path.join(BASE, "static")), name="static")
 app.mount("/vendor", StaticFiles(directory="/app/vendor"), name="vendor")
 
-PUBLIC = ("/login", "/setup", "/static/", "/vendor/", "/healthz")
+PUBLIC = ("/login", "/setup", "/static/", "/vendor/", "/healthz", "/internal/")  # /internal/: svc token, checked per route
 RESTART_FLAG = os.path.join(DATA_DIR, "restart-needed")
 
 
@@ -66,6 +66,11 @@ async def secure_cookie(request: Request, call_next):
         response.raw_headers[:] = [(k, v + b"; secure" if k == b"set-cookie" and v.startswith(b"tentacontrol=")
                                     and b"secure" not in v.lower() else v) for k, v in raw]
     return response
+
+
+@app.on_event("startup")
+async def prepare_activity():
+    activity.ensure_token()
 
 
 @app.on_event("startup")
@@ -340,6 +345,57 @@ async def services_page(request: Request):
     systems = systems_store.load_all()
     return page(request, "services.html", services=services_store.load_all(), templates_list=services_store.list_templates(),
                 systems=systems, system_names={x["name"] for x in systems})
+
+
+# ---------------------------------------------------------------- activity: approvals (confirm) and audit log
+
+def _svc_auth(request):
+    return activity.token_ok(request.headers.get("x-tc-token", ""))
+
+
+@app.post("/internal/approvals")
+async def internal_approval_create(request: Request):
+    if not _svc_auth(request):
+        return JSONResponse({"error": "forbidden"}, status_code=403)
+    data = await request.json()
+    return JSONResponse({"id": activity.create(data.get("service", "?"), data.get("part", "?"), data.get("action", "?"))})
+
+
+@app.get("/internal/approvals/{rid}")
+async def internal_approval_wait(request: Request, rid: str, wait: int = 25):
+    if not _svc_auth(request):
+        return JSONResponse({"error": "forbidden"}, status_code=403)
+    return JSONResponse(await activity.wait(rid, wait))
+
+
+@app.get("/activity", response_class=HTMLResponse)
+async def activity_page(request: Request, service: str = "", decision: str = ""):
+    return page(request, "activity.html", entries=activity.audit_entries(service=service, decision=decision),
+                service=service, decision=decision,
+                services_known=sorted({e.get("service", "") for e in activity.audit_entries(limit=2000)}))
+
+
+@app.get("/partials/approvals", response_class=HTMLResponse)
+async def approvals_partial(request: Request):
+    return templates.TemplateResponse(request, "partials/approvals.html",
+                                      {"pending": activity.pending(), "recent": activity.recent_decisions(), "now": time.time()})
+
+
+@app.get("/partials/approval-count", response_class=HTMLResponse)
+async def approval_count():
+    n = len(activity.pending())
+    return HTMLResponse(f'<span class="nav-badge">{n}</span>' if n else "")
+
+
+@app.post("/approvals/{rid}/{verdict}", response_class=HTMLResponse)
+async def approval_decide(request: Request, rid: str, verdict: str):
+    if verdict not in ("approve", "deny"):
+        return PlainTextResponse("", status_code=400)
+    ok = activity.decide(rid, verdict == "approve", who="tentacontrol (" + (request.client.host if request.client else "?") + ")")
+    resp = await approvals_partial(request)
+    if not ok:
+        resp.headers.update(toast("Request no longer pending", "warn"))
+    return resp
 
 
 # ---------------------------------------------------------------- topology (prototype)

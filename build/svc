@@ -20,6 +20,8 @@ resolved from the stack's .env (read fresh on every call) and the container envi
   svc compose <name> <stack> <args...>
                                    docker compose in <stacks_dir>/<stack> of that host, e.g. svc compose gate pangolin ps
   (access "ro": only read-only docker/compose commands are allowed)
+  svc audit [n]                    last n write actions (audit log: auto / approved / denied / blocked)
+  (access "confirm": writes wait for the user's approval in tentacontrol → Activity)
   svc test <name>                  connection test of every part (api, mcp, git, docker, db, web, files)
   svc db [name] "<SQL>" | tables | describe <t> | shell    databases (postgres, mysql/mariadb); [--csv]
   svc web [name] [--links|--raw|--login] [path]          web sources: page as readable text, links, raw HTML
@@ -180,7 +182,11 @@ def cmd_call(services, name, method, path, extra):
         cmd = ["curl", "-sS", "-X", method.upper(), "-H", f"@{files[0]}", "-K", files[1]]
         if api.get("insecure_tls"):
             cmd.append("-k")
-        return subprocess.call(cmd + list(extra))
+        if method.upper() in ("GET", "HEAD", "OPTIONS"):
+            return subprocess.call(cmd + list(extra))
+        body = " (with body)" if any(a in ("-d", "--data", "--data-raw", "--data-binary", "--json", "-F", "--form", "-T") for a in extra) else ""
+        return guarded(name, "api", access_mode(svc["api"], "rw"), f"{method.upper()} {path}{body}",
+                       lambda: subprocess.call(cmd + list(extra)))
     finally:
         for f in files:
             os.unlink(f)
@@ -272,17 +278,18 @@ def configure_repo(name, path, git):
     access = git.get("access", "ro")
     git_run(["config", "tentaclai.access", access], cwd=path)
     hook = os.path.join(path, ".git", "hooks", "pre-push")
-    if access == "ro":
-        git_run(["config", "remote.origin.pushurl", RO_PUSHURL], cwd=path)
+    # one hook for every mode: ro blocks, rw is logged, confirm asks first (svc git-push-hook)
+    if not os.path.exists(hook) or HOOK_MARK in open(hook).read():
         os.makedirs(os.path.dirname(hook), exist_ok=True)
         with open(hook, "w") as f:
-            f.write(f"#!/bin/sh\n{HOOK_MARK}\necho 'tentaclai: repo \"{name}\" is read-only – push blocked.' >&2\nexit 1\n")
+            f.write(f"#!/bin/sh\n{HOOK_MARK}\nexec svc git-push-hook {shlex.quote(name)} \"$@\"\n")
         os.chmod(hook, 0o755)
     else:
+        print(f"    {name}: own pre-push hook found – push is not audited/confirmed", file=sys.stderr)
+    if access == "ro":
+        git_run(["config", "remote.origin.pushurl", RO_PUSHURL], cwd=path)
+    else:
         git_run(["config", "--unset", "remote.origin.pushurl"], cwd=path, quiet=True)
-        if os.path.exists(hook) and HOOK_MARK in open(hook).read():
-            os.remove(hook)
-
 
 def git_sync(services, names=None, fetch=True):
     repos = {n: s for n, s in services.items() if "git" in s and (not names or n in names)}
@@ -485,15 +492,21 @@ def cmd_docker(services, args):
         return 0
     name, rest = args[0], args[1:]
     d = get_docker(services, name)
-    if d.get("access", "ro") == "ro" and not _ro_allowed(rest):
-        sys.exit(f"svc: {name} is read-only – '{' '.join(rest[:2])}' is not allowed")
-    return subprocess.call(docker_argv(name, d, rest))
+    run = lambda: subprocess.call(docker_argv(name, d, rest))  # noqa: E731
+    if _ro_allowed(rest):
+        return run()
+    return guarded(name, "docker", access_mode(d), "docker " + shlex.join(rest), run)
 
 
 def cmd_compose(services, name, stack, rest):
     d = get_docker(services, name)
-    if d.get("access", "ro") == "ro" and not _ro_allowed(rest, compose=True):
-        sys.exit(f"svc: {name} is read-only – 'compose {' '.join(rest[:1])}' is not allowed")
+    if _ro_allowed(rest, compose=True):
+        return _compose(name, d, stack, rest)
+    return guarded(name, "docker", access_mode(d), f"compose {stack} {shlex.join(rest)}",
+                   lambda: _compose(name, d, stack, rest))
+
+
+def _compose(name, d, stack, rest):
     if not re.fullmatch(r"[A-Za-z0-9._-]+", stack):
         sys.exit("svc: invalid stack name")
     base = d.get("stacks_dir") or sys.exit(f"svc: {name} has no stacks_dir")
@@ -551,7 +564,7 @@ def db_engine(db):
 
 def db_run(name, db, sql=None, fmt="table", interactive=False):
     """run SQL (or an interactive client) – password only in env / a 0600 tmpfs file, ro enforced per session"""
-    ro = db.get("access", "ro") != "rw"
+    ro = access_mode(db) == "ro"
     if sql is not None and ro and DB_RO_BYPASS.search(sql):
         sys.exit(f"svc: {name} is read-only – statements that change the transaction mode are not allowed")
     if db_engine(db) == "postgres":
@@ -604,10 +617,11 @@ def cmd_db(services, args):
     if not rest:
         sys.exit(f"usage: svc db {name} \"<SQL>\" | tables | describe <table> | shell")
     pg = db_engine(db) == "postgres"
+    mode = access_mode(db)
     if rest[0] == "shell":
-        if db.get("access", "ro") != "rw":
+        if mode == "ro":
             sys.exit(f"svc: {name} is read-only – use svc db {name} \"<SQL>\" (the shell could switch the session to read-write)")
-        return db_run(name, db, interactive=True)
+        return guarded(name, "db", mode, "interactive SQL shell", lambda: db_run(name, db, interactive=True))
     if rest[0] == "tables":
         return db_run(name, db, "\\dt+" if pg else "SHOW FULL TABLES", fmt)
     if rest[0] == "describe" and len(rest) == 2:
@@ -615,7 +629,10 @@ def cmd_db(services, args):
         if not re.fullmatch(r"[A-Za-z0-9_.]+", t):
             sys.exit("svc: invalid table name")
         return db_run(name, db, f"\\d {t}" if pg else f"DESCRIBE `{t.replace('.', '`.`')}`", fmt)
-    return db_run(name, db, " ".join(rest), fmt)
+    sql = " ".join(rest)
+    if mode != "ro" and sql_writes(sql):
+        return guarded(name, "db", mode, f"SQL: {sql}", lambda: db_run(name, db, sql, fmt))
+    return db_run(name, db, sql, fmt)
 
 
 def db_test(name, db):
@@ -868,7 +885,6 @@ def cmd_files(services, args):
     name, op, rest = args[0], args[1], args[2:]
     f = get_part(services, name, "files")
     host, root, sudo = files_target(name, f)
-    rw = f.get("access", "ro") == "rw"
     local = os.path.join("/workspace/files", name)
     if op == "ls":
         return files_ssh(host, sudo, f"ls -la --group-directories-first {shlex.quote(files_sub(root, rest[0] if rest else ''))}")
@@ -883,7 +899,8 @@ def cmd_files(services, args):
     if op in ("pull", "diff", "push"):
         sub = rest[0] if rest else ""
         remote, dest = files_sub(root, sub), os.path.join(local, sub) if sub else local
-        if op == "push" and not rw:
+        if op == "push" and access_mode(f) == "ro":
+            audit(name, "files", "ro", f"push {sub or '.'} → {host}:{remote}", "blocked")
             sys.exit(f"svc: {name} is read-only – push is not allowed")
         is_dir = subprocess.run(["ssh", host, (sudo + " " if sudo else "") + f"test -d {shlex.quote(remote)}"]).returncode == 0
         src_r, src_l = (remote + "/", dest.rstrip("/") + "/") if is_dir else (remote, dest)
@@ -898,7 +915,8 @@ def cmd_files(services, args):
             sys.exit(f"svc: {dest} not found – pull first")
         if op == "diff":
             return subprocess.call(base + ["-n", "-i", "--checksum", src_l, f"{host}:{src_r}"])
-        return subprocess.call(base + ["-i", src_l, f"{host}:{src_r}"])
+        return guarded(name, "files", access_mode(f), f"push {sub or '.'} → {host}:{remote}",
+                       lambda: subprocess.call(base + ["-i", src_l, f"{host}:{src_r}"]))
     sys.exit("usage: svc files <name> ls|tree|cat <file>|grep <pattern> [path]|pull|diff|push [path]")
 
 
@@ -916,6 +934,148 @@ def files_test(name, f):
     if out == "file":
         return True, f"{host}:{root} – file ({f.get('access', 'ro')})"
     return False, f"{host}:{root} not found"
+
+
+# ---------- audit log and approvals (access mode "confirm") ----------
+# Every write through svc is logged; with access "confirm" it first needs the user's approval in tentacontrol (Activity).
+# A guard rail like ro: it keeps an honest agent and mistakes in check, it is no security boundary against root in this sandbox.
+
+CONTROL_INTERNAL = os.environ.get("TC_CONTROL_INTERNAL", "http://tentacontrol:8080")
+AUDIT_FILE = os.path.join(TC_DIR, "data", "control", "audit.jsonl")
+TOKEN_FILE = os.path.join(TC_DIR, "data", "control", "svc-token")
+APPROVAL_TIMEOUT = 600
+MODES = ("ro", "rw", "confirm")
+
+
+def access_mode(part, default="ro"):
+    mode = str(part.get("access", default))
+    return mode if mode in MODES else "ro"
+
+
+def audit(service, part, mode, action, decision, rc=None, duration=None, detail=""):
+    """append one line to the audit log – never lets the command fail"""
+    entry = {"ts": time.strftime("%Y-%m-%dT%H:%M:%S%z"), "service": service, "part": part, "mode": mode,
+             "action": action[:500], "decision": decision}
+    if rc is not None:
+        entry["exit"] = rc
+    if duration is not None:
+        entry["seconds"] = round(duration, 1)
+    if detail:
+        entry["detail"] = detail[:300]
+    try:
+        import fcntl
+        os.makedirs(os.path.dirname(AUDIT_FILE), exist_ok=True)
+        if os.path.exists(AUDIT_FILE) and os.path.getsize(AUDIT_FILE) > 5 * 2**20:
+            os.replace(AUDIT_FILE, AUDIT_FILE + ".1")
+        with open(AUDIT_FILE, "a") as f:
+            fcntl.flock(f, fcntl.LOCK_EX)
+            f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+    except OSError as e:
+        print(f"svc: audit log not writable ({e})", file=sys.stderr)
+
+
+def _control(method, path, payload=None, timeout=40):
+    import urllib.request
+    try:
+        token = open(TOKEN_FILE).read().strip()
+    except OSError:
+        raise RuntimeError("no svc token from tentacontrol (data/control/svc-token) – is tentacontrol running?")
+    req = urllib.request.Request(CONTROL_INTERNAL + path, method=method,
+                                 data=json.dumps(payload).encode() if payload is not None else None,
+                                 headers={"X-TC-Token": token, "Content-Type": "application/json"})
+    with urllib.request.urlopen(req, timeout=timeout) as r:
+        return json.load(r)
+
+
+def request_approval(service, part, action):
+    """('approved'|'denied'|'expired'|'error', who/why) – waits for the user's decision in tentacontrol"""
+    try:
+        rid = _control("POST", "/internal/approvals", {"service": service, "part": part, "action": action})["id"]
+    except Exception as e:  # noqa: BLE001
+        return "error", f"tentacontrol not reachable: {e}"
+    print(f"svc: ⏳ waiting for approval in tentacontrol → Activity (request #{rid}, up to {APPROVAL_TIMEOUT // 60} min): {action}",
+          file=sys.stderr, flush=True)
+    end = time.time() + APPROVAL_TIMEOUT + 30
+    while time.time() < end:
+        try:
+            st = _control("GET", f"/internal/approvals/{rid}?wait=25", timeout=40)
+        except Exception as e:  # noqa: BLE001
+            return "error", f"tentacontrol not reachable: {e}"
+        if st.get("status") != "pending":
+            return st.get("status", "error"), st.get("by", "")
+    return "expired", ""
+
+
+def guarded(service, part, mode, action, run):
+    """run() performs a write: blocked for ro, logged for rw, approved first for confirm"""
+    if mode == "ro":
+        audit(service, part, mode, action, "blocked")
+        sys.exit(f"svc: {service} is read-only ({part}) – '{action[:80]}' is not allowed")
+    decision, by = "auto", ""
+    if mode == "confirm":
+        decision, by = request_approval(service, part, action)
+        if decision != "approved":
+            audit(service, part, mode, action, decision, detail=by)
+            sys.exit(f"svc: {service}: {action[:80]} – {decision}{(' (' + by + ')') if by else ''}. "
+                     "Not executed – tell the user, don't work around it.")
+        print("svc: ✓ approved", file=sys.stderr, flush=True)
+    t = time.time()
+    rc = run()
+    audit(service, part, mode, action, decision, rc=rc, duration=time.time() - t, detail=by)
+    return rc
+
+
+def cmd_audit(args):
+    n = int(args[0]) if args and args[0].isdigit() else 20
+    try:
+        lines = open(AUDIT_FILE).read().splitlines()[-n:]
+    except OSError:
+        print("No audit entries yet.")
+        return 0
+    for line in lines:
+        try:
+            e = json.loads(line)
+        except ValueError:
+            continue
+        rc = f" exit {e['exit']}" if "exit" in e else ""
+        print(f"{e['ts'][:19]}  {e['decision']:<8} {e['service']:<14} {e['part']:<7} {e['action'][:90]}{rc}")
+    return 0
+
+
+def git_push_hook(services, name, args):
+    """pre-push hook of every repo: ro blocks, rw logs, confirm asks first"""
+    svc = services.get(name) or {}
+    git = svc.get("git") or {}
+    refs = [l.split()[2] for l in sys.stdin.read().splitlines() if len(l.split()) == 4]
+    url = args[1] if len(args) > 1 else git.get("url", "")
+    action = f"git push {', '.join(refs) or '(nothing)'} → {url}"
+    mode = access_mode(git)
+    if mode == "ro":
+        audit(name, "git", mode, action, "blocked")
+        print(f"tentaclai: repo \"{name}\" is read-only – push blocked.", file=sys.stderr)
+        return 1
+    decision, by = "auto", ""
+    if mode == "confirm":
+        decision, by = request_approval(name, "git", action)
+        if decision != "approved":
+            audit(name, "git", mode, action, decision, detail=by)
+            print(f"tentaclai: push {decision} – not pushed.", file=sys.stderr)
+            return 1
+    audit(name, "git", mode, action, decision, detail=by)
+    return 0
+
+
+READ_SQL = re.compile(r"^\s*(select|show|describe|desc|explain|values|table|\\d)\b", re.I)
+WRITE_SQL = re.compile(r"\b(insert|update|delete|merge|upsert|create|alter|drop|truncate|grant|revoke|replace|rename|copy|call|do|lock)\b", re.I)
+
+
+def sql_writes(sql):
+    s = sql.strip()
+    if READ_SQL.match(s) and not (s.lower().startswith(("explain analyze",)) and WRITE_SQL.search(s)):
+        return False
+    if re.match(r"^\s*with\b", s, re.I):
+        return bool(WRITE_SQL.search(s))
+    return True
 
 
 # ---------- connection test ----------
@@ -1199,6 +1359,10 @@ def main(argv):
         return cmd_docker(services, argv[2:])
     if cmd == "test" and len(argv) == 3:
         return cmd_test(services, argv[2])
+    if cmd == "audit":
+        return cmd_audit(argv[2:])
+    if cmd == "git-push-hook" and len(argv) >= 3:
+        return git_push_hook(services, argv[2], argv[3:])
     if cmd == "db":
         return cmd_db(services, argv[2:])
     if cmd == "web":

@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}Activity{% endblock %}
+{% block content %}
+<div class="header">
+  <div><h1>Activity</h1><div class="sub">Write actions through <code>svc</code>: approvals for services with access <code>confirm</code>, and the audit log of everything that changed something.</div></div>
+</div>
+<div class="card" style="margin-bottom:18px">
+  <h2>Pending approvals</h2>
+  <div hx-get="/partials/approvals" hx-trigger="load" hx-swap="outerHTML"><div class="skeleton"></div></div>
+</div>
+<div class="card">
+  <div class="card-head"><h2>Audit log</h2>
+    <form class="row" method="get" action="/activity" style="gap:6px">
+      <select name="service" class="sys-select" onchange="this.form.submit()">
+        <option value="">all services</option>
+        {% for s in services_known %}<option value="{{ s }}" {{ 'selected' if s == service }}>{{ s }}</option>{% endfor %}
+      </select>
+      <select name="decision" class="sys-select" onchange="this.form.submit()">
+        <option value="">all decisions</option>
+        {% for d in ('auto', 'approved', 'denied', 'expired', 'blocked', 'error') %}<option value="{{ d }}" {{ 'selected' if d == decision }}>{{ d }}</option>{% endfor %}
+      </select>
+    </form>
+  </div>
+  {% if entries %}
+  <div class="table-wrap"><table class="audit">
+    <thead><tr><th>Time</th><th>Service</th><th>Part</th><th>Action</th><th>Mode</th><th>Decision</th><th>Result</th></tr></thead>
+    <tbody>
+    {% for e in entries %}
+      <tr>
+        <td class="mono small nowrap">{{ e.ts[:10] }} {{ e.ts[11:19] }}</td>
+        <td>{{ e.service }}</td>
+        <td><span class="tag">{{ e.part }}</span></td>
+        <td class="mono small audit-action" title="{{ e.detail or '' }}">{{ e.action }}</td>
+        <td class="small">{{ e.mode }}</td>
+        <td><span class="pill {{ {'auto':'info','approved':'ok','denied':'err','blocked':'warn','expired':'off','error':'err'}.get(e.decision, 'off') }}">{{ e.decision }}</span></td>
+        <td class="small nowrap">{% if e.exit is defined %}{{ '✓' if e.exit == 0 else '✗ exit ' ~ e.exit }}{% if e.seconds is defined %} <span class="faint">{{ e.seconds }} s</span>{% endif %}{% else %}<span class="faint">not run</span>{% endif %}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table></div>
+  <p class="help">Newest first, up to 300 entries (<code>data/control/audit.jsonl</code>, rotated at 5 MB). Secrets are never logged – API requests show method and path, bodies only as “(with body)”. In the sandbox: <code>svc audit</code>.</p>
+  {% else %}
+  <div class="empty small">No write actions logged yet.</div>
+  {% endif %}
+</div>
+{% endblock %}

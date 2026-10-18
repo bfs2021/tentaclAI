@@ -2,6 +2,21 @@
 
 All notable changes, newest first. Every release lists **upgrade steps** from the previous one.
 
+## Unreleased
+
+### Changes
+- **Access mode `confirm`:** writes of a service part (`api`, `docker`, `git`, `db`, `files`) wait for approval in
+  tentacontrol → **Activity** (badge in the sidebar; denied or 10 minutes without answer = not executed). `api` gets an
+  optional `access` field (default `rw`).
+- **Audit log:** every write through `svc` – auto (`rw`), approved/denied/expired (`confirm`) and blocked (`ro`) – is logged
+  without secrets; Activity shows and filters it, `svc audit` prints it in the sandbox. `git push` is covered through a
+  pre-push hook in every repository.
+
+### Upgrade
+1. `./tentaclai.sh update` (or `git pull`, `docker compose build`, `docker compose up -d`) – both images; recreating
+   `tentaclai` ends running sessions and Remote Control.
+2. Optional: switch services to `"access": "confirm"` where writes should need your approval.
+
 ## v0.2.1 – 2026-10-18
 
 ### Highlights

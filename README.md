@@ -174,6 +174,7 @@ Claude commands: **`/onboard <service>`** and **`/inventory`** (see above).
 | **Overview** | Status of the sandbox (resources, Claude version, login), Remote Control with QR code and on/off switch, Docker and SSH hosts with live status, system inventory. |
 | **Terminal** | xterm.js terminals into the sandbox (Claude, Remote Control, shell, login). Reconnects automatically. |
 | **Connections** | Everything Claude can reach, in four tabs: **Services** (grouped by system, live status dot per service; templates, JSON editor, write-only tokens, connection test, onboarding, enable/disable, move between systems) · **SSH hosts** (live status; add with host key check and one-time password key deployment, edit incl. jump host, sudo and rename, remove with key revocation) · **Systems** (groups with SSH host and rules) · **Topology** (live graph incl. optional stacks/containers, search, saved layout, PNG export). |
+| **Activity** | Pending approvals for `confirm` services (Approve / Deny, badge in the sidebar) and the audit log of all write actions with filters. |
 | **Settings** | All `.env` settings with descriptions; secrets are write-only. Shows *Apply now* when the sandbox must be recreated. |
 | **Updates** | Installed tentaclAI version, new releases with their upgrade steps (checked every 6 h, also shown in the sidebar; `UPDATE_CHECK=false` turns it off), Claude Code and image updates. |
 | **Logs / Help** | Container log; full documentation of every feature. |
@@ -200,7 +201,7 @@ A service file can combine any of these parts:
 
 | Part | Fields | Access control |
 |---|---|---|
-| `api` | `base_url`, `auth.type`: `none` · `bearer` · `header` · `basic` · `query` · `oauth2_client_credentials`; `insecure_tls` | read freely, writes only when asked (rules) |
+| `api` | `base_url`, `auth.type`: `none` · `bearer` · `header` · `basic` · `query` · `oauth2_client_credentials`; `insecure_tls`; `access` (default `rw`) | writes = everything but GET/HEAD/OPTIONS |
 | `mcp` | like Claude's `.mcp.json`: `http`/`sse` (`url`, `headers`) or `stdio` (`command`, `args`, `env`) | the MCP server's own permissions |
 | `git` | `url`, `access`, `auth` (token via credential helper) | `ro`: push blocked (pushurl + pre-push hook) |
 | `docker` | `mode`: `socket` (`socket`, `stacks_dir`) or `ssh` (`ssh_host`, `stacks_dir`); `access` | `ro`: only read-only docker/compose commands |
@@ -211,6 +212,11 @@ A service file can combine any of these parts:
 **TLS:** internal services with your own CA → set `CA_CERT` (trusted by curl, git, python and node). For devices with self-signed
 certificates, `"insecure_tls": true` in `api`, `web`, `git` or `db` (or the switch on the service page) skips certificate
 verification for that part only – the connection stays encrypted. MCP connections are made by Claude Code and need `CA_CERT`.
+
+**Access modes** (`access` in `api`, `docker`, `git`, `db`, `files`): `ro` refuses writes, `rw` allows them, `confirm` makes
+every write wait for your approval in tentacontrol → **Activity** (denied or no answer within 10 minutes = not executed).
+Every write through `svc` – and every blocked attempt – lands in the **audit log** (Activity, or `svc audit` in the sandbox);
+secrets are never logged.
 
 A part stays inactive while one of its `${VAR}`s is empty; `"enabled": false` parks the whole service.
 
@@ -271,14 +277,16 @@ tentaclai/
 
 What tentaclAI does:
 
-- Claude reaches only what you connect; `svc` enforces `ro`/`rw` per service (docker/compose sub-commands, read-only DB
-  sessions, blocked git push, no file push, same-host web fetches).
+- Claude reaches only what you connect; `svc` enforces `ro`/`rw`/`confirm` per service (docker/compose sub-commands, read-only DB
+  sessions, blocked git push, no file push, same-host web fetches) and logs every write in the audit log.
 - Credentials are injected at call time via environment or 0600 files on tmpfs – never in command lines, never shown in the UI.
 - Claude's own permission prompts stay active; its rules tell it to ask before restarts, updates and deletions.
 
 What it does **not** (yet) do – keep it in mind:
 
 - An `rw` Docker host – or an SSH user with unrestricted sudo – is effectively **root on that machine**.
+- `ro`, `confirm` and the audit log are guard rails for an honest agent and against mistakes – Claude runs as root in the
+  sandbox and could bypass `svc` (e.g. plain `ssh`) or edit the log. A hard boundary needs the hardened sandbox (roadmap).
 - The sandbox runs as root and can read the stack directory, including `.env`. A secret broker is on the roadmap.
 - tentacontrol holds the host's Docker socket – protect it with a strong password and keep it off the internet.
 - `data/home` holds the Claude login and `ssh/keys` the private key – back them up and protect them.
@@ -286,7 +294,7 @@ What it does **not** (yet) do – keep it in mind:
 ## Roadmap
 
 - **Security:** hardened sandbox (non-root, read-only root filesystem, egress allowlist, secret broker, Docker socket proxy,
-  prompt-injection safeguards) · audit log of all write actions · access mode `confirm` (approve writes with a click)
+  prompt-injection safeguards)
 - **Automation:** scheduled Claude jobs · monitoring per service with status and recommendations
 - **tentacontrol:** AI assistant for the configuration · OAuth with browser login · export/import of configuration and templates
 - **Topology:** connections between systems and containers (reverse proxy → container, tunnels) · monitoring status
