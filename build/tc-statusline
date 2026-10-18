@@ -1,0 +1,41 @@
+#!/usr/bin/env python3
+"""Status line of Claude Code in tentaclAI (statusLine in ~/.claude/settings.json, refreshed every few seconds).
+
+Reads Claude's session JSON on stdin; prints one line: the caged octopus, model, directory and – most important –
+approvals waiting in tentacontrol, so they show up in the terminal while svc waits.
+"""
+import json
+import os
+import subprocess
+import sys
+
+R, DIM, BOLD, YEL, LAV = "\033[0m", "\033[2m", "\033[1m", "\033[33m", "\033[38;5;141m"
+
+try:
+    s = json.load(sys.stdin)
+except ValueError:
+    s = {}
+model = (s.get("model") or {}).get("display_name") or ""
+cwd = (s.get("workspace") or {}).get("current_dir") or s.get("cwd") or os.getcwd()
+
+parts = [f"{LAV}▥ tentaclAI{R} {DIM}· safely caged{R}"]
+if model:
+    parts.append(f"{DIM}{model}{R}")
+parts.append(f"{DIM}{cwd.replace('/home/claude', '~')}{R}")
+
+try:
+    r = subprocess.run(["svc", "pending", "--json"], capture_output=True, text=True, timeout=4)
+    p = json.loads(r.stdout or "{}")
+except (subprocess.TimeoutExpired, OSError, ValueError):
+    p = {}
+n = p.get("count") or 0
+if n:
+    o = p.get("oldest") or {}
+    what = f"{o.get('service', '')} {o.get('part', '')}".strip()
+    where = p.get("url") or "tentacontrol → Activity"
+    parts.append(f"{YEL}{BOLD}⏳ {n} approval{'s' if n != 1 else ''} pending{R}{YEL} ({what}) → {where}{R}")
+elif p.get("grants"):
+    parts.append(f"{YEL}{p['grants']} grant{'s' if p['grants'] != 1 else ''} active{R}")
+elif "error" in p:
+    parts.append(f"{DIM}tentacontrol unreachable{R}")
+print("  ".join(parts))

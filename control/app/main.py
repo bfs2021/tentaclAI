@@ -363,6 +363,15 @@ async def internal_approval_create(request: Request):
     return JSONResponse({"id": rid, "status": a["status"], "by": a["by"]})
 
 
+@app.get("/internal/approvals")
+async def internal_approval_list(request: Request):
+    """pending requests and active grants – for `svc pending` (the status line in Claude's terminal)"""
+    if not _svc_auth(request):
+        return JSONResponse({"error": "forbidden"}, status_code=403)
+    return JSONResponse({"pending": [{k: a[k] for k in ("id", "service", "part", "action", "created")} for a in activity.pending()],
+                         "grants": [{k: g[k] for k in ("service", "part", "until")} for g in activity.grants()]})
+
+
 @app.get("/internal/approvals/{rid}")
 async def internal_approval_wait(request: Request, rid: str, wait: int = 25):
     if not _svc_auth(request):

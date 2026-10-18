@@ -18,6 +18,7 @@ resolved from the stack's .env (read fresh on every call) and the container envi
   svc git fetch|pull <name>        fetch from the remote (pull: also fast-forward the current branch)
   svc git push <name> [branch] [--force]   push a branch (credentials stay with svc)
   svc ssh <host> [command...]      command (or a shell) on an SSH host – per-host access, default confirm
+  svc pending                      approvals waiting in tentacontrol → Activity (and active grants)
   svc config put service <name> <file> | put local <file>
                                    write a service file / the site rules (local/CLAUDE.md) – always needs approval
   svc docker                       Docker hosts (local socket or via ssh): mode, target, stacks dir, access
@@ -1284,6 +1285,30 @@ def cmd_config(services, args):
     return guarded(name if args[1] == "service" else "local", "config", "confirm", action, write)
 
 
+def cmd_pending(args):
+    """approvals waiting in tentacontrol – `--json` for the status line (count, link, oldest request)"""
+    try:
+        data = _control("GET", "/internal/approvals", timeout=3)
+    except Exception as e:  # noqa: BLE001
+        if "--json" in args:
+            print(json.dumps({"error": str(e)[:120]}))
+            return 1
+        sys.exit(f"svc: tentacontrol not reachable: {e}")
+    url = (os.environ.get("CONTROL_URL") or "").rstrip("/")
+    pending, grants = data.get("pending", []), data.get("grants", [])
+    if "--json" in args:
+        print(json.dumps({"count": len(pending), "url": f"{url}/activity" if url else "", "grants": len(grants),
+                          "oldest": pending[0] if pending else None}))
+        return 0
+    if not pending:
+        print("No pending approvals.")
+    for a in pending:
+        print(f"#{a['id']:<4} {a['service']:<14} {a['part']:<7} {a['action'][:90]}")
+    for g in grants:
+        print(f"grant  {g['service']:<14} {g['part']:<7} until {time.strftime('%H:%M', time.localtime(g['until']))}")
+    return 0
+
+
 def cmd_rc_env():
     """the remote-control settings (no secrets) for rc-loop, which runs as Claude and can't read .env"""
     env = tclib.read_env(ENV_FILE)
@@ -1839,6 +1864,8 @@ def main(argv):
         return cmd_mcp_proxy(services, argv[2])
     if cmd == "rc-env":
         return cmd_rc_env()
+    if cmd == "pending":
+        return cmd_pending(argv[2:])
     if cmd == "config":
         return cmd_config(services, argv[2:])
     if cmd == "docker":

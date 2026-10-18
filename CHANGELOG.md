@@ -2,6 +2,18 @@
 
 All notable changes, newest first. Every release lists **upgrade steps** from the previous one.
 
+## Unreleased
+
+### Highlights
+- **Status line in Claude's terminal** – every Claude session shows `▥ tentaclAI · safely caged`, model and directory,
+  and – refreshed every 5 seconds – pending approvals with a link to Activity. Set in `~/.claude/settings.json`
+  only when you have no status line of your own. `svc pending` lists pending approvals and active grants.
+- **New logo and slogan** – the octopus sits in a birdcage, its arms reach out: “Long arms, one brain – safely caged.”
+
+### Upgrade (from v0.4.1)
+`git pull`, `docker compose build`, `docker compose up -d` – recreating `tentaclai` ends running sessions and Remote
+Control. No `.env` changes. The new logo may need a hard reload in the browser (cached favicon).
+
 ## v0.4.1 – 2026-10-19
 
 ### Changes

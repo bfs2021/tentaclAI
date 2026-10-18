@@ -78,6 +78,7 @@
     <section class="card" id="terminal">
       <h2>Terminal &amp; tmux</h2>
       <p>Every Claude terminal runs in a <strong>tmux session</strong> in the container. Closing the page or losing the connection does not end Claude – opening it again re-attaches.</p>
+      <p>The <strong>status line</strong> at the bottom of every Claude session shows that it runs in the sandbox, the model and directory, and – refreshed every 5 seconds – approvals waiting in Activity. It is set in <code>~/.claude/settings.json</code> only if you have no status line of your own.</p>
       <table>
         <tr><td><span class="kbd">Ctrl+B</span> then <span class="kbd">D</span></td><td>leave the session, Claude keeps running</td></tr>
         <tr><td>mouse wheel</td><td>scroll the history</td></tr>
@@ -303,6 +304,7 @@ svc git | svc git sync    repositories: status / clone + fetch
 svc git push|pull|fetch &lt;repo&gt;   push a branch / update – credentials stay with svc
 svc ssh [&lt;host&gt; [cmd]]     SSH hosts / a command or shell on one (access per host, default confirm)
 svc config put service &lt;name&gt; &lt;file&gt; | local &lt;file&gt;   write a service file / site rules (needs approval)
+svc pending               approvals waiting in Activity and active grants (also shown in Claude's status line)
 svc sync                  register MCP, clone missing repos, write SERVICES.md
 tc-scan                   read-only inventory report
 /inventory · /onboard &lt;service&gt;   Claude commands (inside a Claude session)

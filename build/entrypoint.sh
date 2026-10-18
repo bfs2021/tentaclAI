@@ -62,6 +62,20 @@ fi
 as_claude mkdir -p /home/claude/.claude/commands
 claude-instructions | as_claude sh -c 'cat > /home/claude/.claude/CLAUDE.md' || echo "could not generate CLAUDE.md"
 as_claude sh -c 'cp -f /etc/tentaclai/commands/*.md /home/claude/.claude/commands/' 2>/dev/null || true
+# status line (caged octopus + pending approvals) – only if the user has none of their own
+as_claude python3 - <<'PY' || echo "could not set the status line"
+import json, os
+p = "/home/claude/.claude/settings.json"
+try:
+    s = json.load(open(p))
+except (OSError, ValueError):
+    s = {}
+cur = s.get("statusLine") or {}
+if not cur or cur.get("command") == "tc-statusline":
+    s["statusLine"] = {"type": "command", "command": "tc-statusline", "padding": 0, "refreshInterval": 5}
+    open(p + ".tmp", "w").write(json.dumps(s, indent=2) + "\n")
+    os.replace(p + ".tmp", p)
+PY
 
 # Services (services/*.json): MCP -> Claude config, clone missing repos, regenerate /workspace/SERVICES.md
 echo "svc sync:"

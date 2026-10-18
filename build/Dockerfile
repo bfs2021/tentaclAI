@@ -36,7 +36,7 @@ ARG CACHE_BUST=0
 RUN echo "cache bust: ${CACHE_BUST}" && npm install -g @anthropic-ai/claude-code@${CLAUDE_CODE_VERSION} \
     && npm cache clean --force
 
-COPY build/entrypoint.sh build/start.sh build/rc-loop build/cc build/svc build/claude-instructions build/tc-scan /usr/local/bin/
+COPY build/entrypoint.sh build/start.sh build/rc-loop build/cc build/svc build/claude-instructions build/tc-scan build/tc-statusline /usr/local/bin/
 COPY lib/tclib.py /usr/local/lib/tentaclai/tclib.py
 COPY VERSION /etc/tentaclai/VERSION
 COPY build/CLAUDE.base.md /etc/tentaclai/CLAUDE.base.md
@@ -50,7 +50,7 @@ RUN groupadd -g ${CLAUDE_UID} claude && useradd -m -d /home/claude -u ${CLAUDE_U
     && printf '%s\n' 'Defaults:claude !lecture, env_reset, always_set_home' \
         'claude ALL=(root) NOPASSWD: /usr/local/bin/svc, /usr/local/bin/tc-scan' > /etc/sudoers.d/tentaclai \
     && chmod 0440 /etc/sudoers.d/tentaclai && visudo -cq
-RUN chmod 0755 /usr/local/bin/entrypoint.sh /usr/local/bin/start.sh /usr/local/bin/rc-loop /usr/local/bin/cc /usr/local/bin/svc /usr/local/bin/claude-instructions /usr/local/bin/tc-scan \
+RUN chmod 0755 /usr/local/bin/entrypoint.sh /usr/local/bin/start.sh /usr/local/bin/rc-loop /usr/local/bin/cc /usr/local/bin/svc /usr/local/bin/claude-instructions /usr/local/bin/tc-scan /usr/local/bin/tc-statusline \
     # tmux: mouse scrolling, bigger scrollback, truecolor for Claude's TUI
     && printf '%s\n' 'set -g mouse on' 'set -g history-limit 50000' \
         'set -g default-terminal "tmux-256color"' 'set -ga terminal-overrides ",*:Tc"' > /etc/tmux.conf
