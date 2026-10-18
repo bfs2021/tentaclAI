@@ -280,3 +280,8 @@ What it does **not** (yet) do – keep it in mind:
 - **SSH:** add and edit hosts completely in the UI
 - **tentacontrol:** AI assistant for the configuration · OAuth with browser login · export/import of configuration and templates
 - **Topology:** connections between systems and containers (reverse proxy → container, tunnels) · monitoring status
+
+## Notice
+
+tentaclAI is an independent open-source project. It is not affiliated with, endorsed by or sponsored by Anthropic.
+Claude and Claude Code are trademarks of Anthropic, PBC; they are used here only to describe what this project works with.
