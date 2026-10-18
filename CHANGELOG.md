@@ -14,6 +14,8 @@ All notable changes, newest first. Every release lists **upgrade steps** from th
 - **`ssh-host.sh`** is now a thin wrapper around `tentacontrol-ssh` (same logic as the UI): `list`, `add … [--jump <alias>]
   [--sudo | --sudo-cmd]`, `sudo`, `hostkey`, `remove [--keep-key]`, `test`. Both containers must be running.
 - Docker builds use the repository root as context (`.dockerignore` whitelists `build/`, `control/`, `lib/`).
+- `svc docker <host> exec -it …` and `svc compose <host> <stack> exec …` work interactively on SSH hosts with sudo
+  (svc requests a terminal from ssh when called from one).
 
 ### Upgrade
 1. `git pull` in the stack directory.

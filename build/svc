@@ -369,11 +369,22 @@ def docker_sudo(d):
     return ssh_sudo(d["ssh_host"]) if d.get("mode", "socket") == "ssh" else ""
 
 
+def wants_tty(args, compose=False):
+    """interactive call from a terminal (docker exec/run -it, compose exec/run without -T) → ssh must allocate one"""
+    if not sys.stdin.isatty():
+        return False
+    words = [a for a in args if not a.startswith("-")]
+    if compose:
+        return bool(words) and words[0] in ("exec", "run") and "-T" not in args and "--no-TTY" not in args
+    flags = "".join(a[1:] for a in args if a.startswith("-") and not a.startswith("--"))
+    return bool(words) and words[0] in ("exec", "run", "attach") and ("t" in flags or "--tty" in args)
+
+
 def docker_argv(name, d, args):
     """docker CLI for a docker service: context, or plain ssh + sudo for hosts that need sudo"""
     sudo = docker_sudo(d)
     if sudo:
-        return ["ssh", d["ssh_host"], f"{sudo} docker {shlex.join(args)}"]
+        return ["ssh"] + (["-t", "-q"] if wants_tty(args) else []) + [d["ssh_host"], f"{sudo} docker {shlex.join(args)}"]
     return ["docker", "--context", name, *args]
 
 
@@ -486,7 +497,7 @@ def cmd_compose(services, name, stack, rest):
     if d.get("mode", "socket") == "ssh":
         sudo = docker_sudo(d)
         remote = f"cd {shlex.quote(path)} && {sudo + ' ' if sudo else ''}docker compose {shlex.join(rest)}"
-        return subprocess.call(["ssh", d["ssh_host"], remote])
+        return subprocess.call(["ssh"] + (["-t", "-q"] if wants_tty(rest, compose=True) else []) + [d["ssh_host"], remote])
     if not os.path.isdir(path):
         sys.exit(f"svc: {path} not found")
     return subprocess.call(["docker", "--context", name, "compose", *rest], cwd=path)
