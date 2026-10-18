@@ -49,7 +49,7 @@
     {% if sessions %}
     <div style="margin-top:10px" class="stack small">
       {% for s in sessions %}
-      <div class="between"><span class="mono">{{ s.name }}</span><span class="muted">{{ "attached · " if s.attached }}{{ s.age }}</span></div>
+      <div class="between"><span>{{ s.label }} <span class="mono muted">{{ s.name }}</span></span><span class="muted">{{ "attached · " if s.attached }}{{ s.age }}</span></div>
       {% endfor %}
     </div>
     {% endif %}

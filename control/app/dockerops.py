@@ -141,8 +141,22 @@ def tmux_sessions():
         parts = line.split("|")
         if len(parts) == 3:
             age = human_age(dt.datetime.fromtimestamp(int(parts[2]), dt.timezone.utc)) if parts[2].isdigit() else "–"
-            res.append({"name": parts[0], "attached": parts[1] != "0", "age": age})
+            res.append({"name": parts[0], "label": session_label(parts[0]), "attached": parts[1] != "0", "age": age})
     return res
+
+
+SESSION_LABELS = {"claude-workspace": "Claude terminal", "claude-rc": "Remote Control", "claude-inventory": "System inventory"}
+
+
+def session_label(name):
+    """readable name for a tmux session started by cc, rc-loop or a terminal profile"""
+    if name in SESSION_LABELS:
+        return SESSION_LABELS[name]
+    if name.startswith("claude-onboard-"):
+        return "Onboarding " + name[len("claude-onboard-"):]
+    if name.startswith("claude-"):
+        return "Claude · " + name[len("claude-"):]
+    return name
 
 
 RC_URL = re.compile(r"https://claude\.ai/code\S*")

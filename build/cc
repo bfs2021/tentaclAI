@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Inside the container: open Claude in a persistent tmux session (attach if it already runs).
-#   cc                    -> session "claude" in /workspace
+#   cc                    -> session "claude-workspace" in /workspace
 #   cc /mnt/docker/stacks -> session "claude-stacks" in that directory
 #   cc rc                 -> attach to the remote-control session
 # Detach without stopping: Ctrl+B, then D
@@ -14,7 +14,7 @@ dir="${1:-/workspace}"
 [ -d "$dir" ] || { echo "directory not found: $dir" >&2; exit 1; }
 
 if [ "$dir" = "/workspace" ]; then
-    session="claude"
+    session="claude-workspace"
 else
     session="claude-$(basename "$dir" | tr -c 'a-zA-Z0-9_-' '_' | sed 's/_*$//')"
 fi

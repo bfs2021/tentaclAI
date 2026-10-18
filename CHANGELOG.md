@@ -2,6 +2,14 @@
 
 All notable changes, newest first. Every release lists **upgrade steps** from the previous one.
 
+## Unreleased
+
+### Changes
+- The Claude terminal's tmux session (`cc`, `./tentaclai.sh`, tentacontrol → Claude terminal) is now named
+  `claude-workspace` instead of `claude`, in line with `claude-rc` and `claude-inventory`.
+- Overview lists sessions with a readable name (Claude terminal, Remote Control, Onboarding …) next to the tmux name.
+- The overview button “Workspace” is now called “Claude terminal”.
+
 ## v0.3.0 – 2026-10-18
 
 ### Highlights
