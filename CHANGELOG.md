@@ -2,12 +2,16 @@
 
 All notable changes, newest first. Every release lists **upgrade steps** from the previous one.
 
-## Unreleased
+## v0.4.1 – 2026-10-19
 
 ### Changes
 - Approvals are announced before they block: Claude tells you what it is about to request (and where to approve it)
   before running a write on a `confirm` part, and uses the maximum Bash timeout (10 min) for such commands.
 - svc prints a direct link to Activity (`CONTROL_URL/activity`) and a reminder every minute while it waits.
+
+### Upgrade (from v0.4.0)
+`git pull`, `docker compose build`, `docker compose up -d` – recreating `tentaclai` ends running sessions and Remote
+Control. No `.env` changes. Claude sessions started before the upgrade keep the old rules until they are restarted.
 
 ## v0.4.0 – 2026-10-19
 
