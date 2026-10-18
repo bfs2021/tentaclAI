@@ -5,7 +5,7 @@
   </picture>
 </p>
 
-<p align="center"><strong>Long arms, one brain – and a leash.</strong><br>
+<p align="center"><strong>Long arms, one brain – safely caged.</strong><br>
 Sandbox + service gateway for Claude Code.</p>
 
 <p align="center">

@@ -5,7 +5,7 @@ Edit the texts and styles here, then run scripts/build-brand.sh. Output: docs/br
 import os
 import sys
 
-SLOGAN = "Long arms, one brain –<br>and a leash."
+SLOGAN = "Long arms, one brain –<br>safely caged."
 SUBTITLE = "Claude Code with controlled access to your Docker hosts, APIs, databases, repos and files."
 
 W = sys.argv[1] if len(sys.argv) > 1 else os.path.dirname(os.path.abspath(__file__))  # work dir (logo.svg, topology.png)
