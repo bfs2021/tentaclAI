@@ -1,4 +1,14 @@
 {% from "_icons.html" import icon %}
+<div class="card" style="margin-bottom:16px">
+  <div class="card-head"><h2>{{ icon('refresh') }}tentaclAI</h2>
+    {% if sandbox_version and sandbox_version != tc_version %}<span class="pill warn">versions differ</span>{% endif %}</div>
+  <dl class="kv">
+    <dt>tentacontrol</dt><dd class="mono">v{{ tc_version }}</dd>
+    <dt>Sandbox (tentaclai)</dt><dd class="mono">{{ ('v' ~ sandbox_version) if sandbox_version else '– (not running or older than v0.2.0)' }}</dd>
+  </dl>
+  <p class="help">Release notes and upgrade steps: <a href="https://github.com/mwaldegg/tentaclai/blob/main/CHANGELOG.md" target="_blank" rel="noopener">CHANGELOG</a>.
+    Updating tentaclAI itself: <code>git pull</code> in the stack directory, then follow the upgrade steps of the release.</p>
+</div>
 <div class="card">
   <div class="card-head">
     <h2>{{ icon('sparkle') }}Claude Code</h2>

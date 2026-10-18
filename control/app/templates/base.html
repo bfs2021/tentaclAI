@@ -29,6 +29,7 @@
       tentaclAI {{ cstatus.state }}{% if cstatus.running %} · {{ cstatus.uptime }}{% endif %}
     </div>
     <form method="post" action="/logout"><button class="btn ghost sm" style="width:100%">{{ icon('logout') }}Sign out</button></form>
+    <a class="version-tag" href="https://github.com/mwaldegg/tentaclai/releases" target="_blank" rel="noopener" title="Releases on GitHub">tentaclAI v{{ tc_version }}</a>
   </aside>
   <main class="main">
     {% if restart_needed %}

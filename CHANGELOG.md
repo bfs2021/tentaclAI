@@ -2,9 +2,17 @@
 
 All notable changes, newest first. Every release lists **upgrade steps** from the previous one.
 
-## Unreleased
+## v0.2.0 – 2026-10-18
+
+### Highlights
+- **SSH hosts completely in the UI** – add with host key confirmation and one-time password key deployment, edit
+  (incl. jump hosts, sudo, rename with references), remove with key revocation.
+- **Connections** – Services, SSH hosts, Systems and Topology in one place with tabs; new Systems overview.
+- **One shared implementation** (`lib/tclib.py`) for `.env`, services, systems and SSH hosts.
+- **Safer repository** – CI checks and a pre-commit guard against committed site data and secrets.
 
 ### Changes
+- The installed version is shown in the sidebar and on the Updates page (`VERSION` file in both images).
 - **Connections:** Services, SSH hosts, Systems and Topology are one navigation item with tabs; new **Systems** overview page.
 - **SSH hosts fully in the UI:** add (host key confirmation, key deployment with a one-time password, test), edit
   (host, user, port, jump host/ProxyJump, sudo, rename incl. references) and remove (optionally revoking the key).
@@ -20,12 +28,15 @@ All notable changes, newest first. Every release lists **upgrade steps** from th
 - `svc docker <host> exec -it …` and `svc compose <host> <stack> exec …` work interactively on SSH hosts with sudo
   (svc requests a terminal from ssh when called from one).
 
-### Upgrade
+### Upgrade from v0.1.0
 1. `git pull` in the stack directory.
-2. `docker compose build` – both images (build context is now the repository root; the sandbox image adds `sshpass`).
-3. `docker compose up -d` – recreates both containers; recreating `tentaclai` ends running sessions and Remote Control.
+2. `docker compose build` – both images (the build context is now the repository root; the sandbox image adds `sshpass`).
+3. `docker compose up -d` – recreates both containers (also needed for the new log limits); recreating `tentaclai`
+   ends running sessions and Remote Control.
+4. Optional, if you commit to the repository: `git config core.hooksPath .githooks`.
 
-No `.env` or configuration changes.
+No `.env` or configuration changes. **Changed:** `./ssh-host.sh` now runs inside tentacontrol (both containers must be
+running) and takes `--jump <alias>` / `--sudo` / `--sudo-cmd`; the hostkey, sudo and test commands are new.
 
 ## v0.1.0 – 2026-10-18
 

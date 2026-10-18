@@ -22,6 +22,12 @@ BASE = os.path.dirname(__file__)
 app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
 templates = Jinja2Templates(directory=os.path.join(BASE, "templates"))
 # cache busting: static URLs carry the newest mtime of app.css/app.js, so browsers load a new version right after an update
+# installed tentaclAI version (VERSION file baked into the image)
+try:
+    TC_VERSION = open(os.path.join(os.path.dirname(BASE), "VERSION")).read().strip()
+except OSError:
+    TC_VERSION = "dev"
+templates.env.globals["tc_version"] = TC_VERSION
 templates.env.globals["asset_v"] = str(int(max(os.path.getmtime(os.path.join(BASE, "static", f)) for f in ("app.css", "app.js", "logo.svg"))))
 app.mount("/static", StaticFiles(directory=os.path.join(BASE, "static")), name="static")
 app.mount("/vendor", StaticFiles(directory="/app/vendor"), name="vendor")
@@ -911,8 +917,11 @@ async def versions(request: Request):
     installed, latest = await asyncio.gather(asyncio.to_thread(dockerops.claude_version),
                                              asyncio.to_thread(dockerops.claude_latest))
     pin = read_env().get("CLAUDE_CODE_VERSION", "latest") or "latest"
+    code, out = await asyncio.to_thread(dockerops.run, ["cat", "/etc/tentaclai/VERSION"])
+    sandbox = out.strip() if code == 0 and out.strip() else None
     return templates.TemplateResponse(request, "partials/versions.html",
-                                      {"installed": installed, "latest": latest, "pin": pin, "st": dockerops.status()})
+                                      {"installed": installed, "latest": latest, "pin": pin, "st": dockerops.status(),
+                                       "tc_version": TC_VERSION, "sandbox_version": sandbox})
 
 
 @app.post("/updates/claude")

@@ -272,3 +272,5 @@ dialog.modal { max-height: calc(100vh - 40px); overflow-y: auto; }
 .system-card h2 svg { width: 18px; height: 18px; color: var(--accent); }
 .system-card .kv dd { text-align: left; }
 .sys-rules { margin-top: 12px; padding: 10px 12px; border-radius: var(--radius-sm); background: var(--warn-soft); color: var(--warn); font-size: 12.5px; display: flex; flex-direction: column; gap: 4px; }
+.version-tag { display: block; text-align: center; font-size: 11px; color: var(--faint); margin-top: 8px; }
+.version-tag:hover { color: var(--muted); text-decoration: none; }

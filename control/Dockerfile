@@ -26,6 +26,7 @@ RUN mkdir -p /app/vendor \
     && curl -fsSL -o /app/vendor/cytoscape.min.js https://cdn.jsdelivr.net/npm/cytoscape@3.30.2/dist/cytoscape.min.js
 
 COPY lib/tclib.py /app/tclib.py
+COPY VERSION /app/VERSION
 COPY control/app/ /app/app/
 COPY control/passwd.py /usr/local/bin/tentacontrol-passwd
 COPY control/sshcli.py /usr/local/bin/tentacontrol-ssh

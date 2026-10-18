@@ -38,6 +38,7 @@ RUN echo "cache bust: ${CACHE_BUST}" && npm install -g @anthropic-ai/claude-code
 
 COPY build/entrypoint.sh build/start.sh build/rc-loop build/cc build/svc build/claude-instructions build/tc-scan /usr/local/bin/
 COPY lib/tclib.py /usr/local/lib/tentaclai/tclib.py
+COPY VERSION /etc/tentaclai/VERSION
 COPY build/CLAUDE.base.md /etc/tentaclai/CLAUDE.base.md
 COPY build/commands/ /etc/tentaclai/commands/
 RUN chmod 0755 /usr/local/bin/entrypoint.sh /usr/local/bin/start.sh /usr/local/bin/rc-loop /usr/local/bin/cc /usr/local/bin/svc /usr/local/bin/claude-instructions /usr/local/bin/tc-scan \
