@@ -252,3 +252,6 @@ dialog.modal .card-head { margin-bottom: 12px; }
 .menu-item:hover { background: var(--panel-2); }
 .menu-item svg { width: 14px; height: 14px; color: var(--muted); }
 .menu-sep { height: 1px; background: var(--border); margin: 4px 2px; }
+/* wordmark: tentacl + AI badge */
+.ai-badge { display: inline-block; margin-left: 1px; padding: 0 4px; border-radius: 4px; line-height: 1.25; color: #fff; font-weight: 800;
+  background: linear-gradient(120deg, #7c5cf0, #22d3ee); }

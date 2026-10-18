@@ -9,7 +9,7 @@
 <body>
 <div class="auth">
   <form class="card" method="post" action="/setup">
-    <div class="brand"><img class="logo" src="/static/logo.svg?v={{ asset_v }}" alt="" width="32" height="32"><div>Set up tentaclAI</div></div>
+    <div class="brand"><img class="logo" src="/static/logo.svg?v={{ asset_v }}" alt="" width="32" height="32"><div>Set up tentacl<span class="ai-badge">AI</span></div></div>
     <p class="muted small">Choose the admin password. The setup token is in the container log:<br><code>./tentaclai.sh setup-url</code> or <code>docker logs tentacontrol</code></p>
     {% if error %}<div class="error">{{ error }}</div>{% endif %}
     <div class="field">

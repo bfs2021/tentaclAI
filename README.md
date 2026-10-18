@@ -1,8 +1,9 @@
 <p align="center">
-  <img src="control/app/static/logo.svg" width="96" height="96" alt="tentaclAI logo">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/brand/wordmark-on-dark.png">
+    <img src="docs/brand/wordmark-on-light.png" width="440" alt="tentaclAI">
+  </picture>
 </p>
-
-<h1 align="center">tentaclAI</h1>
 
 <p align="center"><strong>Eight arms, one brain.</strong><br>
 Sandbox + service gateway for Claude Code.</p>

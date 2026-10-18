@@ -301,7 +301,7 @@ async def ws_terminal(ws: WebSocket, p: str = "claude", alias: str = "", target:
     await ws.accept()
     st = dockerops.status()
     if not st["running"]:
-        await ws.send_text(json.dumps({"type": "error", "msg": "tentaclai is not running – start it on the overview first."}))
+        await ws.send_text(json.dumps({"type": "error", "msg": "tentaclAI is not running – start it on the overview first."}))
         await ws.close()
         return
     try:
@@ -396,7 +396,7 @@ async def topology_docker(name: str):
     if not services_store.NAME.match(name):
         return JSONResponse({"error": "invalid name"}, status_code=400)
     if not dockerops.status()["running"]:
-        return JSONResponse({"error": "tentaclai is not running"}, status_code=409)
+        return JSONResponse({"error": "tentaclAI is not running"}, status_code=409)
     try:
         return JSONResponse({"stacks": await asyncio.to_thread(topology.docker_stacks, name)})
     except RuntimeError as e:

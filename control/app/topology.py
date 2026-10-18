@@ -22,7 +22,7 @@ def graph():
     def edge(src, dst, label="", kind="link"):
         edges.append({"data": {"id": f"{src}->{dst}", "source": src, "target": dst, "label": label, "kind": kind}})
 
-    node("core", "tentaclai", "core", info="Claude Code sandbox – reaches everything below only through these connections.")
+    node("core", "tentaclAI", "core", info="Claude Code sandbox – reaches everything below only through these connections.")
     for name, s in systems.items():
         node(f"sys:{name}", name, "system", info=s.get("description", ""), notes=s.get("notes", []),
              href=f"/systems/{name}", ssh=s.get("ssh_host", ""),

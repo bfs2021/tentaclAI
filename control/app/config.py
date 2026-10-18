@@ -23,7 +23,7 @@ def is_secret(key: str) -> bool:
 # (key, label, help, kind) – kind: text | bool | readonly
 SETTINGS_GROUPS = [
     ("General", [
-        ("TC_HOSTNAME", "Host name", "how Claude refers to the host tentaclai runs on", "text"),
+        ("TC_HOSTNAME", "Host name", "how Claude refers to the host tentaclAI runs on", "text"),
         ("TC_DOMAIN", "Internal domain", "prefills templates, e.g. n8n.<domain>", "text"),
         ("CONTROL_URL", "tentacontrol address", "for the setup link and help, e.g. https://tentacontrol.example.lan", "text"),
         ("TZ", "Time zone", "e.g. Europe/Vienna", "text"),
