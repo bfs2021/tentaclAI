@@ -2,6 +2,16 @@
 
 All notable changes, newest first. Every release lists **upgrade steps** from the previous one.
 
+## Unreleased
+
+### Changes
+- tentacontrol runs on Python 3.14.
+- Dependabot: pip updates only when a version falls outside the allowed range; no Node major updates for the sandbox.
+
+### Upgrade
+1. `git pull`
+2. `docker compose build control && docker compose up -d control` – only tentacontrol is rebuilt; sessions and Remote Control keep running.
+
 ## v0.2.0 – 2026-10-18
 
 ### Highlights
