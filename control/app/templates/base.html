@@ -24,6 +24,9 @@
       <a href="/help" class="{{ 'active' if nav == 'help' }}">{{ icon('help') }}Help</a>
     </nav>
     <div class="spacer"></div>
+    {% if update and update.available %}
+    <a class="update-note" href="/updates" title="Release notes and upgrade steps">{{ icon('refresh') }}Update available: {{ update.latest }}</a>
+    {% endif %}
     <div class="cstate">
       <span class="dot {{ 'ok' if cstatus.running else ('err' if cstatus.exists else '') }}"></span>
       tentaclAI {{ cstatus.state }}{% if cstatus.running %} · {{ cstatus.uptime }}{% endif %}

@@ -172,7 +172,7 @@ Claude commands: **`/onboard <service>`** and **`/inventory`** (see above).
 | **Terminal** | xterm.js terminals into the sandbox (Claude, Remote Control, shell, login). Reconnects automatically. |
 | **Connections** | Everything Claude can reach, in four tabs: **Services** (grouped by system; templates, JSON editor, write-only tokens, connection test, onboarding, enable/disable, move between systems) · **SSH hosts** (live status; add with host key check and one-time password key deployment, edit incl. jump host, sudo and rename, remove with key revocation) · **Systems** (groups with SSH host and rules) · **Topology** (live graph incl. optional stacks/containers, search, saved layout, PNG export). |
 | **Settings** | All `.env` settings with descriptions; secrets are write-only. Shows *Apply now* when the sandbox must be recreated. |
-| **Updates** | Claude Code and image updates (rebuild + recreate with a live log). |
+| **Updates** | Installed tentaclAI version, new releases with their upgrade steps (checked every 6 h, also shown in the sidebar; `UPDATE_CHECK=false` turns it off), Claude Code and image updates. |
 | **Logs / Help** | Container log; full documentation of every feature. |
 
 Single admin password (bcrypt), signed session cookie (12 h, SameSite=Strict), login throttling.
@@ -281,7 +281,7 @@ What it does **not** (yet) do – keep it in mind:
 - **Security:** hardened sandbox (non-root, read-only root filesystem, egress allowlist, secret broker, Docker socket proxy,
   prompt-injection safeguards) · audit log of all write actions · access mode `confirm` (approve writes with a click)
 - **Automation:** scheduled Claude jobs · monitoring per service with status and recommendations
-- **tentacontrol:** AI assistant for the configuration · OAuth with browser login · export/import of configuration and templates · update notice in the sidebar when a new release is out
+- **tentacontrol:** AI assistant for the configuration · OAuth with browser login · export/import of configuration and templates
 - **Topology:** connections between systems and containers (reverse proxy → container, tunnels) · monitoring status
 
 ## License

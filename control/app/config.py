@@ -44,6 +44,10 @@ SETTINGS_GROUPS = [
         ("HOST_DOCS", "Host documentation", "optional: Markdown file about the host, imported into Claude's instructions", "text"),
         ("CA_CERT", "Own root CA", "optional: PEM file for internal https services", "text"),
     ]),
+    ("Updates", [
+        ("UPDATE_CHECK", "Check for new releases", "asks the GitHub API every 6 hours (no token, no data sent) – off: no requests", "bool"),
+        ("UPDATE_REPO", "Release repository", "owner/repo whose releases are checked – default mwaldegg/tentaclai (change for a fork)", "text"),
+    ]),
     ("Resources", [
         ("CLAUDE_CPUS", "CPU limit", "number of cores for tentaclai", "text"),
         ("CLAUDE_MEMORY", "Memory limit", "e.g. 8g", "text"),

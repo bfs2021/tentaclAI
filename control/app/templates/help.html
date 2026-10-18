@@ -272,6 +272,7 @@
 
     <section class="card" id="updates">
       <h2>Updates</h2>
+      <p><strong>tentaclAI releases:</strong> tentacontrol checks the GitHub releases every 6 hours (no token, nothing is sent except the request itself) and shows “Update available” in the sidebar; the Updates page lists the upgrade steps of the release. Turn it off with <code>UPDATE_CHECK=false</code>, point it to a fork with <code>UPDATE_REPO</code> (Settings → Updates).</p>
       <p>Claude Code is installed when the image is built. “Update now” rebuilds the image (with a fresh base image) and recreates the container. Pin a version with <code>CLAUDE_CODE_VERSION</code> in the settings. tentacontrol itself is updated on the host: <code>docker compose up -d --build control</code>.</p>
     </section>
 
@@ -329,7 +330,6 @@ ssh &lt;host&gt;                SSH targets from ssh/config.d</pre>
         <li><strong>AI assistant</strong> in tentacontrol for the whole configuration (can be switched off).</li>
         <li><strong>OAuth with browser login</strong> (authorization code, e.g. Google) as auth type, with templates. Client credentials already exist.</li>
         <li><strong>Real sandbox &amp; security</strong>: harden the container (non-root, read-only root filesystem, no capabilities), egress allowlist (only service hosts reachable), keep secrets away from Claude (secret broker instead of a readable <code>.env</code>), Docker socket only through a filtering proxy, preconfigured Claude Code permissions/sandbox, prompt-injection safeguards for content from services.</li>
-        <li><strong>Update notice</strong>: tentacontrol checks the GitHub releases and shows a hint in the sidebar when a newer version than the installed one is available.</li>
       </ul>
     </section>
   </div>

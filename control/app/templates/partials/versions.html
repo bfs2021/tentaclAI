@@ -1,13 +1,25 @@
 {% from "_icons.html" import icon %}
+<div class="versions-wrap">
 <div class="card" style="margin-bottom:16px">
   <div class="card-head"><h2>{{ icon('refresh') }}tentaclAI</h2>
     {% if sandbox_version and sandbox_version != tc_version %}<span class="pill warn">versions differ</span>{% endif %}</div>
   <dl class="kv">
     <dt>tentacontrol</dt><dd class="mono">v{{ tc_version }}</dd>
     <dt>Sandbox (tentaclai)</dt><dd class="mono">{{ ('v' ~ sandbox_version) if sandbox_version else '– (not running or older than v0.2.0)' }}</dd>
+    <dt>Latest release</dt><dd class="mono">{% if not update.enabled %}<span class="faint">check off (UPDATE_CHECK)</span>
+      {% elif update.latest %}<a href="{{ update.url }}" target="_blank" rel="noopener">{{ update.latest }}</a>{% else %}<span class="faint">{{ 'unknown' if not update.error else 'check failed' }}</span>{% endif %}</dd>
   </dl>
-  <p class="help">Release notes and upgrade steps: <a href="https://github.com/mwaldegg/tentaclai/blob/main/CHANGELOG.md" target="_blank" rel="noopener">CHANGELOG</a>.
-    Updating tentaclAI itself: <code>git pull</code> in the stack directory, then follow the upgrade steps of the release.</p>
+  {% if update.available %}
+  <div class="alert warn" style="margin-top:12px"><strong>{{ update.latest }} is available.</strong> Update in the stack directory:</div>
+  {% if update.upgrade %}<pre class="rc upgrade-steps">{{ update.upgrade }}</pre>{% else %}<pre class="rc upgrade-steps">git pull
+docker compose build
+docker compose up -d</pre>{% endif %}
+  <p class="help">Recreating tentaclai ends running sessions and Remote Control. Full notes: <a href="{{ update.url }}" target="_blank" rel="noopener">release {{ update.latest }}</a>.</p>
+  {% else %}
+  <p class="help">{% if update.enabled and update.latest %}Up to date. {% endif %}Release notes and upgrade steps: <a href="https://github.com/{{ update.repo }}/blob/main/CHANGELOG.md" target="_blank" rel="noopener">CHANGELOG</a>.
+    {% if update.error %}<br>Last check failed: {{ update.error }}{% endif %}</p>
+  {% endif %}
+  {% if update.enabled %}<div class="row" style="margin-top:10px"><button class="btn sm" hx-post="/updates/check" hx-target="closest .versions-wrap" hx-swap="outerHTML">{{ icon('refresh') }}Check now</button></div>{% endif %}
 </div>
 <div class="card">
   <div class="card-head">
@@ -27,4 +39,5 @@
     <a class="btn ghost" href="/settings">Pin version</a>
   </div>
   {% if pin != 'latest' and latest and pin != latest %}<p class="help">Pinned to {{ pin }} – a rebuild installs this version, not {{ latest }}.</p>{% endif %}
+</div>
 </div>

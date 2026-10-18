@@ -5,6 +5,8 @@ All notable changes, newest first. Every release lists **upgrade steps** from th
 ## Unreleased
 
 ### Changes
+- **Update notice:** tentacontrol checks the GitHub releases every 6 hours and shows “Update available” in the sidebar;
+  the Updates page lists the release's upgrade steps. New settings `UPDATE_CHECK` (default on) and `UPDATE_REPO`.
 - tentacontrol runs on Python 3.14.
 - Dependabot: pip updates only when a version falls outside the allowed range; no Node major updates for the sandbox.
 

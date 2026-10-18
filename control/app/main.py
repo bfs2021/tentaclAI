@@ -12,7 +12,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
 
-from . import auth, dockerops, jobs, services_store, sshhosts, sshops, systems_store, topology
+from . import auth, dockerops, jobs, services_store, sshhosts, sshops, systems_store, topology, updatecheck
 from .config import CLAUDE_SERVICE, COMPOSE, DATA_DIR, RC_VARS, RESTART_VARS, SETTINGS_GROUPS, is_secret, site
 from .envfile import read_env, update_env
 from .terminal import PROFILES, bridge, onboard_cmd
@@ -69,6 +69,15 @@ async def secure_cookie(request: Request, call_next):
 
 
 @app.on_event("startup")
+async def start_update_check():
+    async def loop():
+        while True:  # refresh() itself only asks GitHub when the cached answer is older than 6 h
+            await asyncio.to_thread(updatecheck.refresh)
+            await asyncio.sleep(1800)
+    asyncio.get_running_loop().create_task(loop())
+
+
+@app.on_event("startup")
 async def announce_setup():
     if not auth.has_password():
         print("=" * 72, flush=True)
@@ -81,6 +90,7 @@ async def announce_setup():
 def page(request, name, **ctx):
     st = dockerops.status()
     ctx.update(request=request, nav=name.split(".")[0], cstatus=st, restart_needed=restart_needed(st), site=site(),
+               update=updatecheck.status(TC_VERSION),
                flash=request.session.pop("flash", None))
     return templates.TemplateResponse(request, name, ctx)
 
@@ -921,7 +931,14 @@ async def versions(request: Request):
     sandbox = out.strip() if code == 0 and out.strip() else None
     return templates.TemplateResponse(request, "partials/versions.html",
                                       {"installed": installed, "latest": latest, "pin": pin, "st": dockerops.status(),
-                                       "tc_version": TC_VERSION, "sandbox_version": sandbox})
+                                       "tc_version": TC_VERSION, "sandbox_version": sandbox,
+                                       "update": updatecheck.status(TC_VERSION)})
+
+
+@app.post("/updates/check", response_class=HTMLResponse)
+async def update_check_now(request: Request):
+    await asyncio.to_thread(updatecheck.refresh, True)
+    return await versions(request)
 
 
 @app.post("/updates/claude")
