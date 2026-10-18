@@ -2,7 +2,7 @@
 
 All notable changes, newest first. Every release lists **upgrade steps** from the previous one.
 
-## Unreleased
+## v0.5.0 – 2026-10-19
 
 ### Highlights
 - **Status line in Claude's terminal** – every Claude session shows `▥ tentaclAI · safely caged`, model and directory,
