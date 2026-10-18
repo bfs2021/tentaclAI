@@ -1,0 +1,59 @@
+name: checks
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: No site data or secrets
+        run: scripts/check-site-data.sh --all
+
+      - name: Python syntax
+        run: |
+          python3 -m py_compile lib/tclib.py build/svc build/tc-scan build/claude-instructions \
+            control/passwd.py control/sshcli.py control/app/*.py
+
+      - name: Shell syntax
+        run: |
+          for f in tentaclai.sh ssh-host.sh build/entrypoint.sh build/start.sh build/rc-loop build/cc \
+                   scripts/*.sh .githooks/pre-commit; do bash -n "$f" || exit 1; done
+
+      - name: ShellCheck (errors only)
+        run: |
+          shellcheck --severity=error tentaclai.sh ssh-host.sh build/entrypoint.sh build/start.sh build/rc-loop \
+            build/cc scripts/*.sh .githooks/pre-commit
+
+      - name: JSON templates and examples
+        run: |
+          python3 - <<'PY'
+          import glob, json, sys
+          bad = 0
+          for p in sorted(glob.glob("services/_templates/*.json") + ["services/_template.json", "systems/_example.json"]):
+              try:
+                  json.load(open(p))
+              except ValueError as e:
+                  print(f"{p}: {e}"); bad = 1
+          sys.exit(bad)
+          PY
+
+      - name: YAML and Jinja templates
+        run: |
+          pip install --quiet pyyaml jinja2
+          python3 - <<'PY'
+          import glob, sys, yaml, jinja2
+          for p in ["compose.yaml", "compose.override.example.yaml", *glob.glob(".github/**/*.yml", recursive=True)]:
+              yaml.safe_load(open(p))
+          env = jinja2.Environment(loader=jinja2.FileSystemLoader("control/app/templates"))
+          for t in env.list_templates():
+              env.parse(env.loader.get_source(env, t)[0])
+          print("ok")
+          PY

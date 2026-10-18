@@ -2,11 +2,18 @@
 #
 #   first time:  ./tentaclai.sh init          (guided setup, creates .env)
 #   start:       docker compose up -d control   (web admin) – then everything else in tentacontrol
-#   cli:         ./tentaclai.sh [rc|shell|svc|scan|anamnese|passwd|setup-url]
+#   cli:         ./tentaclai.sh [rc|shell|svc|scan|inventory|passwd|setup-url]
 #
 # Files (COMPOSE_FILE in .env): compose.yaml (this, generic) + compose.generated.yaml (mounts derived from
 # docker services, written by tentacontrol) + compose.override.yaml (your site additions).
 # tentaclai itself has NO Docker access – that comes only from services of type "docker" (local socket or ssh).
+# container logs: at most 3 × 10 MB per container
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 services:
   claude:
     build:
@@ -18,6 +25,7 @@ services:
     container_name: tentaclai
     hostname: tentaclai
     restart: unless-stopped
+    logging: *logging
     init: true
     stdin_open: true
     tty: true
@@ -60,6 +68,7 @@ services:
     container_name: tentacontrol
     hostname: tentacontrol
     restart: unless-stopped
+    logging: *logging
     environment:
       TZ: ${TZ:-UTC}
       STACK_DIR: ${TC_DIR:?TC_DIR not set – run ./tentaclai.sh init}

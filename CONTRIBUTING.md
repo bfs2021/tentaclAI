@@ -14,6 +14,9 @@ Thanks for your interest in tentaclAI! Issues, ideas and pull requests are welco
 
 ## Development
 
+- Enable the pre-commit check once per clone: `git config core.hooksPath .githooks` – it refuses site files and
+  anything that looks like a token or private key (`scripts/check-site-data.sh`). CI runs the same check on every push.
+
 - Test in an isolated instance (own compose project name, own container names and port, scratch `data/`) instead of your
   running stack – recreating the real `tentaclai` container ends running sessions and Remote Control.
 - Quick checks: `python3 -m py_compile build/svc build/tc-scan control/app/*.py` and `bash -n *.sh build/*.sh`.
