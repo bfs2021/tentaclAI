@@ -1353,10 +1353,17 @@ def request_approval(service, part, action):
         return "error", f"tentacontrol not reachable: {e}"
     if res.get("status") == "approved":  # an active "Approve + 15 min" grant
         return "approved", res.get("by", "grant")
-    print(f"svc: ⏳ waiting for approval in tentacontrol → Activity (request #{rid}, up to {APPROVAL_TIMEOUT // 60} min): {action}",
+    where = (os.environ.get("CONTROL_URL") or "").rstrip("/")
+    where = f"{where}/activity" if where else "tentacontrol → Activity"
+    print(f"svc: ⏳ approval needed – {where} (request #{rid}, up to {APPROVAL_TIMEOUT // 60} min): {action}",
           file=sys.stderr, flush=True)
-    end = time.time() + APPROVAL_TIMEOUT + 30
+    start = time.time()
+    end = start + APPROVAL_TIMEOUT + 30
+    reminded = start
     while time.time() < end:
+        if time.time() - reminded >= 60:  # visible in the live output of a running command
+            reminded = time.time()
+            print(f"svc: ⏳ still waiting for approval #{rid} ({int(reminded - start) // 60} min) – {where}", file=sys.stderr, flush=True)
         try:
             st = _control("GET", f"/internal/approvals/{rid}?wait=25", timeout=40)
         except Exception as e:  # noqa: BLE001

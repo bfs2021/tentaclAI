@@ -2,6 +2,13 @@
 
 All notable changes, newest first. Every release lists **upgrade steps** from the previous one.
 
+## Unreleased
+
+### Changes
+- Approvals are announced before they block: Claude tells you what it is about to request (and where to approve it)
+  before running a write on a `confirm` part, and uses the maximum Bash timeout (10 min) for such commands.
+- svc prints a direct link to Activity (`CONTROL_URL/activity`) and a reminder every minute while it waits.
+
 ## v0.4.0 – 2026-10-19
 
 ### Highlights
