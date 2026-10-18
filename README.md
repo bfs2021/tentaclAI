@@ -1,10 +1,37 @@
-# tentaclaude 🐙
+<p align="center">
+  <img src="control/app/static/logo.svg" width="96" height="96" alt="tentaclaude logo">
+</p>
 
-**Eight arms, one brain.** Sandbox + service gateway for Claude Code.
+<h1 align="center">tentaclaude</h1>
 
-Claude Code in a container that works **only through services** you connect: Docker hosts (local socket or ssh),
-APIs, MCP servers and git repos – plus its own workspace for projects. Usable from the host terminal, any container console, remotely via **Remote Control**
-(claude.ai/code, Claude app) and configured in the web admin **tentacontrol**.
+<p align="center"><strong>Eight arms, one brain.</strong><br>
+Sandbox + service gateway for Claude Code.</p>
+
+<p align="center">
+  <img alt="Claude Code" src="https://img.shields.io/badge/Claude_Code-sandbox-7c5cf0">
+  <img alt="Docker" src="https://img.shields.io/badge/runs_on-Docker-22d3ee">
+  <img alt="Services" src="https://img.shields.io/badge/services-docker%20·%20api%20·%20mcp%20·%20git%20·%20db%20·%20web%20·%20files-a78bfa">
+</p>
+
+Claude Code in a container that works **only through the services you connect** – Docker hosts, APIs, MCP servers,
+git repositories, databases, web sources and files on SSH hosts – each with its own rules (`ro` / `rw`), grouped into
+**systems**. Use it from the host terminal, from any container console, remotely via **Remote Control**
+(claude.ai/code, Claude app) – and set everything up in the web admin **tentacontrol**.
+
+<p align="center">
+  <img src="docs/screenshots/topology.png" alt="Topology: what Claude can reach and how" width="900">
+</p>
+
+| | |
+|---|---|
+| **One brain, many arms** | Every service is one JSON file: Docker host (local socket or SSH, optional sudo), REST API, MCP server, git repo, PostgreSQL/MySQL, website with login, directory on a host. |
+| **Guard rails** | `ro`/`rw` per service enforced by `svc`, tokens never in commands, read-only DB sessions, push blocked for read-only repos. |
+| **Systems & topology** | Group services per host with shared rules; see everything as a live graph with containers, search and saved layout. |
+| **Always reachable** | Remote control session with QR code, web terminal, guided onboarding (`/onboard`) and system inventory (`/inventory`). |
+
+<p align="center">
+  <img src="docs/screenshots/services.png" alt="Services grouped by system" width="900">
+</p>
 
 The stack is **generic**. Everything site-specific lives in three places:
 

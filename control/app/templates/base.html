@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}Overview{% endblock %} · tentaclaude</title>
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐙</text></svg>">
+  <link rel="icon" type="image/svg+xml" href="/static/logo.svg?v={{ asset_v }}">
   <link rel="stylesheet" href="/static/app.css?v={{ asset_v }}">
   {% block head %}{% endblock %}
   <script src="/vendor/htmx.min.js" defer></script>
@@ -13,7 +13,7 @@
 <body hx-headers='{"X-Requested-With": "htmx"}'>
 <div class="app">
   <aside class="sidebar">
-    <div class="brand"><div class="logo">🐙</div><div>tentaclaude<small>Eight arms, one brain</small></div></div>
+    <div class="brand"><img class="logo" src="/static/logo.svg?v={{ asset_v }}" alt="" width="32" height="32"><div>tentaclaude<small>Eight arms, one brain</small></div></div>
     <nav class="nav">
       <a href="/" class="{{ 'active' if nav == 'dashboard' }}">{{ icon('home') }}Overview</a>
       <a href="/terminal" class="{{ 'active' if nav == 'terminal' }}">{{ icon('terminal') }}Terminal</a>

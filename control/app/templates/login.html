@@ -3,13 +3,13 @@
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Sign in · tentaclaude</title>
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐙</text></svg>">
+  <link rel="icon" type="image/svg+xml" href="/static/logo.svg?v={{ asset_v }}">
   <link rel="stylesheet" href="/static/app.css?v={{ asset_v }}">
 </head>
 <body>
 <div class="auth">
   <form class="card" method="post" action="/login">
-    <div class="brand"><div class="logo">🐙</div><div>tentaclaude<small>Eight arms, one brain</small></div></div>
+    <div class="brand"><img class="logo" src="/static/logo.svg?v={{ asset_v }}" alt="" width="32" height="32"><div>tentaclaude<small>Eight arms, one brain</small></div></div>
     {% if error %}<div class="error">{{ error }}</div>{% endif %}
     <div class="field">
       <label for="pw">Password</label>

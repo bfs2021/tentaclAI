@@ -1,4 +1,4 @@
-# tentaclaude – sandbox + service gateway for Claude Code 🐙  (generic – site specifics go into .env / compose.override.yaml)
+# tentaclaude – sandbox + service gateway for Claude Code  (generic – site specifics go into .env / compose.override.yaml)
 #
 #   first time:  ./tentaclaude.sh init          (guided setup, creates .env)
 #   start:       docker compose up -d control   (web admin) – then everything else in tentacontrol
