@@ -1,6 +1,6 @@
 {% from "_icons.html" import icon %}
 {% macro hidden(f) -%}
-  {% for k in ("alias", "hostname", "user", "port", "proxyjump", "sudo") %}<input type="hidden" name="{{ k }}" value="{{ f.get(k, '') }}">{% endfor %}
+  {% for k in ("alias", "hostname", "user", "port", "proxyjump", "sudo", "access") %}<input type="hidden" name="{{ k }}" value="{{ f.get(k, '') }}">{% endfor %}
 {%- endmacro %}
 {% macro head(title, sub="") -%}
   <div class="card-head" style="margin-bottom:4px"><h2>{{ title }}</h2>
@@ -32,6 +32,12 @@
     <input type="text" name="sudo" class="mono" value="{{ f.get('sudo') or 'sudo -n' }}" style="margin-top:8px" {{ '' if f.get('sudo') else 'disabled hidden' }}>
     <div class="help">Privileged commands then run as <code>sudo -n …</code> – needs passwordless sudo (<code>NOPASSWD</code>), ideally limited.</div>
   </div>
+  <div class="field"><label>Claude's shell access (<code>svc ssh</code>)</label>
+    <select name="access">
+      {% for v, t in (("confirm", "confirm – every command needs your approval"), ("rw", "rw – commands run without asking"), ("ro", "ro – no shell, only docker/files services")) %}
+      <option value="{{ v }}" {{ 'selected' if (f.get('access') or 'confirm') == v }}>{{ t }}</option>{% endfor %}
+    </select>
+    <div class="help">Docker and files services on this host keep their own access mode.</div></div>
 {%- endmacro %}
 
 {% if step == "form" %}

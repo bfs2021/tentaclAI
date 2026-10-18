@@ -139,7 +139,9 @@ def status_text(svc, env):
 
 # ---------------------------------------------------------------- SSH hosts (ssh/config.d/*.conf)
 
-SUDO_META = re.compile(r"^\s*#\s*tentacl(?:ai|aude):\s*sudo\s*=\s*(.*?)\s*$")
+META = re.compile(r"^\s*#\s*tentacl(?:ai|aude):\s*(sudo|access)\s*=\s*(.*?)\s*$")
+SSH_ACCESS = ("ro", "rw", "confirm")
+SSH_ACCESS_DEFAULT = "confirm"
 SUDO_RE = re.compile(r"^[A-Za-z0-9 ._/=-]{1,60}$")
 ALIAS_RE = re.compile(r"^[A-Za-z0-9._-]{1,40}$")
 HOST_RE = re.compile(r"^[A-Za-z0-9.-]{1,253}$")
@@ -153,15 +155,15 @@ def _conf_files(conf_d):
 
 
 def ssh_hosts(conf_d):
-    """every alias of every Host block: alias, file, hostname, user, port, proxyjump, hostkeyalias, sudo"""
+    """every alias of every Host block: alias, file, hostname, user, port, proxyjump, hostkeyalias, sudo, access"""
     res = []
     for f in _conf_files(conf_d):
         block = []  # all aliases of the current Host line
         for line in open(f):
-            m = SUDO_META.match(line)
+            m = META.match(line)
             if m:
                 for h in block:
-                    h["sudo"] = m.group(1)
+                    h[m.group(1)] = m.group(2)
                 continue
             parts = line.strip().split(None, 1)
             if not parts or parts[0].startswith("#"):
@@ -169,7 +171,8 @@ def ssh_hosts(conf_d):
             key, val = parts[0].lower(), (parts[1] if len(parts) > 1 else "")
             if key == "host":
                 block = [{"alias": a, "file": os.path.basename(f), "hostname": "", "user": "", "port": "22",
-                          "proxyjump": "", "sudo": "", "hostkeyalias": ""} for a in val.split() if "*" not in a]
+                          "proxyjump": "", "sudo": "", "hostkeyalias": "", "access": SSH_ACCESS_DEFAULT}
+                         for a in val.split() if "*" not in a]
                 res += block
             elif key in SSH_KEYS or key == "hostkeyalias":
                 for h in block:
@@ -184,6 +187,13 @@ def ssh_host(conf_d, alias):
 def ssh_sudo(conf_d, alias):
     h = ssh_host(conf_d, alias)
     return h["sudo"] if h else ""
+
+
+def ssh_access(conf_d, alias):
+    """access mode of `svc ssh <alias>`: ro = no ssh commands, confirm = each needs approval, rw = allowed"""
+    h = ssh_host(conf_d, alias)
+    mode = (h or {}).get("access") or SSH_ACCESS_DEFAULT
+    return mode if mode in SSH_ACCESS else "ro"
 
 
 def ssh_validate(fields, aliases=None):
@@ -205,6 +215,8 @@ def ssh_validate(fields, aliases=None):
     sudo = fields.get("sudo", "")
     if sudo and not SUDO_RE.match(sudo):
         raise ValueError("sudo command: letters, digits, space . _ / = - only")
+    if fields.get("access", SSH_ACCESS_DEFAULT) not in SSH_ACCESS:
+        raise ValueError("access: ro, rw or confirm")
     if aliases is not None and fields["alias"] in aliases:
         raise ValueError(f"alias {fields['alias']} exists already")
 
@@ -218,6 +230,8 @@ def _block_lines(fields, extra=()):
     lines += list(extra)
     if fields.get("sudo"):
         lines.append(f"    # tentaclai: sudo={fields['sudo']}\n")
+    if fields.get("access", SSH_ACCESS_DEFAULT) != SSH_ACCESS_DEFAULT:
+        lines.append(f"    # tentaclai: access={fields['access']}\n")
     return lines
 
 
@@ -262,7 +276,7 @@ def ssh_update(conf_d, alias, fields):
     others = {h["alias"] for h in ssh_hosts(conf_d)} - {alias}
     ssh_validate(fields, aliases=others)
     f, lines, start, end = _locate(conf_d, alias)
-    keep = [l for l in lines[start + 1:end] if not SUDO_META.match(l)
+    keep = [l for l in lines[start + 1:end] if not META.match(l)
             and (l.split()[0].lower() if l.split() else "") not in SSH_KEYS]
     while keep and not keep[-1].strip():
         keep.pop()

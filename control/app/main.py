@@ -801,7 +801,9 @@ async def ssh_page(request: Request):
 # ---------------------------------------------------------------- SSH hosts: add / edit / remove in the UI
 
 def _ssh_fields(form):
-    return {k: (form.get(k) or "").strip() for k in ("alias", "hostname", "user", "port", "proxyjump", "sudo")}
+    f = {k: (form.get(k) or "").strip() for k in ("alias", "hostname", "user", "port", "proxyjump", "sudo", "access")}
+    f["access"] = f["access"] or "confirm"
+    return f
 
 
 def _ssh_dialog(request, step, **ctx):

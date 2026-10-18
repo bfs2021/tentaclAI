@@ -14,7 +14,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         ca-certificates curl gnupg git jq ripgrep fd-find less nano vim-tiny tmux \
         openssh-client rsync unzip zip procps iputils-ping dnsutils \
         python3 python3-venv python3-pip make \
-        postgresql-client mariadb-client sshpass \
+        postgresql-client mariadb-client sshpass sudo \
     && ln -s /usr/bin/fdfind /usr/local/bin/fd \
     # Docker CLI + compose plugin (talks to the host daemon via the mounted socket)
     && install -m 0755 -d /etc/apt/keyrings \
@@ -41,6 +41,15 @@ COPY lib/tclib.py /usr/local/lib/tentaclai/tclib.py
 COPY VERSION /etc/tentaclai/VERSION
 COPY build/CLAUDE.base.md /etc/tentaclai/CLAUDE.base.md
 COPY build/commands/ /etc/tentaclai/commands/
+# Users: claude = the agent (no secrets, no keys), tcrun = client tools started by svc (one secret at a time).
+# Root holds .env, SSH keys and service files; Claude reaches them only through `svc`/`tc-scan` via sudo.
+ARG CLAUDE_UID=10000
+RUN groupadd -g ${CLAUDE_UID} claude && useradd -m -d /home/claude -u ${CLAUDE_UID} -g claude -s /bin/bash claude \
+    && groupadd -g 10001 tcrun && useradd -m -d /var/lib/tcrun -u 10001 -g tcrun -s /usr/sbin/nologin tcrun \
+    && chmod 700 /var/lib/tcrun \
+    && printf '%s\n' 'Defaults:claude !lecture, env_reset, always_set_home' \
+        'claude ALL=(root) NOPASSWD: /usr/local/bin/svc, /usr/local/bin/tc-scan' > /etc/sudoers.d/tentaclai \
+    && chmod 0440 /etc/sudoers.d/tentaclai && visudo -cq
 RUN chmod 0755 /usr/local/bin/entrypoint.sh /usr/local/bin/start.sh /usr/local/bin/rc-loop /usr/local/bin/cc /usr/local/bin/svc /usr/local/bin/claude-instructions /usr/local/bin/tc-scan \
     # tmux: mouse scrolling, bigger scrollback, truecolor for Claude's TUI
     && printf '%s\n' 'set -g mouse on' 'set -g history-limit 50000' \

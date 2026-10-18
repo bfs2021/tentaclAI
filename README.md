@@ -80,7 +80,7 @@ The stack consists of **two containers** and one **stack directory**:
 |---|---|
 | **tentaclAI** (container `tentaclai`) | The sandbox: Claude Code, `svc`, git, gh, docker CLI, database clients, tmux. Runs the permanent Remote Control session and holds your workspace (`/workspace`). Has **no** Docker socket and no host access of its own – everything goes through services. |
 | **tentacontrol** (container `tentacontrol`) | The web admin: create and edit services, systems and SSH hosts, enter tokens, test connections, start onboarding, see the topology, open terminals into the sandbox, rebuild and update it. It uses the host's Docker socket only to run the tentaclAI container. |
-| **`svc`** (inside tentaclAI) | The gateway Claude uses for every service: `svc <name> GET /path`, `svc docker`, `svc compose`, `svc db`, `svc web`, `svc files`, `svc git`. It injects credentials from `.env` at call time and enforces `ro`/`rw`. |
+| **`svc`** (inside tentaclAI) | The gateway Claude uses for every service: `svc <name> GET /path`, `svc docker`, `svc compose`, `svc db`, `svc web`, `svc files`, `svc git`. It runs as root (via sudo), injects credentials from `.env` at call time and enforces `ro`/`rw`/`confirm`; Claude itself runs as user `claude` and can't read `.env` or the SSH key. |
 | **Services** (`services/<name>.json`) | One file per thing Claude may reach. A service can combine parts: `api`, `mcp`, `git`, `docker`, `db`, `web`, `files`. Secrets are `${VAR}` placeholders, the values live in `.env`. |
 | **Systems** (`systems/<name>.json`) | Optional groups – e.g. *the NAS* = its SSH host + Docker + a database + an API – with a shared SSH host and rules that apply to every member. Services can also stand alone. |
 | **SSH hosts** (`ssh/config.d/*.conf`) | Machines reachable with tentaclAI's own key, optionally with a sudo prefix for non-root users. Docker and file services use them. |
@@ -148,7 +148,7 @@ setup changes; existing knowledge is kept.
 |---|---|
 | **Phone / any browser** | Remote Control session (`claude-rc`), always running: claude.ai/code or the Claude app. |
 | **tentacontrol → Terminal** | Web terminal into the sandbox: Claude in `/workspace`, the Remote Control session, a shell, onboarding/inventory sessions. Sessions run in tmux and survive closing the tab. |
-| **Host terminal** | `./tentaclai.sh` (Claude), `./tentaclai.sh rc`, `./tentaclai.sh shell`, `./tentaclai.sh status`, `./tentaclai.sh update`. |
+| **Host terminal** | `./tentaclai.sh` (Claude), `./tentaclai.sh rc`, `./tentaclai.sh shell` (as user claude; `rootshell` as root), `./tentaclai.sh status`, `./tentaclai.sh update`. |
 
 Inside the sandbox, Claude (and you) use:
 
@@ -161,7 +161,10 @@ svc compose <host> <stack> logs --tail 50   # compose in <stacks_dir>/<stack> of
 svc db <name> "SELECT …" | tables           # databases (ro = read-only session)
 svc web <name> /wiki/page | --links         # web pages as readable text, login handled by svc
 svc files <name> ls|cat|grep|pull|diff|push # folders on SSH hosts; edit in /workspace/files/<name>
-svc git | git sync [name]                   # repos in /workspace/repos (ro = push blocked)
+svc git | git sync [name]                   # repos in /workspace/repos (no credentials inside)
+svc git push|pull|fetch <repo> [branch]     # through svc's mirror – access mode and approval apply
+svc ssh <host> [command]                    # command or shell on an SSH host (default: needs approval)
+svc config put service <name> <file>        # Claude proposes a service file – always needs approval
 tc-scan                                     # read-only inventory of all docker hosts, services, SSH hosts
 ```
 
@@ -239,7 +242,8 @@ SSH hosts: tentacontrol → Connections → SSH hosts, or `./ssh-host.sh list|ad
 | `TC_HOSTNAME`, `TC_DOMAIN` | name of this host for Claude; domain that prefills templates |
 | `CONTROL_URL`, `CONTROL_BIND`, `CONTROL_PORT` | where tentacontrol is reachable |
 | `CLAUDE_CPUS`, `CLAUDE_MEMORY`, `CLAUDE_CODE_VERSION` | sandbox resources, pinned Claude Code version |
-| `GIT_USER_NAME`, `GIT_USER_EMAIL`, `GH_TOKEN` | git identity and GitHub access of the sandbox |
+| `GIT_USER_NAME`, `GIT_USER_EMAIL` | git identity of Claude's commits |
+| `GH_TOKEN` | example token variable for the GitHub templates (`${GH_TOKEN}`) – no longer handed to `gh` in the sandbox |
 | `RC_ENABLED`, `RC_NAME`, `RC_WORKDIR`, `RC_EXTRA_ARGS`, `RC_RESTART_DELAY` | Remote Control – re-read on every restart of the session |
 | everything else | service credentials, referenced as `${VAR}` |
 
@@ -265,7 +269,7 @@ tentaclai/
 ├── control/                   tentacontrol (FastAPI, HTMX, xterm.js, cytoscape.js – vendored, no CDN at runtime)
 ├── services/                  your services (git-ignored) + _template.json + _templates/ (50 templates)
 ├── systems/                   your systems (git-ignored) + _example.json
-├── ssh/                       /root/.ssh of the sandbox: config, config.d/, keys/ (git-ignored)
+├── ssh/                       /root/.ssh of the sandbox (root only – used by svc): config, config.d/, keys/ (git-ignored)
 ├── local/                     CLAUDE.md with your site rules (template: CLAUDE.example.md)
 ├── data/                      Claude login (home), tentacontrol password hash and layout (git-ignored)
 ├── workspace/                 /workspace: projects, repos/, files/, SERVICES.md
@@ -282,19 +286,25 @@ What tentaclAI does:
 - Credentials are injected at call time via environment or 0600 files on tmpfs – never in command lines, never shown in the UI.
 - Claude's own permission prompts stay active; its rules tell it to ask before restarts, updates and deletions.
 
+- **Privilege separation** in the sandbox: Claude runs as the unprivileged user `claude`. `.env`, the SSH key, the service
+  files, git credentials and the audit log belong to root; Claude reaches them only through `svc` (via sudo), which enforces
+  the access modes. Client tools (curl, psql, mariadb, stdio MCP servers) run as a third user `tcrun` with only the secret
+  they need. MCP servers with tokens are proxied by `svc`, git pushes go through a root-owned mirror – Claude never sees a
+  token or the private key, and can't change its own access modes (`svc config put` always needs your approval).
+
 What it does **not** (yet) do – keep it in mind:
 
-- An `rw` Docker host – or an SSH user with unrestricted sudo – is effectively **root on that machine**.
-- `ro`, `confirm` and the audit log are guard rails for an honest agent and against mistakes – Claude runs as root in the
-  sandbox and could bypass `svc` (e.g. plain `ssh`) or edit the log. A hard boundary needs the hardened sandbox (roadmap).
-- The sandbox runs as root and can read the stack directory, including `.env`. A secret broker is on the roadmap.
+- An `rw` Docker host – or an SSH user with unrestricted sudo – is effectively **root on that machine**. A Docker service in
+  `socket` mode is root on the tentaclAI host, and with it everything in the stack directory – prefer `ssh` mode.
+- `tcrun` holds one secret at a time while a client runs: a shell escape in the interactive SQL shell (`\!`, approved
+  separately in `confirm` mode) gets that user, its database password and the web cookie jars – not `.env` or the SSH key.
+- There is no egress filter yet: the sandbox can reach the network (a Claude session could send out what it can read).
 - tentacontrol holds the host's Docker socket – protect it with a strong password and keep it off the internet.
 - `data/home` holds the Claude login and `ssh/keys` the private key – back them up and protect them.
 
 ## Roadmap
 
-- **Security:** hardened sandbox (non-root, read-only root filesystem, egress allowlist, secret broker, Docker socket proxy,
-  prompt-injection safeguards)
+- **Security:** egress allowlist, read-only root filesystem, Docker socket proxy, prompt-injection safeguards
 - **Automation:** scheduled Claude jobs · monitoring per service with status and recommendations
 - **tentacontrol:** AI assistant for the configuration · OAuth with browser login · export/import of configuration and templates
 - **Topology:** connections between systems and containers (reverse proxy → container, tunnels) · monitoring status

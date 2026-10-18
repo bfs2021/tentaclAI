@@ -12,7 +12,8 @@ import tclib  # noqa: E402  shared with svc and tentacontrol
 TEMPLATE = "/etc/tentaclai/CLAUDE.base.md"
 HOST_DOCS = "/etc/tentaclai/host-docs.md"
 
-tc_dir = os.environ.get("TC_DIR", "/opt/tentaclai")
+tc_dir = os.environ.get("TC_DIR") or (open("/etc/tentaclai/tc-dir").read().strip() if os.path.exists("/etc/tentaclai/tc-dir") else "/opt/tentaclai")
+site = tclib.read_env(os.path.join(tc_dir, ".env"))  # runs as root (entrypoint, svc sync) – only non-secret values are used
 
 
 def docker_hosts():
@@ -33,19 +34,21 @@ def ssh_hosts():
     hosts = tclib.ssh_hosts("/root/.ssh/config.d")
     if not hosts:
         return "### SSH hosts\n\nNone configured."
-    rows = [f"| `{h['alias']}` | {h['user'] or '–'} | {h['hostname'] or '–'} | {('`' + h['sudo'] + ' <cmd>`') if h['sudo'] else '–'} |"
-            for h in hosts]
-    return ("### SSH hosts\n\nPrivileged commands on hosts with a sudo prefix: run them as `<prefix> <cmd>` "
-            "(non-interactive, never ask for or type a password). `svc docker`/`svc compose` add the prefix themselves.\n\n"
-            "| Host | User | Hostname | sudo |\n|---|---|---|---|\n" + "\n".join(rows))
+    rows = [f"| `{h['alias']}` | **{tclib.ssh_access('/root/.ssh/config.d', h['alias'])}** | {h['user'] or '–'} | {h['hostname'] or '–'} | "
+            f"{('`' + h['sudo'] + ' <cmd>`') if h['sudo'] else '–'} |" for h in hosts]
+    return ("### SSH hosts\n\nRun commands with `svc ssh <host> <command>` (no command = interactive shell) – the SSH key stays with svc, "
+            "plain `ssh` has no key. Access: `confirm` = every command waits for the user's approval, `rw` = allowed (still ask "
+            "before changes), `ro` = no ssh commands (use the read-only svc parts instead). Privileged commands on hosts with a sudo prefix: "
+            "`svc ssh <host> <prefix> <cmd>` (non-interactive, never ask for or type a password). `svc docker`/`svc compose` add the prefix themselves.\n\n"
+            "| Host | Access | User | Hostname | sudo |\n|---|---|---|---|---|\n" + "\n".join(rows))
 
 
 values = {
     "TC_DIR": tc_dir,
     "DOCKER_HOSTS": docker_hosts(),
     "SSH_HOSTS": ssh_hosts(),
-    "TC_HOSTNAME": os.environ.get("TC_HOSTNAME") or os.uname().nodename,
-    "CONTROL_URL": os.environ.get("CONTROL_URL") or "tentacontrol",
+    "TC_HOSTNAME": site.get("TC_HOSTNAME") or os.environ.get("TC_HOSTNAME") or os.uname().nodename,
+    "CONTROL_URL": site.get("CONTROL_URL") or os.environ.get("CONTROL_URL") or "tentacontrol",
 }
 text = open(TEMPLATE).read()
 for k, v in values.items():

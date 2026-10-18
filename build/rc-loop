@@ -1,16 +1,15 @@
 #!/usr/bin/env bash
-# Runs `claude remote-control` in a loop. Reads RC_* from $TC_DIR/.env before every start:
+# Runs `claude remote-control` in a loop. Reads RC_* from the stack's .env (via svc) before every start:
 #   RC_ENABLED       true|false          (false: wait and re-check)
 #   RC_NAME          session name in claude.ai/code and the app
 #   RC_WORKDIR       start directory
 #   RC_EXTRA_ARGS    additional arguments for `claude remote-control`
 #   RC_RESTART_DELAY seconds to wait after the session ended (default 30)
-ENV_FILE="${TC_DIR:-/opt/tentaclai}/.env"
-
+# runs as Claude, which can't read .env – `svc rc-env` hands over just these settings
 val() {  # key default
     local v
-    v="$(sed -n "s/^$1=//p" "$ENV_FILE" 2>/dev/null | tail -1)"
-    v="${v%\"}"; v="${v#\"}"; v="${v%\'}"; v="${v#\'}"
+    v="$(svc rc-env 2>/dev/null | sed -n "s/^$1=//p" | tail -1)"
+    [ -n "$v" ] && eval "v=$v"  # shell-quoted by svc
     echo "${v:-$2}"
 }
 

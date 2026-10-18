@@ -5,7 +5,7 @@
 #   ./tentaclai.sh host [name] Claude in the stacks dir of a local docker service (first one if no name)
 #   ./tentaclai.sh <dir>      Claude in any directory inside the container
 #   ./tentaclai.sh rc         attach to the remote-control session
-#   ./tentaclai.sh shell      bash in the container
+#   ./tentaclai.sh shell      bash in the container as user claude (rootshell: as root – sees the secrets)
 #   ./tentaclai.sh login      claude auth login (needed for remote control)
 #   ./tentaclai.sh status     container + tmux sessions
 #   ./tentaclai.sh svc        apply services/*.json (MCP, repos, catalog) and show status
@@ -214,22 +214,23 @@ if [ "$(docker inspect -f '{{.State.Running}}' "$CONTAINER" 2>/dev/null)" != "tr
 fi
 
 case "${1:-}" in
-    "")       exec docker exec -it "$CONTAINER" cc ;;
-    login)    exec docker exec -it "$CONTAINER" claude auth login ;;
+    "")       exec docker exec -it -u claude "$CONTAINER" cc ;;
+    login)    exec docker exec -it -u claude "$CONTAINER" claude auth login ;;
     host)
         d="$(docker exec "$CONTAINER" svc docker dirs | awk -F'\t' -v n="${2:-}" 'n=="" || $1==n {print $2; exit}')"
         [ -n "$d" ] || { echo "No local docker service${2:+ named $2} (svc docker)"; exit 1; }
-        exec docker exec -it "$CONTAINER" cc "$d" ;;
-    rc)       exec docker exec -it "$CONTAINER" cc rc ;;
-    inventory) exec docker exec -it "$CONTAINER" tmux new-session -A -s claude-inventory -c /workspace claude /inventory ;;
+        exec docker exec -it -u claude "$CONTAINER" cc "$d" ;;
+    rc)       exec docker exec -it -u claude "$CONTAINER" cc rc ;;
+    inventory) exec docker exec -it -u claude "$CONTAINER" tmux new-session -A -s claude-inventory -c /workspace claude /inventory ;;
     scan)     exec docker exec "$CONTAINER" tc-scan ;;
-    shell)    exec docker exec -it "$CONTAINER" bash ;;
+    shell)    exec docker exec -it -u claude "$CONTAINER" bash ;;
+    rootshell) exec docker exec -it "$CONTAINER" bash ;;
     status)
         docker ps --filter "name=^${CONTAINER}$" --format 'table {{.Names}}\t{{.Status}}\t{{.Image}}'
-        echo; docker exec "$CONTAINER" tmux ls 2>/dev/null || echo "no tmux sessions" ;;
+        echo; docker exec -u claude "$CONTAINER" tmux ls 2>/dev/null || echo "no tmux sessions" ;;
     svc|mcp)
         docker exec "$CONTAINER" svc sync
         echo; docker exec "$CONTAINER" svc list
-        echo; docker exec "$CONTAINER" claude mcp list ;;
-    *)        exec docker exec -it "$CONTAINER" cc "$1" ;;
+        echo; docker exec -u claude "$CONTAINER" claude mcp list ;;
+    *)        exec docker exec -it -u claude "$CONTAINER" cc "$1" ;;
 esac

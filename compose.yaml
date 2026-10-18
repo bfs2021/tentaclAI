@@ -30,8 +30,7 @@ services:
     stdin_open: true
     tty: true
     working_dir: /workspace
-    # every variable from .env reaches the container (tokens, git identity, ...)
-    env_file: .env
+    # no env_file: secrets stay in .env, which only svc (root) reads – Claude runs as user "claude"
     environment:
       TZ: ${TZ:-UTC}
       TC_DIR: ${TC_DIR:?TC_DIR not set – run ./tentaclai.sh init}
@@ -44,12 +43,17 @@ services:
       - ${HOST_DOCS:-/dev/null}:/etc/tentaclai/host-docs.md:ro
       # optional: own root CA (PEM) for internal https services – /dev/null = none
       - ${CA_CERT:-/dev/null}:/etc/tentaclai/ca.crt:ro
-      # persistent home: Claude login/settings, ~/.config, shell history
+      # Claude's home: login, settings, history (user claude)
+      - ./data/claude:/home/claude
+      # root's home: svc state (git mirrors, caches) – Claude can't read it
       - ./data/home:/root
       # ssh: config + config.d/<host>.conf, own key pair, known_hosts
       - ./ssh:/root/.ssh
       # projects, repos (git services), generated SERVICES.md
       - ./workspace:/workspace
+    # svc/sudo need SETUID/SETGID; root needs CHOWN/DAC_OVERRIDE/FOWNER for the hand-over of files – nothing else
+    cap_drop: [ALL]
+    cap_add: [CHOWN, DAC_OVERRIDE, FOWNER, SETUID, SETGID, KILL, AUDIT_WRITE]
     extra_hosts:
       # the host running tentaclai (e.g. for an ssh docker service on the same machine)
       - host.docker.internal:host-gateway

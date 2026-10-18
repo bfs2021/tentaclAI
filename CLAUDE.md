@@ -23,7 +23,11 @@ architecture and `CONTRIBUTING.md` for the ground rules.
   `local/CLAUDE.md`, `compose.override.yaml`, `data/`). Before every commit check `git diff --cached --name-only` –
   never commit them, nor tokens, hostnames or IPs of a real installation.
 - **English** for code, UI, messages, docs, templates and commit messages.
-- **Guard rails stay intact:** `svc` enforces `ro`/`rw`, secrets never go into argv, logs, the UI or Claude's context.
+- **Guard rails stay intact:** `svc` enforces `ro`/`rw`/`confirm`, secrets never go into argv, logs, the UI or Claude's context.
+- **Privilege separation:** Claude runs as user `claude`, `svc`/`tc-scan` as root via sudo, client tools as `tcrun`
+  (`runner()` in svc). Code running as root must never read, write or run git in paths Claude controls (workspace, its
+  home) – hand files over as the other user (`as_user`, `write_as_claude`, staging dirs) and never pass Claude's
+  arguments to a root process that touches local files. New secrets go to the client tool via 0600 files/env of `tcrun`.
 - **Test in isolation**, not on a running installation: own compose project / container names / port, scratch `data/`.
   Recreating the real `tentaclai` container ends running sessions and Remote Control – only after asking.
 - Keep README, tentacontrol → Help (`control/app/templates/help.html`) and this file in sync with behaviour changes.

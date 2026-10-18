@@ -5,7 +5,7 @@ ENV_FILE = os.path.join(STACK_DIR, ".env")
 SERVICES_DIR = os.path.join(STACK_DIR, "services")
 SYSTEMS_DIR = os.path.join(STACK_DIR, "systems")
 SSH_DIR = os.path.join(STACK_DIR, "ssh")
-HOME_DIR = os.path.join(STACK_DIR, "data", "home")
+HOME_DIR = os.path.join(STACK_DIR, "data", "claude")  # Claude's home (user claude in the sandbox)
 DATA_DIR = os.environ.get("DATA_DIR", "/data")
 CLAUDE_CONTAINER = os.environ.get("CLAUDE_CONTAINER", "tentaclai")
 CLAUDE_SERVICE = os.environ.get("CLAUDE_SERVICE", "claude")
@@ -55,8 +55,8 @@ SETTINGS_GROUPS = [
 ]
 
 # read at container start (not by svc) -> claude container must be recreated
-RESTART_VARS = {"TZ", "TC_HOSTNAME", "CONTROL_URL", "GIT_USER_NAME", "GIT_USER_EMAIL", "GH_TOKEN",
-                "ANTHROPIC_API_KEY", "HOST_DOCS", "CA_CERT", "CLAUDE_CPUS", "CLAUDE_MEMORY"}
+RESTART_VARS = {"TZ", "TC_HOSTNAME", "CONTROL_URL", "GIT_USER_NAME", "GIT_USER_EMAIL",
+                "HOST_DOCS", "CA_CERT", "CLAUDE_CPUS", "CLAUDE_MEMORY"}
 # RC_* are read by rc-loop on every restart -> "Restart" of remote control is enough
 RC_VARS = {"RC_ENABLED", "RC_NAME", "RC_WORKDIR", "RC_EXTRA_ARGS", "RC_RESTART_DELAY"}
 

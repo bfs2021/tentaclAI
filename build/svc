@@ -14,7 +14,12 @@ resolved from the stack's .env (read fresh on every call) and the container envi
                                    svc arcane GET /environments
                                    svc mealie POST /households/shopping/items -d '{"note":"milk"}'
   svc git                          git repos: path, access (ro/rw), branch, ahead/behind, changes
-  svc git sync [name...]           clone missing repos, apply ro/rw + credentials, fetch
+  svc git sync [name...]           clone missing repos, apply settings, fetch
+  svc git fetch|pull <name>        fetch from the remote (pull: also fast-forward the current branch)
+  svc git push <name> [branch] [--force]   push a branch (credentials stay with svc)
+  svc ssh <host> [command...]      command (or a shell) on an SSH host – per-host access, default confirm
+  svc config put service <name> <file> | put local <file>
+                                   write a service file / the site rules (local/CLAUDE.md) – always needs approval
   svc docker                       Docker hosts (local socket or via ssh): mode, target, stacks dir, access
   svc docker <name> <args...>      docker CLI against that host, e.g. svc docker gate ps
   svc compose <name> <stack> <args...>
@@ -26,11 +31,17 @@ resolved from the stack's .env (read fresh on every call) and the container envi
   svc db [name] "<SQL>" | tables | describe <t> | shell    databases (postgres, mysql/mariadb); [--csv]
   svc web [name] [--links|--raw|--login] [path]          web sources: page as readable text, links, raw HTML
   svc files [name] ls|tree|cat|grep|pull|diff|push [path] directories/files on SSH hosts (pull → /workspace/files/<name>)
+
+Privilege separation: Claude runs as user "claude" and calls svc through sudo; svc runs as root (it alone can read
+.env, the SSH keys and the service files) and starts client tools (curl, psql, mariadb, stdio MCP servers) as the
+unprivileged user "tcrun" with only the secret they need. Anything run as root never touches Claude's files directly.
 """
 import glob
 import json
 import os
+import pwd
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -42,7 +53,16 @@ from html.parser import HTMLParser
 sys.path.insert(0, "/usr/local/lib/tentaclai")
 import tclib  # noqa: E402  shared with tentacontrol
 
-TC_DIR = os.environ.get("TC_DIR", "/opt/tentaclai")
+def _read(path):
+    try:
+        return open(path).read().strip()
+    except OSError:
+        return ""
+
+
+CLAUDE_USER, RUN_USER = "claude", "tcrun"
+# under sudo the environment is reset – the stack path then comes from a root-owned file written by the entrypoint
+TC_DIR = os.environ.get("TC_DIR") or _read("/etc/tentaclai/tc-dir") or "/opt/tentaclai"
 SERVICES_DIR = os.environ.get("SVC_DIR", os.path.join(TC_DIR, "services"))
 SYSTEMS_DIR = os.path.join(TC_DIR, "systems")
 PARTS = tclib.PARTS
@@ -59,8 +79,79 @@ RO_DOCKER = {"ps", "inspect", "logs", "images", "info", "version", "stats", "top
              "network", "volume", "image", "container", "system", "context"}
 RO_SUB = {"ls", "list", "inspect", "ps", "logs", "df", "info", "top", "port", "diff", "history", "show"}
 RO_COMPOSE = {"ps", "logs", "config", "ls", "images", "top", "port", "version", "events"}
-RO_PUSHURL = "READ-ONLY--push-disabled-by-tentaclai"
-HOOK_MARK = "# tentaclai read-only hook"
+HOOK_MARK = "# tentaclai pre-push hook"
+MIRRORS = os.path.expanduser("~/.cache/tentaclai/git")
+ORIG_CWD = "/"
+
+
+# ---------- privileges ----------
+
+def elevate():
+    """Claude (non-root) → re-run through sudo as root; root (entrypoint, tentacontrol) runs directly"""
+    if os.geteuid() != 0 and os.path.exists("/etc/sudoers.d/tentaclai"):
+        os.execvp("sudo", ["sudo", "-n", "--", os.path.abspath(sys.argv[0]), *sys.argv[1:]])
+
+
+def privileged():
+    return os.geteuid() == 0
+
+
+def via_sudo():
+    """called by Claude through sudo (not by root directly)"""
+    return privileged() and "SUDO_UID" in os.environ
+
+
+def _account(user):
+    try:
+        return pwd.getpwnam(user)
+    except KeyError:
+        return None
+
+
+def as_user(user, env=None, cwd=None):
+    """subprocess kwargs to run a command as another user with a minimal environment (no secrets of other parts)"""
+    pw = _account(user) if privileged() else None
+    base = {k: os.environ[k] for k in ("PATH", "LANG", "LC_ALL", "TERM", "TZ", "COLUMNS", "LINES") if k in os.environ}
+    base.setdefault("PATH", "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin")
+    if pw is None:  # not root (tests outside the image) – run as ourselves
+        return {"env": {**os.environ, **(env or {})}, **({"cwd": cwd} if cwd else {})}
+    base.update(HOME=pw.pw_dir, USER=user, LOGNAME=user)
+    return {"user": pw.pw_uid, "group": pw.pw_gid, "extra_groups": [], "umask": 0o022,
+            "env": {**base, **(env or {})}, "cwd": cwd or (ORIG_CWD if _can_enter(pw, ORIG_CWD) else pw.pw_dir)}
+
+
+def _can_enter(pw, path):
+    try:
+        st = os.stat(path)
+    except OSError:
+        return False
+    mode = st.st_mode
+    return bool(mode & 0o001) or (st.st_uid == pw.pw_uid and mode & 0o100) or (st.st_gid == pw.pw_gid and mode & 0o010)
+
+
+def runner(env=None):
+    """client tools (curl, psql, mariadb …) run as tcrun: they only get their own secret, never root"""
+    return as_user(RUN_USER, env)
+
+
+def give(path, user):
+    """hand a file/tree created by root to a user (Claude's workspace files, tcrun's secret files)"""
+    pw = _account(user) if privileged() else None
+    if pw is None:
+        return
+    if os.path.isdir(path) and not os.path.islink(path):
+        for root, dirs, files in os.walk(path):
+            for n in dirs + files:
+                os.lchown(os.path.join(root, n), pw.pw_uid, pw.pw_gid)
+    os.lchown(path, pw.pw_uid, pw.pw_gid)
+
+
+def stage_dir(owner=None):
+    """private temp dir for handing files between root and Claude (rsync, git bundles)"""
+    d = tempfile.mkdtemp(prefix="svc-", dir="/tmp")
+    if owner:
+        give(d, owner)
+    return d
 
 
 # ---------- loading ----------
@@ -176,17 +267,16 @@ def cmd_call(services, name, method, path, extra):
     files = []
     try:
         for content in ("\n".join(headers) + "\n", "\n".join(config) + "\n"):
-            with tempfile.NamedTemporaryFile("w", dir="/dev/shm", delete=False) as fh:
-                fh.write(content)
-                files.append(fh.name)
-        cmd = ["curl", "-sS", "-X", method.upper(), "-H", f"@{files[0]}", "-K", files[1]]
+            files.append(_shm_file(content))
+        # curl runs as tcrun: extra args (-o, -d @file, -K …) only reach what that user may read/write
+        cmd = ["curl", "-q", "-sS", "-X", method.upper(), "-H", f"@{files[0]}", "-K", files[1]]
         if api.get("insecure_tls"):
             cmd.append("-k")
         if method.upper() in ("GET", "HEAD", "OPTIONS"):
-            return subprocess.call(cmd + list(extra))
+            return subprocess.call(cmd + list(extra), **runner())
         body = " (with body)" if any(a in ("-d", "--data", "--data-raw", "--data-binary", "--json", "-F", "--form", "-T") for a in extra) else ""
         return guarded(name, "api", access_mode(svc["api"], "rw"), f"{method.upper()} {path}{body}",
-                       lambda: subprocess.call(cmd + list(extra)))
+                       lambda: subprocess.call(cmd + list(extra), **runner()))
     finally:
         for f in files:
             os.unlink(f)
@@ -195,12 +285,10 @@ def cmd_call(services, name, method, path, extra):
 # ---------- oauth2 (client credentials) ----------
 
 def _curl_secret(argv_head, config_lines):
-    """run curl with secrets only in a 0600 config file on tmpfs; return stdout"""
-    with tempfile.NamedTemporaryFile("w", dir="/dev/shm", delete=False) as fh:
-        fh.write("\n".join(config_lines) + "\n")
-        cfg = fh.name
+    """run curl (as tcrun) with secrets only in a 0600 config file on tmpfs; return stdout"""
+    cfg = _shm_file("\n".join(config_lines) + "\n")
     try:
-        r = subprocess.run(["curl", "-sS", *argv_head, "-K", cfg], capture_output=True, text=True)
+        r = subprocess.run(["curl", "-q", "-sS", *argv_head, "-K", cfg], capture_output=True, text=True, **runner())
         return r.returncode, r.stdout, r.stderr
     finally:
         os.unlink(cfg)
@@ -247,14 +335,27 @@ def oauth_token(name, auth, insecure=False):
 
 
 # ---------- git ----------
+# The working copy belongs to Claude (/workspace/repos/<name>) and has no credentials. svc keeps a bare mirror per
+# repo (root only, ~/.cache/tentaclai/git) that talks to the remote; commits travel between the two as git bundles.
+# Root never runs git inside Claude's repo (its config and hooks could run commands), Claude never sees a token.
 
 def repo_path(name, git):
     return git.get("path") or os.path.join(REPO_ROOT, name)
 
 
-def git_run(args, cwd=None, quiet=False):
-    env = {**os.environ, "GIT_TERMINAL_PROMPT": "0"}
+def git_run(args, cwd="/", quiet=False):
+    """git as root – only for the mirror and remote URLs, never in Claude's working copy"""
+    env = {k: v for k, v in os.environ.items() if not k.startswith(("SUDO_", "GIT_"))}
+    env["GIT_TERMINAL_PROMPT"] = "0"
     r = subprocess.run(["git", *args], cwd=cwd, env=env, capture_output=True, text=True)
+    if r.returncode != 0 and not quiet:
+        print(f"    git {' '.join(a for a in args[:3] if not a.startswith('credential'))}: {(r.stderr or r.stdout).strip()[:300]}")
+    return r
+
+
+def claude_git(args, path, quiet=False):
+    """git as Claude in the working copy"""
+    r = subprocess.run(["git", *args], capture_output=True, text=True, **as_user(CLAUDE_USER, {"GIT_TERMINAL_PROMPT": "0"}, cwd=path))
     if r.returncode != 0 and not quiet:
         print(f"    git {' '.join(args[:2])}: {(r.stderr or r.stdout).strip()[:300]}")
     return r
@@ -264,32 +365,87 @@ def uses_token(git):
     return (git.get("auth") or {}).get("type") == "token"
 
 
-def configure_repo(name, path, git):
-    """apply credentials and ro/rw protection – idempotent, also switches ro <-> rw"""
-    git_run(["config", "--unset-all", "credential.helper"], cwd=path, quiet=True)
-    git_run(["config", "--add", "credential.helper", ""], cwd=path)  # ignore global helpers (e.g. gh)
+def remote_args(name, git):
+    args = ["-c", "credential.helper="] + (["-c", "http.sslVerify=false"] if git.get("insecure_tls") else [])
     if uses_token(git):
-        git_run(["config", "--add", "credential.helper", f"!svc git-credential {name}"], cwd=path)
-    git_run(["config", "tentaclai.service", name], cwd=path)
-    if git.get("insecure_tls"):  # self-signed git server: skip certificate checks for this repo only
-        git_run(["config", "http.sslVerify", "false"], cwd=path)
+        args += ["-c", f"credential.helper=!{os.path.abspath(sys.argv[0])} git-credential {name}"]
+    return args
+
+
+def mirror_path(name):
+    return os.path.join(MIRRORS, f"{name}.git")
+
+
+def mirror_fetch(name, git):
+    """create/refresh the bare mirror; returns the default branch or None on failure"""
+    m = mirror_path(name)
+    if not os.path.isdir(m):
+        os.makedirs(MIRRORS, mode=0o700, exist_ok=True)
+        if git_run(["init", "--quiet", "--bare", m]).returncode != 0:
+            return None
+        git_run(["config", "remote.origin.url", git["url"]], cwd=m)
+        git_run(["config", "--add", "remote.origin.fetch", "+refs/heads/*:refs/heads/*"], cwd=m)
+        git_run(["config", "--add", "remote.origin.fetch", "+refs/tags/*:refs/tags/*"], cwd=m)
     else:
-        git_run(["config", "--unset", "http.sslVerify"], cwd=path, quiet=True)
-    access = git.get("access", "ro")
-    git_run(["config", "tentaclai.access", access], cwd=path)
+        git_run(["config", "remote.origin.url", git["url"]], cwd=m)
+    if git_run(remote_args(name, git) + ["fetch", "--quiet", "--prune", "origin"], cwd=m).returncode != 0:
+        return None
+    branch = git.get("branch")
+    if not branch:
+        r = git_run(remote_args(name, git) + ["ls-remote", "--symref", "origin", "HEAD"], cwd=m, quiet=True)
+        found = re.search(r"^ref: refs/heads/(\S+)\s+HEAD", r.stdout, re.M)
+        branch = found.group(1) if found else "main"
+    git_run(["symbolic-ref", "HEAD", f"refs/heads/{branch}"], cwd=m, quiet=True)
+    return branch
+
+
+def bundle_to_claude(name, git, path):
+    """mirror → Claude's working copy (clone if missing, else fetch into refs/remotes/origin)"""
+    branch = mirror_fetch(name, git)
+    if branch is None:
+        return False
+    m = mirror_path(name)
+    if not git_run(["for-each-ref", "--count=1", "refs/heads"], cwd=m, quiet=True).stdout.strip():
+        print(f"    {name}: remote repository is empty")
+        return os.path.isdir(os.path.join(path, ".git")) or claude_git(["init", "--quiet", "-b", branch, path], "/").returncode == 0
+    stage = stage_dir()
+    try:
+        b = os.path.join(stage, "repo.bundle")
+        if git_run(["bundle", "create", "--quiet", b, "--all"], cwd=m).returncode != 0:
+            return False
+        give(stage, CLAUDE_USER)
+        if not os.path.isdir(os.path.join(path, ".git")):
+            parent = os.path.dirname(path)
+            subprocess.run(["mkdir", "-p", parent], **as_user(CLAUDE_USER, cwd="/"))
+            if claude_git(["clone", "--quiet", "--branch", branch, b, path], parent).returncode != 0:
+                return False
+            claude_git(["remote", "set-url", "origin", git["url"]], path)
+            return True
+        return claude_git(["fetch", "--quiet", "--prune", b, "+refs/heads/*:refs/remotes/origin/*", "+refs/tags/*:refs/tags/*"],
+                          path).returncode == 0
+    finally:
+        shutil.rmtree(stage, ignore_errors=True)
+
+
+def configure_repo(name, path, git):
+    """settings of the working copy (as Claude) – idempotent; drops credentials and pushurls of older versions"""
+    claude_git(["config", "--unset-all", "credential.helper"], path, quiet=True)
+    claude_git(["config", "--unset", "remote.origin.pushurl"], path, quiet=True)
+    claude_git(["config", "tentaclai.service", name], path)
+    claude_git(["config", "tentaclai.access", git.get("access", "ro")], path)
+    if git.get("insecure_tls"):
+        claude_git(["config", "http.sslVerify", "false"], path)
+    else:
+        claude_git(["config", "--unset", "http.sslVerify"], path, quiet=True)
     hook = os.path.join(path, ".git", "hooks", "pre-push")
-    # one hook for every mode: ro blocks, rw is logged, confirm asks first (svc git-push-hook)
-    if not os.path.exists(hook) or HOOK_MARK in open(hook).read():
-        os.makedirs(os.path.dirname(hook), exist_ok=True)
-        with open(hook, "w") as f:
-            f.write(f"#!/bin/sh\n{HOOK_MARK}\nexec svc git-push-hook {shlex.quote(name)} \"$@\"\n")
-        os.chmod(hook, 0o755)
-    else:
-        print(f"    {name}: own pre-push hook found – push is not audited/confirmed", file=sys.stderr)
-    if access == "ro":
-        git_run(["config", "remote.origin.pushurl", RO_PUSHURL], cwd=path)
-    else:
-        git_run(["config", "--unset", "remote.origin.pushurl"], cwd=path, quiet=True)
+    # plain `git push` has no credentials – the hook points to svc git push
+    text = f"#!/bin/sh\n{HOOK_MARK}\nexec svc git-push-hook {shlex.quote(name)} \"$@\"\n"
+    r = subprocess.run(["sh", "-c", 'grep -qsE "# tentaclai (read-only|pre-push) hook" "$1" || [ ! -e "$1" ] && '
+                        '{ mkdir -p "$(dirname "$1")"; cat > "$1"; chmod 755 "$1"; }', "sh", hook],
+                       input=text, text=True, **as_user(CLAUDE_USER, cwd="/"))
+    if r.returncode != 0:
+        print(f"    {name}: own pre-push hook kept", file=sys.stderr)
+
 
 def git_sync(services, names=None, fetch=True):
     repos = {n: s for n, s in services.items() if "git" in s and (not names or n in names)}
@@ -305,14 +461,10 @@ def git_sync(services, names=None, fetch=True):
         if miss:
             print(f"  – {name}: skipped, empty in .env: {', '.join(miss)}")
             continue
+        git = render(git)
         path = repo_path(name, git)
         if not os.path.isdir(os.path.join(path, ".git")):
-            os.makedirs(os.path.dirname(path), exist_ok=True)
-            args = ["-c", "credential.helper="] + (["-c", "http.sslVerify=false"] if git.get("insecure_tls") else [])
-            if uses_token(git):
-                args += ["-c", f"credential.helper=!svc git-credential {name}"]
-            args += ["clone"] + (["--branch", git["branch"]] if git.get("branch") else []) + [git["url"], path]
-            if git_run(args).returncode != 0:
+            if not bundle_to_claude(name, git, path):
                 print(f"  ✗ {name}: clone failed")
                 continue
             configure_repo(name, path, git)
@@ -320,7 +472,7 @@ def git_sync(services, names=None, fetch=True):
             continue
         configure_repo(name, path, git)
         if fetch:
-            ok = git_run(["fetch", "--prune", "--quiet"], cwd=path).returncode == 0
+            ok = bundle_to_claude(name, git, path)
             print(f"  {'✓' if ok else '✗'} {name}: {'updated (fetch)' if ok else 'fetch failed'} – {git.get('access', 'ro')}")
         else:
             print(f"  ✓ {name}: present ({git.get('access', 'ro')})")
@@ -329,9 +481,9 @@ def git_sync(services, names=None, fetch=True):
 def git_state(path):
     if not os.path.isdir(os.path.join(path, ".git")):
         return "not cloned"
-    branch = git_run(["rev-parse", "--abbrev-ref", "HEAD"], cwd=path, quiet=True).stdout.strip()
-    counts = git_run(["rev-list", "--left-right", "--count", "HEAD...@{upstream}"], cwd=path, quiet=True).stdout.split()
-    dirty = bool(git_run(["status", "--porcelain"], cwd=path, quiet=True).stdout.strip())
+    branch = claude_git(["rev-parse", "--abbrev-ref", "HEAD"], path, quiet=True).stdout.strip()
+    counts = claude_git(["rev-list", "--left-right", "--count", "HEAD...@{upstream}"], path, quiet=True).stdout.split()
+    dirty = bool(claude_git(["status", "--porcelain"], path, quiet=True).stdout.strip())
     parts = [branch or "?"]
     if len(counts) == 2:
         if counts[0] != "0":
@@ -356,9 +508,68 @@ def cmd_git_list(services):
         print(f"{name:<18}{git.get('access', 'ro'):<9}{state:<28}{path}")
 
 
+def get_git(services, name):
+    svc = get(services, name)
+    if "git" not in svc:
+        sys.exit(f"svc: {name} is not a git service (svc git)")
+    git = get_part(services, name, "git")
+    path = repo_path(name, git)
+    if not os.path.isdir(os.path.join(path, ".git")):
+        sys.exit(f"svc: {name} is not cloned yet – svc git sync {name}")
+    return git, path
+
+
+def cmd_git_fetch(services, name, pull=False):
+    git, path = get_git(services, name)
+    if not bundle_to_claude(name, git, path):
+        return 1
+    print(f"✓ {name}: fetched")
+    if pull:
+        r = claude_git(["merge", "--ff-only", "@{upstream}"], path)
+        print(r.stdout.strip() or r.stderr.strip())
+        return r.returncode
+    return 0
+
+
+def cmd_git_push(services, name, args):
+    git, path = get_git(services, name)
+    force = any(a in ("-f", "--force") for a in args)
+    rest = [a for a in args if a not in ("-f", "--force")]
+    branch = rest[0] if rest else claude_git(["rev-parse", "--abbrev-ref", "HEAD"], path, quiet=True).stdout.strip()
+    if not branch or branch == "HEAD" or claude_git(["check-ref-format", "--branch", branch], path, quiet=True).returncode != 0:
+        sys.exit("svc: no branch to push (detached HEAD?) – svc git push <name> <branch>")
+    if mirror_fetch(name, git) is None:
+        return 1
+    m = mirror_path(name)
+    stage = stage_dir(CLAUDE_USER)
+    try:
+        b = os.path.join(stage, "push.bundle")
+        if claude_git(["bundle", "create", "--quiet", b, f"refs/heads/{branch}"], path).returncode != 0:
+            sys.exit(f"svc: branch {branch} not found in {path}")
+        if git_run(["fetch", "--quiet", b, f"+refs/heads/{branch}:refs/tentaclai/push"], cwd=m).returncode != 0:
+            return 1
+        commit = git_run(["rev-parse", "--short", "refs/tentaclai/push"], cwd=m).stdout.strip()
+        action = f"git push {branch} ({commit}){' --force' if force else ''} → {git['url']}"
+
+        def push():
+            r = git_run(remote_args(name, git) + ["push", "--quiet"] + (["--force"] if force else [])
+                        + ["origin", f"refs/tentaclai/push:refs/heads/{branch}"], cwd=m)
+            return r.returncode
+        rc = guarded(name, "git", access_mode(git), action, push)
+    finally:
+        git_run(["update-ref", "-d", "refs/tentaclai/push"], cwd=m, quiet=True)
+        shutil.rmtree(stage, ignore_errors=True)
+    if rc == 0:
+        bundle_to_claude(name, git, path)
+        print(f"✓ {name}: pushed {branch} ({commit})")
+    return rc
+
+
 def cmd_git_credential(services, name, op):
-    """git credential helper protocol – answers 'get' with the token from .env"""
+    """git credential helper protocol – answers 'get' with the token from .env (only for svc's own git, never for Claude)"""
     sys.stdin.read()
+    if via_sudo():
+        sys.exit("svc: git-credential is internal")
     svc = services.get(name)
     if op != "get" or not svc or not enabled(svc) or "git" not in svc:
         return 0
@@ -392,10 +603,10 @@ def wants_tty(args, compose=False):
 
 
 def docker_argv(name, d, args):
-    """docker CLI for a docker service: context, or plain ssh + sudo for hosts that need sudo"""
-    sudo = docker_sudo(d)
-    if sudo:
-        return ["ssh"] + (["-t", "-q"] if wants_tty(args) else []) + [d["ssh_host"], f"{sudo} docker {shlex.join(args)}"]
+    """docker CLI for a docker service: ssh hosts run docker remotely (local files are never touched), sockets via a context"""
+    if d.get("mode", "socket") == "ssh":
+        sudo = docker_sudo(d)
+        return ["ssh"] + (["-t", "-q"] if wants_tty(args) else []) + [d["ssh_host"], f"{sudo + ' ' if sudo else ''}docker {shlex.join(args)}"]
     return ["docker", "--context", name, *args]
 
 
@@ -422,8 +633,8 @@ def sync_docker_contexts(services):
     active = set()
     for name, svc in docker_services(services).items():
         d = render(svc["docker"])
-        if docker_sudo(d):  # docker contexts can't use sudo – svc docker/compose go through ssh instead
-            print(f"  ✓ {name} (docker ssh + sudo: {d['ssh_host']}, {d.get('access', 'ro')}, no docker context)")
+        if d.get("mode", "socket") == "ssh":  # svc docker/compose run docker on the host through ssh – no context needed
+            print(f"  ✓ {name} (docker via ssh {d['ssh_host']}{' + sudo' if docker_sudo(d) else ''}, {d.get('access', 'ro')})")
             continue
         host = docker_target(name, d)
         exists = subprocess.run(["docker", "context", "inspect", name], capture_output=True).returncode == 0
@@ -539,10 +750,11 @@ def part_services(services, part):
 
 
 def _shm_file(content):
-    """0600 file on tmpfs for secrets – caller deletes it"""
+    """0600 file on tmpfs for secrets, readable by tcrun only (the client tool) – caller deletes it"""
     with tempfile.NamedTemporaryFile("w", dir="/dev/shm", delete=False) as fh:
         fh.write(content)
-        return fh.name
+    give(fh.name, RUN_USER)
+    return fh.name
 
 
 # ---------- databases (db) ----------
@@ -568,7 +780,7 @@ def db_run(name, db, sql=None, fmt="table", interactive=False):
     if sql is not None and ro and DB_RO_BYPASS.search(sql):
         sys.exit(f"svc: {name} is read-only – statements that change the transaction mode are not allowed")
     if db_engine(db) == "postgres":
-        env = dict(os.environ, PGHOST=str(db.get("host", "")), PGPORT=str(db.get("port", 5432)),
+        env = dict(PGHOST=str(db.get("host", "")), PGPORT=str(db.get("port", 5432)),
                    PGDATABASE=str(db.get("database", "")), PGUSER=str(db.get("user", "")), PGPASSWORD=str(db.get("password", "")),
                    PGSSLMODE=pg_sslmode(db), PGAPPNAME="tentaclai", PGCONNECT_TIMEOUT="10")
         if ro:
@@ -578,12 +790,13 @@ def db_run(name, db, sql=None, fmt="table", interactive=False):
             cmd.append("--csv")
         if sql is not None:
             cmd += ["-c", sql]
-        return subprocess.call(cmd, env=env) if interactive or sql is not None else 0
+        # psql runs as tcrun: shell escapes (\!) in the interactive shell get that user, not root
+        return subprocess.call(cmd, **runner(env)) if interactive or sql is not None else 0
     cfg = _shm_file("[client]\n" + "".join(f"{k}={v}\n" for k, v in (
         ("host", db.get("host", "")), ("port", db.get("port", 3306)), ("user", db.get("user", "")),
         ("password", db.get("password", "")), ("database", db.get("database", ""))) if v != ""))
     try:
-        cmd = ["mariadb", f"--defaults-extra-file={cfg}", "--connect-timeout=10"]
+        cmd = ["mariadb", f"--defaults-extra-file={cfg}", "--connect-timeout=10", "--sandbox"]
         if db.get("ssl") in (True, "require", "true"):
             cmd.append("--ssl")
             if db.get("insecure_tls"):
@@ -592,7 +805,7 @@ def db_run(name, db, sql=None, fmt="table", interactive=False):
             cmd.append("--init-command=SET SESSION TRANSACTION READ ONLY")
         if sql is not None:
             cmd += (["--batch"] if fmt == "csv" else ["--table"]) + ["-e", sql]
-        return subprocess.call(cmd)
+        return subprocess.call(cmd, **runner())
     finally:
         os.unlink(cfg)
 
@@ -638,17 +851,17 @@ def cmd_db(services, args):
 def db_test(name, db):
     """(ok, detail)"""
     if db_engine(db) == "postgres":
-        env = dict(os.environ, PGHOST=str(db.get("host", "")), PGPORT=str(db.get("port", 5432)), PGDATABASE=str(db.get("database", "")),
+        env = dict(PGHOST=str(db.get("host", "")), PGPORT=str(db.get("port", 5432)), PGDATABASE=str(db.get("database", "")),
                    PGUSER=str(db.get("user", "")), PGPASSWORD=str(db.get("password", "")), PGSSLMODE=pg_sslmode(db),
                    PGCONNECT_TIMEOUT="8", PGOPTIONS="-c default_transaction_read_only=on")
-        r = subprocess.run(["psql", "-X", "-At", "-c", "SELECT version()"], env=env, capture_output=True, text=True, timeout=20)
+        r = subprocess.run(["psql", "-X", "-At", "-c", "SELECT version()"], capture_output=True, text=True, timeout=20, **runner(env))
     else:
         cfg = _shm_file("[client]\n" + "".join(f"{k}={v}\n" for k, v in (
             ("host", db.get("host", "")), ("port", db.get("port", 3306)), ("user", db.get("user", "")),
             ("password", db.get("password", "")), ("database", db.get("database", ""))) if v != ""))
         try:
             r = subprocess.run(["mariadb", f"--defaults-extra-file={cfg}", "--connect-timeout=8", "-N", "-e", "SELECT VERSION()"],
-                               capture_output=True, text=True, timeout=20)
+                               capture_output=True, text=True, timeout=20, **runner())
         finally:
             os.unlink(cfg)
     if r.returncode == 0:
@@ -722,9 +935,11 @@ class _HTMLText(HTMLParser):
 
 
 def web_paths(name):
-    d = os.path.expanduser("~/.cache/tentaclai/web")
-    os.makedirs(d, mode=0o700, exist_ok=True)
-    return os.path.join(d, f"{name}.cookies")
+    """per-service cookie jar – created and used by tcrun, which runs curl"""
+    pw = _account(RUN_USER) if privileged() else None
+    jar = os.path.join(pw.pw_dir if pw else os.path.expanduser("~"), ".cache", "tentaclai", "web", f"{name}.cookies")
+    subprocess.run(["sh", "-c", 'umask 077; mkdir -p "$(dirname "$1")" && touch "$1"', "sh", jar], **runner())
+    return jar
 
 
 def web_url(name, web, path):
@@ -759,9 +974,6 @@ def web_curl(name, web, url, method="GET", data_lines=(), out=None):
         cfg += [f'data-urlencode = {_q(l)}' for l in data_lines]
     if web.get("insecure_tls"):
         cfg.append("insecure")
-    if not os.path.exists(jar):
-        open(jar, "w").close()
-        os.chmod(jar, 0o600)
     code, stdout, stderr = _curl_secret([], cfg)
     body, _, meta = stdout.rpartition("\n")
     parts = meta.split(" ", 2) + ["", "", ""]
@@ -903,20 +1115,36 @@ def cmd_files(services, args):
             audit(name, "files", "ro", f"push {sub or '.'} → {host}:{remote}", "blocked")
             sys.exit(f"svc: {name} is read-only – push is not allowed")
         is_dir = subprocess.run(["ssh", host, (sudo + " " if sudo else "") + f"test -d {shlex.quote(remote)}"]).returncode == 0
-        src_r, src_l = (remote + "/", dest.rstrip("/") + "/") if is_dir else (remote, dest)
+        src_r = remote + "/" if is_dir else remote
         base = ["rsync", "-a", "--exclude=.git/"] + ([f"--rsync-path={sudo} rsync"] if sudo else [])
-        if op == "pull":
-            os.makedirs(dest if is_dir else os.path.dirname(dest) or local, exist_ok=True)
-            r = subprocess.call(base + [f"{host}:{src_r}", src_l])
-            if r == 0:
-                print(f"→ {dest}  (edit there; changes go back with: svc files {name} diff|push{' ' + sub if sub else ''})")
-            return r
-        if not os.path.exists(dest):
-            sys.exit(f"svc: {dest} not found – pull first")
-        if op == "diff":
-            return subprocess.call(base + ["-n", "-i", "--checksum", src_l, f"{host}:{src_r}"])
-        return guarded(name, "files", access_mode(f), f"push {sub or '.'} → {host}:{remote}",
-                       lambda: subprocess.call(base + ["-i", src_l, f"{host}:{src_r}"]))
+        # root talks to the host (SSH key); the local side is copied as Claude through a private staging dir,
+        # so root never reads or writes a path inside Claude's workspace (symlinks there can't redirect it)
+        claude = as_user(CLAUDE_USER)
+        stage = stage_dir()
+        try:
+            st = os.path.join(stage, "x") + ("/" if is_dir else "")
+            if op == "pull":
+                r = subprocess.call(base + [f"{host}:{src_r}", st])
+                if r != 0:
+                    return r
+                give(stage, CLAUDE_USER)
+                r = subprocess.call(["sh", "-c", 'mkdir -p "$1" && rsync -a "$2" "$3"', "sh", dest if is_dir else os.path.dirname(dest) or local,
+                                     st, dest.rstrip("/") + "/" if is_dir else dest], **claude)
+                if r == 0:
+                    print(f"→ {dest}  (edit there; changes go back with: svc files {name} diff|push{' ' + sub if sub else ''})")
+                return r
+            give(stage, CLAUDE_USER)
+            if subprocess.call(["test", "-e", dest], **claude) != 0:
+                sys.exit(f"svc: {dest} not found – pull first")
+            if subprocess.call(["rsync", "-a", "--exclude=.git/", dest.rstrip("/") + "/" if is_dir else dest, st], **claude) != 0:
+                sys.exit(f"svc: could not read {dest}")
+            out = base + ["--no-owner", "--no-group"]  # the staged copy belongs to Claude – keep the host's owners
+            if op == "diff":
+                return subprocess.call(out + ["-n", "-i", "--checksum", st, f"{host}:{src_r}"])
+            return guarded(name, "files", access_mode(f), f"push {sub or '.'} → {host}:{remote}",
+                           lambda: subprocess.call(out + ["-i", st, f"{host}:{src_r}"]))
+        finally:
+            shutil.rmtree(stage, ignore_errors=True)
     sys.exit("usage: svc files <name> ls|tree|cat <file>|grep <pattern> [path]|pull|diff|push [path]")
 
 
@@ -936,9 +1164,96 @@ def files_test(name, f):
     return False, f"{host}:{root} not found"
 
 
+# ---------- ssh ----------
+
+def cmd_ssh(name_args):
+    """a command (or an interactive shell) on an SSH host – the key stays with svc; access per host (default confirm)"""
+    if not name_args:
+        print(f"{'Host':<16}{'Access':<9}{'User':<10}{'Hostname':<30}sudo")
+        for h in tclib.ssh_hosts(SSH_CONF_D):
+            print(f"{h['alias']:<16}{tclib.ssh_access(SSH_CONF_D, h['alias']):<9}{h['user'] or '–':<10}{h['hostname'] or '–':<30}{h['sudo'] or '–'}")
+        return 0
+    alias, cmd = name_args[0], name_args[1:]
+    if cmd[:1] == ["--"]:
+        cmd = cmd[1:]
+    if not tclib.ssh_host(SSH_CONF_D, alias):
+        sys.exit(f"svc: unknown SSH host '{alias}' (svc ssh)")
+    mode = tclib.ssh_access(SSH_CONF_D, alias)
+    remote = " ".join(cmd)
+    tty = not cmd or sys.stdin.isatty() and sys.stdout.isatty()
+    argv = ["ssh"] + (["-t"] if tty else ["-T"]) + ["--", alias] + ([remote] if remote else [])
+    return guarded(alias, "ssh", mode, f"ssh {alias} {remote}" if remote else f"ssh {alias} (interactive shell)",
+                   lambda: subprocess.call(argv))
+
+
+def cmd_config(services, args):
+    """Claude proposes a service file or the site rules; the user approves every write (the stack dir is root's)"""
+    if len(args) < 3 or args[0] != "put" or args[1] not in ("service", "local") or (args[1] == "service" and len(args) < 4):
+        sys.exit("usage: svc config put service <name> <file>  |  svc config put local <file>")
+    if args[1] == "service":
+        name, src = args[2], args[3]
+        if not re.fullmatch(r"[a-z0-9][a-z0-9_-]{0,40}", name):
+            sys.exit("svc: service names: a-z 0-9 _ - (max 41)")
+        target = os.path.join(SERVICES_DIR, f"{name}.json")
+    else:
+        name, src = "local", args[2]
+        target = os.path.join(TC_DIR, "local", "CLAUDE.md")
+    r = subprocess.run(["cat", "--", src], capture_output=True, **as_user(CLAUDE_USER))  # read with Claude's rights
+    if r.returncode != 0:
+        sys.exit(f"svc: can't read {src}: {r.stderr.decode(errors='replace').strip()[:160]}")
+    text = r.stdout.decode("utf-8", "replace")
+    if len(text) > 512 * 1024:
+        sys.exit("svc: file too large")
+    old = open(target).read() if os.path.exists(target) else None
+    if args[1] == "service":
+        try:
+            data = json.loads(text)
+        except ValueError as e:
+            sys.exit(f"svc: invalid JSON: {e}")
+        if not isinstance(data, dict):
+            sys.exit("svc: a service file is a JSON object")
+        access = ", ".join(f"{p} {data[p].get('access', '–')}" for p in PARTS if isinstance(data.get(p), dict)) or "no parts"
+        action = f"{'change' if old is not None else 'create'} services/{name}.json ({access})"
+    else:
+        action = f"{'change' if old is not None else 'create'} local/CLAUDE.md ({len(text.splitlines())} lines)"
+    if old == text:
+        print("unchanged")
+        return 0
+    if old is not None:
+        import difflib
+        diff = list(difflib.unified_diff(old.splitlines(), text.splitlines(), lineterm="", n=0))
+        added, removed = sum(1 for l in diff if l.startswith("+") and not l.startswith("+++")), \
+            sum(1 for l in diff if l.startswith("-") and not l.startswith("---"))
+        action += f", +{added}/-{removed} lines"
+
+    def write():
+        if old is not None:
+            shutil.copy2(target, f"{target}.bak-{time.strftime('%Y-%m-%d-%H%M%S')}")
+        os.makedirs(os.path.dirname(target), exist_ok=True)
+        with open(target + ".tmp", "w") as f:
+            f.write(text)
+        os.replace(target + ".tmp", target)
+        print(f"✓ {os.path.relpath(target, TC_DIR)} written" + (" (previous version kept as .bak-…)" if old is not None else ""))
+        if args[1] == "service":
+            cmd_sync(load())
+        else:
+            write_instructions()
+        return 0
+    return guarded(name if args[1] == "service" else "local", "config", "confirm", action, write)
+
+
+def cmd_rc_env():
+    """the remote-control settings (no secrets) for rc-loop, which runs as Claude and can't read .env"""
+    env = tclib.read_env(ENV_FILE)
+    for k in ("RC_ENABLED", "RC_NAME", "RC_WORKDIR", "RC_EXTRA_ARGS", "RC_RESTART_DELAY"):
+        if k in env:
+            print(f"{k}={shlex.quote(env[k])}")
+    return 0
+
+
 # ---------- audit log and approvals (access mode "confirm") ----------
 # Every write through svc is logged; with access "confirm" it first needs the user's approval in tentacontrol (Activity).
-# A guard rail like ro: it keeps an honest agent and mistakes in check, it is no security boundary against root in this sandbox.
+# Claude runs as an unprivileged user and reaches services only through svc (sudo), so the modes are enforced here.
 
 CONTROL_INTERNAL = os.environ.get("TC_CONTROL_INTERNAL", "http://tentacontrol:8080")
 AUDIT_FILE = os.path.join(TC_DIR, "data", "control", "audit.jsonl")
@@ -1043,26 +1358,11 @@ def cmd_audit(args):
 
 
 def git_push_hook(services, name, args):
-    """pre-push hook of every repo: ro blocks, rw logs, confirm asks first"""
-    svc = services.get(name) or {}
-    git = svc.get("git") or {}
-    refs = [l.split()[2] for l in sys.stdin.read().splitlines() if len(l.split()) == 4]
-    url = args[1] if len(args) > 1 else git.get("url", "")
-    action = f"git push {', '.join(refs) or '(nothing)'} → {url}"
-    mode = access_mode(git)
-    if mode == "ro":
-        audit(name, "git", mode, action, "blocked")
-        print(f"tentaclai: repo \"{name}\" is read-only – push blocked.", file=sys.stderr)
-        return 1
-    decision, by = "auto", ""
-    if mode == "confirm":
-        decision, by = request_approval(name, "git", action)
-        if decision != "approved":
-            audit(name, "git", mode, action, decision, detail=by)
-            print(f"tentaclai: push {decision} – not pushed.", file=sys.stderr)
-            return 1
-    audit(name, "git", mode, action, decision, detail=by)
-    return 0
+    """pre-push hook of every working copy: plain `git push` has no credentials – push through svc instead"""
+    sys.stdin.read()
+    print(f"tentaclai: push with `svc git push {name} [branch]` – credentials, access mode and approval are handled there.",
+          file=sys.stderr)
+    return 1
 
 
 READ_SQL = re.compile(r"^\s*(select|show|describe|desc|explain|values|table|\\d)\b", re.I)
@@ -1118,11 +1418,8 @@ def cmd_test(services, name):
                 found = subprocess.run(["sh", "-c", f"command -v {m.get('command', '')}"], capture_output=True).returncode == 0
                 report("mcp", found, f"stdio command {m.get('command')} {'found' if found else 'not found'}")
         elif part == "git":
-            g = svc["git"]
-            args = ["-c", "credential.helper="] + (["-c", "http.sslVerify=false"] if g.get("insecure_tls") else [])
-            if uses_token(g):
-                args += ["-c", f"credential.helper=!svc git-credential {name}"]
-            r = git_run(args + ["ls-remote", "--heads", g["url"]], quiet=True)
+            g = render(svc["git"])
+            r = git_run(remote_args(name, g) + ["ls-remote", "--heads", g["url"]], quiet=True)
             heads = len(r.stdout.splitlines())
             report("git", r.returncode == 0, f"{g['url']} → {heads} Branches" if r.returncode == 0 else (r.stderr.strip()[-160:] or "error"))
         elif part == "docker":
@@ -1189,8 +1486,122 @@ def cmd_info(services, name):
         print(f"  ! [{sysd['name']}] {note}")
 
 
+# ---------- MCP ----------
+# MCP servers whose config holds secrets (headers, env) are registered in Claude's config as `svc mcp-proxy <name>`:
+# stdio servers run as tcrun with their env, http servers are bridged here (stdio ↔ Streamable HTTP) with the headers
+# added by svc – the tokens never land in Claude's ~/.claude.json.
+
 def claude_mcp(*args):
-    return subprocess.run(["claude", "mcp", *args], capture_output=True, text=True)
+    return subprocess.run(["claude", "mcp", *args], capture_output=True, text=True, **as_user(CLAUDE_USER, cwd="/"))
+
+
+def mcp_entry(name, mcp):
+    """what Claude's config gets: the server itself when it needs no secret, else the svc proxy"""
+    if not variables(mcp):
+        return render(mcp)
+    return {"type": "stdio", "command": "svc", "args": ["mcp-proxy", name]}
+
+
+def cmd_mcp_proxy(services, name):
+    svc = services.get(name) or sys.exit(f"svc: unknown service '{name}'")
+    if "mcp" not in svc or not enabled(svc) or missing_vars(svc["mcp"]):
+        sys.exit(f"svc: {name}: MCP not available (svc test {name})")
+    m = render(svc["mcp"])
+    kind = m.get("type", "stdio" if m.get("command") else "http")
+    if kind == "stdio":
+        kw = runner({k: str(v) for k, v in (m.get("env") or {}).items()})
+        kw.pop("cwd", None)
+        pw = _account(RUN_USER) if privileged() else None
+        os.chdir(pw.pw_dir if pw else ORIG_CWD)
+        if pw:
+            os.setgroups([])
+            os.setgid(pw.pw_gid)
+            os.setuid(pw.pw_uid)
+        os.execvpe(m["command"], [m["command"], *[str(a) for a in m.get("args", [])]], kw["env"])
+    if kind != "http":
+        sys.exit(f"svc: {name}: MCP type {kind} can't be proxied – use type http (Streamable HTTP)")
+    return mcp_bridge(m)
+
+
+def mcp_bridge(m):
+    import ssl
+    import threading
+    import urllib.error
+    import urllib.request
+    ctx = ssl._create_unverified_context() if m.get("insecure_tls") else ssl.create_default_context()
+    headers = {str(k): str(v) for k, v in (m.get("headers") or {}).items()}
+    state = {"session": None, "version": None}
+    lock = threading.Lock()
+
+    def emit(obj):
+        with lock:
+            sys.stdout.write(json.dumps(obj, separators=(",", ":")) + "\n")
+            sys.stdout.flush()
+
+    def post(line, rid):
+        h = dict(headers, **{"Content-Type": "application/json", "Accept": "application/json, text/event-stream"})
+        if state["session"]:
+            h["Mcp-Session-Id"] = state["session"]
+        if state["version"]:
+            h["MCP-Protocol-Version"] = state["version"]
+        req = urllib.request.Request(m["url"], data=line.encode(), headers=h, method="POST")
+        try:
+            with urllib.request.urlopen(req, context=ctx, timeout=300) as r:
+                sid = r.headers.get("Mcp-Session-Id")
+                if sid:
+                    state["session"] = sid
+                ctype = r.headers.get("Content-Type", "")
+                if r.status == 202:
+                    return
+                if "text/event-stream" in ctype:
+                    data = []
+                    for raw in r:
+                        l = raw.decode("utf-8", "replace").rstrip("\r\n")
+                        if l.startswith("data:"):
+                            data.append(l[5:].lstrip())
+                        elif not l and data:
+                            msg = json.loads("\n".join(data))
+                            data = []
+                            note_version(msg)
+                            emit(msg)
+                    if data:
+                        msg = json.loads("\n".join(data))
+                        note_version(msg)
+                        emit(msg)
+                    return
+                body = r.read().decode("utf-8", "replace").strip()
+                if body:
+                    msg = json.loads(body)
+                    for x in (msg if isinstance(msg, list) else [msg]):
+                        note_version(x)
+                        emit(x)
+        except urllib.error.HTTPError as e:
+            if e.code == 404 and state["session"]:
+                state["session"] = None  # session expired – the client has to initialize again
+            if rid is not None:
+                emit({"jsonrpc": "2.0", "id": rid, "error": {"code": -32000, "message": f"HTTP {e.code} from MCP server"}})
+        except Exception as e:  # noqa: BLE001 – network errors, bad JSON
+            if rid is not None:
+                emit({"jsonrpc": "2.0", "id": rid, "error": {"code": -32000, "message": f"MCP proxy: {str(e)[:200]}"}})
+
+    def note_version(msg):
+        if isinstance(msg, dict) and isinstance(msg.get("result"), dict) and msg["result"].get("protocolVersion"):
+            state["version"] = msg["result"]["protocolVersion"]
+
+    for line in sys.stdin:
+        line = line.strip()
+        try:
+            msg = json.loads(line) if line else None
+        except ValueError:
+            continue
+        if not isinstance(msg, dict):
+            continue
+        rid = msg.get("id")
+        if rid is None or msg.get("method") == "initialize" or not state["session"] and not state["version"]:
+            post(line, rid)  # initialize and notifications in order (initialize sets the session id)
+        else:
+            threading.Thread(target=post, args=(line, rid), daemon=True).start()  # requests may run long – in parallel
+    return 0
 
 
 def cmd_sync(services):
@@ -1212,7 +1623,7 @@ def cmd_sync(services):
             print(f"  – {name}: MCP skipped, empty in .env: {', '.join(miss)}")
             continue
         claude_mcp("remove", "--scope", "user", name)
-        r = claude_mcp("add-json", "--scope", "user", name, json.dumps(render(mcp)))
+        r = claude_mcp("add-json", "--scope", "user", name, json.dumps(mcp_entry(name, mcp)))
         if r.returncode == 0:
             print(f"  ✓ {name} (MCP)")
             active.add(name)
@@ -1230,16 +1641,23 @@ def cmd_sync(services):
     write_instructions()
 
 
+def write_as_claude(path, text):
+    """write a file in Claude's area as Claude (root never opens paths Claude controls – symlinks can't redirect it)"""
+    return subprocess.run(["sh", "-c", 'mkdir -p "$(dirname "$1")" && cat > "$1.tmp" && mv -f "$1.tmp" "$1"', "sh", path],
+                          input=text, text=True, capture_output=True, **as_user(CLAUDE_USER, cwd="/"))
+
+
+def claude_home():
+    pw = _account(CLAUDE_USER) if privileged() else None
+    return pw.pw_dir if pw else os.path.expanduser("~")
+
+
 def write_instructions():
     """regenerate Claude's CLAUDE.md (docker + SSH host tables) – new sessions pick it up without a restart"""
     r = subprocess.run(["claude-instructions"], capture_output=True, text=True)
     if r.returncode == 0 and r.stdout.strip():
-        path = os.path.expanduser("~/.claude/CLAUDE.md")
-        os.makedirs(os.path.dirname(path), exist_ok=True)
-        with open(path + ".tmp", "w") as f:
-            f.write(r.stdout)
-        os.replace(path + ".tmp", path)
-        print("  ✓ ~/.claude/CLAUDE.md updated")
+        w = write_as_claude(os.path.join(claude_home(), ".claude", "CLAUDE.md"), r.stdout)
+        print("  ✓ ~/.claude/CLAUDE.md updated" if w.returncode == 0 else f"  ✗ CLAUDE.md: {w.stderr.strip()[:160]}")
 
 
 def write_catalog(services):
@@ -1328,15 +1746,19 @@ def write_catalog(services):
             lines += ["", f"## {name}", ""]
             lines += [f"- `{e}`" for e in svc.get("examples", [])]
             lines += [f"- ⚠ {n}" for n in svc.get("notes", [])]
-    try:
-        with open(CATALOG, "w") as f:
-            f.write("\n".join(lines) + "\n")
-        print(f"  ✓ {CATALOG} updated")
-    except OSError as e:
-        print(f"  ✗ {CATALOG}: {e}")
+    w = write_as_claude(CATALOG, "\n".join(lines) + "\n")
+    print(f"  ✓ {CATALOG} updated" if w.returncode == 0 else f"  ✗ {CATALOG}: {w.stderr.strip()[:160]}")
 
 
 def main(argv):
+    global ORIG_CWD
+    elevate()
+    try:
+        ORIG_CWD = os.getcwd()
+    except OSError:
+        ORIG_CWD = "/"
+    if privileged():
+        os.chdir("/")  # nothing running as root reads files from Claude's current directory
     load_env_file()
     services = load()
     if len(argv) < 2 or argv[1] in ("-h", "--help", "help"):
@@ -1354,7 +1776,19 @@ def main(argv):
     if cmd == "git":
         if len(argv) >= 3 and argv[2] == "sync":
             return git_sync(services, argv[3:] or None)
+        if len(argv) >= 4 and argv[2] in ("fetch", "pull"):
+            return cmd_git_fetch(services, argv[3], pull=argv[2] == "pull")
+        if len(argv) >= 4 and argv[2] == "push":
+            return cmd_git_push(services, argv[3], argv[4:])
         return cmd_git_list(services)
+    if cmd == "ssh":
+        return cmd_ssh(argv[2:])
+    if cmd == "mcp-proxy" and len(argv) == 3:
+        return cmd_mcp_proxy(services, argv[2])
+    if cmd == "rc-env":
+        return cmd_rc_env()
+    if cmd == "config":
+        return cmd_config(services, argv[2:])
     if cmd == "docker":
         return cmd_docker(services, argv[2:])
     if cmd == "test" and len(argv) == 3:

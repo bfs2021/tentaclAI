@@ -20,6 +20,16 @@ import tclib  # noqa: E402  shared with svc and tentacontrol
 SSH_CONF_D = os.path.expanduser("~/.ssh/config.d")
 
 
+def tc_dir():
+    """under sudo the environment is reset – the stack path then comes from the file the entrypoint writes"""
+    if os.environ.get("TC_DIR"):
+        return os.environ["TC_DIR"]
+    try:
+        return open("/etc/tentaclai/tc-dir").read().strip()
+    except OSError:
+        return ""
+
+
 def sh(cmd, timeout=20):
     try:
         r = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
@@ -196,8 +206,7 @@ def services():
     section("Connected services (svc)")
     code, out = sh(["svc", "list"])
     print("```\n" + out + "\n```")
-    tc_dir = os.environ.get("TC_DIR", "")
-    for name, d in tclib.load_services(os.path.join(tc_dir, "services")).items():
+    for name, d in tclib.load_services(os.path.join(tc_dir(), "services")).items():
         if "api" in d and tclib.enabled(d):
             path = d.get("test_path", "/")
             code, out = sh(["svc", name, "GET", path, "-o", "/dev/null", "-w", "%{http_code}", "--max-time", "8"], timeout=15)
@@ -241,11 +250,10 @@ def ssh_hosts():
 
 def docker_hosts():
     """docker services from services/*.json (rendered like svc does)"""
-    tc_dir = os.environ.get("TC_DIR", "")
-    env = tclib.read_env(os.path.join(tc_dir, ".env"))
-    systems = tclib.load_systems(tc_dir)
+    env = tclib.read_env(os.path.join(tc_dir(), ".env"))
+    systems = tclib.load_systems(tc_dir())
     res = []
-    for name, svc in tclib.load_services(os.path.join(tc_dir, "services"), systems).items():
+    for name, svc in tclib.load_services(os.path.join(tc_dir(), "services"), systems).items():
         d = svc.get("docker")
         if not d or not tclib.enabled(svc):
             continue
@@ -256,6 +264,10 @@ def docker_hosts():
 
 
 def main():
+    # needs the SSH keys and service settings → runs as root through sudo, like svc (Claude can't read them)
+    if os.geteuid() != 0 and os.path.exists("/etc/sudoers.d/tentaclai"):
+        os.execvp("sudo", ["sudo", "-n", "--", os.path.abspath(sys.argv[0]), *sys.argv[1:]])
+    os.chdir("/")
     args = set(sys.argv[1:])
     print("# System inventory (tc-scan)\n\n_read-only, no secrets_")
     hosts = docker_hosts()

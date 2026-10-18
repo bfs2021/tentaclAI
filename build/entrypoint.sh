@@ -1,6 +1,17 @@
 #!/usr/bin/env bash
-# Prepares the persistent home (/root) on every container start, then runs CMD.
+# Runs as root on every container start: protects the secrets, prepares Claude's home and the services,
+# then starts CMD as the unprivileged user "claude".
+#   root   – .env, SSH keys, service files, svc state (/root = data/home)
+#   claude – Claude Code, /home/claude (= data/claude), /workspace; reaches services only via `sudo svc`
 set -euo pipefail
+
+TC_DIR="${TC_DIR:-/opt/tentaclai}"
+as_claude() { setpriv --reuid=claude --regid=claude --init-groups env -i HOME=/home/claude USER=claude LOGNAME=claude \
+    PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin LANG="${LANG:-C.UTF-8}" "$@"; }
+envval() {  # a value from the stack's .env (root only reads it)
+    python3 -c 'import os, sys; sys.path.insert(0, "/usr/local/lib/tentaclai"); import tclib
+print(tclib.read_env(os.path.join(sys.argv[1], ".env")).get(sys.argv[2], ""))' "$TC_DIR" "$1"
+}
 
 # Optional own root CA (CA_CERT in .env, mounted as /etc/tentaclai/ca.crt; /dev/null = none).
 # Added to the system bundle; Node uses it via NODE_EXTRA_CA_CERTS=/etc/ssl/certs/ca-certificates.crt
@@ -9,36 +20,56 @@ if [ -s /etc/tentaclai/ca.crt ]; then
     update-ca-certificates >/dev/null 2>&1 || true
 fi
 
-umask 077
-mkdir -p /root/.claude /root/.config
+# svc runs through sudo with a reset environment – it finds the stack here
+echo "$TC_DIR" > /etc/tentaclai/tc-dir
+chmod 644 /etc/tentaclai/tc-dir
 
-# git identity for new projects
-if [ -n "${GIT_USER_NAME:-}" ]; then git config --global user.name "$GIT_USER_NAME"; fi
-if [ -n "${GIT_USER_EMAIL:-}" ]; then git config --global user.email "$GIT_USER_EMAIL"; fi
-git config --global init.defaultBranch main
-git config --global --replace-all safe.directory '*'
-
-# GitHub: gh reads GH_TOKEN itself; also let git push/pull over https use it
-if [ -n "${GH_TOKEN:-}" ]; then
-    gh auth setup-git >/dev/null 2>&1 || true
-fi
-
-# SSH: /root/.ssh is the stack's ssh/ dir (config, config.d/, keys/, known_hosts)
+# Secrets: root only (also fixes installations from before the privilege separation)
+chmod 600 "$TC_DIR"/.env "$TC_DIR"/.env.* 2>/dev/null || true
+chmod 700 /root "$TC_DIR/data/control" 2>/dev/null || true
 chmod 700 /root/.ssh /root/.ssh/keys 2>/dev/null || true
 chmod 600 /root/.ssh/config /root/.ssh/keys/*_ed25519 2>/dev/null || true
+
+# Claude's home moved from /root to /home/claude (v0.4.0): carry over login, settings and history once
+migrated=""
+if [ ! -e /home/claude/.claude ] && [ -d /root/.claude ]; then
+    echo "migrating Claude's home from /root to /home/claude"
+    for f in .claude .claude.json .bash_history; do
+        [ -e "/root/$f" ] && mv "/root/$f" /home/claude/ || true
+    done
+    rm -rf /root/.claude.json.backup*
+    migrated=1
+fi
+# everything in Claude's areas belongs to Claude (no symlinks followed)
+find /home/claude /workspace -xdev ! -user claude -exec chown -h claude:claude {} + 2>/dev/null || true
+chmod 700 /home/claude
+
+umask 077
+# git: root only ever works on its own mirrors – it must not trust repositories owned by others
+git config --global --unset-all safe.directory 2>/dev/null || true
+name="$(envval GIT_USER_NAME)"; mail="$(envval GIT_USER_EMAIL)"
+[ -n "$name" ] && as_claude git config --global user.name "$name"
+[ -n "$mail" ] && as_claude git config --global user.email "$mail"
+as_claude git config --global init.defaultBranch main
+
+# SSH: /root/.ssh is the stack's ssh/ dir (config, config.d/, keys/, known_hosts) – used by svc only
 if [ ! -f /root/.ssh/keys/tentaclai_ed25519 ] && [ -d /root/.ssh ]; then
     mkdir -p /root/.ssh/keys
-    ssh-keygen -q -t ed25519 -N '' -C "tentaclai@${TC_HOSTNAME:-tentaclai}" -f /root/.ssh/keys/tentaclai_ed25519
+    ssh-keygen -q -t ed25519 -N '' -C "tentaclai@$(envval TC_HOSTNAME | grep . || echo tentaclai)" -f /root/.ssh/keys/tentaclai_ed25519
 fi
 
-# Claude's user-level instructions: generic rules (image) + this site's values, host docs and local rules
-claude-instructions > /root/.claude/CLAUDE.md || echo "could not generate CLAUDE.md"
-# custom slash commands shipped with the image (e.g. /inventory) – own commands in ~/.claude/commands stay untouched
-mkdir -p /root/.claude/commands
-cp -f /etc/tentaclai/commands/*.md /root/.claude/commands/ 2>/dev/null || true
+# Claude's user-level instructions and the slash commands shipped with the image (own commands stay untouched)
+as_claude mkdir -p /home/claude/.claude/commands
+claude-instructions | as_claude sh -c 'cat > /home/claude/.claude/CLAUDE.md' || echo "could not generate CLAUDE.md"
+as_claude sh -c 'cp -f /etc/tentaclai/commands/*.md /home/claude/.claude/commands/' 2>/dev/null || true
 
 # Services (services/*.json): MCP -> Claude config, clone missing repos, regenerate /workspace/SERVICES.md
 echo "svc sync:"
 svc sync || echo "svc sync failed – container starts anyway"
+# after a migration: svc sync replaced MCP entries that held tokens inline – drop config backups that still have them
+[ -n "$migrated" ] && rm -rf /home/claude/.claude/backups /home/claude/.claude.json.backup*
 
-exec "$@"
+# CMD as Claude, with a clean environment
+exec setpriv --reuid=claude --regid=claude --init-groups env -i HOME=/home/claude USER=claude LOGNAME=claude SHELL=/bin/bash \
+    PATH="$PATH" LANG="${LANG:-C.UTF-8}" LC_ALL="${LC_ALL:-C.UTF-8}" TERM="${TERM:-xterm-256color}" TZ="${TZ:-UTC}" \
+    TC_DIR="$TC_DIR" NODE_EXTRA_CA_CERTS="${NODE_EXTRA_CA_CERTS:-}" DISABLE_AUTOUPDATER="${DISABLE_AUTOUPDATER:-1}" "$@"

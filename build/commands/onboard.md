@@ -24,7 +24,7 @@ Onboard the service **$ARGUMENTS** for working with Claude. Goal: afterwards `$T
    - Important objects/areas (specific workflows, repos, stacks, organisations), naming conventions, peculiarities.
    - For `git`/`docker`/`db`/`files`: is `access` (`ro`/`rw`) set correctly?
 6. **Draft** changes to the service file – `description` (one sentence: what + what for), `notes` (rules: allowed / only after asking / never, peculiarities), `examples` (3–6 proven, harmless calls from step 3), and if useful `test_path`, `docs`, `access`. No secrets, no token values, nothing invented. Write texts in the user's language. Show it as a diff.
-7. **Approval**: write only after "yes" (copy the old file to `services/$ARGUMENTS.json.bak-<date>` first), validate the JSON (`python3 -m json.tool`), then run `svc sync`.
+7. **Approval**: after "yes", write the draft to `/workspace/.onboard/$ARGUMENTS.json`, validate it (`python3 -m json.tool`), then run `svc config put service $ARGUMENTS /workspace/.onboard/$ARGUMENTS.json` – the user approves it once more in tentacontrol → Activity; svc keeps a backup of the old file and runs `svc sync` itself.
 8. **Finish**: confirm that the service is now in the catalog (`/workspace/SERVICES.md`) with purpose and rules; list open points (missing permissions/tokens, a useful MCP addition, template improvements).
 
 Don't change anything on the service itself during onboarding – only read, and update the service file at the end (after approval).

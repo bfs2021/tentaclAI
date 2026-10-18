@@ -2,13 +2,53 @@
 
 All notable changes, newest first. Every release lists **upgrade steps** from the previous one.
 
-## Unreleased
+## Unreleased (v0.4.0)
+
+### Highlights
+- **Privilege separation in the sandbox** – Claude now runs as the unprivileged user `claude`. `.env`, the SSH key, the
+  service files, git credentials and the audit log belong to root; `svc` (and `tc-scan`) run as root through a single
+  sudo rule and are Claude's only way to services. `ro` / `rw` / `confirm` are now enforced, not just guard rails.
+- **Client tools as `tcrun`** – curl, psql, mariadb and stdio MCP servers run as a third user with only the secret
+  they need; a shell escape from the SQL shell gets neither root nor `.env`.
+- **MCP proxy** – MCP servers with tokens are registered as `svc mcp-proxy <name>` (stdio ↔ Streamable HTTP bridge
+  with the headers added by svc); the tokens are no longer in Claude's `~/.claude.json`.
+- **Git through a mirror** – working copies in `/workspace/repos` have no credentials; `svc git push|pull|fetch <repo>`
+  move commits through a root-owned mirror (git bundles), with the repo's access mode and approval.
+- **`svc ssh <host> [cmd]`** replaces plain `ssh`: access per SSH host (`confirm` by default, `rw`, `ro`), set in
+  tentacontrol → Connections → SSH.
+- **`svc config put`** – Claude proposes service files (`/onboard`) and site rules (`/inventory`); every write needs
+  your approval in Activity, the old file is kept as `.bak-…`.
 
 ### Changes
-- The Claude terminal's tmux session (`cc`, `./tentaclai.sh`, tentacontrol → Claude terminal) is now named
-  `claude-workspace` instead of `claude`, in line with `claude-rc` and `claude-inventory`.
-- Overview lists sessions with a readable name (Claude terminal, Remote Control, Onboarding …) next to the tmux name.
-- The overview button “Workspace” is now called “Claude terminal”.
+- The tmux session of the Claude terminal is now named `claude-workspace` (was `claude`); the overview lists sessions
+  with readable names; the overview button “Workspace” is now “Claude terminal”.
+- `.env` is no longer loaded into the sandbox environment (`env_file` removed) – only svc reads it.
+- Claude's home is `/home/claude` (`data/claude`); root's home `/root` (`data/home`) keeps svc state only.
+- Docker services in `ssh` mode always run `docker` on the host through ssh (no docker contexts) – `cp`/`build` paths
+  are host paths.
+- `svc <api> … -o file` can't write into the workspace any more (curl runs as `tcrun`) – redirect with `> file`.
+- `gh` in the sandbox has no credentials; `GH_TOKEN` is only a variable for service files.
+- Terminals in tentacontrol and `./tentaclai.sh` run as user `claude`; `./tentaclai.sh rootshell` opens a root shell.
+- The container drops all capabilities except CHOWN, DAC_OVERRIDE, FOWNER, SETUID, SETGID, KILL and AUDIT_WRITE.
+
+### Upgrade (from v0.3.0)
+1. `git pull` in the stack directory.
+2. `docker compose build` (both images).
+3. `docker compose up -d` – recreates **both** containers; running Claude sessions and Remote Control end.
+4. Automatic on the first start: Claude's login, settings and history move from `data/home` to `data/claude`, file
+   permissions of `.env`, `ssh/` and `data/` are tightened, `/workspace` is handed to the user `claude`, repos lose
+   their credential helper, MCP servers with tokens are re-registered through the proxy. Nothing to do in `.env`.
+5. In tentacontrol → Connections → SSH: check the new **Shell** column (`svc ssh` access per host, default `confirm`).
+6. Recommended: rotate tokens Claude could read before this release (everything in `.env`, MCP headers).
+7. `./tentaclai.sh` and Remote Control work as before; Remote Control may ask for the one-time confirmation again.
+
+Rollback: `git checkout v0.3.0`, `docker compose build`, then move the home back before starting:
+`mv data/claude/.claude data/claude/.claude.json data/home/` and `docker compose up -d`.
+
+### Known issues
+- A Docker service in `socket` mode is root on the tentaclAI host and can read the stack's secrets; its stacks
+  directory is root-owned, so Claude edits it through `svc compose`/`svc docker` only. Prefer `ssh` mode.
+- No egress filter yet – the sandbox can still reach the network.
 
 ## v0.3.0 – 2026-10-18
 

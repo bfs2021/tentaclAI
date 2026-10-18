@@ -16,7 +16,7 @@ PROFILES = {
     "claude":    {"title": "Claude · /workspace", "cmd": ["cc"]},
     "login":     {"title": "Claude login", "cmd": ["bash", "-lc", "claude auth login; echo; claude auth status --text; echo; read -rp 'Press Enter to close. '"]},
     "rc":        {"title": "Remote control session", "cmd": ["bash", "-lc", "tmux has-session -t claude-rc 2>/dev/null && exec tmux attach -t claude-rc || { echo 'No claude-rc session (container just started?).'; sleep 600; }"]},
-    "shell":     {"title": "Shell", "cmd": ["bash", "-l"]},
+    "shell":     {"title": "Shell (user claude)", "cmd": ["bash", "-l"]},
     "svc":       {"title": "svc list", "cmd": ["bash", "-lc", "svc list; echo; svc docker; echo; exec bash -l"]},
     "inventory": {"title": "System inventory", "cmd": ["tmux", "new-session", "-A", "-s", "claude-inventory", "-c", "/workspace", "claude", "/inventory"]},
 }
@@ -29,9 +29,10 @@ def onboard_cmd(name):
     return ["tmux", "new-session", "-A", "-s", f"claude-onboard-{name}", "-c", "/workspace", "claude", f"/onboard {name}"]
 
 
-async def bridge(ws: WebSocket, cmd, workdir="/workspace"):
+async def bridge(ws: WebSocket, cmd, workdir="/workspace", user="claude"):
+    """every terminal runs as the unprivileged user claude – the same view and rights Claude has"""
     api = client().api
-    exec_id = api.exec_create(CLAUDE_CONTAINER, cmd, tty=True, stdin=True, workdir=workdir,
+    exec_id = api.exec_create(CLAUDE_CONTAINER, cmd, tty=True, stdin=True, workdir=workdir, user=user,
                               environment={"TERM": "xterm-256color", "COLORTERM": "truecolor", "LANG": "C.UTF-8"})["Id"]
     sock = api.exec_start(exec_id, tty=True, socket=True)
     raw = getattr(sock, "_sock", sock)

@@ -69,7 +69,8 @@
         <tr><td><code>services/*.json</code></td><td>One file per service (docker, api, mcp and/or git). Tokens only as <code>${VAR}</code>.</td></tr>
         <tr><td><code>.env</code></td><td>All values and secrets (mode 600). <code>svc</code> reads it fresh on every call.</td></tr>
         <tr><td><code>/workspace</code></td><td>Projects, <code>SERVICES.md</code> (generated service catalog), <code>repos/</code> (git services).</td></tr>
-        <tr><td><code>data/home</code></td><td>Persistent <code>/root</code>: Claude login, settings, history.</td></tr>
+        <tr><td><code>data/claude</code></td><td>Claude's home (<code>/home/claude</code>, user <code>claude</code>): login, settings, history.</td></tr>
+        <tr><td><code>data/home</code></td><td>Root's home in the sandbox (<code>/root</code>): svc state – git mirrors, caches. Claude can't read it.</td></tr>
       </table>
       <p class="muted small">Everything lives under <code>{{ site.tc_dir }}</code> – include it in your backups (especially <code>data/</code>, <code>ssh/keys</code>, <code>.env</code>).</p>
     </section>
@@ -123,7 +124,7 @@
 }</pre>
       <ul>
         <li><strong>Status</strong>: <span class="pill ok">active</span> all variables set · <span class="pill warn">token missing</span> at least one <code>${VAR}</code> empty · <span class="pill off">disabled</span> <code>"enabled": false</code>.</li>
-        <li>New tokens work for <code>svc</code> immediately. Only <code>GH_TOKEN</code>, <code>GIT_*</code> and new/changed local Docker hosts need “Apply now”.</li>
+        <li>New tokens work for <code>svc</code> immediately. Only <code>GIT_*</code> and new/changed local Docker hosts need “Apply now”.</li>
         <li>Running Claude sessions see new MCP servers after <code>/mcp</code> → reconnect or in a new session.</li>
         <li>Internal https services with your own CA: set <code>CA_CERT</code> in the settings – the CA becomes trusted in the container. Single devices with self-signed certificates: <code>"insecure_tls": true</code>.</li>
         <li><strong>Self-signed certificates</strong> (routers, NAS, hypervisors): the switch <em>Ignore TLS certificate errors</em> on the service page sets <code>insecure_tls</code> for its <code>api</code>, <code>web</code>, <code>git</code> and <code>db</code> parts – encrypted, but the server is not verified. MCP connections are made by Claude Code and always verify; use <code>CA_CERT</code> for them.</li>
@@ -260,7 +261,8 @@
         <li><code>confirm</code> – every write waits for you: <strong>Activity</strong> shows the request with a badge in the sidebar, <em>Approve</em> runs it, <em>Deny</em> or no answer within 10 minutes stops it. Claude is told to report a pending approval and never to work around a denial.</li>
       </ul>
       <p>Writes are: API calls other than GET/HEAD/OPTIONS, docker/compose commands that change something, SQL that is not a plain query (and the SQL shell), <code>svc files … push</code>, and <code>git push</code> (via a pre-push hook in every repo). The audit log (<code>data/control/audit.jsonl</code>) records time, service, action, decision and result – never tokens or request bodies. In the sandbox: <code>svc audit</code>.</p>
-      <p class="help">Like <code>ro</code>, this is a guard rail against mistakes, not a hard boundary: Claude runs as root in the sandbox and could bypass <code>svc</code>. MCP servers are called by Claude Code directly and are not covered.</p>
+      <p>Also gated: <code>svc ssh &lt;host&gt; …</code> (per SSH host, default <code>confirm</code>) and <code>svc config put …</code> – Claude's way to write a service file or <code>local/CLAUDE.md</code>, which always needs your approval.</p>
+      <p class="help">Claude runs as the unprivileged user <code>claude</code> and can't read <code>.env</code>, the SSH key or the audit log, nor change service files – <code>svc</code> (root, via sudo) is its only way out. MCP tool calls are not gated (Claude Code asks for them itself); MCP servers with tokens run through <code>svc mcp-proxy</code>.</p>
     </section>
 
     <section class="card" id="ssh">
@@ -298,11 +300,13 @@ svc &lt;name&gt; GET /path       API call, e.g. svc arcane GET /environments
 svc docker [&lt;host&gt; …]     docker hosts / docker CLI against one host (svc docker vps1 ps)
 svc compose &lt;host&gt; &lt;stack&gt; …   compose in the stack directory of that host (local or via SSH)
 svc git | svc git sync    repositories: status / clone + fetch
-svc sync                  register MCP, docker contexts, clone missing repos, write SERVICES.md
+svc git push|pull|fetch &lt;repo&gt;   push a branch / update – credentials stay with svc
+svc ssh [&lt;host&gt; [cmd]]     SSH hosts / a command or shell on one (access per host, default confirm)
+svc config put service &lt;name&gt; &lt;file&gt; | local &lt;file&gt;   write a service file / site rules (needs approval)
+svc sync                  register MCP, clone missing repos, write SERVICES.md
 tc-scan                   read-only inventory report
 /inventory · /onboard &lt;service&gt;   Claude commands (inside a Claude session)
-gh …                      GitHub CLI (GH_TOKEN)
-ssh &lt;host&gt;                SSH targets from ssh/config.d</pre>
+gh …                      GitHub CLI without credentials (public data)</pre>
       <p>On the host (<code>{{ site.tc_dir }}</code>): <code>./tentaclai.sh [init|host|rc|shell|login|status|svc|scan|inventory|passwd|setup-url]</code>, <code>./ssh-host.sh add|remove|list|test</code>.</p>
     </section>
 
@@ -310,7 +314,8 @@ ssh &lt;host&gt;                SSH targets from ssh/config.d</pre>
       <h2>Security</h2>
       <ul>
         <li>tentacontrol has the Docker socket of this host (to run tentaclAI) – that is <strong>root on {{ site.hostname }}</strong>. Choose the tentacontrol password accordingly.</li>
-        <li>tentaclAI has Docker access only through docker services. An <code>rw</code> docker service is root on that host; <code>ro</code> blocks changing commands in <code>svc</code> but is no hard boundary while socket or SSH access exists.</li>
+        <li>In tentaclAI, Claude runs as the unprivileged user <code>claude</code>. <code>.env</code>, the SSH key, the service files and the audit log belong to root; <code>svc</code> (via sudo) is the only way to services and enforces <code>ro</code>/<code>rw</code>/<code>confirm</code>. Client tools run as a third user (<code>tcrun</code>) with only their own secret.</li>
+        <li>An <code>rw</code> docker service is root on that host. A docker service in <code>socket</code> mode is root on this host – and so can read everything in the stack, secrets included; prefer <code>ssh</code> mode.</li>
         <li>Login: bcrypt hash, 12 h session, <code>SameSite=Strict</code> cookie (Secure behind https), origin check for forms and the terminal, throttling after failed attempts.</li>
         <li>Secrets never reach the browser; <code>svc</code> passes them to curl through temporary 0600 files on tmpfs, not on the command line.</li>
         <li>Claude keeps asking before actions – the rules are in its instructions (generic rules + <code>local/CLAUDE.md</code>).</li>
@@ -340,7 +345,7 @@ ssh &lt;host&gt;                SSH targets from ssh/config.d</pre>
         <li><strong>Export/import</strong>: configuration and templates, e.g. for a second installation or to share templates.</li>
         <li><strong>AI assistant</strong> in tentacontrol for the whole configuration (can be switched off).</li>
         <li><strong>OAuth with browser login</strong> (authorization code, e.g. Google) as auth type, with templates. Client credentials already exist.</li>
-        <li><strong>Real sandbox &amp; security</strong>: harden the container (non-root, read-only root filesystem, no capabilities), egress allowlist (only service hosts reachable), keep secrets away from Claude (secret broker instead of a readable <code>.env</code>), Docker socket only through a filtering proxy, preconfigured Claude Code permissions/sandbox, prompt-injection safeguards for content from services.</li>
+        <li><strong>More sandbox</strong>: egress allowlist (only service hosts reachable), read-only root filesystem, Docker socket only through a filtering proxy, preconfigured Claude Code permissions, prompt-injection safeguards for content from services.</li>
       </ul>
     </section>
   </div>

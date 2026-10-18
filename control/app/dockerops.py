@@ -27,13 +27,16 @@ def container():
         return None
 
 
-def run(cmd, workdir=None):
+CLAUDE_USER = "claude"  # Claude Code, tmux sessions and remote control run as this user; svc/ssh as root
+
+
+def run(cmd, workdir=None, user="root"):
     """Run a command in the claude container, return (exit_code, text)."""
     c = container()
     if c is None or c.status != "running":
         return 1, "container is not running"
     try:
-        r = c.exec_run(cmd, workdir=workdir, demux=False)
+        r = c.exec_run(cmd, workdir=workdir, demux=False, user=user)
         return r.exit_code, (r.output or b"").decode(errors="replace")
     except Exception as e:  # noqa: BLE001
         return 1, str(e)
@@ -114,18 +117,18 @@ def stats():
 
 
 def claude_version():
-    code, out = run(["claude", "--version"])
+    code, out = run(["claude", "--version"], user=CLAUDE_USER)
     return out.strip().split()[0] if code == 0 and out.strip() else None
 
 
 def claude_latest():
-    code, out = run(["timeout", "30", "npm", "view", "@anthropic-ai/claude-code", "version"])
+    code, out = run(["timeout", "30", "npm", "view", "@anthropic-ai/claude-code", "version"], user=CLAUDE_USER)
     return out.strip() if code == 0 else None
 
 
 def logged_in_claude():
     """`claude auth status` (JSON); falls back to the credentials file when the container is not running"""
-    code, out = run(["claude", "auth", "status", "--json"])
+    code, out = run(["claude", "auth", "status", "--json"], user=CLAUDE_USER)
     try:
         return bool(json.loads(out).get("loggedIn"))
     except ValueError:
@@ -133,7 +136,7 @@ def logged_in_claude():
 
 
 def tmux_sessions():
-    code, out = run(["tmux", "ls", "-F", "#{session_name}|#{session_attached}|#{session_created}"])
+    code, out = run(["tmux", "ls", "-F", "#{session_name}|#{session_attached}|#{session_created}"], user=CLAUDE_USER)
     if code != 0:
         return []
     res = []
@@ -164,7 +167,7 @@ RC_URL = re.compile(r"https://claude\.ai/code\S*")
 
 def rc_info():
     """state of the remote-control session parsed from its tmux pane (None = no session)"""
-    code, out = run(["tmux", "capture-pane", "-p", "-J", "-t", "claude-rc", "-S", "-300"])
+    code, out = run(["tmux", "capture-pane", "-p", "-J", "-t", "claude-rc", "-S", "-300"], user=CLAUDE_USER)
     if code != 0:
         return None
     lines = [l.rstrip() for l in out.splitlines() if l.strip()]
@@ -190,7 +193,7 @@ def rc_info():
 
 
 def rc_restart():
-    return run(["tmux", "respawn-pane", "-k", "-t", "claude-rc"])
+    return run(["tmux", "respawn-pane", "-k", "-t", "claude-rc"], user=CLAUDE_USER)
 
 
 def logs(tail=300):
