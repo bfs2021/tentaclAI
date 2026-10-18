@@ -1,0 +1,6 @@
+# build context = repository root; only the image sources go in – never site data (.env, ssh/, data/, services …)
+*
+!build/
+!control/
+!lib/
+**/__pycache__

@@ -3,29 +3,15 @@ import os
 import re
 import tempfile
 
+import tclib
+
 from .config import ENV_FILE
 
 LINE = re.compile(r"^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=(.*)$")
 
 
-def _unquote(v: str) -> str:
-    v = v.strip()
-    if len(v) >= 2 and v[0] == v[-1] and v[0] in "'\"":
-        return v[1:-1]
-    return v
-
-
 def read_env(path: str = ENV_FILE) -> dict:
-    values = {}
-    try:
-        with open(path) as f:
-            for line in f:
-                m = LINE.match(line)
-                if m:
-                    values[m.group(1)] = _unquote(m.group(2))
-    except FileNotFoundError:
-        pass
-    return values
+    return tclib.read_env(path)
 
 
 def _quote(v: str) -> str:

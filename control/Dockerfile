@@ -14,7 +14,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
-COPY requirements.txt .
+COPY control/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Frontend libraries are vendored at build time – no CDN at runtime
@@ -25,9 +25,11 @@ RUN mkdir -p /app/vendor \
     && curl -fsSL -o /app/vendor/addon-fit.js https://cdn.jsdelivr.net/npm/@xterm/addon-fit@0.10.0/lib/addon-fit.js \
     && curl -fsSL -o /app/vendor/cytoscape.min.js https://cdn.jsdelivr.net/npm/cytoscape@3.30.2/dist/cytoscape.min.js
 
-COPY app/ /app/app/
-COPY passwd.py /usr/local/bin/tentacontrol-passwd
-RUN chmod 0755 /usr/local/bin/tentacontrol-passwd
+COPY lib/tclib.py /app/tclib.py
+COPY control/app/ /app/app/
+COPY control/passwd.py /usr/local/bin/tentacontrol-passwd
+COPY control/sshcli.py /usr/local/bin/tentacontrol-ssh
+RUN chmod 0755 /usr/local/bin/tentacontrol-passwd /usr/local/bin/tentacontrol-ssh
 
 EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=5s CMD curl -fsS http://127.0.0.1:8080/healthz || exit 1

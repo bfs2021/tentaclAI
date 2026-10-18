@@ -4,28 +4,16 @@ import json
 import os
 import re
 
+import tclib
+
 from .config import SERVICES_DIR, STACK_DIR, is_secret  # noqa: F401  (STACK_DIR re-exported)
 from .envfile import read_env
 
 TEMPLATES_DIR = os.path.join(SERVICES_DIR, "_templates")
 
-VAR = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*)\}")
 NAME = re.compile(r"^[a-z0-9][a-z0-9_-]{0,40}$")
-PARTS = ("api", "mcp", "git", "docker", "db", "web", "files")
-
-
-def variables(obj):
-    found = set()
-    if isinstance(obj, str):
-        found.update(VAR.findall(obj))
-    elif isinstance(obj, list):
-        for v in obj:
-            found |= variables(v)
-    elif isinstance(obj, dict):
-        for k, v in obj.items():
-            if not k.startswith("_"):
-                found |= variables(v)
-    return found
+PARTS = tclib.PARTS
+variables = tclib.variables
 
 
 def path_of(name):
@@ -36,20 +24,10 @@ def path_of(name):
 
 def load_all():
     env = read_env()
-    out = []
-    for p in sorted(glob.glob(os.path.join(SERVICES_DIR, "*.json"))):
-        base = os.path.basename(p)
-        if base.startswith("_"):
-            continue
-        name = base[:-5]
-        try:
-            with open(p) as f:
-                data = json.load(f)
-            error = None
-        except ValueError as e:
-            data, error = {}, str(e)
-        out.append(describe(name, data, env, error))
-    return out
+    errors = {}
+    data = tclib.load_services(SERVICES_DIR, errors=errors)
+    out = [describe(n, d, env) for n, d in data.items()] + [describe(n, {}, env, e) for n, e in errors.items()]
+    return sorted(out, key=lambda x: x["name"])
 
 
 def describe(name, data, env=None, error=None):
@@ -75,7 +53,7 @@ def describe(name, data, env=None, error=None):
         "web": web_info(data.get("web"), env) if data.get("web") else None,
         "files": files_info(data.get("files")) if data.get("files") else None,
         # URLs contain no secrets -> show them with ${VAR}s resolved
-        "base_url": VAR.sub(lambda m: env.get(m.group(1)) or m.group(0), (data.get("api") or {}).get("base_url", "")),
+        "base_url": tclib.render((data.get("api") or {}).get("base_url", ""), env, keep_unknown=True),
         "vars": [{"name": v, "set": bool(env.get(v)), "secret": is_secret(v),
                   "value": "" if is_secret(v) else env.get(v, "")} for v in vars_],
         "missing": missing, "state": state, "label": label,
@@ -91,7 +69,7 @@ def git_info(name, git):
 
 
 def _sub(v, env):
-    return VAR.sub(lambda m: env.get(m.group(1)) or m.group(0), str(v or ""))
+    return tclib.render(str(v or ""), env, keep_unknown=True)
 
 
 def db_info(d, env):
@@ -111,10 +89,9 @@ def files_info(f):
 
 
 def docker_info(d, env):
-    sub = lambda v: VAR.sub(lambda m: env.get(m.group(1)) or m.group(0), str(v or ""))
     mode = d.get("mode", "socket")
-    return {"mode": mode, "access": d.get("access", "ro"), "stacks_dir": sub(d.get("stacks_dir")),
-            "target": sub(d.get("socket", "/var/run/docker.sock")) if mode == "socket" else d.get("ssh_host", "")}
+    return {"mode": mode, "access": d.get("access", "ro"), "stacks_dir": _sub(d.get("stacks_dir"), env),
+            "target": _sub(d.get("socket", "/var/run/docker.sock"), env) if mode == "socket" else d.get("ssh_host", "")}
 
 
 def list_templates():

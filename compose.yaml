@@ -10,7 +10,8 @@
 services:
   claude:
     build:
-      context: ./build
+      context: .
+      dockerfile: build/Dockerfile
       args:
         CLAUDE_CODE_VERSION: ${CLAUDE_CODE_VERSION:-latest}
     image: local/tentaclai:latest
@@ -52,7 +53,9 @@ services:
 
   # tentacontrol – web admin: status, browser terminal (login/RC), settings, services, SSH, updates, logs, help
   control:
-    build: ./control
+    build:
+      context: .
+      dockerfile: control/Dockerfile
     image: local/tentacontrol:latest
     container_name: tentacontrol
     hostname: tentacontrol

@@ -10,6 +10,10 @@ tentaclAI = sandbox + service gateway for Claude Code. Two containers (`compose.
 - `claude` → container **tentaclai** (`build/`): Claude Code, `svc` (service gateway), `tc-scan`, remote control loop.
 - `control` → container **tentacontrol** (`control/`): web admin, FastAPI + Jinja + HTMX, vendored JS (no CDN at runtime).
 
+Shared logic lives in **`lib/tclib.py`** (`.env`, `${VAR}`, services, systems, SSH hosts) and is copied into both images –
+`svc`, `tc-scan`, `claude-instructions` and tentacontrol use it. Never re-implement these parsers elsewhere; extend tclib.
+Both images build from the repository root (`.dockerignore` whitelists `build/`, `control/`, `lib/`).
+
 Display name **tentaclAI**, technical name **tentaclai** (container, image, paths, scripts). See `README.md` for the
 architecture and `CONTRIBUTING.md` for the ground rules.
 

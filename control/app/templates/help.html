@@ -234,6 +234,7 @@
       <ul>
         <li>Files: <code>systems/&lt;name&gt;.json</code> (example: <code>systems/_example.json</code>).</li>
         <li>Docker services of mode <code>ssh</code> without their own <code>ssh_host</code> use the system's SSH host.</li>
+        <li>Rule of thumb: one <em>service</em> = one way in with one set of credentials (an API and its MCP server may share a file); one <em>system</em> = one machine or appliance.</li>
         <li>Claude sees systems in the service catalog and via <code>svc systems [name]</code>; <code>svc info &lt;service&gt;</code> also prints the system's rules.</li>
       </ul>
     </section>
@@ -258,7 +259,7 @@
         <li><strong>Authorize tentaclAI</strong> – enter the user's password once (passed to <code>sshpass</code> via stdin, never stored or logged), or add the key by hand with the shown command.</li>
         <li>The host is saved and tested (login, sudo).</li>
       </ol>
-      <p><strong>Edit</strong> changes host, user, port, jump host, sudo and the alias – a rename also updates docker/files services, systems and other hosts that jump through it. If a host key changed, <em>Check host key</em> fetches and confirms the new one. <strong>Remove</strong> can also take tentaclAI's key off the host. On the command line the same is possible with <code>./ssh-host.sh</code>.</p>
+      <p><strong>Edit</strong> changes host, user, port, jump host, sudo and the alias – a rename also updates docker/files services, systems and other hosts that jump through it. If a host key changed, <em>Check host key</em> fetches and confirms the new one. <strong>Remove</strong> can also take tentaclAI's key off the host. On the command line: <code>./ssh-host.sh list|add|sudo|hostkey|remove|test</code> – same logic as this page.</p>
       <h4>Hosts without root login: sudo</h4>
       <p>If the SSH user is not root, enable <strong>use sudo</strong> (when adding the host, or later in the <em>sudo</em> column). The prefix (default <code>sudo -n</code>, also e.g. <code>doas</code>) is stored as <code># tentaclai: sudo=…</code> in the host's block. <code>svc docker</code>/<code>svc compose</code> and <code>tc-scan</code> use it automatically (such docker hosts run through ssh instead of a docker context), and Claude's instructions list it per host for admin commands.</p>
       <p>It is non-interactive: the user needs passwordless sudo, ideally limited, e.g. <code>/etc/sudoers.d/tentaclai</code>: <code>deploy ALL=(root) NOPASSWD: /usr/bin/docker</code>. “Test” checks login and sudo.</p>

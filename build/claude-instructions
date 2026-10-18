@@ -4,6 +4,10 @@ import glob
 import json
 import os
 import re
+import sys
+
+sys.path.insert(0, "/usr/local/lib/tentaclai")
+import tclib  # noqa: E402  shared with svc and tentacontrol
 
 TEMPLATE = "/etc/tentaclai/CLAUDE.base.md"
 HOST_DOCS = "/etc/tentaclai/host-docs.md"
@@ -12,60 +16,25 @@ tc_dir = os.environ.get("TC_DIR", "/opt/tentaclai")
 
 
 def docker_hosts():
-    env = {}
-    try:
-        for line in open(os.path.join(tc_dir, ".env")):
-            m = re.match(r"^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=(.*)$", line)
-            if m:
-                env[m.group(1)] = m.group(2).strip().strip("'\"")
-    except OSError:
-        pass
+    env = tclib.read_env(os.path.join(tc_dir, ".env"))
     rows = []
-    for p in sorted(glob.glob(os.path.join(tc_dir, "services", "*.json"))):
-        if os.path.basename(p).startswith("_"):
-            continue
-        try:
-            svc = json.load(open(p))
-        except ValueError:
-            continue
+    for name, svc in tclib.load_services(os.path.join(tc_dir, "services"), tclib.load_systems(tc_dir)).items():
         d = svc.get("docker")
-        if not d or svc.get("enabled", True) is False:
+        if not d or not tclib.enabled(svc):
             continue
-        name = svc.get("name") or os.path.basename(p)[:-5]
-        sub = lambda v: re.sub(r"\$\{([A-Za-z_][A-Za-z0-9_]*)\}", lambda m: env.get(m.group(1), ""), str(v))
         target = "local socket" if d.get("mode", "socket") == "socket" else f"ssh `{d.get('ssh_host')}`"
-        rows.append(f"| `{name}` | {target} | **{d.get('access', 'ro')}** | `{sub(d.get('stacks_dir', '–'))}` | {svc.get('description', '')} |")
+        rows.append(f"| `{svc.get('name') or name}` | {target} | **{d.get('access', 'ro')}** | `{tclib.render(str(d.get('stacks_dir', '–')), env)}` | {svc.get('description', '')} |")
     if not rows:
         return "### Docker hosts\n\nNone configured – this sandbox has no Docker access."
     return "### Docker hosts\n\n| Host | Via | Access | Stacks dir | Description |\n|---|---|---|---|---|\n" + "\n".join(rows)
 
 
 def ssh_hosts():
-    meta = re.compile(r"^\s*#\s*tentacl(?:ai|aude):\s*sudo\s*=\s*(.*?)\s*$")
-    hosts = {}
-    for f in sorted(glob.glob("/root/.ssh/config.d/*.conf")):
-        current = []
-        for line in open(f):
-            m = meta.match(line)
-            if m:
-                for a in current:
-                    hosts[a]["sudo"] = m.group(1)
-                continue
-            parts = line.split()
-            if not parts:
-                continue
-            key = parts[0].lower()
-            if key == "host":
-                current = [a for a in parts[1:] if "*" not in a]
-                for a in current:
-                    hosts[a] = {"user": "", "hostname": "", "sudo": ""}
-            elif key in ("user", "hostname") and len(parts) > 1:
-                for a in current:
-                    hosts[a][key] = parts[1]
+    hosts = tclib.ssh_hosts("/root/.ssh/config.d")
     if not hosts:
         return "### SSH hosts\n\nNone configured."
-    rows = [f"| `{a}` | {h['user'] or '–'} | {h['hostname'] or '–'} | {('`' + h['sudo'] + ' <cmd>`') if h['sudo'] else '–'} |"
-            for a, h in hosts.items()]
+    rows = [f"| `{h['alias']}` | {h['user'] or '–'} | {h['hostname'] or '–'} | {('`' + h['sudo'] + ' <cmd>`') if h['sudo'] else '–'} |"
+            for h in hosts]
     return ("### SSH hosts\n\nPrivileged commands on hosts with a sudo prefix: run them as `<prefix> <cmd>` "
             "(non-interactive, never ask for or type a password). `svc docker`/`svc compose` add the prefix themselves.\n\n"
             "| Host | User | Hostname | sudo |\n|---|---|---|---|\n" + "\n".join(rows))

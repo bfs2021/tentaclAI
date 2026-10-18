@@ -2,17 +2,14 @@
 import asyncio
 import json
 import re
-import shlex
 import socket
 import threading
 
 from fastapi import WebSocket, WebSocketDisconnect
 
-from .config import CLAUDE_CONTAINER, STACK_DIR
+from .config import CLAUDE_CONTAINER
 from .dockerops import client
 
-ALIAS = re.compile(r"^[A-Za-z0-9._-]{1,40}$")
-TARGET = re.compile(r"^[A-Za-z0-9._-]{1,64}@[A-Za-z0-9.-]{1,253}(:\d{1,5})?$")
 
 # Fixed commands only – the browser picks an id, never sends a command line.
 PROFILES = {
@@ -25,30 +22,11 @@ PROFILES = {
 }
 
 
-def ssh_add_cmd(alias, target, sudo=""):
-    if not ALIAS.match(alias or "") or not TARGET.match(target or ""):
-        raise ValueError("invalid alias or target (user@host[:port])")
-    cmd = [f"{STACK_DIR}/ssh-host.sh", "add", alias, target]
-    if sudo:
-        if not re.match(r"^[A-Za-z0-9 ._/=-]{1,60}$", sudo):
-            raise ValueError("invalid sudo command")
-        cmd += ["--sudo-cmd", sudo]
-    # keep the terminal open after the script so the result stays readable
-    return ["bash", "-lc", shlex.join(cmd) + "; echo; read -rp 'Done – press Enter to close the terminal. '"]
-
-
 def onboard_cmd(name):
     """Claude service onboarding (/onboard <name>) in its own persistent tmux session"""
     if not re.match(r"^[a-z0-9][a-z0-9_-]{0,40}$", name or ""):
         raise ValueError("invalid service name")
     return ["tmux", "new-session", "-A", "-s", f"claude-onboard-{name}", "-c", "/workspace", "claude", f"/onboard {name}"]
-
-
-def ssh_remove_cmd(alias):
-    if not ALIAS.match(alias or ""):
-        raise ValueError("invalid alias")
-    cmd = [f"{STACK_DIR}/ssh-host.sh", "remove", alias]
-    return ["bash", "-lc", shlex.join(cmd) + "; echo; read -rp 'Done – press Enter to close the terminal. '"]
 
 
 async def bridge(ws: WebSocket, cmd, workdir="/workspace"):

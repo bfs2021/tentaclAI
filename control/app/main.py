@@ -15,7 +15,7 @@ from starlette.middleware.sessions import SessionMiddleware
 from . import auth, dockerops, jobs, services_store, sshhosts, sshops, systems_store, topology
 from .config import CLAUDE_SERVICE, COMPOSE, DATA_DIR, RC_VARS, RESTART_VARS, SETTINGS_GROUPS, is_secret, site
 from .envfile import read_env, update_env
-from .terminal import PROFILES, bridge, onboard_cmd, ssh_add_cmd, ssh_remove_cmd
+from .terminal import PROFILES, bridge, onboard_cmd
 from . import generated
 
 BASE = os.path.dirname(__file__)
@@ -266,20 +266,16 @@ async def rc_restart():
 # ---------------------------------------------------------------- terminal
 
 @app.get("/terminal", response_class=HTMLResponse)
-async def terminal_page(request: Request, p: str = "claude", alias: str = "", target: str = "", sudo: str = ""):
+async def terminal_page(request: Request, p: str = "claude", alias: str = ""):
     hosts = docker_dirs()
-    if p == "sshadd":
-        title = f"Add SSH host: {alias}"
-    elif p == "sshremove":
-        title = f"Remove SSH host: {alias}"
-    elif p == "onboard":
+    if p == "onboard":
         title = f"Onboard service: {alias}"
     elif p == "host":
         title = f"Claude · {hosts.get(alias, alias)}"
     else:
         title = PROFILES.get(p, PROFILES["claude"])["title"]
     return page(request, "terminal.html", profiles=PROFILES, hosts=hosts, current=p, title=title,
-                params={"alias": alias, "target": target, "sudo": sudo},
+                params={"alias": alias},
                 reattach=p in ("claude", "rc", "inventory", "onboard", "host"))  # tmux-based: safe to reconnect automatically
 
 
@@ -294,7 +290,7 @@ def docker_dirs():
 
 
 @app.websocket("/ws/terminal")
-async def ws_terminal(ws: WebSocket, p: str = "claude", alias: str = "", target: str = "", sudo: str = ""):
+async def ws_terminal(ws: WebSocket, p: str = "claude", alias: str = ""):
     if not ws.session.get("auth") or not auth.same_origin(ws):
         await ws.close(code=4401)
         return
@@ -305,11 +301,7 @@ async def ws_terminal(ws: WebSocket, p: str = "claude", alias: str = "", target:
         await ws.close()
         return
     try:
-        if p == "sshadd":
-            cmd = ssh_add_cmd(alias, target, sudo)
-        elif p == "sshremove":
-            cmd = ssh_remove_cmd(alias)
-        elif p == "onboard":
+        if p == "onboard":
             cmd = onboard_cmd(alias)
         elif p == "host":
             d = docker_dirs().get(alias)

@@ -14,6 +14,9 @@ import shlex
 import subprocess
 import sys
 
+sys.path.insert(0, "/usr/local/lib/tentaclai")
+import tclib  # noqa: E402  shared with svc and tentacontrol
+
 SSH_CONF_D = os.path.expanduser("~/.ssh/config.d")
 
 
@@ -194,15 +197,8 @@ def services():
     code, out = sh(["svc", "list"])
     print("```\n" + out + "\n```")
     tc_dir = os.environ.get("TC_DIR", "")
-    for p in sorted(glob.glob(os.path.join(tc_dir, "services", "*.json"))):
-        name = os.path.basename(p)[:-5]
-        if name.startswith("_"):
-            continue
-        try:
-            d = json.load(open(p))
-        except ValueError:
-            continue
-        if "api" in d and d.get("enabled", True) is not False:
+    for name, d in tclib.load_services(os.path.join(tc_dir, "services")).items():
+        if "api" in d and tclib.enabled(d):
             path = d.get("test_path", "/")
             code, out = sh(["svc", name, "GET", path, "-o", "/dev/null", "-w", "%{http_code}", "--max-time", "8"], timeout=15)
             if code == 0 and out.isdigit():
@@ -216,37 +212,14 @@ def services():
         print("\nGit repos:\n```\n" + out + "\n```")
 
 
-SSH_META = re.compile(r"^\s*#\s*tentacl(?:ai|aude):\s*sudo\s*=\s*(.*?)\s*$")
-
-
-def ssh_sudo_map():
-    """alias -> sudo prefix from '# tentaclai: sudo=…' lines in ssh/config.d"""
-    res = {}
-    for f in sorted(glob.glob(os.path.join(SSH_CONF_D, "*.conf"))):
-        current = []
-        for line in open(f):
-            m = SSH_META.match(line)
-            if m:
-                res.update({a: m.group(1) for a in current})
-                continue
-            parts = line.split()
-            if parts and parts[0].lower() == "host":
-                current = parts[1:]
-    return res
-
-
 def ssh_hosts():
     section("SSH hosts")
-    hosts = []
-    for f in sorted(glob.glob(os.path.join(SSH_CONF_D, "*.conf"))):
-        for line in open(f):
-            parts = line.split()
-            if len(parts) >= 2 and parts[0].lower() == "host":
-                hosts += [h for h in parts[1:] if "*" not in h]
+    known = tclib.ssh_hosts(SSH_CONF_D)
+    hosts = [h["alias"] for h in known]
     if not hosts:
         print("No SSH hosts configured.")
         return
-    sudo_map = ssh_sudo_map()
+    sudo_map = {h['alias']: h['sudo'] for h in known}
     probe = ("echo \"host=$(hostname)\"; echo \"user=$(whoami)\"; . /etc/os-release 2>/dev/null && echo \"os=$PRETTY_NAME\"; "
              "echo \"kernel=$(uname -r)\"; echo \"uptime=$(uptime -p 2>/dev/null)\"; "
              "[ -n \"$S\" ] && { $S true 2>/dev/null && echo \"sudo=ok ($S)\" || echo \"sudo=FAILED ($S) – needs NOPASSWD\"; }; "
@@ -269,29 +242,16 @@ def ssh_hosts():
 def docker_hosts():
     """docker services from services/*.json (rendered like svc does)"""
     tc_dir = os.environ.get("TC_DIR", "")
-    env = {}
-    try:
-        for line in open(os.path.join(tc_dir, ".env")):
-            m = re.match(r"^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=(.*)$", line)
-            if m:
-                env[m.group(1)] = m.group(2).strip().strip("'\"")
-    except OSError:
-        pass
+    env = tclib.read_env(os.path.join(tc_dir, ".env"))
+    systems = tclib.load_systems(tc_dir)
     res = []
-    for p in sorted(glob.glob(os.path.join(tc_dir, "services", "*.json"))):
-        if os.path.basename(p).startswith("_"):
-            continue
-        try:
-            svc = json.load(open(p))
-        except ValueError:
-            continue
+    for name, svc in tclib.load_services(os.path.join(tc_dir, "services"), systems).items():
         d = svc.get("docker")
-        if not d or svc.get("enabled", True) is False:
+        if not d or not tclib.enabled(svc):
             continue
-        sub = lambda v: re.sub(r"\$\{([A-Za-z_][A-Za-z0-9_]*)\}", lambda m: env.get(m.group(1), ""), str(v or ""))
-        res.append({"name": svc.get("name") or os.path.basename(p)[:-5], "mode": d.get("mode", "socket"),
+        res.append({"name": svc.get("name") or name, "mode": d.get("mode", "socket"),
                     "ssh_host": d.get("ssh_host") if d.get("mode") == "ssh" else None,
-                    "stacks_dir": sub(d.get("stacks_dir")), "access": d.get("access", "ro")})
+                    "stacks_dir": tclib.render(str(d.get("stacks_dir") or ""), env), "access": d.get("access", "ro")})
     return res
 
 

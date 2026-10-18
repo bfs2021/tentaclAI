@@ -36,9 +36,10 @@ ARG CACHE_BUST=0
 RUN echo "cache bust: ${CACHE_BUST}" && npm install -g @anthropic-ai/claude-code@${CLAUDE_CODE_VERSION} \
     && npm cache clean --force
 
-COPY entrypoint.sh start.sh rc-loop cc svc claude-instructions tc-scan /usr/local/bin/
-COPY CLAUDE.base.md /etc/tentaclai/CLAUDE.base.md
-COPY commands/ /etc/tentaclai/commands/
+COPY build/entrypoint.sh build/start.sh build/rc-loop build/cc build/svc build/claude-instructions build/tc-scan /usr/local/bin/
+COPY lib/tclib.py /usr/local/lib/tentaclai/tclib.py
+COPY build/CLAUDE.base.md /etc/tentaclai/CLAUDE.base.md
+COPY build/commands/ /etc/tentaclai/commands/
 RUN chmod 0755 /usr/local/bin/entrypoint.sh /usr/local/bin/start.sh /usr/local/bin/rc-loop /usr/local/bin/cc /usr/local/bin/svc /usr/local/bin/claude-instructions /usr/local/bin/tc-scan \
     # tmux: mouse scrolling, bigger scrollback, truecolor for Claude's TUI
     && printf '%s\n' 'set -g mouse on' 'set -g history-limit 50000' \

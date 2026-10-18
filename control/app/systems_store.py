@@ -6,6 +6,8 @@ import glob
 import json
 import os
 
+import tclib
+
 from . import services_store
 from .config import SYSTEMS_DIR
 from .services_store import NAME
@@ -18,21 +20,17 @@ def path_of(name):
 
 
 def load_all():
+    errors = {}
+    data = tclib.load_systems(os.path.dirname(SYSTEMS_DIR), errors)
+    data.update({n: {"description": "invalid JSON"} for n in errors})
     out = []
-    for p in sorted(glob.glob(os.path.join(SYSTEMS_DIR, "*.json"))):
-        base = os.path.basename(p)
-        if base.startswith("_"):
-            continue
-        try:
-            with open(p) as f:
-                data = json.load(f)
-        except ValueError:
-            data = {"description": "invalid JSON"}
-        data["name"] = base[:-5]
-        data.setdefault("description", "")
-        data.setdefault("ssh_host", "")
-        data.setdefault("notes", [])
-        out.append(data)
+    for name in sorted(data):
+        x = data[name]
+        x["name"] = name
+        x.setdefault("description", "")
+        x.setdefault("ssh_host", "")
+        x.setdefault("notes", [])
+        out.append(x)
     return out
 
 

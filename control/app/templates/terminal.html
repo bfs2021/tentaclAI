@@ -14,7 +14,7 @@
   {% for name, dir in hosts.items() %}
   <a href="/terminal?p=host&alias={{ name | urlencode }}" class="{{ 'active' if current == 'host' and params.alias == name }}" title="{{ dir }}">Claude · {{ name }}</a>
   {% endfor %}
-  {% if current in ('sshadd', 'sshremove', 'onboard') %}<a class="active">{{ title }}</a>{% endif %}
+  {% if current == 'onboard' %}<a class="active">{{ title }}</a>{% endif %}
 </div>
 <div class="term-wrap"><div id="term" style="height:100%"></div></div>
 <p class="help">tmux: scroll with the mouse wheel · leave a session without ending it: <code>Ctrl+B</code>, then <code>D</code> · paste: <code>Ctrl+Shift+V</code> or right click</p>
@@ -24,7 +24,7 @@
 <script src="/vendor/addon-fit.js"></script>
 <script>
 (function () {
-  var params = new URLSearchParams({p: {{ current | tojson }}, alias: {{ params.alias | tojson }}, target: {{ params.target | tojson }}, sudo: {{ (params.sudo or '') | tojson }}});
+  var params = new URLSearchParams({p: {{ current | tojson }}, alias: {{ params.alias | tojson }}});
   var state = document.getElementById("term-state"), btn = document.getElementById("reconnect");
   var css = getComputedStyle(document.documentElement);
   var term = new Terminal({

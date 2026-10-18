@@ -8,6 +8,8 @@ Thanks for your interest in tentaclAI! Issues, ideas and pull requests are welco
   and `data/` are git-ignored on purpose. Check `git status` before every commit – no tokens, hostnames or IPs of your setup.
 - **Keep it generic.** Code, templates and docs must work for any installation; site specifics belong in the files above.
 - **English** for code, UI, messages, docs and templates.
+- **One implementation.** Parsing of `.env`, services, systems and SSH hosts lives in `lib/tclib.py` – extend it instead of
+  writing another parser.
 - **Guard rails first.** Changes to `svc` must keep `ro`/`rw` enforcement and never put secrets into command lines, logs or the UI.
 
 ## Development

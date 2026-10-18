@@ -37,10 +37,14 @@ import hashlib
 import shlex
 from html.parser import HTMLParser
 
+sys.path.insert(0, "/usr/local/lib/tentaclai")
+import tclib  # noqa: E402  shared with tentacontrol
+
 TC_DIR = os.environ.get("TC_DIR", "/opt/tentaclai")
 SERVICES_DIR = os.environ.get("SVC_DIR", os.path.join(TC_DIR, "services"))
 SYSTEMS_DIR = os.path.join(TC_DIR, "systems")
-PARTS = ("api", "mcp", "git", "docker", "db", "web", "files")
+PARTS = tclib.PARTS
+SSH_CONF_D = os.path.expanduser("~/.ssh/config.d")
 # Values from the stack's .env win over the container environment, so new tokens work without recreating
 ENV_FILE = os.environ.get("SVC_ENV_FILE", os.path.join(TC_DIR, ".env"))
 CATALOG = os.environ.get("SVC_CATALOG", "/workspace/SERVICES.md")
@@ -53,7 +57,6 @@ RO_DOCKER = {"ps", "inspect", "logs", "images", "info", "version", "stats", "top
              "network", "volume", "image", "container", "system", "context"}
 RO_SUB = {"ls", "list", "inspect", "ps", "logs", "df", "info", "top", "port", "diff", "history", "show"}
 RO_COMPOSE = {"ps", "logs", "config", "ls", "images", "top", "port", "version", "events"}
-VAR = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*)\}")
 RO_PUSHURL = "READ-ONLY--push-disabled-by-tentaclai"
 HOOK_MARK = "# tentaclai read-only hook"
 
@@ -61,61 +64,27 @@ HOOK_MARK = "# tentaclai read-only hook"
 # ---------- loading ----------
 
 def load_env_file():
-    line_re = re.compile(r"^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=(.*)$")
-    try:
-        with open(ENV_FILE) as f:
-            for line in f:
-                m = line_re.match(line)
-                if m:
-                    v = m.group(2).strip()
-                    if len(v) >= 2 and v[0] == v[-1] and v[0] in "'\"":
-                        v = v[1:-1]
-                    os.environ[m.group(1)] = v
-    except OSError:
-        pass
+    """values from the stack's .env win over the container environment"""
+    os.environ.update(tclib.read_env(ENV_FILE))
+
+
+def _report(errors, prefix=""):
+    for name, e in errors.items():
+        print(f"svc: {prefix}{name}.json: invalid JSON ({e})", file=sys.stderr)
 
 
 def load():
-    services = {}
-    for path in sorted(glob.glob(os.path.join(SERVICES_DIR, "*.json"))):
-        base = os.path.basename(path)
-        if base.startswith("_"):
-            continue
-        try:
-            with open(path) as f:
-                svc = json.load(f)
-        except ValueError as e:
-            print(f"svc: {base}: invalid JSON ({e})", file=sys.stderr)
-            continue
-        svc.setdefault("name", base[:-5])
-        services[svc["name"]] = svc
-    # a docker service of mode ssh without ssh_host uses the SSH host of its system
-    systems = load_systems()
-    for svc in services.values():
-        d, sysd = svc.get("docker"), systems.get(svc.get("system", ""))
-        if d and d.get("mode") == "ssh" and not d.get("ssh_host") and sysd and sysd.get("ssh_host"):
-            d["ssh_host"] = sysd["ssh_host"]
-        f = svc.get("files")
-        if f and not f.get("ssh_host") and sysd and sysd.get("ssh_host"):
-            f["ssh_host"] = sysd["ssh_host"]
+    errors = {}
+    services = {s["name"]: s for s in tclib.load_services(SERVICES_DIR, load_systems(), errors).values()}
+    _report(errors)
     return services
 
 
 def load_systems():
     """systems/*.json – groups of services (one host or appliance) with shared description, SSH host and rules"""
-    systems = {}
-    for path in sorted(glob.glob(os.path.join(SYSTEMS_DIR, "*.json"))):
-        base = os.path.basename(path)
-        if base.startswith("_"):
-            continue
-        try:
-            with open(path) as f:
-                s = json.load(f)
-        except ValueError as e:
-            print(f"svc: systems/{base}: invalid JSON ({e})", file=sys.stderr)
-            continue
-        s.setdefault("name", base[:-5])
-        systems[s["name"]] = s
+    errors = {}
+    systems = tclib.load_systems(TC_DIR, errors)
+    _report(errors, "systems/")
     return systems
 
 
@@ -148,49 +117,24 @@ def cmd_systems(services, name=None):
     return 0
 
 
-def variables(obj):
-    found = set()
-    if isinstance(obj, str):
-        found.update(VAR.findall(obj))
-    elif isinstance(obj, list):
-        for v in obj:
-            found |= variables(v)
-    elif isinstance(obj, dict):
-        for k, v in obj.items():
-            if not k.startswith("_"):
-                found |= variables(v)
-    return found
+variables = tclib.variables
+enabled = tclib.enabled
 
 
 def render(obj):
-    if isinstance(obj, str):
-        return VAR.sub(lambda m: os.environ.get(m.group(1), ""), obj)
-    if isinstance(obj, list):
-        return [render(v) for v in obj]
-    if isinstance(obj, dict):
-        return {k: render(v) for k, v in obj.items() if not k.startswith("_")}
-    return obj
+    return tclib.render(obj, os.environ)
 
 
 def missing_vars(part):
-    return sorted(v for v in variables(part) if not os.environ.get(v))
-
-
-def enabled(svc):
-    return svc.get("enabled", True) is not False
+    return tclib.missing(part, os.environ)
 
 
 def status(svc):
-    if not enabled(svc):
-        return "disabled"
-    miss = set()
-    for part in PARTS:
-        miss |= set(missing_vars(svc.get(part, {})))
-    return "missing: " + ", ".join(sorted(miss)) if miss else "active"
+    return tclib.status_text(svc, os.environ)
 
 
 def kinds(svc):
-    return "+".join(k for k in PARTS if k in svc) or "-"
+    return "+".join(tclib.kinds(svc)) or "-"
 
 
 def get(services, name):
@@ -416,23 +360,9 @@ def cmd_git_credential(services, name, op):
 
 # ---------- docker ----------
 
-SSH_META = re.compile(r"^\s*#\s*tentacl(?:ai|aude):\s*sudo\s*=\s*(.*?)\s*$")
-
-
 def ssh_sudo(alias):
     """sudo prefix configured for an SSH host ('# tentaclai: sudo=sudo -n' inside its Host block), '' = none"""
-    for f in sorted(glob.glob(os.path.expanduser("~/.ssh/config.d/*.conf"))):
-        current = []
-        for line in open(f):
-            m = SSH_META.match(line)
-            if m:
-                if alias in current:
-                    return m.group(1)
-                continue
-            parts = line.split()
-            if parts and parts[0].lower() == "host":
-                current = parts[1:]
-    return ""
+    return tclib.ssh_sudo(SSH_CONF_D, alias)
 
 
 def docker_sudo(d):

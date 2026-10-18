@@ -206,8 +206,12 @@ A service file can combine any of these parts:
 | `files` | `ssh_host` (or the system's), `path`, `sudo`; `access` | `ro`: no push; paths stay inside `path` |
 
 A part stays inactive while one of its `${VAR}`s is empty; `"enabled": false` parks the whole service.
+
+**Rule of thumb:** one *service* = one way in with one set of credentials (an API and its MCP server may share a file);
+one *system* = one machine or appliance that groups several services.
 Systems: `systems/<name>.json` with `description`, `ssh_host`, `notes` (rules for every member) – see `systems/_example.json`.
-SSH hosts: tentacontrol → Connections → SSH hosts (or `./ssh-host.sh add <alias> <user@host[:port]> [--sudo]`); jump hosts via `ProxyJump`; the sudo prefix is stored as
+SSH hosts: tentacontrol → Connections → SSH hosts, or `./ssh-host.sh list|add|sudo|hostkey|remove|test` (same logic, e.g.
+`./ssh-host.sh add nas admin@nas.lan --jump gate --sudo`); jump hosts via `ProxyJump`; the sudo prefix is stored as
 `# tentaclai: sudo=sudo -n` in the host block and needs passwordless sudo, ideally limited to what Claude needs.
 
 ## Configuration
@@ -236,7 +240,8 @@ tentaclai/
 ├── compose.override.*.yaml    site additions: reverse proxy, labels (example + your own)
 ├── .env.example               settings template (your .env: mode 600, git-ignored)
 ├── tentaclai.sh               host helper: init, Claude/RC/shell, status, inventory, passwd, setup-url
-├── ssh-host.sh                add/remove SSH hosts (config, host key, key deployment, sudo, test)
+├── ssh-host.sh                SSH hosts on the command line (wraps tentacontrol-ssh – same logic as the UI)
+├── lib/tclib.py               shared logic of both images: .env, ${VAR}, services, systems, SSH hosts
 ├── build/                     tentaclai image
 │   ├── svc                    service gateway CLI
 │   ├── tc-scan                read-only inventory
