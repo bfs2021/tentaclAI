@@ -1,4 +1,4 @@
-"""Topology graph (prototype): tentaclaude → systems → services / SSH hosts, from the configuration only.
+"""Topology graph (prototype): tentaclai → systems → services / SSH hosts, from the configuration only.
 
 Docker stacks of a docker service can be loaded on demand (live, read-only `docker ps`).
 """
@@ -22,7 +22,7 @@ def graph():
     def edge(src, dst, label="", kind="link"):
         edges.append({"data": {"id": f"{src}->{dst}", "source": src, "target": dst, "label": label, "kind": kind}})
 
-    node("core", "tentaclaude", "core", info="Claude Code sandbox – reaches everything below only through these connections.")
+    node("core", "tentaclai", "core", info="Claude Code sandbox – reaches everything below only through these connections.")
     for name, s in systems.items():
         node(f"sys:{name}", name, "system", info=s.get("description", ""), notes=s.get("notes", []),
              href=f"/systems/{name}", ssh=s.get("ssh_host", ""),

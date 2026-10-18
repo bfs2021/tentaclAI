@@ -1,4 +1,4 @@
-# tentaclaude – everything site-specific or secret stays out of the repository.
+# tentaclai – everything site-specific or secret stays out of the repository.
 # Tracked: generic code (build/, control/, compose.yaml, scripts), *.example files, service templates.
 
 # settings & secrets

@@ -10,7 +10,7 @@
     "auth": {
       "type": "token",
       "token": "${GITEA_TOKEN}",
-      "username": "tentaclaude"
+      "username": "tentaclai"
     }
   }
 }

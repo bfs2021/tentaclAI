@@ -1,4 +1,4 @@
-# tentaclaude – sandbox + service gateway for Claude Code
+# tentaclai – sandbox + service gateway for Claude Code
 # Tools: Claude Code, Docker CLI + compose, git, python, node, ssh, jq, ripgrep
 FROM node:22-bookworm-slim
 
@@ -37,8 +37,8 @@ RUN echo "cache bust: ${CACHE_BUST}" && npm install -g @anthropic-ai/claude-code
     && npm cache clean --force
 
 COPY entrypoint.sh start.sh rc-loop cc svc claude-instructions tc-scan /usr/local/bin/
-COPY CLAUDE.base.md /etc/tentaclaude/CLAUDE.base.md
-COPY commands/ /etc/tentaclaude/commands/
+COPY CLAUDE.base.md /etc/tentaclai/CLAUDE.base.md
+COPY commands/ /etc/tentaclai/commands/
 RUN chmod 0755 /usr/local/bin/entrypoint.sh /usr/local/bin/start.sh /usr/local/bin/rc-loop /usr/local/bin/cc /usr/local/bin/svc /usr/local/bin/claude-instructions /usr/local/bin/tc-scan \
     # tmux: mouse scrolling, bigger scrollback, truecolor for Claude's TUI
     && printf '%s\n' 'set -g mouse on' 'set -g history-limit 50000' \

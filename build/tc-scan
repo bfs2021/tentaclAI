@@ -216,11 +216,11 @@ def services():
         print("\nGit repos:\n```\n" + out + "\n```")
 
 
-SSH_META = re.compile(r"^\s*#\s*tentaclaude:\s*sudo\s*=\s*(.*?)\s*$")
+SSH_META = re.compile(r"^\s*#\s*tentacl(?:ai|aude):\s*sudo\s*=\s*(.*?)\s*$")
 
 
 def ssh_sudo_map():
-    """alias -> sudo prefix from '# tentaclaude: sudo=…' lines in ssh/config.d"""
+    """alias -> sudo prefix from '# tentaclai: sudo=…' lines in ssh/config.d"""
     res = {}
     for f in sorted(glob.glob(os.path.join(SSH_CONF_D, "*.conf"))):
         current = []

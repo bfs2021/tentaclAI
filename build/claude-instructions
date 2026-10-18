@@ -5,10 +5,10 @@ import json
 import os
 import re
 
-TEMPLATE = "/etc/tentaclaude/CLAUDE.base.md"
-HOST_DOCS = "/etc/tentaclaude/host-docs.md"
+TEMPLATE = "/etc/tentaclai/CLAUDE.base.md"
+HOST_DOCS = "/etc/tentaclai/host-docs.md"
 
-tc_dir = os.environ.get("TC_DIR", "/opt/tentaclaude")
+tc_dir = os.environ.get("TC_DIR", "/opt/tentaclai")
 
 
 def docker_hosts():
@@ -41,7 +41,7 @@ def docker_hosts():
 
 
 def ssh_hosts():
-    meta = re.compile(r"^\s*#\s*tentaclaude:\s*sudo\s*=\s*(.*?)\s*$")
+    meta = re.compile(r"^\s*#\s*tentacl(?:ai|aude):\s*sudo\s*=\s*(.*?)\s*$")
     hosts = {}
     for f in sorted(glob.glob("/root/.ssh/config.d/*.conf")):
         current = []

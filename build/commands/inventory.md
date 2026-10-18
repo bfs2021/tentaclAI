@@ -2,11 +2,11 @@
 description: System inventory – scan docker hosts, stacks, services and SSH hosts, clarify with the user, record the result in local/CLAUDE.md
 ---
 
-Run a **system inventory** of this tentaclaude installation. Goal: afterwards `$TC_DIR/local/CLAUDE.md` contains the site knowledge you need for future tasks. Talk to the user in the language they write in.
+Run a **system inventory** of this tentaclai installation. Goal: afterwards `$TC_DIR/local/CLAUDE.md` contains the site knowledge you need for future tasks. Talk to the user in the language they write in.
 
 ## Steps
 
-1. **Read what is known**: current `$TC_DIR/local/CLAUDE.md` and – if present – the host documentation `/etc/tentaclaude/host-docs.md`. Don't ask again for things already documented.
+1. **Read what is known**: current `$TC_DIR/local/CLAUDE.md` and – if present – the host documentation `/etc/tentaclai/host-docs.md`. Don't ask again for things already documented.
 2. **Scan**: run `tc-scan` (read-only, no secrets). Look deeper where useful: compose files and `README`/`agents.md` in stack directories (local or via `ssh`) – **never** print or copy `.env` contents or other secrets.
 3. **Summarize**: show the user briefly what you found (docker hosts, number of stacks/containers, reverse proxy, services, SSH hosts, notable things like stopped stacks or unreachable services).
 4. **Ask** – in rounds of 2–4 questions with sensible suggestions (AskUserQuestion), only about what the scan cannot tell:

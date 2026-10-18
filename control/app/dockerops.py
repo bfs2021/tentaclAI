@@ -1,4 +1,4 @@
-"""Everything that talks to the Docker daemon about the tentaclaude container."""
+"""Everything that talks to the Docker daemon about the tentaclai container."""
 import datetime as dt
 import json
 import os
@@ -194,7 +194,7 @@ def lifecycle(action):
 
 
 def ssh_check(alias, sudo=""):
-    """test an SSH login as tentaclaude; uses a throwaway container from the same image when tentaclaude is stopped"""
+    """test an SSH login as tentaclai; uses a throwaway container from the same image when tentaclai is stopped"""
     probe = "echo $(whoami)@$(hostname)"
     if sudo:
         probe += f"; {sudo} true 2>/dev/null && echo SUDO_OK || echo SUDO_FAILED"
@@ -202,7 +202,7 @@ def ssh_check(alias, sudo=""):
     c = container()
     if c is not None and c.status == "running":
         return run(cmd)
-    image = image_name(c) if c is not None else "local/tentaclaude:latest"
+    image = image_name(c) if c is not None else "local/tentaclai:latest"
     try:
         out = client().containers.run(image, cmd[1:], entrypoint="ssh", remove=True, stdout=True, stderr=True,
                                       volumes={SSH_DIR: {"bind": "/root/.ssh", "mode": "rw"}},
@@ -211,6 +211,6 @@ def ssh_check(alias, sudo=""):
     except docker.errors.ContainerError as e:
         return e.exit_status, (e.stderr or b"").decode(errors="replace")
     except docker.errors.ImageNotFound:
-        return 1, "image local/tentaclaude not built yet (Updates → build)"
+        return 1, "image local/tentaclai not built yet (Updates → build)"
     except Exception as e:  # noqa: BLE001
         return 1, str(e)

@@ -1,22 +1,22 @@
 #!/usr/bin/env bash
-# Host helper for tentaclaude (sandbox + service gateway for Claude Code) and tentacontrol (web admin).
-#   ./tentaclaude.sh init       guided first-time setup (questions; --defaults = no questions)
-#   ./tentaclaude.sh            Claude in /workspace (persistent tmux session)
-#   ./tentaclaude.sh host [name] Claude in the stacks dir of a local docker service (first one if no name)
-#   ./tentaclaude.sh <dir>      Claude in any directory inside the container
-#   ./tentaclaude.sh rc         attach to the remote-control session
-#   ./tentaclaude.sh shell      bash in the container
-#   ./tentaclaude.sh login      claude auth login (needed for remote control)
-#   ./tentaclaude.sh status     container + tmux sessions
-#   ./tentaclaude.sh svc        apply services/*.json (MCP, repos, catalog) and show status
-#   ./tentaclaude.sh inventory   guided system inventory → local/CLAUDE.md (Claude asks, you approve)
-#   ./tentaclaude.sh scan       read-only inventory report (tc-scan)
-#   ./tentaclaude.sh passwd     set/reset the tentacontrol web admin password
-#   ./tentaclaude.sh setup-url  show the one-time tentacontrol setup link (first start)
+# Host helper for tentaclai (sandbox + service gateway for Claude Code) and tentacontrol (web admin).
+#   ./tentaclai.sh init       guided first-time setup (questions; --defaults = no questions)
+#   ./tentaclai.sh            Claude in /workspace (persistent tmux session)
+#   ./tentaclai.sh host [name] Claude in the stacks dir of a local docker service (first one if no name)
+#   ./tentaclai.sh <dir>      Claude in any directory inside the container
+#   ./tentaclai.sh rc         attach to the remote-control session
+#   ./tentaclai.sh shell      bash in the container
+#   ./tentaclai.sh login      claude auth login (needed for remote control)
+#   ./tentaclai.sh status     container + tmux sessions
+#   ./tentaclai.sh svc        apply services/*.json (MCP, repos, catalog) and show status
+#   ./tentaclai.sh inventory   guided system inventory → local/CLAUDE.md (Claude asks, you approve)
+#   ./tentaclai.sh scan       read-only inventory report (tc-scan)
+#   ./tentaclai.sh passwd     set/reset the tentacontrol web admin password
+#   ./tentaclai.sh setup-url  show the one-time tentacontrol setup link (first start)
 # Detach from a tmux session without stopping Claude: Ctrl+B, then D
 set -euo pipefail
 
-CONTAINER=tentaclaude
+CONTAINER=tentaclai
 STACK_DIR="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
 ENV_FILE="$STACK_DIR/.env"
 
@@ -65,7 +65,7 @@ write_generated() {  # compose.generated.yaml from local docker services (same l
 cmd_init() {
     cd "$STACK_DIR"
     [ "${1:-}" = "--defaults" ] || [ ! -t 0 ] && INTERACTIVE=0
-    echo "🐙 tentaclaude – first-time setup$( [ "$INTERACTIVE" = 0 ] && echo ' (no questions)')"
+    echo "🐙 tentaclai – first-time setup$( [ "$INTERACTIVE" = 0 ] && echo ' (no questions)')"
     if [ ! -f .env ]; then install -m 600 .env.example .env; echo "→ created .env from .env.example"; fi
     chmod 600 .env
     cur() { local v; v="$(env_value "$1")"; echo "${v:-$2}"; }
@@ -122,9 +122,9 @@ cmd_init() {
     mkdir -p data/home data/control workspace local services ssh/config.d ssh/keys
     chmod 700 data/control ssh ssh/keys
     [ -f ssh/known_hosts ] || install -m 600 /dev/null ssh/known_hosts
-    if [ ! -f ssh/keys/tentaclaude_ed25519 ]; then
-        ssh-keygen -q -t ed25519 -N '' -C "tentaclaude@$(env_value TC_HOSTNAME)" -f ssh/keys/tentaclaude_ed25519
-        echo "  → generated SSH key ssh/keys/tentaclaude_ed25519"
+    if [ ! -f ssh/keys/tentaclai_ed25519 ]; then
+        ssh-keygen -q -t ed25519 -N '' -C "tentaclai@$(env_value TC_HOSTNAME)" -f ssh/keys/tentaclai_ed25519
+        echo "  → generated SSH key ssh/keys/tentaclai_ed25519"
     fi
     [ -f local/CLAUDE.md ] || { cp local/CLAUDE.example.md local/CLAUDE.md 2>/dev/null || printf '# Site rules for Claude\n' > local/CLAUDE.md; echo "  → created local/CLAUDE.md"; }
     [ -f compose.override.yaml ] || printf '# site additions (see compose.override.example.yaml)\nservices: {}\n' > compose.override.yaml
@@ -149,9 +149,9 @@ cmd_init() {
         for _ in $(seq 1 30); do docker logs tentacontrol 2>&1 | grep -q 'setup?token=' && break; sleep 1; done
         echo; echo "Setup link (one-time):"; "$0" setup-url
         echo; echo "Then in tentacontrol: Overview → Create & start → Terminal (Claude login) → Services."
-        echo "Tip: the system inventory (tentacontrol → Overview, or ./tentaclaude.sh inventory) lets Claude get to know your host."
+        echo "Tip: the system inventory (tentacontrol → Overview, or ./tentaclai.sh inventory) lets Claude get to know your host."
     else
-        echo "Next: docker compose up -d control && ./tentaclaude.sh setup-url"
+        echo "Next: docker compose up -d control && ./tentaclai.sh setup-url"
     fi
 }
 

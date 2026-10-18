@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""svc – homelab service registry for tentaclaude.
+"""svc – homelab service registry for tentaclai.
 
 One JSON file per service in $TC_DIR/services/*.json.
 A service can have an "api", an "mcp" and/or a "git" part. Secrets are ${VAR} placeholders,
@@ -37,7 +37,7 @@ import hashlib
 import shlex
 from html.parser import HTMLParser
 
-TC_DIR = os.environ.get("TC_DIR", "/opt/tentaclaude")
+TC_DIR = os.environ.get("TC_DIR", "/opt/tentaclai")
 SERVICES_DIR = os.environ.get("SVC_DIR", os.path.join(TC_DIR, "services"))
 SYSTEMS_DIR = os.path.join(TC_DIR, "systems")
 PARTS = ("api", "mcp", "git", "docker", "db", "web", "files")
@@ -45,17 +45,17 @@ PARTS = ("api", "mcp", "git", "docker", "db", "web", "files")
 ENV_FILE = os.environ.get("SVC_ENV_FILE", os.path.join(TC_DIR, ".env"))
 CATALOG = os.environ.get("SVC_CATALOG", "/workspace/SERVICES.md")
 REPO_ROOT = os.environ.get("SVC_REPO_ROOT", "/workspace/repos")
-STATE = os.path.expanduser("~/.config/tentaclaude/mcp-managed.json")
-OAUTH_CACHE = os.path.expanduser("~/.cache/tentaclaude/oauth")
-DOCKER_STATE = os.path.expanduser("~/.config/tentaclaude/docker-managed.json")
-SOCK_DIR = "/run/tentaclaude"  # local sockets are mounted here as docker-<name>.sock (compose.generated.yaml)
+STATE = os.path.expanduser("~/.config/tentaclai/mcp-managed.json")
+OAUTH_CACHE = os.path.expanduser("~/.cache/tentaclai/oauth")
+DOCKER_STATE = os.path.expanduser("~/.config/tentaclai/docker-managed.json")
+SOCK_DIR = "/run/tentaclai"  # local sockets are mounted here as docker-<name>.sock (compose.generated.yaml)
 RO_DOCKER = {"ps", "inspect", "logs", "images", "info", "version", "stats", "top", "port", "diff", "history", "events",
              "network", "volume", "image", "container", "system", "context"}
 RO_SUB = {"ls", "list", "inspect", "ps", "logs", "df", "info", "top", "port", "diff", "history", "show"}
 RO_COMPOSE = {"ps", "logs", "config", "ls", "images", "top", "port", "version", "events"}
 VAR = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*)\}")
-RO_PUSHURL = "READ-ONLY--push-disabled-by-tentaclaude"
-HOOK_MARK = "# tentaclaude read-only hook"
+RO_PUSHURL = "READ-ONLY--push-disabled-by-tentaclai"
+HOOK_MARK = "# tentaclai read-only hook"
 
 
 # ---------- loading ----------
@@ -320,15 +320,15 @@ def configure_repo(name, path, git):
     git_run(["config", "--add", "credential.helper", ""], cwd=path)  # ignore global helpers (e.g. gh)
     if uses_token(git):
         git_run(["config", "--add", "credential.helper", f"!svc git-credential {name}"], cwd=path)
-    git_run(["config", "tentaclaude.service", name], cwd=path)
+    git_run(["config", "tentaclai.service", name], cwd=path)
     access = git.get("access", "ro")
-    git_run(["config", "tentaclaude.access", access], cwd=path)
+    git_run(["config", "tentaclai.access", access], cwd=path)
     hook = os.path.join(path, ".git", "hooks", "pre-push")
     if access == "ro":
         git_run(["config", "remote.origin.pushurl", RO_PUSHURL], cwd=path)
         os.makedirs(os.path.dirname(hook), exist_ok=True)
         with open(hook, "w") as f:
-            f.write(f"#!/bin/sh\n{HOOK_MARK}\necho 'tentaclaude: repo \"{name}\" is read-only – push blocked.' >&2\nexit 1\n")
+            f.write(f"#!/bin/sh\n{HOOK_MARK}\necho 'tentaclai: repo \"{name}\" is read-only – push blocked.' >&2\nexit 1\n")
         os.chmod(hook, 0o755)
     else:
         git_run(["config", "--unset", "remote.origin.pushurl"], cwd=path, quiet=True)
@@ -416,11 +416,11 @@ def cmd_git_credential(services, name, op):
 
 # ---------- docker ----------
 
-SSH_META = re.compile(r"^\s*#\s*tentaclaude:\s*sudo\s*=\s*(.*?)\s*$")
+SSH_META = re.compile(r"^\s*#\s*tentacl(?:ai|aude):\s*sudo\s*=\s*(.*?)\s*$")
 
 
 def ssh_sudo(alias):
-    """sudo prefix configured for an SSH host ('# tentaclaude: sudo=sudo -n' inside its Host block), '' = none"""
+    """sudo prefix configured for an SSH host ('# tentaclai: sudo=sudo -n' inside its Host block), '' = none"""
     for f in sorted(glob.glob(os.path.expanduser("~/.ssh/config.d/*.conf"))):
         current = []
         for line in open(f):
@@ -476,7 +476,7 @@ def sync_docker_contexts(services):
         host = docker_target(name, d)
         exists = subprocess.run(["docker", "context", "inspect", name], capture_output=True).returncode == 0
         verb = "update" if exists else "create"
-        r = subprocess.run(["docker", "context", verb, name, "--description", f"tentaclaude service {name}",
+        r = subprocess.run(["docker", "context", verb, name, "--description", f"tentaclai service {name}",
                             "--docker", f"host={host}"], capture_output=True, text=True)
         if r.returncode == 0:
             active.add(name)
@@ -606,7 +606,7 @@ def db_run(name, db, sql=None, fmt="table", interactive=False):
     if db_engine(db) == "postgres":
         env = dict(os.environ, PGHOST=str(db.get("host", "")), PGPORT=str(db.get("port", 5432)),
                    PGDATABASE=str(db.get("database", "")), PGUSER=str(db.get("user", "")), PGPASSWORD=str(db.get("password", "")),
-                   PGSSLMODE=str(db.get("ssl", "prefer")), PGAPPNAME="tentaclaude", PGCONNECT_TIMEOUT="10")
+                   PGSSLMODE=str(db.get("ssl", "prefer")), PGAPPNAME="tentaclai", PGCONNECT_TIMEOUT="10")
         if ro:
             env["PGOPTIONS"] = "-c default_transaction_read_only=on"
         cmd = ["psql", "-X", "-v", "ON_ERROR_STOP=1"]
@@ -752,7 +752,7 @@ class _HTMLText(HTMLParser):
 
 
 def web_paths(name):
-    d = os.path.expanduser("~/.cache/tentaclaude/web")
+    d = os.path.expanduser("~/.cache/tentaclai/web")
     os.makedirs(d, mode=0o700, exist_ok=True)
     return os.path.join(d, f"{name}.cookies")
 
@@ -774,7 +774,7 @@ def web_curl(name, web, url, method="GET", data_lines=(), out=None):
     """curl with auth in a 0600 config file and a per-service cookie jar; returns (code, http_status, final_url, content_type, body)"""
     auth, jar = web.get("auth") or {"type": "none"}, web_paths(name)
     cfg = ['url = ' + _q(url), 'location', 'max-redirs = 10', 'max-time = 30', f'cookie-jar = {_q(jar)}', f'cookie = {_q(jar)}',
-           'user-agent = "tentaclaude (+svc web)"', 'write-out = "\\n%{http_code} %{url_effective} %{content_type}"']
+           'user-agent = "tentaclai (+svc web)"', 'write-out = "\\n%{http_code} %{url_effective} %{content_type}"']
     t = auth.get("type", "none")
     if t == "basic":
         cfg.append(f'user = {_q(auth["user"] + ":" + auth["password"])}')
@@ -1128,7 +1128,7 @@ def write_instructions():
 
 def write_catalog(services):
     lines = [
-        "# Service catalog (generated – edit `services/*.json` in the tentaclaude stack, then `svc sync`)",
+        "# Service catalog (generated – edit `services/*.json` in the tentaclai stack, then `svc sync`)",
         "",
         "Call APIs with `svc <name> <METHOD> <path> [curl args]` – auth is injected, tokens never appear in commands.",
         "Details per service: `svc info <name>`. Status \"missing: VAR\" = token not set in `.env` → tell the user, don't work around it.",

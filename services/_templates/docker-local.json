@@ -2,7 +2,7 @@
   "_meta": {
     "title": "Docker host (local, socket)",
     "category": "Docker hosts",
-    "setup": "For the host tentaclaude runs on. Socket and stacks directory are mounted into the container after “Apply now” (compose.generated.yaml)."
+    "setup": "For the host tentaclai runs on. Socket and stacks directory are mounted into the container after “Apply now” (compose.generated.yaml)."
   },
   "description": "Docker host – manage stacks and containers",
   "docker": {

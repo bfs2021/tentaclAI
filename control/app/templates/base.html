@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{% block title %}Overview{% endblock %} · tentaclaude</title>
+  <title>{% block title %}Overview{% endblock %} · tentaclAI</title>
   <link rel="icon" type="image/svg+xml" href="/static/logo.svg?v={{ asset_v }}">
   <link rel="stylesheet" href="/static/app.css?v={{ asset_v }}">
   {% block head %}{% endblock %}
@@ -13,7 +13,7 @@
 <body hx-headers='{"X-Requested-With": "htmx"}'>
 <div class="app">
   <aside class="sidebar">
-    <div class="brand"><img class="logo" src="/static/logo.svg?v={{ asset_v }}" alt="" width="32" height="32"><div>tentaclaude<small>Eight arms, one brain</small></div></div>
+    <div class="brand"><img class="logo" src="/static/logo.svg?v={{ asset_v }}" alt="" width="32" height="32"><div>tentaclAI<small>Eight arms, one brain</small></div></div>
     <nav class="nav">
       <a href="/" class="{{ 'active' if nav == 'dashboard' }}">{{ icon('home') }}Overview</a>
       <a href="/terminal" class="{{ 'active' if nav == 'terminal' }}">{{ icon('terminal') }}Terminal</a>
@@ -28,15 +28,15 @@
     <div class="spacer"></div>
     <div class="cstate">
       <span class="dot {{ 'ok' if cstatus.running else ('err' if cstatus.exists else '') }}"></span>
-      tentaclaude {{ cstatus.state }}{% if cstatus.running %} · {{ cstatus.uptime }}{% endif %}
+      tentaclAI {{ cstatus.state }}{% if cstatus.running %} · {{ cstatus.uptime }}{% endif %}
     </div>
     <form method="post" action="/logout"><button class="btn ghost sm" style="width:100%">{{ icon('logout') }}Sign out</button></form>
   </aside>
   <main class="main">
     {% if restart_needed %}
     <div class="banner">
-      <div><strong>Configuration changed.</strong> <span class="muted">tentaclaude has to be recreated for the changes to take effect – running Claude sessions will end.</span></div>
-      <button class="btn primary sm" hx-post="/container/recreate" hx-confirm="Recreate tentaclaude now? Running sessions will end.">{{ icon('refresh') }}Apply now</button>
+      <div><strong>Configuration changed.</strong> <span class="muted">tentaclAI has to be recreated for the changes to take effect – running Claude sessions will end.</span></div>
+      <button class="btn primary sm" hx-post="/container/recreate" hx-confirm="Recreate tentaclAI now? Running sessions will end.">{{ icon('refresh') }}Apply now</button>
     </div>
     {% endif %}
     {% block content %}{% endblock %}

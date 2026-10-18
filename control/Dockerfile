@@ -1,9 +1,9 @@
-# tentacontrol – web admin for tentaclaude
+# tentacontrol – web admin for tentaclai
 FROM python:3.12-slim-bookworm
 
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 DEBIAN_FRONTEND=noninteractive
 
-# docker CLI + compose (to rebuild/recreate the tentaclaude service), curl for vendoring
+# docker CLI + compose (to rebuild/recreate the tentaclai service), curl for vendoring
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl gnupg \
     && install -m 0755 -d /etc/apt/keyrings \
     && curl -fsSL https://download.docker.com/linux/debian/gpg -o /etc/apt/keyrings/docker.asc \

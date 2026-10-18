@@ -1,13 +1,13 @@
 import os
 
-STACK_DIR = os.environ.get("STACK_DIR", "/opt/tentaclaude")
+STACK_DIR = os.environ.get("STACK_DIR", "/opt/tentaclai")
 ENV_FILE = os.path.join(STACK_DIR, ".env")
 SERVICES_DIR = os.path.join(STACK_DIR, "services")
 SYSTEMS_DIR = os.path.join(STACK_DIR, "systems")
 SSH_DIR = os.path.join(STACK_DIR, "ssh")
 HOME_DIR = os.path.join(STACK_DIR, "data", "home")
 DATA_DIR = os.environ.get("DATA_DIR", "/data")
-CLAUDE_CONTAINER = os.environ.get("CLAUDE_CONTAINER", "tentaclaude")
+CLAUDE_CONTAINER = os.environ.get("CLAUDE_CONTAINER", "tentaclai")
 CLAUDE_SERVICE = os.environ.get("CLAUDE_SERVICE", "claude")
 COMPOSE = ["docker", "compose", "--project-directory", STACK_DIR]
 
@@ -23,7 +23,7 @@ def is_secret(key: str) -> bool:
 # (key, label, help, kind) – kind: text | bool | readonly
 SETTINGS_GROUPS = [
     ("General", [
-        ("TC_HOSTNAME", "Host name", "how Claude refers to the host tentaclaude runs on", "text"),
+        ("TC_HOSTNAME", "Host name", "how Claude refers to the host tentaclai runs on", "text"),
         ("TC_DOMAIN", "Internal domain", "prefills templates, e.g. n8n.<domain>", "text"),
         ("CONTROL_URL", "tentacontrol address", "for the setup link and help, e.g. https://tentacontrol.example.lan", "text"),
         ("TZ", "Time zone", "e.g. Europe/Vienna", "text"),
@@ -39,13 +39,13 @@ SETTINGS_GROUPS = [
         ("RC_RESTART_DELAY", "Restart delay (s)", "wait time before an ended session restarts (default 30)", "text"),
     ]),
     ("Paths & mounts", [
-        ("TC_DIR", "Stack directory", "set by ./tentaclaude.sh init", "readonly"),
-        ("DOCKER_SOCKET", "Docker socket of this host", "only for tentacontrol itself (runs tentaclaude); Claude's Docker access comes from docker services", "text"),
+        ("TC_DIR", "Stack directory", "set by ./tentaclai.sh init", "readonly"),
+        ("DOCKER_SOCKET", "Docker socket of this host", "only for tentacontrol itself (runs tentaclai); Claude's Docker access comes from docker services", "text"),
         ("HOST_DOCS", "Host documentation", "optional: Markdown file about the host, imported into Claude's instructions", "text"),
         ("CA_CERT", "Own root CA", "optional: PEM file for internal https services", "text"),
     ]),
     ("Resources", [
-        ("CLAUDE_CPUS", "CPU limit", "number of cores for tentaclaude", "text"),
+        ("CLAUDE_CPUS", "CPU limit", "number of cores for tentaclai", "text"),
         ("CLAUDE_MEMORY", "Memory limit", "e.g. 8g", "text"),
     ]),
 ]

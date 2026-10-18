@@ -19,7 +19,7 @@
     <div id="cy"></div>
     <div class="topo-empty" id="topo-loading">Loading …</div>
     <div class="topo-legend small">
-      <span><i class="lg core"></i>tentaclaude</span><span><i class="lg system"></i>system</span>
+      <span><i class="lg core"></i>tentaclAI</span><span><i class="lg system"></i>system</span>
       <span><i class="lg ok"></i>service</span><span><i class="lg warn">!</i>token missing</span>
       <span><i class="lg ssh"></i>SSH host (yellow = sudo fails, red = unreachable)</span><span><i class="lg stack"></i>stack</span><span><i class="lg ctr"></i>container</span>
       <span class="faint">drag to move · scroll to zoom</span>
@@ -41,7 +41,7 @@
   var stateColor = { ok: C.ok, warn: C.warn, err: C.err, off: C.muted, error: C.err };
   var esc = function (s) { var d = document.createElement("div"); d.textContent = s == null ? "" : String(s); return d.innerHTML; };
   var $ = function (id) { return document.getElementById(id); };
-  // the octopus in the central tentaclaude node (own vector drawing, white on the accent color)
+  // the octopus in the central tentaclAI node (own vector drawing, white on the accent color)
   var octopus = "data:image/svg+xml;utf8," + encodeURIComponent("<svg xmlns='http://www.w3.org/2000/svg' width='96' height='96' viewBox='0 0 48 48'>" +
     "<g fill='none' stroke='#fff' stroke-width='3.2' stroke-linecap='round'>" +
     "<path d='M15 27c-3 3-6 5-8 9 0 2 2 3 3 1'/><path d='M19 29c-1 4-3 7-3 11 0 2 2 2 3 0'/>" +
@@ -109,7 +109,7 @@
     placeAround();
     separate();
   }
-  // docker over ssh: put the SSH host between tentaclaude and the docker host, outside the stack ring
+  // docker over ssh: put the SSH host between tentaclAI and the docker host, outside the stack ring
   function placeSsh() {
     var core = cy.$("#core").position();
     cy.edges("[kind='docker']").forEach(function (e) {
@@ -342,7 +342,7 @@
   $("topo-png").onclick = function () {
     var a = document.createElement("a");
     a.href = cy.png({ full: true, scale: 2, bg: C.panel });
-    a.download = "tentaclaude-topology.png"; a.click();
+    a.download = "tentaclai-topology.png"; a.click();
   };
 
   build();

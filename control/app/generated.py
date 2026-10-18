@@ -1,7 +1,7 @@
 """compose.generated.yaml – mounts derived from services/*.json (docker services with mode "socket").
 
 The claude container gets Docker access only through such services:
-  socket  -> /run/tentaclaude/docker-<name>.sock   (svc creates a docker context <name> for it)
+  socket  -> /run/tentaclai/docker-<name>.sock   (svc creates a docker context <name> for it)
   stacks  -> same path as on the host             (so docker compose resolves relative bind mounts)
 """
 import json
@@ -42,7 +42,7 @@ def mounts(stack_dir):
         name = svc.get("name") or p[:-5]
         sock = VAR.sub(lambda m: env.get(m.group(1), ""), d.get("socket", "/var/run/docker.sock"))
         stacks = VAR.sub(lambda m: env.get(m.group(1), ""), d.get("stacks_dir", ""))
-        for m in (f"{sock}:/run/tentaclaude/docker-{name}.sock", f"{stacks}:{stacks}" if stacks else None):
+        for m in (f"{sock}:/run/tentaclai/docker-{name}.sock", f"{stacks}:{stacks}" if stacks else None):
             if m and m not in seen and not m.startswith(":"):
                 seen.add(m)
                 res.append(m)

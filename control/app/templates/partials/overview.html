@@ -24,8 +24,8 @@
     {% endif %}
     <div class="row" style="margin-top:16px">
       {% if st.running %}
-      <button class="btn sm" hx-post="/container/restart" hx-confirm="Restart tentaclaude? Running Claude sessions will end.">{{ icon('refresh') }}Restart</button>
-      <button class="btn sm danger" hx-post="/container/stop" hx-confirm="Stop tentaclaude? Running Claude sessions and remote control will end.">{{ icon('stop') }}Stop</button>
+      <button class="btn sm" hx-post="/container/restart" hx-confirm="Restart tentaclAI? Running Claude sessions will end.">{{ icon('refresh') }}Restart</button>
+      <button class="btn sm danger" hx-post="/container/stop" hx-confirm="Stop tentaclAI? Running Claude sessions and remote control will end.">{{ icon('stop') }}Stop</button>
       {% else %}
       <button class="btn sm primary" hx-post="/container/start">{{ icon('play') }}Start</button>
       {% endif %}

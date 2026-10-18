@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Connect (or disconnect) a host to tentaclaude via SSH. Run on the Docker host (or inside tentaclaude / via tentacontrol).
+# Connect (or disconnect) a host to tentaclai via SSH. Run on the Docker host (or inside tentaclai / via tentacontrol).
 #
 #   ./ssh-host.sh add <alias> <user@host[:port]> [--sudo] [--sudo-cmd "<cmd>"]
 #   ./ssh-host.sh sudo <alias> [<cmd>|off]     show / set / remove the sudo prefix of a host
@@ -10,18 +10,18 @@
 # add:
 #   1. writes ssh/config.d/<alias>.conf
 #   2. fetches the host key, shows its fingerprint and stores it in ssh/known_hosts
-#   3. appends the tentaclaude public key to ~/.ssh/authorized_keys of <user> on the target
+#   3. appends the tentaclai public key to ~/.ssh/authorized_keys of <user> on the target
 #      (like ssh-copy-id); logs in with your usual key or asks for the password once
 #   4. tests the login from inside the container
 # --sudo: the user is not root – privileged commands (docker, compose, admin tasks) are run with a prefix,
 #         default "sudo -n" (non-interactive → the user needs NOPASSWD sudo, ideally limited to what Claude needs).
-#         Stored as "# tentaclaude: sudo=<cmd>" inside the Host block.
+#         Stored as "# tentaclai: sudo=<cmd>" inside the Host block.
 set -euo pipefail
 
 STACK_DIR="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
 SSH_DIR="$STACK_DIR/ssh"
-PUBKEY_FILE="$SSH_DIR/keys/tentaclaude_ed25519.pub"
-CONTAINER=tentaclaude
+PUBKEY_FILE="$SSH_DIR/keys/tentaclai_ed25519.pub"
+CONTAINER=tentaclai
 
 die() { echo "Error: $*" >&2; exit 1; }
 usage() { sed -n '2,/^set -euo/p' "$0" | sed '$d'; exit 1; }
@@ -32,10 +32,10 @@ KEY_BODY="$(awk '{print $2}' "$PUBKEY_FILE")"
 
 SUDO_RE='^[A-Za-z0-9 ._/=-]{1,60}$'
 
-sudo_of() {  # alias -> sudo prefix from the "# tentaclaude: sudo=" line in its Host block
+sudo_of() {  # alias -> sudo prefix from the "# tentaclai: sudo=" line in its Host block
     awk -v a="$1" '
         tolower($1)=="host" { cur=0; for (i=2;i<=NF;i++) if ($i==a) cur=1; next }
-        cur && /^[ \t]*#[ \t]*tentaclaude:[ \t]*sudo[ \t]*=/ { sub(/^[^=]*=[ \t]*/, ""); sub(/[ \t]+$/, ""); print; exit }
+        cur && /^[ \t]*#[ \t]*tentacl(ai|aude):[ \t]*sudo[ \t]*=/ { sub(/^[^=]*=[ \t]*/, ""); sub(/[ \t]+$/, ""); print; exit }
     ' "$SSH_DIR"/config.d/*.conf 2>/dev/null
 }
 
@@ -45,8 +45,8 @@ set_sudo() {  # alias cmd ("" = remove)
     [ -n "$f" ] || die "host $alias not found in $SSH_DIR/config.d"
     local tmp; tmp="$(mktemp "$f.XXXX")"
     awk -v a="$alias" -v c="$cmd" '
-        tolower($1)=="host" { cur=0; for (i=2;i<=NF;i++) if ($i==a) cur=1; print; if (cur && c!="") print "    # tentaclaude: sudo=" c; next }
-        cur && /^[ \t]*#[ \t]*tentaclaude:[ \t]*sudo[ \t]*=/ { next }
+        tolower($1)=="host" { cur=0; for (i=2;i<=NF;i++) if ($i==a) cur=1; print; if (cur && c!="") print "    # tentaclai: sudo=" c; next }
+        cur && /^[ \t]*#[ \t]*tentacl(ai|aude):[ \t]*sudo[ \t]*=/ { next }
         { print }
     ' "$f" > "$tmp"
     chmod --reference="$f" "$tmp" 2>/dev/null || chmod 600 "$tmp"
@@ -62,7 +62,7 @@ container_test() {
     else
         # container not running: same image, same ssh dir, throwaway
         docker run --rm --entrypoint ssh -v "$SSH_DIR:/root/.ssh" --add-host host.docker.internal:host-gateway \
-            local/tentaclaude:latest -o BatchMode=yes -o ConnectTimeout=10 "$alias" "$probe"
+            local/tentaclai:latest -o BatchMode=yes -o ConnectTimeout=10 "$alias" "$probe"
     fi
 }
 
@@ -102,7 +102,7 @@ cmd_add() {
         echo "    HostName $host"
         echo "    User $user"
         [ "$port" != 22 ] && echo "    Port $port"
-        [ -n "$sudo" ] && echo "    # tentaclaude: sudo=$sudo"
+        [ -n "$sudo" ] && echo "    # tentaclai: sudo=$sudo"
     } > "$conf"
     echo "→ created $conf"
 

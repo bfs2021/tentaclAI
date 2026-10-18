@@ -2,7 +2,7 @@
   "_meta": {
     "title": "Proxmox VE",
     "category": "Docker & Infra",
-    "setup": "Datacenter → Permissions → API Tokens. PVE_TOKEN_ID e.g. claude@pve!tentaclaude, ideally PVEAuditor only."
+    "setup": "Datacenter → Permissions → API Tokens. PVE_TOKEN_ID e.g. claude@pve!tentaclai, ideally PVEAuditor only."
   },
   "description": "Proxmox VE – VMs, containers, storage",
   "api": {

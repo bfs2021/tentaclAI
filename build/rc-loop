@@ -5,7 +5,7 @@
 #   RC_WORKDIR       start directory
 #   RC_EXTRA_ARGS    additional arguments for `claude remote-control`
 #   RC_RESTART_DELAY seconds to wait after the session ended (default 30)
-ENV_FILE="${TC_DIR:-/opt/tentaclaude}/.env"
+ENV_FILE="${TC_DIR:-/opt/tentaclai}/.env"
 
 val() {  # key default
     local v
@@ -19,7 +19,7 @@ while true; do
         clear; echo "Remote control is disabled (RC_ENABLED=false) – checking again every 60 s."
         sleep 60; continue
     fi
-    name="$(val RC_NAME tentaclaude)"; dir="$(val RC_WORKDIR /workspace)"; extra="$(val RC_EXTRA_ARGS "")"
+    name="$(val RC_NAME tentaclai)"; dir="$(val RC_WORKDIR /workspace)"; extra="$(val RC_EXTRA_ARGS "")"
     delay="$(val RC_RESTART_DELAY 30)"
     [ -d "$dir" ] || dir=/workspace
     cd "$dir" || cd /workspace

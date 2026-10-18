@@ -1,7 +1,7 @@
 {
   "_help": [
     "Copy to <name>.json. Files starting with '_' are ignored.",
-    "Secrets only as ${VAR}; put VAR=... into ../.env, then 'docker compose up -d' (new var) or './tentaclaude.sh svc' (only JSON changed).",
+    "Secrets only as ${VAR}; put VAR=... into ../.env, then 'docker compose up -d' (new var) or './tentaclai.sh svc' (only JSON changed).",
     "A part (api/mcp) stays inactive while one of its ${VAR}s is empty. \"enabled\": false parks the whole service.",
     "api.auth.type: none | bearer {token} | header {header, value} | basic {user, password}",
     "mcp: like Claude's .mcp.json entries: http/sse {url, headers} or stdio {command, args, env}"

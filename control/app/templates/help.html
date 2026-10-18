@@ -19,7 +19,7 @@
 </style>
 {% endblock %}
 {% block content %}
-<div class="header"><div><h1>Help</h1><div class="sub">Everything about tentaclaude and tentacontrol</div></div></div>
+<div class="header"><div><h1>Help</h1><div class="sub">Everything about tentaclAI and tentacontrol</div></div></div>
 <div class="help-layout">
   <nav class="toc">
     <a href="#start">Getting started</a><a href="#site">Site &amp; installation</a><a href="#concept">How it fits together</a>
@@ -44,7 +44,7 @@
 
     <section class="card" id="site">
       <h2>Site &amp; installation</h2>
-      <p>tentaclaude is generic – everything site-specific lives in a few places:</p>
+      <p>tentaclAI is generic – everything site-specific lives in a few places:</p>
       <table>
         <tr><td><code>.env</code></td><td>paths (<code>TC_DIR</code>, <code>DOCKER_SOCKET</code>, <code>HOST_DOCS</code>, <code>CA_CERT</code>), domain, resources, remote control, tokens – editable under <a href="/settings">Settings</a>.</td></tr>
         <tr><td><code>services/*.json</code></td><td>everything Claude can reach: Docker hosts, APIs, MCP servers, git repositories.</td></tr>
@@ -53,10 +53,10 @@
         <tr><td><code>local/CLAUDE.md</code></td><td>rules and knowledge about your site for Claude; imported together with the generic rules and the host docs (<code>HOST_DOCS</code>) on every start.</td></tr>
       </table>
       <h4>Install on a new host</h4>
-<pre>git clone … tentaclaude &amp;&amp; cd tentaclaude
-./tentaclaude.sh init                 # guided setup: paths, domain, access (port / nginx-proxy / Traefik),
+<pre>git clone … tentaclai &amp;&amp; cd tentaclai
+./tentaclai.sh init                 # guided setup: paths, domain, access (port / nginx-proxy / Traefik),
                                       # git, remote control, limits, local Docker host – then starts tentacontrol
-./tentaclaude.sh init --defaults      # the same without questions</pre>
+./tentaclai.sh init --defaults      # the same without questions</pre>
       <p class="muted small">Without a reverse proxy tentacontrol listens on <code>http://127.0.0.1:8484</code> (<code>CONTROL_BIND</code>/<code>CONTROL_PORT</code>).
       For a public repository, <code>.gitignore</code> keeps <code>.env</code>, <code>compose.override.yaml</code>, <code>compose.generated.yaml</code>, <code>local/</code>, <code>services/*.json</code>, <code>ssh/keys</code>, <code>ssh/config.d</code>, <code>data/</code> and <code>workspace/</code> out; the <code>*.example</code> files are their templates.</p>
     </section>
@@ -64,8 +64,8 @@
     <section class="card" id="concept">
       <h2>How it fits together</h2>
       <table>
-        <tr><td><strong>tentaclaude</strong></td><td>Container with Claude Code, Docker CLI, git, Python, Node, <code>gh</code>, <code>svc</code>. It reaches <strong>only connected services</strong> – Docker hosts, APIs, MCP servers, git repositories. Without a docker service it has no Docker access.</td></tr>
-        <tr><td><strong>tentacontrol</strong></td><td>This web admin. Edits <code>.env</code>, <code>services/</code>, <code>ssh/</code> of the stack and builds/recreates tentaclaude.</td></tr>
+        <tr><td><strong>tentaclAI</strong></td><td>Container with Claude Code, Docker CLI, git, Python, Node, <code>gh</code>, <code>svc</code>. It reaches <strong>only connected services</strong> – Docker hosts, APIs, MCP servers, git repositories. Without a docker service it has no Docker access.</td></tr>
+        <tr><td><strong>tentacontrol</strong></td><td>This web admin. Edits <code>.env</code>, <code>services/</code>, <code>ssh/</code> of the stack and builds/recreates tentaclAI.</td></tr>
         <tr><td><code>services/*.json</code></td><td>One file per service (docker, api, mcp and/or git). Tokens only as <code>${VAR}</code>.</td></tr>
         <tr><td><code>.env</code></td><td>All values and secrets (mode 600). <code>svc</code> reads it fresh on every call.</td></tr>
         <tr><td><code>/workspace</code></td><td>Projects, <code>SERVICES.md</code> (generated service catalog), <code>repos/</code> (git services).</td></tr>
@@ -83,7 +83,7 @@
         <tr><td><span class="kbd">Ctrl+Shift+V</span> / right click</td><td>paste (e.g. a login code)</td></tr>
         <tr><td><span class="kbd">Ctrl+C</span> twice</td><td>quit Claude</td></tr>
       </table>
-      <p>On the host the same works with <code>./tentaclaude.sh</code>, in a container console (e.g. Arcane, Portainer) with <code>cc</code>. Local docker hosts get their own tab “Claude · &lt;host&gt;” starting in their stacks directory.</p>
+      <p>On the host the same works with <code>./tentaclai.sh</code>, in a container console (e.g. Arcane, Portainer) with <code>cc</code>. Local docker hosts get their own tab “Claude · &lt;host&gt;” starting in their stacks directory.</p>
     </section>
 
     <section class="card" id="rc">
@@ -199,7 +199,7 @@
         <li><strong>ro</strong>: push is blocked twice (blocked push URL + pre-push hook). Ideal for public repositories or third-party code as reference.</li>
         <li><strong>rw</strong>: Claude may commit and push – when you ask for it.</li>
         <li>Tokens never end up in <code>.git/config</code>: a credential helper (<code>svc git-credential</code>) reads them from <code>.env</code> when needed.</li>
-        <li>SSH URLs use the tentaclaude key – add it as deploy key in the repository (see <a href="/ssh">SSH</a>).</li>
+        <li>SSH URLs use the tentaclAI key – add it as deploy key in the repository (see <a href="/ssh">SSH</a>).</li>
         <li>Cloning happens on sync or with the “Clone” button; “Fetch” pulls changes and re-applies ro/rw.</li>
         <li>Usernames per provider: GitHub <code>x-access-token</code>, GitLab <code>oauth2</code>, Gitea/Forgejo any.</li>
       </ul>
@@ -219,13 +219,13 @@
 
     <section class="card" id="inventory">
       <h2>System inventory</h2>
-      <p>This is how Claude gets to know a new site. Start: <strong>Overview → System inventory</strong>, terminal tab “System inventory” or <code>./tentaclaude.sh inventory</code>.</p>
+      <p>This is how Claude gets to know a new site. Start: <strong>Overview → System inventory</strong>, terminal tab “System inventory” or <code>./tentaclai.sh inventory</code>.</p>
       <ol>
         <li><code>tc-scan</code> collects read-only for every docker host (local and via SSH): system (OS, Docker, resources), all stacks and containers (images, status, ports, proxy hosts, mounts), networks, connected services with a test call, git repositories and the SSH hosts. Environment variables and <code>.env</code> contents are never read.</li>
         <li>Claude summarizes and asks short rounds of questions: purpose and criticality of the stacks, taboos, container manager, proxy/DNS, backups, access, conventions.</li>
         <li>Claude shows a draft for <code>local/CLAUDE.md</code> and writes it only after your approval (with a backup copy).</li>
       </ol>
-      <p class="muted small">Report only: <code>./tentaclaude.sh scan</code> or <code>tc-scan</code> in the container. The inventory can be repeated at any time – existing knowledge is kept.</p>
+      <p class="muted small">Report only: <code>./tentaclai.sh scan</code> or <code>tc-scan</code> in the container. The inventory can be repeated at any time – existing knowledge is kept.</p>
     </section>
 
     <section class="card" id="systems">
@@ -240,7 +240,7 @@
 
     <section class="card" id="topology">
       <h2>Topology</h2>
-      <p>Graph of what Claude can reach: tentaclaude in the middle, systems as dashed boxes with their services and SSH host, standalone services around it. Disabled services are hidden; a yellow <strong>!</strong> marks a missing token. Docker over SSH is drawn through the SSH host; SSH hosts are colored by a live login check (green / yellow = sudo fails / red).</p>
+      <p>Graph of what Claude can reach: tentaclAI in the middle, systems as dashed boxes with their services and SSH host, standalone services around it. Disabled services are hidden; a yellow <strong>!</strong> marks a missing token. Docker over SSH is drawn through the SSH host; SSH hosts are colored by a live login check (green / yellow = sudo fails / red).</p>
       <ul>
         <li><strong>Containers</strong> loads stacks and containers of all active docker hosts live (read-only <code>docker ps</code>) and arranges them around their host; red dots are stopped containers.</li>
         <li><strong>Search</strong> highlights matching nodes (name, description, image, URL) and dims the rest; Enter zooms to the matches.</li>
@@ -251,10 +251,10 @@
 
     <section class="card" id="ssh">
       <h2>SSH targets</h2>
-      <p>tentaclaude has its own key (<code>ssh/keys/tentaclaude_ed25519</code>). Each host is a file in <code>ssh/config.d/</code>. “Add host” opens a terminal with <code>ssh-host.sh add</code>: confirm the host key fingerprint, enter the target's password once – done.</p>
+      <p>tentaclAI has its own key (<code>ssh/keys/tentaclai_ed25519</code>). Each host is a file in <code>ssh/config.d/</code>. “Add host” opens a terminal with <code>ssh-host.sh add</code>: confirm the host key fingerprint, enter the target's password once – done.</p>
       <h4>Hosts without root login: sudo</h4>
-      <p>If the SSH user is not root, enable <strong>use sudo</strong> (when adding the host, or later in the <em>sudo</em> column). The prefix (default <code>sudo -n</code>, also e.g. <code>doas</code>) is stored as <code># tentaclaude: sudo=…</code> in the host's block. <code>svc docker</code>/<code>svc compose</code> and <code>tc-scan</code> use it automatically (such docker hosts run through ssh instead of a docker context), and Claude's instructions list it per host for admin commands.</p>
-      <p>It is non-interactive: the user needs passwordless sudo, ideally limited, e.g. <code>/etc/sudoers.d/tentaclaude</code>: <code>deploy ALL=(root) NOPASSWD: /usr/bin/docker</code>. “Test” checks login and sudo.</p>
+      <p>If the SSH user is not root, enable <strong>use sudo</strong> (when adding the host, or later in the <em>sudo</em> column). The prefix (default <code>sudo -n</code>, also e.g. <code>doas</code>) is stored as <code># tentaclai: sudo=…</code> in the host's block. <code>svc docker</code>/<code>svc compose</code> and <code>tc-scan</code> use it automatically (such docker hosts run through ssh instead of a docker context), and Claude's instructions list it per host for admin commands.</p>
+      <p>It is non-interactive: the user needs passwordless sudo, ideally limited, e.g. <code>/etc/sudoers.d/tentaclai</code>: <code>deploy ALL=(root) NOPASSWD: /usr/bin/docker</code>. “Test” checks login and sudo.</p>
     </section>
 
     <section class="card" id="settings">
@@ -281,18 +281,18 @@ tc-scan                   read-only inventory report
 /inventory · /onboard &lt;service&gt;   Claude commands (inside a Claude session)
 gh …                      GitHub CLI (GH_TOKEN)
 ssh &lt;host&gt;                SSH targets from ssh/config.d</pre>
-      <p>On the host (<code>{{ site.tc_dir }}</code>): <code>./tentaclaude.sh [init|host|rc|shell|login|status|svc|scan|inventory|passwd|setup-url]</code>, <code>./ssh-host.sh add|remove|list|test</code>.</p>
+      <p>On the host (<code>{{ site.tc_dir }}</code>): <code>./tentaclai.sh [init|host|rc|shell|login|status|svc|scan|inventory|passwd|setup-url]</code>, <code>./ssh-host.sh add|remove|list|test</code>.</p>
     </section>
 
     <section class="card" id="security">
       <h2>Security</h2>
       <ul>
-        <li>tentacontrol has the Docker socket of this host (to run tentaclaude) – that is <strong>root on {{ site.hostname }}</strong>. Choose the tentacontrol password accordingly.</li>
-        <li>tentaclaude has Docker access only through docker services. An <code>rw</code> docker service is root on that host; <code>ro</code> blocks changing commands in <code>svc</code> but is no hard boundary while socket or SSH access exists.</li>
+        <li>tentacontrol has the Docker socket of this host (to run tentaclAI) – that is <strong>root on {{ site.hostname }}</strong>. Choose the tentacontrol password accordingly.</li>
+        <li>tentaclAI has Docker access only through docker services. An <code>rw</code> docker service is root on that host; <code>ro</code> blocks changing commands in <code>svc</code> but is no hard boundary while socket or SSH access exists.</li>
         <li>Login: bcrypt hash, 12 h session, <code>SameSite=Strict</code> cookie (Secure behind https), origin check for forms and the terminal, throttling after failed attempts.</li>
         <li>Secrets never reach the browser; <code>svc</code> passes them to curl through temporary 0600 files on tmpfs, not on the command line.</li>
         <li>Claude keeps asking before actions – the rules are in its instructions (generic rules + <code>local/CLAUDE.md</code>).</li>
-        <li>Forgot the password: <code>./tentaclaude.sh passwd</code> on the host.</li>
+        <li>Forgot the password: <code>./tentaclai.sh passwd</code> on the host.</li>
       </ul>
     </section>
 

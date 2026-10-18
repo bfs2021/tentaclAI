@@ -1,17 +1,17 @@
-# SSH config for tentaclaude (mounted as /root/.ssh in the container)
+# SSH config for tentaclai (mounted as /root/.ssh in the container)
 #
 # New host: create config.d/<name>.conf with a Host block, e.g.
 #   Host nas
 #       HostName nas.example.lan
 #       User admin
 # then authorize the public key on that host:
-#   keys/tentaclaude_ed25519.pub
+#   keys/tentaclai_ed25519.pub
 # No restart needed – ssh reads this on every connect.
 
 Include ~/.ssh/config.d/*.conf
 
 Host *
-    IdentityFile ~/.ssh/keys/tentaclaude_ed25519
+    IdentityFile ~/.ssh/keys/tentaclai_ed25519
     IdentitiesOnly yes
     # New hosts are trusted on first connect, changed keys are refused
     StrictHostKeyChecking accept-new

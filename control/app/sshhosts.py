@@ -6,7 +6,7 @@ import re
 from .config import SSH_DIR
 
 
-META = re.compile(r"^\s*#\s*tentaclaude:\s*sudo\s*=\s*(.*?)\s*$")
+META = re.compile(r"^\s*#\s*tentacl(?:ai|aude):\s*sudo\s*=\s*(.*?)\s*$")
 SUDO_RE = re.compile(r"^[A-Za-z0-9 ._/=-]{1,60}$")
 
 
@@ -39,7 +39,7 @@ def sudo_of(alias):
 
 
 def set_sudo(alias, cmd):
-    """write/remove '# tentaclaude: sudo=<cmd>' in the Host block of <alias>"""
+    """write/remove '# tentaclai: sudo=<cmd>' in the Host block of <alias>"""
     cmd = (cmd or "").strip()
     if cmd and not SUDO_RE.match(cmd):
         raise ValueError("invalid sudo command (letters, digits, space . _ / = - only)")
@@ -54,7 +54,7 @@ def set_sudo(alias, cmd):
                 if cur:
                     found = True
                     if cmd:
-                        out.append(f"    # tentaclaude: sudo={cmd}\n")
+                        out.append(f"    # tentaclai: sudo={cmd}\n")
                 continue
             if cur and META.match(line):
                 continue
@@ -71,7 +71,7 @@ def set_sudo(alias, cmd):
 
 def public_key():
     try:
-        with open(os.path.join(SSH_DIR, "keys", "tentaclaude_ed25519.pub")) as f:
+        with open(os.path.join(SSH_DIR, "keys", "tentaclai_ed25519.pub")) as f:
             return f.read().strip()
     except FileNotFoundError:
         return None

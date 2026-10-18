@@ -1,6 +1,6 @@
 # Site: <host name> (<what this host is for>)
 
-<!-- Copied to local/CLAUDE.md by ./tentaclaude.sh init. Imported into Claude's instructions on every start.
+<!-- Copied to local/CLAUDE.md by ./tentaclai.sh init. Imported into Claude's instructions on every start.
      Easiest way to fill it: run the system inventory (/anamnese) – Claude scans and asks you. -->
 
 Language: talk to the user in <German/English/…>.

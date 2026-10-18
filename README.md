@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="control/app/static/logo.svg" width="96" height="96" alt="tentaclaude logo">
+  <img src="control/app/static/logo.svg" width="96" height="96" alt="tentaclAI logo">
 </p>
 
-<h1 align="center">tentaclaude</h1>
+<h1 align="center">tentaclAI</h1>
 
 <p align="center"><strong>Eight arms, one brain.</strong><br>
 Sandbox + service gateway for Claude Code.</p>
@@ -13,7 +13,7 @@ Sandbox + service gateway for Claude Code.</p>
   <img alt="Services" src="https://img.shields.io/badge/services-docker%20·%20api%20·%20mcp%20·%20git%20·%20db%20·%20web%20·%20files-a78bfa">
 </p>
 
-tentaclaude runs [Claude Code](https://claude.com/claude-code) in its own container and gives it **controlled access to
+tentaclAI runs [Claude Code](https://claude.com/claude-code) in its own container and gives it **controlled access to
 your infrastructure** – Docker hosts, APIs, MCP servers, git repositories, databases, websites and files on other machines.
 Every connection is a **service** you add on purpose, with its own rules (read-only or read-write). A web admin,
 **tentacontrol**, sets it all up, and you talk to Claude from the browser, from your phone or from the terminal.
@@ -32,7 +32,7 @@ Every connection is a **service** you add on purpose, with its own rules (read-o
 
 Claude Code is great at operating systems – reading logs, fixing a compose file, querying an API, writing an automation.
 Pointed at a real homelab or server landscape, two questions come up immediately: *what may it touch?* and *how does it know
-my setup?* tentaclaude answers both:
+my setup?* tentaclAI answers both:
 
 - **Explicit reach.** Claude sees nothing by default. Each Docker host, API, database or folder is connected as a service
   with an access mode – the `svc` tool in the container enforces it, and tokens never appear in commands or in Claude's context.
@@ -52,7 +52,7 @@ flowchart LR
   end
   subgraph host["Docker host"]
     control["<b>tentacontrol</b><br/>web admin"]
-    sandbox["<b>tentaclaude</b><br/>Claude Code + svc"]
+    sandbox["<b>tentaclAI</b><br/>Claude Code + svc"]
     files[("stack directory<br/>.env · services/ · systems/<br/>ssh/ · local/CLAUDE.md")]
   end
   subgraph reach["Connected services"]
@@ -76,12 +76,12 @@ The stack consists of **two containers** and one **stack directory**:
 
 | Part | What it is |
 |---|---|
-| **tentaclaude** (container `tentaclaude`) | The sandbox: Claude Code, `svc`, git, gh, docker CLI, database clients, tmux. Runs the permanent Remote Control session and holds your workspace (`/workspace`). Has **no** Docker socket and no host access of its own – everything goes through services. |
-| **tentacontrol** (container `tentacontrol`) | The web admin: create and edit services, systems and SSH hosts, enter tokens, test connections, start onboarding, see the topology, open terminals into the sandbox, rebuild and update it. It uses the host's Docker socket only to run the tentaclaude container. |
-| **`svc`** (inside tentaclaude) | The gateway Claude uses for every service: `svc <name> GET /path`, `svc docker`, `svc compose`, `svc db`, `svc web`, `svc files`, `svc git`. It injects credentials from `.env` at call time and enforces `ro`/`rw`. |
+| **tentaclAI** (container `tentaclai`) | The sandbox: Claude Code, `svc`, git, gh, docker CLI, database clients, tmux. Runs the permanent Remote Control session and holds your workspace (`/workspace`). Has **no** Docker socket and no host access of its own – everything goes through services. |
+| **tentacontrol** (container `tentacontrol`) | The web admin: create and edit services, systems and SSH hosts, enter tokens, test connections, start onboarding, see the topology, open terminals into the sandbox, rebuild and update it. It uses the host's Docker socket only to run the tentaclAI container. |
+| **`svc`** (inside tentaclAI) | The gateway Claude uses for every service: `svc <name> GET /path`, `svc docker`, `svc compose`, `svc db`, `svc web`, `svc files`, `svc git`. It injects credentials from `.env` at call time and enforces `ro`/`rw`. |
 | **Services** (`services/<name>.json`) | One file per thing Claude may reach. A service can combine parts: `api`, `mcp`, `git`, `docker`, `db`, `web`, `files`. Secrets are `${VAR}` placeholders, the values live in `.env`. |
 | **Systems** (`systems/<name>.json`) | Optional groups – e.g. *the NAS* = its SSH host + Docker + a database + an API – with a shared SSH host and rules that apply to every member. Services can also stand alone. |
-| **SSH hosts** (`ssh/config.d/*.conf`) | Machines reachable with tentaclaude's own key, optionally with a sudo prefix for non-root users. Docker and file services use them. |
+| **SSH hosts** (`ssh/config.d/*.conf`) | Machines reachable with tentaclAI's own key, optionally with a sudo prefix for non-root users. Docker and file services use them. |
 | **Site knowledge** | Claude's instructions are assembled on every start from generic rules, an optional host document, `local/CLAUDE.md` (your site rules) and generated tables of Docker and SSH hosts. A service catalog (`/workspace/SERVICES.md`) lists every service, system and rule. |
 
 **Generic by design.** Code, templates and examples are the same for every installation. Everything site-specific lives in
@@ -93,17 +93,17 @@ Requirements: a Linux host with Docker (compose plugin) and a claude.ai account 
 an API key is not enough).
 
 ```bash
-git clone https://github.com/mwaldegg/tentaclaude.git /srv/stacks/tentaclaude
-cd /srv/stacks/tentaclaude
-./tentaclaude.sh init        # guided: paths, domain, how to reach tentacontrol (port / nginx-proxy / Traefik),
+git clone https://github.com/mwaldegg/tentaclai.git /srv/stacks/tentaclai
+cd /srv/stacks/tentaclai
+./tentaclai.sh init        # guided: paths, domain, how to reach tentacontrol (port / nginx-proxy / Traefik),
                              # git identity, remote control, resources – then builds and starts tentacontrol
-./tentaclaude.sh setup-url   # one-time link to set the tentacontrol password
+./tentaclai.sh setup-url   # one-time link to set the tentacontrol password
 ```
 
 Then, in tentacontrol:
 
 1. **Settings** – check paths, domain and git identity.
-2. **Overview → Create & start** – builds and starts the tentaclaude container.
+2. **Overview → Create & start** – builds and starts the tentaclAI container.
 3. **Overview → Sign in now** – `claude auth login` in a web terminal; sign in with your claude.ai account.
 4. **Overview → Remote Control** – scan the QR code or open the link; the session now shows up in claude.ai/code and the app.
 5. **SSH** – add the machines Claude should reach (host key check + key deployment in one step).
@@ -143,7 +143,7 @@ setup changes; existing knowledge is kept.
 |---|---|
 | **Phone / any browser** | Remote Control session (`claude-rc`), always running: claude.ai/code or the Claude app. |
 | **tentacontrol → Terminal** | Web terminal into the sandbox: Claude in `/workspace`, the Remote Control session, a shell, onboarding/inventory sessions. Sessions run in tmux and survive closing the tab. |
-| **Host terminal** | `./tentaclaude.sh` (Claude), `./tentaclaude.sh rc`, `./tentaclaude.sh shell`, `./tentaclaude.sh status`. |
+| **Host terminal** | `./tentaclai.sh` (Claude), `./tentaclai.sh rc`, `./tentaclai.sh shell`, `./tentaclai.sh status`. |
 
 Inside the sandbox, Claude (and you) use:
 
@@ -176,7 +176,7 @@ Claude commands: **`/onboard <service>`** and **`/inventory`** (see above).
 | **Logs / Help** | Container log; full documentation of every feature. |
 
 Single admin password (bcrypt), signed session cookie (12 h, SameSite=Strict), login throttling.
-Reset: `./tentaclaude.sh passwd`. tentacontrol itself is updated on the host: `docker compose up -d --build control`.
+Reset: `./tentaclai.sh passwd`. tentacontrol itself is updated on the host: `docker compose up -d --build control`.
 
 ## Service reference
 
@@ -208,7 +208,7 @@ A service file can combine any of these parts:
 A part stays inactive while one of its `${VAR}`s is empty; `"enabled": false` parks the whole service.
 Systems: `systems/<name>.json` with `description`, `ssh_host`, `notes` (rules for every member) – see `systems/_example.json`.
 SSH hosts: `./ssh-host.sh add <alias> <user@host[:port]> [--sudo]` or tentacontrol → SSH; the sudo prefix is stored as
-`# tentaclaude: sudo=sudo -n` in the host block and needs passwordless sudo, ideally limited to what Claude needs.
+`# tentaclai: sudo=sudo -n` in the host block and needs passwordless sudo, ideally limited to what Claude needs.
 
 ## Configuration
 
@@ -230,14 +230,14 @@ SSH hosts: `./ssh-host.sh add <alias> <user@host[:port]> [--sudo]` or tentacontr
 <summary>Repository layout</summary>
 
 ```
-tentaclaude/
-├── compose.yaml               services claude (tentaclaude) + control (tentacontrol)
+tentaclai/
+├── compose.yaml               services claude (tentaclai) + control (tentacontrol)
 ├── compose.generated.yaml     socket/stacks mounts for local docker services (written by tentacontrol)
 ├── compose.override.*.yaml    site additions: reverse proxy, labels (example + your own)
 ├── .env.example               settings template (your .env: mode 600, git-ignored)
-├── tentaclaude.sh             host helper: init, Claude/RC/shell, status, inventory, passwd, setup-url
+├── tentaclai.sh               host helper: init, Claude/RC/shell, status, inventory, passwd, setup-url
 ├── ssh-host.sh                add/remove SSH hosts (config, host key, key deployment, sudo, test)
-├── build/                     tentaclaude image
+├── build/                     tentaclai image
 │   ├── svc                    service gateway CLI
 │   ├── tc-scan                read-only inventory
 │   ├── claude-instructions    assembles Claude's CLAUDE.md (base rules + host docs + site rules + host tables)
@@ -257,7 +257,7 @@ tentaclaude/
 
 ## Security
 
-What tentaclaude does:
+What tentaclAI does:
 
 - Claude reaches only what you connect; `svc` enforces `ro`/`rw` per service (docker/compose sub-commands, read-only DB
   sessions, blocked git push, no file push, same-host web fetches).

@@ -1,4 +1,4 @@
-"""tentacontrol – web admin for the tentaclaude sandbox + service gateway for Claude Code."""
+"""tentacontrol – web admin for the tentaclai sandbox + service gateway for Claude Code."""
 import asyncio
 import html
 import json
@@ -68,7 +68,7 @@ async def announce_setup():
         print("=" * 72, flush=True)
         print("tentacontrol: no password set yet. One-time setup link:", flush=True)
         print(f"  https://<host>/setup?token={auth.SETUP_TOKEN}", flush=True)
-        print("  (or: ./tentaclaude.sh passwd)", flush=True)
+        print("  (or: ./tentaclai.sh passwd)", flush=True)
         print("=" * 72, flush=True)
 
 
@@ -103,7 +103,7 @@ def _mounts_differ(st):
         return False
     stack_dir = services_store.STACK_DIR
     have = {(_norm(s), d) for s, d in st.get("mounts", [])
-            if d.startswith("/run/tentaclaude/docker-") or (s == d and d != stack_dir)}
+            if d.startswith("/run/tentaclai/docker-") or (s == d and d != stack_dir)}
     return want != have
 
 
@@ -164,7 +164,7 @@ async def setup_save(request: Request, token: str = Form(""), password: str = Fo
         return RedirectResponse("/login", status_code=303)
     error = None
     if token != auth.SETUP_TOKEN:
-        error = "invalid setup token – see ./tentaclaude.sh setup-url"
+        error = "invalid setup token – see ./tentaclai.sh setup-url"
     elif len(password) < 10:
         error = "at least 10 characters"
     elif password != password2:
@@ -229,13 +229,13 @@ async def overview(request: Request):
 async def container_action(request: Request, action: str):
     if action == "create":
         try:
-            job = jobs.start("Create & start tentaclaude", [COMPOSE + ["up", "-d", "--no-deps", CLAUDE_SERVICE]])
+            job = jobs.start("Create & start tentaclai", [COMPOSE + ["up", "-d", "--no-deps", CLAUDE_SERVICE]])
         except RuntimeError as e:
             return PlainTextResponse("", headers=toast(str(e), "err"))
         return PlainTextResponse("", headers={"HX-Redirect": f"/jobs/{job.id}"})
     if action == "recreate":
         try:
-            job = jobs.start("Recreate tentaclaude (apply configuration)",
+            job = jobs.start("Recreate tentaclai (apply configuration)",
                              [COMPOSE + ["up", "-d", "--no-deps", "--force-recreate", CLAUDE_SERVICE]])
         except RuntimeError as e:
             return PlainTextResponse("", headers=toast(str(e), "err"))
@@ -244,7 +244,7 @@ async def container_action(request: Request, action: str):
         return PlainTextResponse("unknown action", status_code=400)
     ok, msg = await asyncio.to_thread(dockerops.lifecycle, action)
     label = {"start": "started", "stop": "stopped", "restart": "restarted"}[action]
-    return respond(request, f"tentaclaude {label}" if ok else msg, "ok" if ok else "err", refresh=True)
+    return respond(request, f"tentaclai {label}" if ok else msg, "ok" if ok else "err", refresh=True)
 
 
 @app.post("/rc/toggle")
@@ -301,7 +301,7 @@ async def ws_terminal(ws: WebSocket, p: str = "claude", alias: str = "", target:
     await ws.accept()
     st = dockerops.status()
     if not st["running"]:
-        await ws.send_text(json.dumps({"type": "error", "msg": "tentaclaude is not running – start it on the overview first."}))
+        await ws.send_text(json.dumps({"type": "error", "msg": "tentaclai is not running – start it on the overview first."}))
         await ws.close()
         return
     try:
@@ -396,7 +396,7 @@ async def topology_docker(name: str):
     if not services_store.NAME.match(name):
         return JSONResponse({"error": "invalid name"}, status_code=400)
     if not dockerops.status()["running"]:
-        return JSONResponse({"error": "tentaclaude is not running"}, status_code=409)
+        return JSONResponse({"error": "tentaclai is not running"}, status_code=409)
     try:
         return JSONResponse({"stacks": await asyncio.to_thread(topology.docker_stacks, name)})
     except RuntimeError as e:
@@ -741,7 +741,7 @@ async def update_claude():
     steps = [
         COMPOSE + ["build", "--pull", "--build-arg", f"CACHE_BUST={int(time.time())}", CLAUDE_SERVICE],
         COMPOSE + ["up", "-d", "--no-deps", "--force-recreate", CLAUDE_SERVICE],
-        ["docker", "image", "prune", "-f", "--filter", "label=com.docker.compose.project=tentaclaude"],
+        ["docker", "image", "prune", "-f", "--filter", "label=com.docker.compose.project=tentaclai"],
     ]
     try:
         job = jobs.start("Update Claude Code (rebuild image)", steps)
