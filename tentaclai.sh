@@ -13,11 +13,12 @@
 #   ./tentaclai.sh scan       read-only inventory report (tc-scan)
 #   ./tentaclai.sh passwd     set/reset the tentacontrol web admin password
 #   ./tentaclai.sh setup-url  show the one-time tentacontrol setup link (first start)
+#   ./tentaclai.sh update     git pull + what's new (changelog) + rebuild + recreate, asks before each step (--check: only show)
 # Detach from a tmux session without stopping Claude: Ctrl+B, then D
 set -euo pipefail
 
 CONTAINER=tentaclai
-STACK_DIR="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
+STACK_DIR="${TC_STACK_DIR:-$(cd "$(dirname "$(readlink -f "$0")")" && pwd)}"
 ENV_FILE="$STACK_DIR/.env"
 
 env_value() { sed -n "s/^$1=//p" "$ENV_FILE" 2>/dev/null | tail -1 | tr -d "'\""; }
@@ -155,6 +156,47 @@ cmd_init() {
     fi
 }
 
+cmd_update() {  # git pull + changelog of the new versions + rebuild + recreate – asks before every step
+    if [ -z "${TC_UPDATE_COPY:-}" ]; then
+        # git pull may replace this very script – continue from a temporary copy
+        local copy; copy="$(mktemp)"; cp "$0" "$copy"
+        TC_UPDATE_COPY="$copy" TC_STACK_DIR="$STACK_DIR" exec bash "$copy" update "$@"
+    fi
+    trap 'rm -f "$TC_UPDATE_COPY"' EXIT
+    cd "$STACK_DIR"
+    [ -d .git ] && command -v git >/dev/null || { echo "$STACK_DIR is no git checkout (or git is missing) – update by hand"; exit 1; }
+    local old new branch upstream behind
+    old="$(cat VERSION 2>/dev/null || echo "?")"
+    echo "🐙 tentaclAI – installed v$old"
+    git fetch --quiet origin || { echo "✗ git fetch failed"; exit 1; }
+    branch="$(git rev-parse --abbrev-ref HEAD)"
+    upstream="$(git rev-parse --abbrev-ref --symbolic-full-name "@{u}" 2>/dev/null)" || { echo "✗ branch $branch has no upstream"; exit 1; }
+    behind="$(git rev-list --count "HEAD..$upstream")"
+    if [ "$behind" = 0 ]; then echo "✓ up to date ($upstream)"; return 0; fi
+    new="$(git show "$upstream:VERSION" 2>/dev/null || echo "?")"
+    echo "→ $behind new commit(s) on $upstream – version v$new"
+    echo; echo "What's new (CHANGELOG – read the Upgrade steps):"; echo
+    # every changelog section newer than the installed version
+    git show "$upstream:CHANGELOG.md" | awk -v old="v$old" '/^## /{ if (index($0, old " ") || $0 ~ ("## " old "$")) exit; p=1 } p' | sed 's/^/   /'
+    [ "${1:-}" = "--check" ] && return 0
+    if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
+        echo "✗ tracked files have local changes – commit or stash them first:"; git status --short --untracked-files=no; exit 1
+    fi
+    ask_yn "Pull and rebuild the images now?" y || return 0
+    git pull --ff-only --quiet
+    docker compose build
+    echo
+    if ask_yn "Recreate tentacontrol now (the web admin restarts briefly)?" y; then
+        docker compose up -d --no-deps control
+    fi
+    if ask_yn "Recreate tentaclai now? Running Claude sessions and Remote Control end." n; then
+        docker compose up -d --no-deps --force-recreate claude
+    else
+        echo "  later: docker compose up -d --force-recreate claude   (or Overview → Apply now)"
+    fi
+    echo "✓ updated to v$(cat VERSION 2>/dev/null || echo "?") – check the upgrade steps above for anything else"
+}
+
 case "${1:-}" in
     init)      cmd_init "${2:-}"; exit 0 ;;
     passwd)    exec docker exec -it tentacontrol tentacontrol-passwd ;;
@@ -162,7 +204,8 @@ case "${1:-}" in
         url="$(env_value CONTROL_URL)"
         docker logs tentacontrol 2>&1 | grep -E 'setup\?token=' | tail -1 | sed "s|https://<host>|${url:-http://127.0.0.1:8484}|"
         exit 0 ;;
-    -h|--help|help) sed -n '2,18p' "$0"; exit 0 ;;
+    update)    cmd_update "${2:-}"; exit 0 ;;
+    -h|--help|help) sed -n '2,19p' "$0"; exit 0 ;;
 esac
 
 if [ "$(docker inspect -f '{{.State.Running}}' "$CONTAINER" 2>/dev/null)" != "true" ]; then

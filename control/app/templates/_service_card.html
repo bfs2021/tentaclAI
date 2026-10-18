@@ -2,7 +2,8 @@
 {% macro service_card(s, systems=[]) %}
   <div class="card service-card">
     <div class="between">
-      <h2 style="margin:0">{{ s.name }}</h2>
+      <h2 class="row" style="margin:0;gap:9px;flex-wrap:nowrap">
+        <span class="ssh-dot" hx-get="/services/{{ s.name }}/status" hx-trigger="load" hx-swap="innerHTML"><span class="dot" title="checking …"></span></span>{{ s.name }}</h2>
       <span class="pill {{ s.state }}">{{ s.label }}</span>
     </div>
     <div class="row">{% for k in s.kinds %}<span class="tag">{{ k }}</span>{% endfor %}</div>

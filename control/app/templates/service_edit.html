@@ -6,7 +6,8 @@
 <div class="header">
   <div>
     <div class="small"><a href="/services">← Services</a></div>
-    <h1 class="row">{{ svc.name }} <span class="pill {{ svc.state }}">{{ svc.label }}</span></h1>
+    <h1 class="row">{{ svc.name }} <span class="pill {{ svc.state }}">{{ svc.label }}</span>
+      <span class="ssh-dot" style="margin-left:2px" hx-get="/services/{{ svc.name }}/status" hx-trigger="load" hx-swap="innerHTML"><span class="dot" title="checking …"></span></span></h1>
     <div class="sub">{{ svc.description }}</div>
     <div class="row small" style="margin-top:8px">
       <span class="muted">System</span>

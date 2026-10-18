@@ -273,7 +273,7 @@
 
     <section class="card" id="updates">
       <h2>Updates</h2>
-      <p><strong>tentaclAI releases:</strong> tentacontrol checks the GitHub releases every 6 hours (no token, nothing is sent except the request itself) and shows “Update available” in the sidebar; the Updates page lists the upgrade steps of the release. Turn it off with <code>UPDATE_CHECK=false</code>, point it to a fork with <code>UPDATE_REPO</code> (Settings → Updates).</p>
+      <p><strong>tentaclAI releases:</strong> tentacontrol checks the GitHub releases every 6 hours (no token, nothing is sent except the request itself) and shows “Update available” in the sidebar; the Updates page lists the upgrade steps of the release. Update with <code>./tentaclai.sh update</code> on the host – it shows the changes and upgrade steps, pulls, rebuilds and asks before recreating each container. Turn the check off with <code>UPDATE_CHECK=false</code>, point it to a fork with <code>UPDATE_REPO</code> (Settings → Updates).</p>
       <p>Claude Code is installed when the image is built. “Update now” rebuilds the image (with a fresh base image) and recreates the container. Pin a version with <code>CLAUDE_CODE_VERSION</code> in the settings. tentacontrol itself is updated on the host: <code>docker compose up -d --build control</code>.</p>
     </section>
 

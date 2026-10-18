@@ -2,19 +2,29 @@
 
 All notable changes, newest first. Every release lists **upgrade steps** from the previous one.
 
-## Unreleased
+## v0.2.1 – 2026-10-18
+
+### Highlights
+- **`./tentaclai.sh update`** – update with one command: shows what's new (changelog incl. upgrade steps), pulls,
+  rebuilds and asks before recreating each container; `--check` only shows what is new.
+- **Status dot per service** on the service cards and pages – result of the last connection test (green / yellow =
+  partly or token missing / red), cached for 10 minutes and refreshed when the service or `.env` changes.
+- **Update notice** in the sidebar when a new release is out, with the release's upgrade steps on the Updates page.
+- **TLS switch per service** – *Ignore TLS certificate errors* for devices with self-signed certificates.
 
 ### Changes
-- **TLS:** one switch per service, *Ignore TLS certificate errors* – `insecure_tls` now works for `api`, `web`, `git`
-  (`http.sslVerify=false` for that repo only) and `db` (no certificate verification); cards show “TLS not verified”.
-- **Update notice:** tentacontrol checks the GitHub releases every 6 hours and shows “Update available” in the sidebar;
-  the Updates page lists the release's upgrade steps. New settings `UPDATE_CHECK` (default on) and `UPDATE_REPO`.
+- **TLS:** `insecure_tls` now works for `api`, `web`, `git` (`http.sslVerify=false` for that repo only) and `db`
+  (no certificate verification); cards show “TLS not verified”, `svc info` warns.
+- **Update notice:** GitHub releases are checked every 6 hours; new settings `UPDATE_CHECK` (default on) and `UPDATE_REPO`.
 - tentacontrol runs on Python 3.14.
 - Dependabot: pip updates only when a version falls outside the allowed range; no Node major updates for the sandbox.
 
-### Upgrade
-1. `git pull`
-2. `docker compose build control && docker compose up -d control` – only tentacontrol is rebuilt; sessions and Remote Control keep running.
+### Upgrade from v0.2.0
+1. `git pull` in the stack directory.
+2. `docker compose build` – both images (the sandbox's `svc` handles TLS for git and databases).
+3. `docker compose up -d` – recreates both containers; recreating `tentaclai` ends running sessions and Remote Control.
+
+No `.env` changes needed (`UPDATE_CHECK`/`UPDATE_REPO` are optional). From now on, `./tentaclai.sh update` does these steps.
 
 ## v0.2.0 – 2026-10-18
 

@@ -11,9 +11,8 @@
   </dl>
   {% if update.available %}
   <div class="alert warn" style="margin-top:12px"><strong>{{ update.latest }} is available.</strong> Update in the stack directory:</div>
-  {% if update.upgrade %}<pre class="rc upgrade-steps">{{ update.upgrade }}</pre>{% else %}<pre class="rc upgrade-steps">git pull
-docker compose build
-docker compose up -d</pre>{% endif %}
+  <pre class="rc upgrade-steps">./tentaclai.sh update</pre>
+  {% if update.upgrade %}<details class="small"><summary class="muted">Upgrade steps of {{ update.latest }}</summary><pre class="rc upgrade-steps">{{ update.upgrade }}</pre></details>{% endif %}
   <p class="help">Recreating tentaclai ends running sessions and Remote Control. Full notes: <a href="{{ update.url }}" target="_blank" rel="noopener">release {{ update.latest }}</a>.</p>
   {% else %}
   <p class="help">{% if update.enabled and update.latest %}Up to date. {% endif %}Release notes and upgrade steps: <a href="https://github.com/{{ update.repo }}/blob/main/CHANGELOG.md" target="_blank" rel="noopener">CHANGELOG</a>.

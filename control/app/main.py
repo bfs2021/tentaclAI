@@ -612,10 +612,63 @@ async def sync_services():
     return await asyncio.to_thread(dockerops.run, ["svc", "sync"])
 
 
+# ---------------------------------------------------------------- service status dots (cached svc test)
+
+_SVC_STATUS = {}            # name -> (cache key, time, state, title)
+_SVC_SEM = asyncio.Semaphore(4)  # at most 4 connection tests at the same time
+
+
+def _svc_cache_key(name):
+    """changes when the service file or .env changes → stale results are dropped"""
+    try:
+        return (os.path.getmtime(services_store.path_of(name)), os.path.getmtime(os.path.join(services_store.STACK_DIR, ".env")))
+    except (OSError, ValueError):
+        return None
+
+
+async def service_state(name, force=False):
+    """('ok'|'warn'|'err'|'', title) from svc test – cached for 10 minutes"""
+    try:
+        data = json.loads(services_store.read_raw(name))
+    except (OSError, ValueError):
+        return "err", "invalid service file"
+    d = services_store.describe(name, data)
+    if d["state"] == "off":
+        return "", "disabled"
+    if d["state"] == "warn":
+        return "warn", "token missing: " + ", ".join(d["missing"])
+    key = _svc_cache_key(name)
+    hit = _SVC_STATUS.get(name)
+    if hit and not force and hit[0] == key and time.time() - hit[1] < 600:
+        return hit[2], hit[3]
+    async with _SVC_SEM:
+        code, out = await asyncio.to_thread(dockerops.run, ["svc", "test", name])
+    lines = [l.strip() for l in out.strip().splitlines() if l.strip().startswith(("✓", "✗"))]
+    good, bad = sum(l.startswith("✓") for l in lines), sum(l.startswith("✗") for l in lines)
+    if not lines:
+        state = "" if "not running" in out else "err"
+        title = (out.strip().splitlines() or ["no answer"])[-1]
+    else:
+        state = "ok" if not bad else ("warn" if good else "err")
+        title = " · ".join(lines)
+    title = f"{title} (checked {time.strftime('%H:%M')})"
+    _SVC_STATUS[name] = (key, time.time(), state, title)
+    return state, title
+
+
+@app.get("/services/{name}/status", response_class=HTMLResponse)
+async def service_status_dot(name: str):
+    if not services_store.NAME.match(name):
+        return HTMLResponse('<span class="dot"></span>')
+    state, title = await service_state(name)
+    return HTMLResponse(f'<span class="dot {state}" title="{html.escape(title)}"></span>')
+
+
 @app.post("/services/{name}/svc-test", response_class=HTMLResponse)
 async def service_svc_test(name: str):
     if not services_store.NAME.match(name):
         return HTMLResponse('<span class="pill err">invalid</span>')
+    _SVC_STATUS.pop(name, None)  # the next status dot reflects this test run
     code, out = await asyncio.to_thread(dockerops.run, ["svc", "test", name])
     from html import escape
     lines = "".join(f'<div class="{"ok" if l.startswith("✓") else "err" if l.startswith("✗") else "muted"}">{escape(l)}</div>'

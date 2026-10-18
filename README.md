@@ -114,6 +114,9 @@ Then, in tentacontrol:
 
 Without a reverse proxy tentacontrol listens on `http://127.0.0.1:8484` (`CONTROL_BIND`, `CONTROL_PORT`).
 
+**Updating:** `./tentaclai.sh update` – shows what's new and the upgrade steps, pulls, rebuilds and asks before recreating
+the containers (`--check` only shows). tentacontrol also shows “Update available” in the sidebar.
+
 ## Connecting a service
 
 <p align="center">
@@ -145,7 +148,7 @@ setup changes; existing knowledge is kept.
 |---|---|
 | **Phone / any browser** | Remote Control session (`claude-rc`), always running: claude.ai/code or the Claude app. |
 | **tentacontrol → Terminal** | Web terminal into the sandbox: Claude in `/workspace`, the Remote Control session, a shell, onboarding/inventory sessions. Sessions run in tmux and survive closing the tab. |
-| **Host terminal** | `./tentaclai.sh` (Claude), `./tentaclai.sh rc`, `./tentaclai.sh shell`, `./tentaclai.sh status`. |
+| **Host terminal** | `./tentaclai.sh` (Claude), `./tentaclai.sh rc`, `./tentaclai.sh shell`, `./tentaclai.sh status`, `./tentaclai.sh update`. |
 
 Inside the sandbox, Claude (and you) use:
 
@@ -170,7 +173,7 @@ Claude commands: **`/onboard <service>`** and **`/inventory`** (see above).
 |---|---|
 | **Overview** | Status of the sandbox (resources, Claude version, login), Remote Control with QR code and on/off switch, Docker and SSH hosts with live status, system inventory. |
 | **Terminal** | xterm.js terminals into the sandbox (Claude, Remote Control, shell, login). Reconnects automatically. |
-| **Connections** | Everything Claude can reach, in four tabs: **Services** (grouped by system; templates, JSON editor, write-only tokens, connection test, onboarding, enable/disable, move between systems) · **SSH hosts** (live status; add with host key check and one-time password key deployment, edit incl. jump host, sudo and rename, remove with key revocation) · **Systems** (groups with SSH host and rules) · **Topology** (live graph incl. optional stacks/containers, search, saved layout, PNG export). |
+| **Connections** | Everything Claude can reach, in four tabs: **Services** (grouped by system, live status dot per service; templates, JSON editor, write-only tokens, connection test, onboarding, enable/disable, move between systems) · **SSH hosts** (live status; add with host key check and one-time password key deployment, edit incl. jump host, sudo and rename, remove with key revocation) · **Systems** (groups with SSH host and rules) · **Topology** (live graph incl. optional stacks/containers, search, saved layout, PNG export). |
 | **Settings** | All `.env` settings with descriptions; secrets are write-only. Shows *Apply now* when the sandbox must be recreated. |
 | **Updates** | Installed tentaclAI version, new releases with their upgrade steps (checked every 6 h, also shown in the sidebar; `UPDATE_CHECK=false` turns it off), Claude Code and image updates. |
 | **Logs / Help** | Container log; full documentation of every feature. |
