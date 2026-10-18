@@ -495,6 +495,17 @@ async def service_edit(request: Request, name: str):
     return page(request, "service_edit.html", svc=svc, raw=raw, systems=systems_store.load_all())
 
 
+@app.post("/services/{name}/tls")
+async def service_set_tls(request: Request, name: str, insecure: str = Form("")):
+    try:
+        services_store.set_insecure_tls(name, insecure == "1")
+    except (ValueError, OSError) as e:
+        return PlainTextResponse("", headers=toast(str(e), "err"))
+    await sync_services()
+    return respond(request, f"{name}: TLS certificates {'NOT verified' if insecure == '1' else 'verified'}",
+                   kind="warn" if insecure == "1" else "ok", refresh=True)
+
+
 @app.post("/services/{name}/system")
 async def service_set_system(request: Request, name: str, system: str = Form("")):
     system = system.strip()

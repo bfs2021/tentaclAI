@@ -45,6 +45,7 @@ def describe(name, data, env=None, error=None):
         state, label = "ok", "active"
     return {
         "name": name, "data": data, "error": error, "enabled": enabled, "system": data.get("system", ""),
+        "tls_off": tclib.tls_unverified(data), "tls_parts": [p for p in tclib.TLS_PARTS if isinstance(data.get(p), dict)],
         "description": data.get("description", ""),
         "kinds": [k for k in PARTS if k in data],
         "docker": docker_info(data.get("docker"), env) if data.get("docker") else None,
@@ -168,3 +169,15 @@ def set_enabled(name, enabled):
 
 def delete(name):
     os.remove(path_of(name))
+
+
+def set_insecure_tls(name, on):
+    """switch certificate verification for every TLS part of a service (api, mcp, git, db, web)"""
+    data = json.loads(read_raw(name))
+    for part in tclib.TLS_PARTS:
+        if isinstance(data.get(part), dict):
+            if on:
+                data[part]["insecure_tls"] = True
+            else:
+                data[part].pop("insecure_tls", None)
+    save_raw(name, json.dumps(data, ensure_ascii=False))

@@ -70,4 +70,5 @@ def site():
         "domain": env.get("TC_DOMAIN") or "example.lan",
         "control_url": env.get("CONTROL_URL") or "",
         "tc_dir": env.get("TC_DIR") or STACK_DIR,
+        "ca_cert": bool(env.get("CA_CERT")),
     }

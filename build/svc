@@ -265,6 +265,10 @@ def configure_repo(name, path, git):
     if uses_token(git):
         git_run(["config", "--add", "credential.helper", f"!svc git-credential {name}"], cwd=path)
     git_run(["config", "tentaclai.service", name], cwd=path)
+    if git.get("insecure_tls"):  # self-signed git server: skip certificate checks for this repo only
+        git_run(["config", "http.sslVerify", "false"], cwd=path)
+    else:
+        git_run(["config", "--unset", "http.sslVerify"], cwd=path, quiet=True)
     access = git.get("access", "ro")
     git_run(["config", "tentaclai.access", access], cwd=path)
     hook = os.path.join(path, ".git", "hooks", "pre-push")
@@ -297,7 +301,7 @@ def git_sync(services, names=None, fetch=True):
         path = repo_path(name, git)
         if not os.path.isdir(os.path.join(path, ".git")):
             os.makedirs(os.path.dirname(path), exist_ok=True)
-            args = ["-c", "credential.helper="]
+            args = ["-c", "credential.helper="] + (["-c", "http.sslVerify=false"] if git.get("insecure_tls") else [])
             if uses_token(git):
                 args += ["-c", f"credential.helper=!svc git-credential {name}"]
             args += ["clone"] + (["--branch", git["branch"]] if git.get("branch") else []) + [git["url"], path]
@@ -534,6 +538,12 @@ DB_RO_BYPASS = re.compile(r"read\s+write|default_transaction_read_only|transacti
                           r"session\s+characteristics|\bset\s+role\b|\bset\s+session\s+authorization\b", re.I)
 
 
+def pg_sslmode(db):
+    """libpq sslmode; insecure_tls keeps the encryption but drops certificate verification"""
+    mode = str(db.get("ssl", "prefer"))
+    return "require" if db.get("insecure_tls") and mode in ("verify-ca", "verify-full") else mode
+
+
 def db_engine(db):
     e = (db.get("engine") or "postgres").lower()
     return "mysql" if e in ("mysql", "mariadb") else "postgres"
@@ -547,7 +557,7 @@ def db_run(name, db, sql=None, fmt="table", interactive=False):
     if db_engine(db) == "postgres":
         env = dict(os.environ, PGHOST=str(db.get("host", "")), PGPORT=str(db.get("port", 5432)),
                    PGDATABASE=str(db.get("database", "")), PGUSER=str(db.get("user", "")), PGPASSWORD=str(db.get("password", "")),
-                   PGSSLMODE=str(db.get("ssl", "prefer")), PGAPPNAME="tentaclai", PGCONNECT_TIMEOUT="10")
+                   PGSSLMODE=pg_sslmode(db), PGAPPNAME="tentaclai", PGCONNECT_TIMEOUT="10")
         if ro:
             env["PGOPTIONS"] = "-c default_transaction_read_only=on"
         cmd = ["psql", "-X", "-v", "ON_ERROR_STOP=1"]
@@ -563,6 +573,8 @@ def db_run(name, db, sql=None, fmt="table", interactive=False):
         cmd = ["mariadb", f"--defaults-extra-file={cfg}", "--connect-timeout=10"]
         if db.get("ssl") in (True, "require", "true"):
             cmd.append("--ssl")
+            if db.get("insecure_tls"):
+                cmd.append("--skip-ssl-verify-server-cert")
         if ro:
             cmd.append("--init-command=SET SESSION TRANSACTION READ ONLY")
         if sql is not None:
@@ -610,7 +622,7 @@ def db_test(name, db):
     """(ok, detail)"""
     if db_engine(db) == "postgres":
         env = dict(os.environ, PGHOST=str(db.get("host", "")), PGPORT=str(db.get("port", 5432)), PGDATABASE=str(db.get("database", "")),
-                   PGUSER=str(db.get("user", "")), PGPASSWORD=str(db.get("password", "")), PGSSLMODE=str(db.get("ssl", "prefer")),
+                   PGUSER=str(db.get("user", "")), PGPASSWORD=str(db.get("password", "")), PGSSLMODE=pg_sslmode(db),
                    PGCONNECT_TIMEOUT="8", PGOPTIONS="-c default_transaction_read_only=on")
         r = subprocess.run(["psql", "-X", "-At", "-c", "SELECT version()"], env=env, capture_output=True, text=True, timeout=20)
     else:
@@ -939,7 +951,7 @@ def cmd_test(services, name):
             if m.get("type", "http") in ("http", "sse"):
                 hdr = [f"{k}: {v}" for k, v in (m.get("headers") or {}).items()]
                 cfg = [f"url = {_q(m['url'])}", 'header = "Accept: application/json, text/event-stream"'] + [f"header = {_q(h)}" for h in hdr]
-                rc, out, err = _curl_secret(["-o", "/dev/null", "-w", "%{http_code}", "--max-time", "10"], cfg)
+                rc, out, err = _curl_secret(["-o", "/dev/null", "-w", "%{http_code}", "--max-time", "10"] + (["-k"] if m.get("insecure_tls") else []), cfg)
                 good = rc == 0 and out not in ("", "000", "401", "403", "404")
                 report("mcp", good, f"{m['url']} reachable → HTTP {out or '–'}" + (" (authentication rejected)" if out in ("401", "403") else ""))
             else:
@@ -947,7 +959,7 @@ def cmd_test(services, name):
                 report("mcp", found, f"stdio command {m.get('command')} {'found' if found else 'not found'}")
         elif part == "git":
             g = svc["git"]
-            args = ["-c", "credential.helper="]
+            args = ["-c", "credential.helper="] + (["-c", "http.sslVerify=false"] if g.get("insecure_tls") else [])
             if uses_token(g):
                 args += ["-c", f"credential.helper=!svc git-credential {name}"]
             r = git_run(args + ["ls-remote", "--heads", g["url"]], quiet=True)
@@ -1006,6 +1018,9 @@ def cmd_info(services, name):
     if git:
         path = repo_path(name, git)
         print(f"Git:  {git.get('url')}  [{git.get('access', 'ro')}]  -> {path}  ({git_state(path)})")
+    off = tclib.tls_unverified(svc)
+    if off:
+        print(f"TLS:  certificates NOT verified for {', '.join(off)} (insecure_tls) – fine for self-signed devices, risky elsewhere")
     for ex in svc.get("examples", []):
         print(f"  $ {ex}")
     for note in svc.get("notes", []):

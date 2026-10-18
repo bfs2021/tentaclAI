@@ -108,6 +108,14 @@ def load_services(services_dir, systems=None, errors=None):
     return services
 
 
+TLS_PARTS = ("api", "mcp", "git", "db", "web")
+
+
+def tls_unverified(svc):
+    """parts whose TLS certificates are not verified (insecure_tls: true)"""
+    return [p for p in TLS_PARTS if isinstance(svc.get(p), dict) and svc[p].get("insecure_tls")]
+
+
 def kinds(svc):
     return [k for k in PARTS if k in svc]
 

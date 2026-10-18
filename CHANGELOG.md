@@ -5,6 +5,8 @@ All notable changes, newest first. Every release lists **upgrade steps** from th
 ## Unreleased
 
 ### Changes
+- **TLS:** one switch per service, *Ignore TLS certificate errors* – `insecure_tls` now works for `api`, `web`, `git`
+  (`http.sslVerify=false` for that repo only) and `db` (no certificate verification); cards show “TLS not verified”.
 - **Update notice:** tentacontrol checks the GitHub releases every 6 hours and shows “Update available” in the sidebar;
   the Updates page lists the release's upgrade steps. New settings `UPDATE_CHECK` (default on) and `UPDATE_REPO`.
 - tentacontrol runs on Python 3.14.

@@ -205,6 +205,10 @@ A service file can combine any of these parts:
 | `web` | `base_url`, `auth.type`: `none` · `basic` · `bearer` · `header` · `form` (`login_url`, `fields`, `csrf_field`); `paths` | GET only, same host |
 | `files` | `ssh_host` (or the system's), `path`, `sudo`; `access` | `ro`: no push; paths stay inside `path` |
 
+**TLS:** internal services with your own CA → set `CA_CERT` (trusted by curl, git, python and node). For devices with self-signed
+certificates, `"insecure_tls": true` in `api`, `web`, `git` or `db` (or the switch on the service page) skips certificate
+verification for that part only – the connection stays encrypted. MCP connections are made by Claude Code and need `CA_CERT`.
+
 A part stays inactive while one of its `${VAR}`s is empty; `"enabled": false` parks the whole service.
 
 **Rule of thumb:** one *service* = one way in with one set of credentials (an API and its MCP server may share a file);
