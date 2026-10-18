@@ -16,6 +16,10 @@ All notable changes, newest first. Every release lists **upgrade steps** from th
   move commits through a root-owned mirror (git bundles), with the repo's access mode and approval.
 - **`svc ssh <host> [cmd]`** replaces plain `ssh`: access per SSH host (`confirm` by default, `rw`, `ro`), set in
   tentacontrol → Connections → SSH.
+- **Approve + 15 min** – one click lets further writes of the same service part / SSH host run for 15 minutes
+  (Activity → Active grants, revocable; never for `svc config put`).
+- **Status commands over `svc ssh` without approval** – a fixed allowlist (`uptime`, `df`, `docker ps|logs|inspect`,
+  `systemctl status`, `journalctl`, `ip a`, `ss` …, no shell syntax, no file contents) runs on every host, even `ro`.
 - **`svc config put`** – Claude proposes service files (`/onboard`) and site rules (`/inventory`); every write needs
   your approval in Activity, the old file is kept as `.bak-…`.
 

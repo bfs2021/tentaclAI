@@ -1166,6 +1166,46 @@ def files_test(name, f):
 
 # ---------- ssh ----------
 
+# Read-only commands that `svc ssh` runs without approval (also on ro hosts): status only, no file contents
+# (cat/grep could read a host's .env – those need approval). No shell syntax: one plain command, checked word by word.
+SSH_READ = {"uptime", "df", "free", "ps", "ls", "hostname", "whoami", "id", "uname", "date", "lsblk", "findmnt",
+            "nproc", "lscpu", "vmstat", "iostat", "who", "w", "last", "docker", "systemctl", "journalctl", "ip", "ss"}
+SSH_SHELL_CHARS = set(";&|$`<>(){}\\\n")
+SYSTEMCTL_READ = {"status", "is-active", "is-enabled", "is-failed", "list-units", "list-unit-files", "list-timers",
+                  "list-sockets", "list-dependencies", "show", "cat", "--failed"}
+JOURNAL_WRITE = ("--vacuum", "--rotate", "--flush", "--sync", "--relinquish", "--smart-relinquish", "--setup-keys",
+                 "--update-catalog")
+
+
+def ssh_read_only(alias, cmd):
+    """True for a plain status command from SSH_READ (optionally behind the host's sudo prefix)"""
+    text = " ".join(cmd)
+    if not cmd or any(c in SSH_SHELL_CHARS for c in text):
+        return False
+    try:
+        words = shlex.split(text)
+    except ValueError:
+        return False
+    sudo = shlex.split(ssh_sudo(alias) or "")
+    if sudo and words[:len(sudo)] == sudo:
+        words = words[len(sudo):]
+    if not words or words[0] not in SSH_READ:
+        return False
+    head, rest = words[0], words[1:]
+    args = [a for a in rest if not a.startswith("-")]
+    if head == "docker":
+        return bool(args) and _ro_allowed(rest)
+    if head == "systemctl":
+        return bool(args or rest) and all(a in SYSTEMCTL_READ for a in args[:1] or rest[:1])
+    if head == "journalctl":
+        return not any(a.startswith(JOURNAL_WRITE) for a in rest)
+    if head == "ip":
+        return not args or args[0] in ("a", "addr", "address", "r", "route", "l", "link", "n", "neigh") and \
+            not any(a in ("add", "del", "delete", "set", "change", "replace", "flush", "append") for a in args[1:])
+    if head == "ss":
+        return not any(a in ("-K", "--kill") or (a.startswith("-") and not a.startswith("--") and "K" in a) for a in rest)
+    return True
+
 def cmd_ssh(name_args):
     """a command (or an interactive shell) on an SSH host – the key stays with svc; access per host (default confirm)"""
     if not name_args:
@@ -1182,6 +1222,8 @@ def cmd_ssh(name_args):
     remote = " ".join(cmd)
     tty = not cmd or sys.stdin.isatty() and sys.stdout.isatty()
     argv = ["ssh"] + (["-t"] if tty else ["-T"]) + ["--", alias] + ([remote] if remote else [])
+    if ssh_read_only(alias, cmd):
+        return subprocess.call(argv)
     return guarded(alias, "ssh", mode, f"ssh {alias} {remote}" if remote else f"ssh {alias} (interactive shell)",
                    lambda: subprocess.call(argv))
 
@@ -1305,9 +1347,12 @@ def _control(method, path, payload=None, timeout=40):
 def request_approval(service, part, action):
     """('approved'|'denied'|'expired'|'error', who/why) – waits for the user's decision in tentacontrol"""
     try:
-        rid = _control("POST", "/internal/approvals", {"service": service, "part": part, "action": action})["id"]
+        res = _control("POST", "/internal/approvals", {"service": service, "part": part, "action": action})
+        rid = res["id"]
     except Exception as e:  # noqa: BLE001
         return "error", f"tentacontrol not reachable: {e}"
+    if res.get("status") == "approved":  # an active "Approve + 15 min" grant
+        return "approved", res.get("by", "grant")
     print(f"svc: ⏳ waiting for approval in tentacontrol → Activity (request #{rid}, up to {APPROVAL_TIMEOUT // 60} min): {action}",
           file=sys.stderr, flush=True)
     end = time.time() + APPROVAL_TIMEOUT + 30
@@ -1333,7 +1378,7 @@ def guarded(service, part, mode, action, run):
             audit(service, part, mode, action, decision, detail=by)
             sys.exit(f"svc: {service}: {action[:80]} – {decision}{(' (' + by + ')') if by else ''}. "
                      "Not executed – tell the user, don't work around it.")
-        print("svc: ✓ approved", file=sys.stderr, flush=True)
+        print(f"svc: ✓ approved{' – ' + by if by.startswith('grant') else ''}", file=sys.stderr, flush=True)
     t = time.time()
     rc = run()
     audit(service, part, mode, action, decision, rc=rc, duration=time.time() - t, detail=by)

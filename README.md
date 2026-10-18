@@ -163,7 +163,7 @@ svc web <name> /wiki/page | --links         # web pages as readable text, login 
 svc files <name> ls|cat|grep|pull|diff|push # folders on SSH hosts; edit in /workspace/files/<name>
 svc git | git sync [name]                   # repos in /workspace/repos (no credentials inside)
 svc git push|pull|fetch <repo> [branch]     # through svc's mirror – access mode and approval apply
-svc ssh <host> [command]                    # command or shell on an SSH host (default: needs approval)
+svc ssh <host> [command]                    # command or shell on an SSH host (status commands free, others need approval)
 svc config put service <name> <file>        # Claude proposes a service file – always needs approval
 tc-scan                                     # read-only inventory of all docker hosts, services, SSH hosts
 ```

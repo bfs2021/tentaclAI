@@ -15,9 +15,12 @@ from .config import DATA_DIR
 TOKEN_FILE = os.path.join(DATA_DIR, "svc-token")
 AUDIT_FILE = os.path.join(DATA_DIR, "audit.jsonl")
 TIMEOUT = 600
+GRANT_SECONDS = 15 * 60
+NO_GRANT_PARTS = ("config",)  # service files / site rules: every write is approved on its own
 
 _ids = itertools.count(1)
 APPROVALS = {}  # id -> dict
+GRANTS = {}  # (service, part) -> {"until": ts, "by": who} – "Approve + 15 min"
 
 
 def ensure_token():
@@ -48,20 +51,49 @@ def _expire():
 
 
 def create(service, part, action):
+    """new request; approved at once while a grant for this service + part is active"""
     _expire()
     rid = str(next(_ids))
-    APPROVALS[rid] = {"id": rid, "service": str(service)[:60], "part": str(part)[:20], "action": str(action)[:500],
-                      "created": time.time(), "status": "pending", "by": "", "event": asyncio.Event()}
+    a = {"id": rid, "service": str(service)[:60], "part": str(part)[:20], "action": str(action)[:500],
+         "created": time.time(), "status": "pending", "by": "", "event": asyncio.Event()}
+    g = active_grant(a["service"], a["part"])
+    if g:
+        a.update(status="approved", decided=time.time(), by=f"grant until {time.strftime('%H:%M', time.localtime(g['until']))} ({g['by']})")
+        a["event"].set()
+    APPROVALS[rid] = a
     return rid
 
 
-def decide(rid, approve, who="tentacontrol"):
+def decide(rid, approve, who="tentacontrol", grant=False):
     a = APPROVALS.get(rid)
     if not a or a["status"] != "pending":
         return False
     a.update(status="approved" if approve else "denied", decided=time.time(), by=who)
+    if approve and grant and a["part"] not in NO_GRANT_PARTS:
+        GRANTS[(a["service"], a["part"])] = {"until": time.time() + GRANT_SECONDS, "by": who}
+        a["by"] = who + " + 15 min"
     a["event"].set()
     return True
+
+
+def active_grant(service, part):
+    g = GRANTS.get((service, part))
+    if g and g["until"] > time.time() and part not in NO_GRANT_PARTS:
+        return g
+    GRANTS.pop((service, part), None)
+    return None
+
+
+def grants():
+    now = time.time()
+    for k in [k for k, g in GRANTS.items() if g["until"] <= now]:
+        GRANTS.pop(k, None)
+    return [{"service": s, "part": p, "until_s": time.strftime("%H:%M", time.localtime(g["until"])), **g}
+            for (s, p), g in sorted(GRANTS.items(), key=lambda x: x[1]["until"])]
+
+
+def revoke(service, part):
+    return GRANTS.pop((service, part), None) is not None
 
 
 async def wait(rid, seconds):

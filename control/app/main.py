@@ -358,7 +358,9 @@ async def internal_approval_create(request: Request):
     if not _svc_auth(request):
         return JSONResponse({"error": "forbidden"}, status_code=403)
     data = await request.json()
-    return JSONResponse({"id": activity.create(data.get("service", "?"), data.get("part", "?"), data.get("action", "?"))})
+    rid = activity.create(data.get("service", "?"), data.get("part", "?"), data.get("action", "?"))
+    a = activity.APPROVALS[rid]
+    return JSONResponse({"id": rid, "status": a["status"], "by": a["by"]})
 
 
 @app.get("/internal/approvals/{rid}")
@@ -378,7 +380,16 @@ async def activity_page(request: Request, service: str = "", decision: str = "")
 @app.get("/partials/approvals", response_class=HTMLResponse)
 async def approvals_partial(request: Request):
     return templates.TemplateResponse(request, "partials/approvals.html",
-                                      {"pending": activity.pending(), "recent": activity.recent_decisions(), "now": time.time()})
+                                      {"pending": activity.pending(), "recent": activity.recent_decisions(), "now": time.time(),
+                                       "grants": activity.grants(), "no_grant": activity.NO_GRANT_PARTS})
+
+
+@app.post("/grants/revoke", response_class=HTMLResponse)
+async def grant_revoke(request: Request, service: str = Form(...), part: str = Form(...)):
+    activity.revoke(service, part)
+    resp = await approvals_partial(request)
+    resp.headers.update(toast(f"Grant for {service} ({part}) revoked"))
+    return resp
 
 
 @app.get("/partials/approval-count", response_class=HTMLResponse)
@@ -389,9 +400,10 @@ async def approval_count():
 
 @app.post("/approvals/{rid}/{verdict}", response_class=HTMLResponse)
 async def approval_decide(request: Request, rid: str, verdict: str):
-    if verdict not in ("approve", "deny"):
+    if verdict not in ("approve", "approve15", "deny"):
         return PlainTextResponse("", status_code=400)
-    ok = activity.decide(rid, verdict == "approve", who="tentacontrol (" + (request.client.host if request.client else "?") + ")")
+    ok = activity.decide(rid, verdict != "deny", who="tentacontrol (" + (request.client.host if request.client else "?") + ")",
+                         grant=verdict == "approve15")
     resp = await approvals_partial(request)
     if not ok:
         resp.headers.update(toast("Request no longer pending", "warn"))

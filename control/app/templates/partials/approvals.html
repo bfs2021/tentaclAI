@@ -13,6 +13,8 @@
       </div>
       <div class="row" style="margin-top:10px">
         <button class="btn primary" hx-post="/approvals/{{ a.id }}/approve" hx-target="#approvals" hx-swap="outerHTML">{{ icon('check') }}Approve</button>
+        {% if a.part not in no_grant %}<button class="btn" hx-post="/approvals/{{ a.id }}/approve15" hx-target="#approvals" hx-swap="outerHTML"
+          title="Approve this and every further write of {{ a.service }} ({{ a.part }}) for the next 15 minutes">Approve + 15 min</button>{% endif %}
         <button class="btn danger" hx-post="/approvals/{{ a.id }}/deny" hx-target="#approvals" hx-swap="outerHTML">Deny</button>
       </div>
     </div>
@@ -20,6 +22,17 @@
   </div>
   {% else %}
   <div class="empty small">No pending approvals. Services with <code>"access": "confirm"</code> wait here before every write.</div>
+  {% endif %}
+  {% if grants %}
+  <div class="small" style="margin-top:12px"><strong>Active grants</strong> – writes run without asking until:
+    {% for g in grants %}
+    <form class="row" style="gap:8px;margin-top:6px" hx-post="/grants/revoke" hx-target="#approvals" hx-swap="outerHTML">
+      <input type="hidden" name="service" value="{{ g.service }}"><input type="hidden" name="part" value="{{ g.part }}">
+      <span class="pill warn">{{ g.service }} · {{ g.part }}</span><span class="muted">until {{ g.until_s }}</span>
+      <button class="btn sm ghost">Revoke</button>
+    </form>
+    {% endfor %}
+  </div>
   {% endif %}
   {% if recent %}
   <div class="small muted" style="margin-top:10px">Recent decisions:

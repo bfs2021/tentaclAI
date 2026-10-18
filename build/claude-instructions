@@ -38,7 +38,9 @@ def ssh_hosts():
             f"{('`' + h['sudo'] + ' <cmd>`') if h['sudo'] else '–'} |" for h in hosts]
     return ("### SSH hosts\n\nRun commands with `svc ssh <host> <command>` (no command = interactive shell) – the SSH key stays with svc, "
             "plain `ssh` has no key. Access: `confirm` = every command waits for the user's approval, `rw` = allowed (still ask "
-            "before changes), `ro` = no ssh commands (use the read-only svc parts instead). Privileged commands on hosts with a sudo prefix: "
+            "before changes), `ro` = no ssh commands (use the read-only svc parts instead). Plain status commands (`uptime`, `df -h`, `free`, `ps`, `ls`, "
+            "`docker ps|logs|inspect`, `systemctl status`, `journalctl -u …`, `ip a`, `ss -tlnp` – one command, no `;`/`|`/`$`/redirects) run without "
+            "approval on every host; prefer them, and use `svc files` for file contents. Privileged commands on hosts with a sudo prefix: "
             "`svc ssh <host> <prefix> <cmd>` (non-interactive, never ask for or type a password). `svc docker`/`svc compose` add the prefix themselves.\n\n"
             "| Host | Access | User | Hostname | sudo |\n|---|---|---|---|---|\n" + "\n".join(rows))
 
