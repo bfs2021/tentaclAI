@@ -2,20 +2,28 @@
 
 All notable changes, newest first. Every release lists **upgrade steps** from the previous one.
 
-## Unreleased
+## v0.3.0 – 2026-10-18
+
+### Highlights
+- **Access mode `confirm`** – writes of a service wait for your approval in tentacontrol → **Activity**
+  (Approve / Deny, badge in the sidebar). Denied or no answer within 10 minutes = not executed.
+- **Audit log** – every write through `svc` is recorded: automatic (`rw`), approved / denied / expired (`confirm`) and
+  blocked (`ro`), without secrets. Filterable in Activity, `svc audit` in the sandbox.
 
 ### Changes
-- **Access mode `confirm`:** writes of a service part (`api`, `docker`, `git`, `db`, `files`) wait for approval in
-  tentacontrol → **Activity** (badge in the sidebar; denied or 10 minutes without answer = not executed). `api` gets an
-  optional `access` field (default `rw`).
-- **Audit log:** every write through `svc` – auto (`rw`), approved/denied/expired (`confirm`) and blocked (`ro`) – is logged
-  without secrets; Activity shows and filters it, `svc audit` prints it in the sandbox. `git push` is covered through a
-  pre-push hook in every repository.
+- Writes are: API calls other than GET/HEAD/OPTIONS, docker/compose commands that change something, SQL that is not a
+  plain query (and the SQL shell), `svc files … push`, and `git push` (pre-push hook in every repository).
+- `api` parts accept an optional `access` field (`rw` default, `ro`, `confirm`); access pills show `confirm`.
+- Claude is instructed to report pending approvals and never to work around a denial.
+- Guard rail, not a hard boundary: Claude runs as root in the sandbox; MCP calls are not covered (see Security in the README).
 
-### Upgrade
-1. `./tentaclai.sh update` (or `git pull`, `docker compose build`, `docker compose up -d`) – both images; recreating
-   `tentaclai` ends running sessions and Remote Control.
-2. Optional: switch services to `"access": "confirm"` where writes should need your approval.
+### Upgrade from v0.2.1
+1. `./tentaclai.sh update` – or `git pull`, `docker compose build`, `docker compose up -d`. Both images change;
+   recreating `tentaclai` ends running sessions and Remote Control.
+2. Optional: set `"access": "confirm"` on service parts whose writes should need your approval
+   (e.g. a docker host: `"docker": { …, "access": "confirm" }`).
+
+No `.env` changes.
 
 ## v0.2.1 – 2026-10-18
 
