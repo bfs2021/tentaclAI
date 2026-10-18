@@ -52,3 +52,9 @@ Every release gets an entry in **`CHANGELOG.md`** (newest first) and the same te
 
 Before tagging: run the quick checks from `CONTRIBUTING.md`, test the upgrade path from the previous release in an
 isolated instance when the Upgrade section is more than a plain rebuild.
+
+## Brand images
+
+`docs/brand/*.png` (GitHub social preview, wordmarks) are generated: edit slogan, subtitle and styles in
+`docs/brand/src/gen.py`, then run `scripts/build-brand.sh` (Docker + Playwright). The slogan also appears in
+`README.md` and the brand block of `control/app/templates/base.html` / `login.html` – keep them in sync.
