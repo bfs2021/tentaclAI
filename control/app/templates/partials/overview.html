@@ -57,7 +57,7 @@
       {% if not logged %}
       <a class="btn sm primary" href="/terminal?p=login">{{ icon('key') }}Sign in now</a>
       {% endif %}
-      <a class="btn sm" href="/terminal?p=claude">{{ icon('terminal') }}Workspace</a>
+      <a class="btn sm" href="/terminal?p=claude" title="Claude Code in /workspace – persistent tmux session, same as ./tentaclai.sh on the host">{{ icon('terminal') }}Claude terminal</a>
       {% for s in services if s.docker and s.docker.mode == 'socket' and s.state == 'ok' %}<a class="btn sm" href="/terminal?p=host&alias={{ s.name | urlencode }}">{{ icon('terminal') }}{{ s.name }}</a>{% endfor %}
     </div>
     {% if not logged %}<p class="help">“Sign in now” runs <code>claude auth login</code>: open the link in your browser, sign in with your claude.ai account, paste the code into the terminal.</p>{% endif %}
