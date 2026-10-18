@@ -108,7 +108,7 @@ Then, in tentacontrol:
 2. **Overview → Create & start** – builds and starts the tentaclAI container.
 3. **Overview → Sign in now** – `claude auth login` in a web terminal; sign in with your claude.ai account.
 4. **Overview → Remote Control** – scan the QR code or open the link; the session now shows up in claude.ai/code and the app.
-5. **SSH** – add the machines Claude should reach (host key check + key deployment in one step).
+5. **SSH** – add the machines Claude should reach: host key check, key deployment with a one-time password, test – all in one dialog.
 6. **Services** – connect your Docker hosts and services ([next section](#connecting-a-service)).
 7. **Overview → System inventory** – Claude scans everything read-only, interviews you and writes `local/CLAUDE.md`.
 
@@ -173,7 +173,7 @@ Claude commands: **`/onboard <service>`** and **`/inventory`** (see above).
 | **Services** | Services grouped by system; create from templates, JSON editor, write-only tokens, connection test, onboarding, enable/disable, move between systems. |
 | **Topology** | Live graph of systems, services and SSH hosts; optional stacks and containers of every Docker host; search, movable nodes with saved layout, PNG export, details with actions. |
 | **Settings** | All `.env` settings with descriptions; secrets are write-only. Shows *Apply now* when the sandbox must be recreated. |
-| **SSH** | SSH hosts with live status, sudo prefix per host, add/remove with host key check and key deployment. |
+| **SSH** | SSH hosts with live status; add (host key check, one-time password key deployment), edit (incl. jump host, sudo, rename with references) and remove (optionally revoking the key) – no terminal needed. |
 | **Updates** | Claude Code and image updates (rebuild + recreate with a live log). |
 | **Logs / Help** | Container log; full documentation of every feature. |
 
@@ -209,7 +209,7 @@ A service file can combine any of these parts:
 
 A part stays inactive while one of its `${VAR}`s is empty; `"enabled": false` parks the whole service.
 Systems: `systems/<name>.json` with `description`, `ssh_host`, `notes` (rules for every member) – see `systems/_example.json`.
-SSH hosts: `./ssh-host.sh add <alias> <user@host[:port]> [--sudo]` or tentacontrol → SSH; the sudo prefix is stored as
+SSH hosts: tentacontrol → SSH (or `./ssh-host.sh add <alias> <user@host[:port]> [--sudo]`); jump hosts via `ProxyJump`; the sudo prefix is stored as
 `# tentaclai: sudo=sudo -n` in the host block and needs passwordless sudo, ideally limited to what Claude needs.
 
 ## Configuration
@@ -278,7 +278,6 @@ What it does **not** (yet) do – keep it in mind:
 - **Security:** hardened sandbox (non-root, read-only root filesystem, egress allowlist, secret broker, Docker socket proxy,
   prompt-injection safeguards) · audit log of all write actions · access mode `confirm` (approve writes with a click)
 - **Automation:** scheduled Claude jobs · monitoring per service with status and recommendations
-- **SSH:** add and edit hosts completely in the UI
 - **tentacontrol:** AI assistant for the configuration · OAuth with browser login · export/import of configuration and templates
 - **Topology:** connections between systems and containers (reverse proxy → container, tunnels) · monitoring status
 

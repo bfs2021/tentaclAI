@@ -5,7 +5,7 @@
   <div><h1>SSH targets</h1><div class="sub">One file per host in <code>ssh/config.d/</code>, own key <code>tentaclai_ed25519</code></div></div>
   <div class="row">
     <button class="btn" onclick="document.getElementById('dlg-pubkey').showModal()">{{ icon('key') }}Public key</button>
-    <button class="btn primary" onclick="document.getElementById('dlg-add').showModal()">{{ icon('plus') }}Add host</button>
+    <button class="btn primary" hx-get="/ssh/new" hx-target="#ssh-dlg-body" onclick="document.getElementById('dlg-ssh').showModal()">{{ icon('plus') }}Add host</button>
   </div>
 </div>
 <div class="card" style="margin-bottom:16px">
@@ -19,7 +19,7 @@
           <td><span class="row" style="gap:10px;flex-wrap:nowrap">
             <span hx-get="/ssh/{{ h.alias }}/status" hx-trigger="load, every 120s" hx-swap="innerHTML" class="ssh-dot"><span class="dot" title="checking …"></span></span>
             <strong>{{ h.alias }}</strong></span></td>
-          <td class="mono small">{{ h.user }}@{{ h.hostname }}{% if h.port != '22' %}:{{ h.port }}{% endif %}
+          <td class="mono small">{{ h.user }}@{{ h.hostname }}{% if h.port != '22' %}:{{ h.port }}{% endif %}{% if h.proxyjump %} <span class="pill info">via {{ h.proxyjump }}</span>{% endif %}
             <div class="ssh-result" id="t-{{ loop.index }}"></div></td>
           <td>
             <details class="sudo-edit">
@@ -35,7 +35,8 @@
           <td class="faint small">{{ h.file }}</td>
           <td style="text-align:right;white-space:nowrap">
             <button class="btn sm" hx-post="/ssh/{{ h.alias }}/test" hx-target="#t-{{ loop.index }}">Test</button>
-            <a class="btn sm ghost" href="/terminal?p=sshremove&alias={{ h.alias | urlencode }}" title="Remove the key on the target and delete the entry">{{ icon('trash') }}</a>
+            <button class="btn sm" hx-get="/ssh/{{ h.alias }}/edit" hx-target="#ssh-dlg-body" onclick="document.getElementById('dlg-ssh').showModal()">Edit</button>
+            <button class="btn sm ghost" title="Remove" hx-get="/ssh/{{ h.alias }}/remove" hx-target="#ssh-dlg-body" onclick="document.getElementById('dlg-ssh').showModal()">{{ icon('trash') }}</button>
           </td>
         </tr>
       {% endfor %}
@@ -43,24 +44,8 @@
     </table></div>
     {% else %}<div class="empty">No hosts configured.</div>{% endif %}
 </div>
-<dialog class="modal" id="dlg-add">
-  <div class="card-head"><h2>Add host</h2><button class="btn sm ghost" onclick="this.closest('dialog').close()" aria-label="Close">✕</button></div>
-  <form method="get" action="/terminal">
-        <input type="hidden" name="p" value="sshadd">
-        <div class="fields">
-          <div class="field"><label>Alias</label><input type="text" name="alias" placeholder="nas" pattern="[A-Za-z0-9._-]+" required></div>
-          <div class="field"><label>Target</label><input type="text" name="target" placeholder="admin@nas.{{ site.domain }}" class="mono" required>
-            <div class="help">user@host or user@host:port</div></div>
-        </div>
-        <div class="field">
-          <label class="check"><input type="checkbox" onchange="var s=document.getElementById('add-sudo');s.disabled=!this.checked;s.hidden=!this.checked">
-            Use sudo – the user is not root</label>
-          <input type="text" id="add-sudo" name="sudo" value="sudo -n" class="mono" style="margin-top:8px" disabled hidden>
-          <div class="help">Privileged commands (docker, compose, admin tasks) then run as <code>sudo -n …</code>. Non-interactive: the user needs passwordless sudo (<code>NOPASSWD</code>), ideally limited to what Claude needs.</div>
-        </div>
-        <button class="btn primary">{{ icon('terminal') }}Set up in terminal</button>
-        <p class="help">The terminal shows the host key fingerprint for confirmation and asks once for the target's password (like <code>ssh-copy-id</code>).</p>
-      </form>
+<dialog class="modal" id="dlg-ssh">
+  <div id="ssh-dlg-body"><div class="muted small">Loading …</div></div>
 </dialog>
 <dialog class="modal" id="dlg-pubkey">
   <div class="card-head"><h2>Public key</h2>
@@ -71,6 +56,10 @@
 </dialog>
 <script>
   // close a dialog by clicking the backdrop
+  // after a change (result step shown) the table must be reloaded when the dialog closes
+  document.getElementById("dlg-ssh").addEventListener("close", function () {
+    if (document.querySelector("#ssh-dlg-body .result-list")) location.reload();
+  });
   document.querySelectorAll("dialog.modal").forEach(function (d) {
     d.addEventListener("click", function (e) { if (e.target === d) d.close(); });
   });

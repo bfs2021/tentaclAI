@@ -1,0 +1,113 @@
+{% from "_icons.html" import icon %}
+{% macro hidden(f) -%}
+  {% for k in ("alias", "hostname", "user", "port", "proxyjump", "sudo") %}<input type="hidden" name="{{ k }}" value="{{ f.get(k, '') }}">{% endfor %}
+{%- endmacro %}
+{% macro head(title, sub="") -%}
+  <div class="card-head" style="margin-bottom:4px"><h2>{{ title }}</h2>
+    <button type="button" class="btn sm ghost" onclick="this.closest('dialog').close()" aria-label="Close">✕</button></div>
+  {% if sub %}<p class="small muted" style="margin:0 0 14px">{{ sub }}</p>{% endif %}
+  {% if error %}<div class="alert err">{{ error }}</div>{% endif %}
+{%- endmacro %}
+{% macro host_fields(f, hosts, edit=False) -%}
+  <div class="fields">
+    <div class="field"><label>Alias</label>
+      <input type="text" name="alias" value="{{ f.get('alias', '') }}" placeholder="nas" pattern="[A-Za-z0-9._-]+" required autocomplete="off">
+      <div class="help">{{ 'Renaming updates services and systems that use it.' if edit else 'Name Claude and the services use, e.g. ssh nas' }}</div></div>
+    <div class="field"><label>Host</label>
+      <input type="text" name="hostname" class="mono" value="{{ f.get('hostname', '') }}" placeholder="nas.{{ site.domain }}" required autocomplete="off"></div>
+    <div class="field"><label>User</label>
+      <input type="text" name="user" class="mono" value="{{ f.get('user', '') }}" placeholder="admin" required autocomplete="off"></div>
+    <div class="field"><label>Port</label>
+      <input type="text" name="port" class="mono" value="{{ f.get('port') or '22' }}" inputmode="numeric" pattern="[0-9]{1,5}"></div>
+  </div>
+  <div class="field"><label>Jump host (ProxyJump)</label>
+    <select name="proxyjump">
+      <option value="">– direct connection –</option>
+      {% for h in hosts if h.alias != f.get('alias') %}<option value="{{ h.alias }}" {{ 'selected' if h.alias == f.get('proxyjump') }}>{{ h.alias }} ({{ h.user }}@{{ h.hostname }})</option>{% endfor %}
+    </select>
+    <div class="help">For hosts that are only reachable through another SSH host.</div></div>
+  <div class="field">
+    <label class="check"><input type="checkbox" name="use_sudo" value="1" {{ 'checked' if f.get('sudo') }}
+      onchange="var s=this.form.sudo;s.disabled=!this.checked;s.hidden=!this.checked"> Use sudo – the user is not root</label>
+    <input type="text" name="sudo" class="mono" value="{{ f.get('sudo') or 'sudo -n' }}" style="margin-top:8px" {{ '' if f.get('sudo') else 'disabled hidden' }}>
+    <div class="help">Privileged commands then run as <code>sudo -n …</code> – needs passwordless sudo (<code>NOPASSWD</code>), ideally limited.</div>
+  </div>
+{%- endmacro %}
+
+{% if step == "form" %}
+<form hx-post="/ssh/new/scan" hx-target="#ssh-dlg-body" hx-indicator="#ssh-dlg-spin" autocomplete="off">
+  {{ head("Add host", "Step 1 of 3 – where is the host?") }}
+  {{ host_fields(f, hosts) }}
+  <div class="row"><button class="btn primary">Continue – check host key</button><span id="ssh-dlg-spin" class="spinner htmx-indicator"></span></div>
+</form>
+
+{% elif step == "hostkey" %}
+<form hx-post="{{ action }}" hx-target="#ssh-dlg-body" hx-indicator="#ssh-dlg-spin">
+  {{ head("Confirm host key", ("Step 2 of 3 – " if not edit else "") ~ "is this really " ~ f.hostname ~ "?") }}
+  {{ hidden(f) }}<input type="hidden" name="token" value="{{ scan.token }}">
+  <p class="small">The host presented this key. Compare the fingerprint with the host's own, e.g. on the host:
+    <code>ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub</code></p>
+  <div class="fp-list">{% for fp in scan.fingerprints %}<div class="mono small">{{ fp }}</div>{% endfor %}</div>
+  <div class="row" style="margin-top:14px">
+    <button class="btn primary">{{ icon('check') }}Fingerprint is correct</button>
+    {% if not edit %}<button type="button" class="btn ghost" hx-post="/ssh/new/form" hx-target="#ssh-dlg-body" hx-include="closest form">Back</button>{% endif %}
+    <span id="ssh-dlg-spin" class="spinner htmx-indicator"></span>
+  </div>
+</form>
+
+{% elif step == "deploy" %}
+<form hx-post="/ssh/new/deploy" hx-target="#ssh-dlg-body" hx-indicator="#ssh-dlg-spin" autocomplete="off">
+  {{ head("Authorize tentaclAI", "Step 3 of 3 – put tentaclAI's public key on " ~ f.user ~ "@" ~ f.hostname) }}
+  {{ hidden(f) }}
+  <div class="field"><label>Password of {{ f.user }} (used once, never stored)</label>
+    <input type="password" name="password" autocomplete="new-password">
+    <div class="help">tentaclAI logs in once with this password and appends its key to <code>~/.ssh/authorized_keys</code>.</div></div>
+  <div class="row">
+    <button class="btn primary" name="mode" value="password">{{ icon('key') }}Deploy key</button>
+    <button class="btn" name="mode" value="skip" formnovalidate>The key is already there</button>
+    <span id="ssh-dlg-spin" class="spinner htmx-indicator"></span>
+  </div>
+  <details class="small" style="margin-top:14px"><summary class="muted">No password login? Add the key by hand</summary>
+    <p>Run this on the host as {{ f.user }}, then click <em>The key is already there</em>:</p>
+    <pre class="rc" id="ssh-manual" style="white-space:pre-wrap;word-break:break-all">mkdir -p ~/.ssh &amp;&amp; chmod 700 ~/.ssh &amp;&amp; echo '{{ pubkey }}' &gt;&gt; ~/.ssh/authorized_keys &amp;&amp; chmod 600 ~/.ssh/authorized_keys</pre>
+    <button type="button" class="btn sm" data-copy="#ssh-manual">{{ icon('copy') }}Copy</button>
+  </details>
+</form>
+
+{% elif step == "result" %}
+  {{ head(title) }}
+  <div class="result-list">
+    {% for ok, text in results %}<div class="row small" style="flex-wrap:nowrap;align-items:flex-start">
+      <span class="dot {{ 'ok' if ok == True else ('warn' if ok == None else 'err') }}" style="margin-top:5px"></span><span>{{ text }}</span></div>{% endfor %}
+  </div>
+  <div class="row" style="margin-top:16px">
+    {% if hostkey_alias %}<button class="btn" hx-post="/ssh/{{ hostkey_alias }}/hostkey/scan" hx-target="#ssh-dlg-body" hx-indicator="#ssh-dlg-spin">Check host key</button>{% endif %}
+    <button class="btn primary" onclick="location.reload()">Done</button>
+    <span id="ssh-dlg-spin" class="spinner htmx-indicator"></span>
+  </div>
+
+{% elif step == "edit" %}
+<form hx-post="/ssh/{{ alias }}/edit" hx-target="#ssh-dlg-body" hx-indicator="#ssh-dlg-spin" autocomplete="off">
+  {{ head("Edit " ~ alias, "File ssh/config.d/" ~ f.file ~ (" · host key alias " ~ f.hostkeyalias if f.hostkeyalias else "")) }}
+  {{ host_fields(f, hosts, edit=True) }}
+  {% if refs %}<p class="help">Used by {% for k, n in refs %}{{ k }} <strong>{{ n }}</strong>{{ ', ' if not loop.last }}{% endfor %}.</p>{% endif %}
+  <div class="row">
+    <button class="btn primary">{{ icon('check') }}Save &amp; test</button>
+    <button type="button" class="btn" hx-post="/ssh/{{ alias }}/hostkey/scan" hx-target="#ssh-dlg-body">Check host key</button>
+    <span id="ssh-dlg-spin" class="spinner htmx-indicator"></span>
+  </div>
+</form>
+
+{% elif step == "remove" %}
+<form hx-post="/ssh/{{ alias }}/remove" hx-target="#ssh-dlg-body" hx-indicator="#ssh-dlg-spin">
+  {{ head("Remove " ~ alias) }}
+  {% if refs %}<div class="alert warn">Still used by {% for k, n in refs %}{{ k }} <strong>{{ n }}</strong>{{ ', ' if not loop.last }}{% endfor %} – they will stop working until you point them to another host.</div>{% endif %}
+  <label class="check" style="margin-bottom:12px"><input type="checkbox" name="unauthorize" value="1" checked>
+    Also remove tentaclAI's key from {{ f.user }}@{{ f.hostname }}</label>
+  <div class="row">
+    <button class="btn danger">{{ icon('trash') }}Remove</button>
+    {% if error %}<button class="btn" name="force" value="1">Remove entry only</button>{% endif %}
+    <span id="ssh-dlg-spin" class="spinner htmx-indicator"></span>
+  </div>
+</form>
+{% endif %}

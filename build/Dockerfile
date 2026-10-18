@@ -14,7 +14,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         ca-certificates curl gnupg git jq ripgrep fd-find less nano vim-tiny tmux \
         openssh-client rsync unzip zip procps iputils-ping dnsutils \
         python3 python3-venv python3-pip make \
-        postgresql-client mariadb-client \
+        postgresql-client mariadb-client sshpass \
     && ln -s /usr/bin/fdfind /usr/local/bin/fd \
     # Docker CLI + compose plugin (talks to the host daemon via the mounted socket)
     && install -m 0755 -d /etc/apt/keyrings \

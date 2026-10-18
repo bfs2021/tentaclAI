@@ -251,7 +251,14 @@
 
     <section class="card" id="ssh">
       <h2>SSH targets</h2>
-      <p>tentaclAI has its own key (<code>ssh/keys/tentaclai_ed25519</code>). Each host is a file in <code>ssh/config.d/</code>. “Add host” opens a terminal with <code>ssh-host.sh add</code>: confirm the host key fingerprint, enter the target's password once – done.</p>
+      <p>tentaclAI has its own key (<code>ssh/keys/tentaclai_ed25519</code>). Each host is a <code>Host</code> block in <code>ssh/config.d/</code>. Everything works in the UI:</p>
+      <ol>
+        <li><strong>Add host</strong> – alias, host, user, port, optionally a <strong>jump host</strong> (ProxyJump through another SSH host) and sudo.</li>
+        <li><strong>Confirm the host key</strong> – tentaclAI fetches it and shows the fingerprint; compare it with <code>ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub</code> on the host.</li>
+        <li><strong>Authorize tentaclAI</strong> – enter the user's password once (passed to <code>sshpass</code> via stdin, never stored or logged), or add the key by hand with the shown command.</li>
+        <li>The host is saved and tested (login, sudo).</li>
+      </ol>
+      <p><strong>Edit</strong> changes host, user, port, jump host, sudo and the alias – a rename also updates docker/files services, systems and other hosts that jump through it. If a host key changed, <em>Check host key</em> fetches and confirms the new one. <strong>Remove</strong> can also take tentaclAI's key off the host. On the command line the same is possible with <code>./ssh-host.sh</code>.</p>
       <h4>Hosts without root login: sudo</h4>
       <p>If the SSH user is not root, enable <strong>use sudo</strong> (when adding the host, or later in the <em>sudo</em> column). The prefix (default <code>sudo -n</code>, also e.g. <code>doas</code>) is stored as <code># tentaclai: sudo=…</code> in the host's block. <code>svc docker</code>/<code>svc compose</code> and <code>tc-scan</code> use it automatically (such docker hosts run through ssh instead of a docker context), and Claude's instructions list it per host for admin commands.</p>
       <p>It is non-interactive: the user needs passwordless sudo, ideally limited, e.g. <code>/etc/sudoers.d/tentaclai</code>: <code>deploy ALL=(root) NOPASSWD: /usr/bin/docker</code>. “Test” checks login and sudo.</p>
@@ -321,8 +328,6 @@ ssh &lt;host&gt;                SSH targets from ssh/config.d</pre>
         <li><strong>AI assistant</strong> in tentacontrol for the whole configuration (can be switched off).</li>
         <li><strong>OAuth with browser login</strong> (authorization code, e.g. Google) as auth type, with templates. Client credentials already exist.</li>
         <li><strong>Real sandbox &amp; security</strong>: harden the container (non-root, read-only root filesystem, no capabilities), egress allowlist (only service hosts reachable), keep secrets away from Claude (secret broker instead of a readable <code>.env</code>), Docker socket only through a filtering proxy, preconfigured Claude Code permissions/sandbox, prompt-injection safeguards for content from services.</li>
-        <li><strong>SSH hosts fully in the UI</strong>: add and edit hosts with a form instead of the terminal (alias, user@host, port, optional ProxyJump), confirm the host key fingerprint in the UI, enter the password once to deploy the key (never stored), automatic test afterwards.</li>
-        <li><strong>Edit SSH targets</strong>: change existing hosts in the UI (hostname, user, port, ProxyJump, rename the alias including references in docker services and systems); today only the sudo setting is editable.</li>
       </ul>
     </section>
   </div>

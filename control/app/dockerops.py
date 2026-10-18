@@ -3,6 +3,7 @@ import datetime as dt
 import json
 import os
 import re
+import socket
 
 import docker
 from docker.errors import NotFound
@@ -198,7 +199,8 @@ def ssh_check(alias, sudo=""):
     probe = "echo $(whoami)@$(hostname)"
     if sudo:
         probe += f"; {sudo} true 2>/dev/null && echo SUDO_OK || echo SUDO_FAILED"
-    cmd = ["ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=8", "-o", "ControlMaster=no", alias, probe]
+    # fresh connection (no shared ControlMaster socket), so a changed host key or revoked key shows up at once
+    cmd = ["ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=8", "-o", "ControlMaster=no", "-o", "ControlPath=none", alias, probe]
     c = container()
     if c is not None and c.status == "running":
         return run(cmd)
@@ -214,3 +216,42 @@ def ssh_check(alias, sudo=""):
         return 1, "image local/tentaclai not built yet (Updates → build)"
     except Exception as e:  # noqa: BLE001
         return 1, str(e)
+
+
+def sandbox_exec(cmd, stdin=None, timeout=60):
+    """run a command in the running sandbox; optional stdin (e.g. a one-time password – never put into argv/env).
+    Returns (exit_code, output)."""
+    c = container()
+    if c is None or c.status != "running":
+        return 1, "tentaclAI is not running – start it on the overview first"
+    api = client().api
+    ex = api.exec_create(c.id, cmd, stdin=stdin is not None, tty=False)
+    sock = api.exec_start(ex["Id"], socket=True)
+    raw = getattr(sock, "_sock", sock)
+    raw.settimeout(timeout)
+    out = bytearray()
+    try:
+        if stdin is not None:
+            raw.sendall(stdin if isinstance(stdin, bytes) else stdin.encode())
+            raw.shutdown(socket.SHUT_WR)
+        buf = b""
+        while True:  # multiplexed stream: 8-byte header (stream, 0, 0, 0, size) + payload
+            chunk = raw.recv(65536)
+            if not chunk:
+                break
+            buf += chunk
+            while len(buf) >= 8:
+                size = int.from_bytes(buf[4:8], "big")
+                if len(buf) < 8 + size:
+                    break
+                out += buf[8:8 + size]
+                buf = buf[8 + size:]
+    except OSError as e:
+        out += f"\n{e}".encode()
+    finally:
+        try:
+            raw.close()
+        except OSError:
+            pass
+    code = api.exec_inspect(ex["Id"]).get("ExitCode")
+    return (code if code is not None else 1), out.decode(errors="replace")
