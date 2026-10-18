@@ -2,7 +2,7 @@
 
 All notable changes, newest first. Every release lists **upgrade steps** from the previous one.
 
-## Unreleased (v0.4.0)
+## v0.4.0 – 2026-10-19
 
 ### Highlights
 - **Privilege separation in the sandbox** – Claude now runs as the unprivileged user `claude`. `.env`, the SSH key, the
