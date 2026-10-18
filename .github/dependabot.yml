@@ -1,14 +1,20 @@
 version: 2
 updates:
+  # Python packages of tentacontrol: only when a new version falls outside the allowed range
   - package-ecosystem: pip
     directory: /control
+    versioning-strategy: increase-if-necessary
     schedule:
       interval: monthly
   - package-ecosystem: docker
     directory: /control
     schedule:
       interval: monthly
+  # sandbox base image: stay on the Node LTS line – major versions are switched deliberately
   - package-ecosystem: docker
     directory: /build
     schedule:
       interval: monthly
+    ignore:
+      - dependency-name: node
+        update-types: ["version-update:semver-major"]
