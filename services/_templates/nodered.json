@@ -1,0 +1,16 @@
+{
+  "_meta": {
+    "title": "Node-RED",
+    "category": "Smart Home"
+  },
+  "description": "Node-RED admin API – read/deploy flows",
+  "api": {
+    "base_url": "https://nodered.{{DOMAIN}}",
+    "auth": {
+      "type": "bearer",
+      "token": "${NODERED_TOKEN}"
+    },
+    "docs": "https://nodered.org/docs/api/admin/"
+  },
+  "test_path": "/flows"
+}

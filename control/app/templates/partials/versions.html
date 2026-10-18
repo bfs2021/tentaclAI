@@ -1,0 +1,20 @@
+{% from "_icons.html" import icon %}
+<div class="card">
+  <div class="card-head">
+    <h2>{{ icon('sparkle') }}Claude Code</h2>
+    {% if installed and latest %}
+      {% if installed == latest %}<span class="pill ok">up to date</span>{% else %}<span class="pill accent">update available</span>{% endif %}
+    {% endif %}
+  </div>
+  <dl class="kv">
+    <dt>Installed</dt><dd class="mono">{{ installed or "– (container not running)" }}</dd>
+    <dt>Latest version</dt><dd class="mono">{{ latest or "–" }}</dd>
+    <dt>Requested (<code>CLAUDE_CODE_VERSION</code>)</dt><dd class="mono">{{ pin }}</dd>
+    <dt>Image built</dt><dd>{{ st.image_age if st.exists else "–" }}</dd>
+  </dl>
+  <div class="row" style="margin-top:16px">
+    <button class="btn primary" hx-post="/updates/claude" hx-confirm="Rebuild the image and recreate tentaclaude? Running sessions will end.">{{ icon('refresh') }}{{ 'Update now' if installed != latest else 'Rebuild' }}</button>
+    <a class="btn ghost" href="/settings">Pin version</a>
+  </div>
+  {% if pin != 'latest' and latest and pin != latest %}<p class="help">Pinned to {{ pin }} – a rebuild installs this version, not {{ latest }}.</p>{% endif %}
+</div>

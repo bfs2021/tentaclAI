@@ -1,0 +1,91 @@
+#!/usr/bin/env python3
+"""Print Claude's user-level CLAUDE.md: image template + site values + optional host docs + local rules."""
+import glob
+import json
+import os
+import re
+
+TEMPLATE = "/etc/tentaclaude/CLAUDE.base.md"
+HOST_DOCS = "/etc/tentaclaude/host-docs.md"
+
+tc_dir = os.environ.get("TC_DIR", "/opt/tentaclaude")
+
+
+def docker_hosts():
+    env = {}
+    try:
+        for line in open(os.path.join(tc_dir, ".env")):
+            m = re.match(r"^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=(.*)$", line)
+            if m:
+                env[m.group(1)] = m.group(2).strip().strip("'\"")
+    except OSError:
+        pass
+    rows = []
+    for p in sorted(glob.glob(os.path.join(tc_dir, "services", "*.json"))):
+        if os.path.basename(p).startswith("_"):
+            continue
+        try:
+            svc = json.load(open(p))
+        except ValueError:
+            continue
+        d = svc.get("docker")
+        if not d or svc.get("enabled", True) is False:
+            continue
+        name = svc.get("name") or os.path.basename(p)[:-5]
+        sub = lambda v: re.sub(r"\$\{([A-Za-z_][A-Za-z0-9_]*)\}", lambda m: env.get(m.group(1), ""), str(v))
+        target = "local socket" if d.get("mode", "socket") == "socket" else f"ssh `{d.get('ssh_host')}`"
+        rows.append(f"| `{name}` | {target} | **{d.get('access', 'ro')}** | `{sub(d.get('stacks_dir', '–'))}` | {svc.get('description', '')} |")
+    if not rows:
+        return "### Docker hosts\n\nNone configured – this sandbox has no Docker access."
+    return "### Docker hosts\n\n| Host | Via | Access | Stacks dir | Description |\n|---|---|---|---|---|\n" + "\n".join(rows)
+
+
+def ssh_hosts():
+    meta = re.compile(r"^\s*#\s*tentaclaude:\s*sudo\s*=\s*(.*?)\s*$")
+    hosts = {}
+    for f in sorted(glob.glob("/root/.ssh/config.d/*.conf")):
+        current = []
+        for line in open(f):
+            m = meta.match(line)
+            if m:
+                for a in current:
+                    hosts[a]["sudo"] = m.group(1)
+                continue
+            parts = line.split()
+            if not parts:
+                continue
+            key = parts[0].lower()
+            if key == "host":
+                current = [a for a in parts[1:] if "*" not in a]
+                for a in current:
+                    hosts[a] = {"user": "", "hostname": "", "sudo": ""}
+            elif key in ("user", "hostname") and len(parts) > 1:
+                for a in current:
+                    hosts[a][key] = parts[1]
+    if not hosts:
+        return "### SSH hosts\n\nNone configured."
+    rows = [f"| `{a}` | {h['user'] or '–'} | {h['hostname'] or '–'} | {('`' + h['sudo'] + ' <cmd>`') if h['sudo'] else '–'} |"
+            for a, h in hosts.items()]
+    return ("### SSH hosts\n\nPrivileged commands on hosts with a sudo prefix: run them as `<prefix> <cmd>` "
+            "(non-interactive, never ask for or type a password). `svc docker`/`svc compose` add the prefix themselves.\n\n"
+            "| Host | User | Hostname | sudo |\n|---|---|---|---|\n" + "\n".join(rows))
+
+
+values = {
+    "TC_DIR": tc_dir,
+    "DOCKER_HOSTS": docker_hosts(),
+    "SSH_HOSTS": ssh_hosts(),
+    "TC_HOSTNAME": os.environ.get("TC_HOSTNAME") or os.uname().nodename,
+    "CONTROL_URL": os.environ.get("CONTROL_URL") or "tentacontrol",
+}
+text = open(TEMPLATE).read()
+for k, v in values.items():
+    text = text.replace("{{" + k + "}}", v)
+
+local = os.path.join(tc_dir, "local", "CLAUDE.md")
+extra = []
+if os.path.isfile(HOST_DOCS) and os.path.getsize(HOST_DOCS) > 0:
+    extra += ["## Host documentation", "", f"@{HOST_DOCS}", ""]
+if os.path.isfile(local) and os.path.getsize(local) > 0:
+    extra += ["## Site-specific rules", "", f"@{local}", ""]
+print(text.rstrip() + ("\n\n" + "\n".join(extra) if extra else "") + "\n")

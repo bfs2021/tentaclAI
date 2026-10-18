@@ -1,0 +1,18 @@
+# One file per host or group: ssh/config.d/<name>.conf  (easiest: ./ssh-host.sh add <alias> <user@host[:port]>)
+# The key, host-key policy and connection reuse come from ssh/config (Host *).
+
+# Host nas
+#     HostName nas.example.lan
+#     User admin
+
+# The Docker host itself (needs the key in root's authorized_keys and a sshd rule allowing it from Docker networks)
+# Host dockerhost
+#     HostName host.docker.internal
+#     User root
+#     HostKeyAlias dockerhost
+
+# Behind a jump host
+# Host internal-db
+#     HostName 10.0.5.20
+#     User deploy
+#     ProxyJump bastion

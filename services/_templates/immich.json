@@ -1,0 +1,17 @@
+{
+  "_meta": {
+    "title": "Immich",
+    "category": "Apps"
+  },
+  "description": "Immich – photos, albums, people",
+  "api": {
+    "base_url": "https://immich.{{DOMAIN}}/api",
+    "auth": {
+      "type": "header",
+      "header": "x-api-key",
+      "value": "${IMMICH_API_KEY}"
+    },
+    "docs": "https://immich.app/docs/api"
+  },
+  "test_path": "/server/about"
+}

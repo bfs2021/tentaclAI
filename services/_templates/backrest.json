@@ -1,0 +1,18 @@
+{
+  "_meta": {
+    "title": "Backrest",
+    "category": "Docker & Infra"
+  },
+  "description": "Backrest – browse restic snapshots (read only)",
+  "api": {
+    "base_url": "https://backrest.{{DOMAIN}}",
+    "auth": {
+      "type": "basic",
+      "user": "${BACKREST_USER}",
+      "password": "${BACKREST_PASSWORD}"
+    }
+  },
+  "notes": [
+    "Never create backups/prunes/plans."
+  ]
+}

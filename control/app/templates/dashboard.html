@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}Overview{% endblock %}
+{% block content %}
+<div class="header">
+  <div><h1>Overview</h1><div class="sub">State of tentaclaude, remote control and connected services</div></div>
+  <div class="row">
+    <a class="btn" href="/terminal?p=inventory" title="Claude scans docker hosts, stacks, services and SSH hosts, asks you questions and writes the result to local/CLAUDE.md after your approval">{{ icon('sparkle') }}System inventory</a>
+    <a class="btn primary" href="/terminal?p=claude">{{ icon('terminal') }}Open Claude</a>
+  </div>
+</div>
+<div hx-get="/partials/overview" hx-trigger="load, every 15s" hx-swap="innerHTML">
+  <div class="grid"><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div></div>
+</div>
+{% endblock %}

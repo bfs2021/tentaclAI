@@ -1,0 +1,28 @@
+{
+  "_meta": {
+    "title": "pfSense (REST API)",
+    "category": "Network",
+    "setup": "Install the package “pfSense-pkg-RESTAPI” (pfrest.org), System → REST API → Keys: create an API key for a user with as few privileges as possible."
+  },
+  "description": "pfSense – firewall rules, interfaces, DHCP, status (pfrest v2)",
+  "api": {
+    "base_url": "https://pfsense.{{DOMAIN}}/api/v2",
+    "auth": {
+      "type": "header",
+      "header": "X-API-Key",
+      "value": "${PFSENSE_API_KEY}"
+    },
+    "insecure_tls": true,
+    "docs": "https://pfrest.org/"
+  },
+  "test_path": "/status/system",
+  "examples": [
+    "svc NAME GET /status/system",
+    "svc NAME GET /firewall/rules",
+    "svc NAME GET /services/dhcp_server/static_mappings"
+  ],
+  "notes": [
+    "Firewall changes only when explicitly asked – a misconfiguration can lock you out.",
+    "Response format: {code, status, data, …}."
+  ]
+}

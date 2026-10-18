@@ -1,0 +1,25 @@
+{
+  "_meta": {
+    "title": "PostgreSQL database",
+    "category": "Databases",
+    "setup": "Ideally a dedicated read-only user: CREATE ROLE claude_ro LOGIN PASSWORD '…'; GRANT pg_read_all_data TO claude_ro; (PostgreSQL 14+). Put user and password into .env."
+  },
+  "description": "PostgreSQL database",
+  "db": {
+    "engine": "postgres",
+    "host": "db.{{DOMAIN}}",
+    "port": 5432,
+    "database": "app",
+    "user": "${EXAMPLE_DB_USER}",
+    "password": "${EXAMPLE_DB_PASSWORD}",
+    "ssl": "prefer",
+    "access": "ro"
+  },
+  "examples": [
+    "svc db NAME tables",
+    "svc db NAME \"SELECT count(*) FROM users\""
+  ],
+  "notes": [
+    "ro: the session is read-only – a read-only database user is the real protection."
+  ]
+}

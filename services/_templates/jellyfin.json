@@ -1,0 +1,17 @@
+{
+  "_meta": {
+    "title": "Jellyfin",
+    "category": "Apps"
+  },
+  "description": "Jellyfin – libraries, users, sessions",
+  "api": {
+    "base_url": "https://jellyfin.{{DOMAIN}}",
+    "auth": {
+      "type": "header",
+      "header": "X-Emby-Token",
+      "value": "${JELLYFIN_API_KEY}"
+    },
+    "docs": "https://api.jellyfin.org"
+  },
+  "test_path": "/System/Info"
+}

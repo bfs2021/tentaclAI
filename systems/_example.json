@@ -1,0 +1,14 @@
+{
+  "_help": [
+    "Copy to <name>.json (or create it in tentacontrol → Services → Systems). Files starting with '_' are ignored.",
+    "A system groups the services of one host or appliance. Services join with \"system\": \"<name>\" in their JSON.",
+    "ssh_host: alias from ssh/config.d – docker services of mode ssh without their own ssh_host use it.",
+    "notes: rules that apply to every service of the system (shown in svc info and the service catalog)."
+  ],
+  "name": "example",
+  "description": "VPS example.org – reverse proxy and mail",
+  "ssh_host": "example",
+  "notes": [
+    "Restarting the proxy interrupts all sites – ask first."
+  ]
+}

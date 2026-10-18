@@ -1,0 +1,17 @@
+{
+  "_meta": {
+    "title": "GitLab",
+    "category": "Development"
+  },
+  "description": "GitLab – projects, issues, MRs, pipelines",
+  "api": {
+    "base_url": "https://gitlab.com/api/v4",
+    "auth": {
+      "type": "header",
+      "header": "PRIVATE-TOKEN",
+      "value": "${GITLAB_TOKEN}"
+    },
+    "docs": "https://docs.gitlab.com/ee/api/rest/"
+  },
+  "test_path": "/user"
+}

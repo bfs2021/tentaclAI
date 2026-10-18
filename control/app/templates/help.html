@@ -1,0 +1,330 @@
+{% extends "base.html" %}
+{% block title %}Help{% endblock %}
+{% block head %}
+<style>
+  .help-layout { display: grid; grid-template-columns: 210px 1fr; gap: 28px; align-items: start; }
+  .toc { position: sticky; top: 24px; display: flex; flex-direction: column; gap: 2px; font-size: 13px; }
+  .toc a { color: var(--muted); padding: 5px 10px; border-radius: 6px; }
+  .toc a:hover { background: var(--panel); color: var(--text); text-decoration: none; }
+  .doc section { margin-bottom: 18px; scroll-margin-top: 20px; }
+  .doc h2 { font-size: 17px; margin-bottom: 10px; }
+  .doc h4 { margin: 16px 0 6px; font-size: 13.5px; }
+  .doc p, .doc li { color: var(--text); }
+  .doc ul, .doc ol { padding-left: 20px; margin: 0 0 10px; }
+  .doc li { margin-bottom: 4px; }
+  .doc pre { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 12px; overflow: auto; margin: 8px 0 12px; }
+  .doc table { margin: 8px 0 12px; }
+  .kbd { font-family: var(--mono); font-size: 12px; padding: 1px 6px; border: 1px solid var(--border); border-bottom-width: 2px; border-radius: 5px; background: var(--panel-2); }
+  @media (max-width: 860px) { .help-layout { grid-template-columns: 1fr; } .toc { position: static; flex-direction: row; flex-wrap: wrap; } }
+</style>
+{% endblock %}
+{% block content %}
+<div class="header"><div><h1>Help</h1><div class="sub">Everything about tentaclaude and tentacontrol</div></div></div>
+<div class="help-layout">
+  <nav class="toc">
+    <a href="#start">Getting started</a><a href="#site">Site &amp; installation</a><a href="#concept">How it fits together</a>
+    <a href="#terminal">Terminal &amp; tmux</a><a href="#rc">Remote control</a><a href="#services">Services</a>
+    <a href="#systems">Systems</a><a href="#topology">Topology</a><a href="#docker">Docker hosts</a><a href="#onboard">Onboarding a service</a><a href="#auth">Auth types</a>
+    <a href="#git">Git repositories</a><a href="#db">Databases</a><a href="#web">Web sources</a><a href="#files">Files</a><a href="#templates">Templates</a><a href="#inventory">System inventory</a>
+    <a href="#ssh">SSH targets</a><a href="#settings">Settings</a><a href="#updates">Updates</a><a href="#cli">Commands</a>
+    <a href="#security">Security</a><a href="#troubleshooting">Troubleshooting</a><a href="#roadmap">Roadmap</a>
+  </nav>
+  <div class="doc">
+    <section class="card" id="start">
+      <h2>Getting started</h2>
+      <ol>
+        <li><strong>Settings</strong>: check paths, domain, git name/email and the remote control name.</li>
+        <li><strong>Overview → Create &amp; start</strong> (or “Apply now” if the container already runs).</li>
+        <li><strong>Overview → Sign in now</strong> (terminal “Claude login”, <code>claude auth login</code>): open the link, sign in with your claude.ai account, paste the code into the terminal.</li>
+        <li><strong>Terminal → Remote control session</strong>: confirm the prompts (e.g. trust the folder). The session then shows up in <a href="https://claude.ai/code" target="_blank" rel="noopener">claude.ai/code</a> and the Claude app.</li>
+        <li><strong>Services</strong>: connect your Docker hosts, APIs, MCP servers and repositories from templates, add tokens, then <strong>Test connection</strong> and <strong>Onboard with Claude</strong>.</li>
+        <li><strong>Overview → System inventory</strong>: Claude gets to know your site and records it in <code>local/CLAUDE.md</code>.</li>
+      </ol>
+    </section>
+
+    <section class="card" id="site">
+      <h2>Site &amp; installation</h2>
+      <p>tentaclaude is generic – everything site-specific lives in a few places:</p>
+      <table>
+        <tr><td><code>.env</code></td><td>paths (<code>TC_DIR</code>, <code>DOCKER_SOCKET</code>, <code>HOST_DOCS</code>, <code>CA_CERT</code>), domain, resources, remote control, tokens – editable under <a href="/settings">Settings</a>.</td></tr>
+        <tr><td><code>services/*.json</code></td><td>everything Claude can reach: Docker hosts, APIs, MCP servers, git repositories.</td></tr>
+        <tr><td><code>compose.override.yaml</code></td><td>reverse proxy (nginx-proxy, Traefik …), extra mounts, labels for container managers. Template: <code>compose.override.example.yaml</code>.</td></tr>
+        <tr><td><code>compose.generated.yaml</code></td><td>written automatically from the local docker services (socket + stacks mounts) – never edit by hand.</td></tr>
+        <tr><td><code>local/CLAUDE.md</code></td><td>rules and knowledge about your site for Claude; imported together with the generic rules and the host docs (<code>HOST_DOCS</code>) on every start.</td></tr>
+      </table>
+      <h4>Install on a new host</h4>
+<pre>git clone … tentaclaude &amp;&amp; cd tentaclaude
+./tentaclaude.sh init                 # guided setup: paths, domain, access (port / nginx-proxy / Traefik),
+                                      # git, remote control, limits, local Docker host – then starts tentacontrol
+./tentaclaude.sh init --defaults      # the same without questions</pre>
+      <p class="muted small">Without a reverse proxy tentacontrol listens on <code>http://127.0.0.1:8484</code> (<code>CONTROL_BIND</code>/<code>CONTROL_PORT</code>).
+      For a public repository, <code>.gitignore</code> keeps <code>.env</code>, <code>compose.override.yaml</code>, <code>compose.generated.yaml</code>, <code>local/</code>, <code>services/*.json</code>, <code>ssh/keys</code>, <code>ssh/config.d</code>, <code>data/</code> and <code>workspace/</code> out; the <code>*.example</code> files are their templates.</p>
+    </section>
+
+    <section class="card" id="concept">
+      <h2>How it fits together</h2>
+      <table>
+        <tr><td><strong>tentaclaude</strong></td><td>Container with Claude Code, Docker CLI, git, Python, Node, <code>gh</code>, <code>svc</code>. It reaches <strong>only connected services</strong> – Docker hosts, APIs, MCP servers, git repositories. Without a docker service it has no Docker access.</td></tr>
+        <tr><td><strong>tentacontrol</strong></td><td>This web admin. Edits <code>.env</code>, <code>services/</code>, <code>ssh/</code> of the stack and builds/recreates tentaclaude.</td></tr>
+        <tr><td><code>services/*.json</code></td><td>One file per service (docker, api, mcp and/or git). Tokens only as <code>${VAR}</code>.</td></tr>
+        <tr><td><code>.env</code></td><td>All values and secrets (mode 600). <code>svc</code> reads it fresh on every call.</td></tr>
+        <tr><td><code>/workspace</code></td><td>Projects, <code>SERVICES.md</code> (generated service catalog), <code>repos/</code> (git services).</td></tr>
+        <tr><td><code>data/home</code></td><td>Persistent <code>/root</code>: Claude login, settings, history.</td></tr>
+      </table>
+      <p class="muted small">Everything lives under <code>{{ site.tc_dir }}</code> – include it in your backups (especially <code>data/</code>, <code>ssh/keys</code>, <code>.env</code>).</p>
+    </section>
+
+    <section class="card" id="terminal">
+      <h2>Terminal &amp; tmux</h2>
+      <p>Every Claude terminal runs in a <strong>tmux session</strong> in the container. Closing the page or losing the connection does not end Claude – opening it again re-attaches.</p>
+      <table>
+        <tr><td><span class="kbd">Ctrl+B</span> then <span class="kbd">D</span></td><td>leave the session, Claude keeps running</td></tr>
+        <tr><td>mouse wheel</td><td>scroll the history</td></tr>
+        <tr><td><span class="kbd">Ctrl+Shift+V</span> / right click</td><td>paste (e.g. a login code)</td></tr>
+        <tr><td><span class="kbd">Ctrl+C</span> twice</td><td>quit Claude</td></tr>
+      </table>
+      <p>On the host the same works with <code>./tentaclaude.sh</code>, in a container console (e.g. Arcane, Portainer) with <code>cc</code>. Local docker hosts get their own tab “Claude · &lt;host&gt;” starting in their stacks directory.</p>
+    </section>
+
+    <section class="card" id="rc">
+      <h2>Remote control</h2>
+      <p>The tmux session <code>claude-rc</code> runs <code>claude remote-control</code> permanently; when it ends it restarts after a delay. Requirements: Claude signed in with a claude.ai account (an API key is not enough) and a one-time confirmation in the terminal.</p>
+      <table>
+        <tr><td><code>RC_ENABLED</code></td><td>on/off</td></tr><tr><td><code>RC_NAME</code></td><td>session name in claude.ai/code and the app</td></tr>
+        <tr><td><code>RC_WORKDIR</code></td><td>start directory (e.g. /workspace or a stacks directory)</td></tr>
+        <tr><td><code>RC_EXTRA_ARGS</code></td><td>extra arguments for <code>claude remote-control</code></td></tr><tr><td><code>RC_RESTART_DELAY</code></td><td>delay before restarting (seconds)</td></tr>
+      </table>
+      <p>The values are read fresh on every start of the session: change them under <a href="/settings">Settings</a>, then press “Restart” on the remote control card – no container recreate needed.</p>
+    </section>
+
+    <section class="card" id="services">
+      <h2>Services</h2>
+      <p>A service is one JSON file in <code>services/</code>. It can have four parts – alone or combined:</p>
+      <table>
+        <tr><td><code>docker</code></td><td>Docker host – local via socket or remote via SSH; Claude manages its stacks with <code>svc docker</code> / <code>svc compose</code>.</td></tr>
+        <tr><td><code>api</code></td><td>REST API, called with <code>svc &lt;name&gt; GET /path</code>. <code>svc</code> injects the authentication; tokens never appear in commands.</td></tr>
+        <tr><td><code>mcp</code></td><td>MCP server – registered in Claude's configuration on “Sync”.</td></tr>
+        <tr><td><code>git</code></td><td>Repository – cloned to <code>/workspace/repos/&lt;name&gt;</code>, read only or read/write.</td></tr>
+      </table>
+      <h4>Structure</h4>
+<pre>{
+  "name": "paperless",
+  "description": "Paperless-ngx – documents",
+  "api": {
+    "base_url": "https://paperless.{{ site.domain }}/api",
+    "auth": { "type": "header", "header": "Authorization", "value": "Token ${PAPERLESS_TOKEN}" },
+    "insecure_tls": false,
+    "docs": "https://docs.paperless-ngx.com/api/"
+  },
+  "mcp": { "type": "http", "url": "https://…/mcp", "headers": { "Authorization": "Bearer ${PAPERLESS_TOKEN}" } },
+  "test_path": "/documents/?page_size=1",
+  "examples": ["svc paperless GET /documents/?query=invoice"],
+  "notes": ["Read only unless explicitly asked"]
+}</pre>
+      <ul>
+        <li><strong>Status</strong>: <span class="pill ok">active</span> all variables set · <span class="pill warn">token missing</span> at least one <code>${VAR}</code> empty · <span class="pill off">disabled</span> <code>"enabled": false</code>.</li>
+        <li>New tokens work for <code>svc</code> immediately. Only <code>GH_TOKEN</code>, <code>GIT_*</code> and new/changed local Docker hosts need “Apply now”.</li>
+        <li>Running Claude sessions see new MCP servers after <code>/mcp</code> → reconnect or in a new session.</li>
+        <li>Internal https services with your own CA: set <code>CA_CERT</code> in the settings – the CA becomes trusted in the container. Single devices with self-signed certificates: <code>"insecure_tls": true</code>.</li>
+      </ul>
+    </section>
+
+    <section class="card" id="docker">
+      <h2>Docker hosts</h2>
+      <p>Docker management is a service like any other. Templates: “Docker host (local, socket)” and “Docker host (remote, SSH)”.</p>
+<pre>"docker": { "mode": "socket", "socket": "/var/run/docker.sock", "stacks_dir": "/srv/stacks", "access": "rw" }
+"docker": { "mode": "ssh", "ssh_host": "vps1", "stacks_dir": "/opt/stacks", "access": "ro" }</pre>
+      <ul>
+        <li><strong>socket</strong>: socket and stacks directory are mounted into the Claude container (<code>compose.generated.yaml</code>, written automatically) – then “Apply now”. The stacks directory keeps the host path so <code>docker compose</code> resolves relative paths correctly.</li>
+        <li><strong>ssh</strong>: through the SSH host (alias from <a href="/ssh">SSH</a>); the user there must be allowed to run <code>docker</code>. Compose runs on the target host in the stack's directory.</li>
+        <li><strong>access</strong>: <code>ro</code> only allows read-only commands through <code>svc</code> (ps, logs, inspect, config …); <code>rw</code> allows changes – Claude asks before restarts, updates and deletions.</li>
+        <li>Commands: <code>svc docker</code> (overview), <code>svc docker &lt;host&gt; ps</code>, <code>svc compose &lt;host&gt; &lt;stack&gt; logs --tail 50</code>.</li>
+      </ul>
+    </section>
+
+    <section class="card" id="onboard">
+      <h2>Onboarding a service</h2>
+      <p>On every service page: <strong>Test connection</strong> checks each part (API test call, MCP reachability, <code>git ls-remote</code>, <code>docker version</code>) – in the container: <code>svc test &lt;name&gt;</code>.</p>
+      <p><strong>Onboard with Claude</strong> runs <code>/onboard &lt;name&gt;</code>: Claude tests the service, explores it read-only (docs/OpenAPI, a few queries, repository content, stacks), asks you what it is for, typical tasks and what is allowed or off limits, and writes description, rules and examples into the service file after your approval. That way the catalog says what each service is for.</p>
+    </section>
+
+    <section class="card" id="auth">
+      <h2>Auth types (<code>api.auth</code>)</h2>
+      <table>
+        <tr><th>type</th><th>fields</th><th>result</th></tr>
+        <tr><td><code>none</code></td><td>–</td><td>no authentication</td></tr>
+        <tr><td><code>bearer</code></td><td><code>token</code></td><td><code>Authorization: Bearer …</code></td></tr>
+        <tr><td><code>header</code></td><td><code>header</code>, <code>value</code></td><td>any header, e.g. <code>X-API-Key</code> or <code>Authorization: Token …</code></td></tr>
+        <tr><td><code>basic</code></td><td><code>user</code>, <code>password</code></td><td>HTTP basic auth</td></tr>
+        <tr><td><code>query</code></td><td><code>param</code>, <code>value</code></td><td>token as URL parameter (e.g. Homematic XML-API <code>?sid=</code>)</td></tr>
+        <tr><td><code>oauth2_client_credentials</code></td><td><code>token_url</code>, <code>client_id</code>, <code>client_secret</code>, <code>scope</code>?, <code>audience</code>?, <code>client_auth</code> (body|basic)</td><td>fetches a bearer token via the client credentials grant and caches it until shortly before it expires</td></tr>
+      </table>
+      <p class="muted small">Additional fixed headers: <code>api.headers</code>. Interactive OAuth (browser login, e.g. Google) is planned.</p>
+    </section>
+
+    <section class="card" id="db">
+      <h2>Databases <code>db</code></h2>
+      <p>PostgreSQL and MySQL/MariaDB with a direct connection (templates “PostgreSQL database”, “MySQL / MariaDB database”). User and password come from <code>.env</code>; svc passes them only via environment or a 0600 file, never on the command line.</p>
+      <pre class="rc">"db": {"engine": "postgres", "host": "db.lan", "port": 5432, "database": "app",
+       "user": "${APP_DB_USER}", "password": "${APP_DB_PASSWORD}", "ssl": "prefer", "access": "ro"}</pre>
+      <p>Claude: <code>svc db &lt;name&gt; "&lt;SQL&gt;"</code>, <code>tables</code>, <code>describe &lt;table&gt;</code>, <code>--csv</code>; <code>shell</code> only for <code>rw</code>. With <code>ro</code> the session is read-only and statements that would switch it to read-write are refused – the real protection is still a read-only database user (see the template's setup hint).</p>
+    </section>
+
+    <section class="card" id="web">
+      <h2>Web sources <code>web</code></h2>
+      <p>Websites to read from – wikis, intranet pages, documentation. Auth: <code>none</code>, <code>basic</code>, <code>bearer</code>, <code>header</code> or <code>form</code> (login form with cookie, optional hidden CSRF field). Only URLs on the configured host are fetched; <code>paths</code> can restrict it further.</p>
+      <pre class="rc">"web": {"base_url": "https://wiki.lan", "auth": {"type": "form", "login_url": "/login",
+        "fields": {"username": "${WIKI_USER}", "password": "${WIKI_PASSWORD}"}, "csrf_field": "_token"},
+        "paths": ["/wiki/"]}</pre>
+      <p>Claude: <code>svc web &lt;name&gt; &lt;path&gt;</code> returns the page as readable text with links, <code>--links</code> lists the links, <code>--raw</code> the HTML, <code>--login</code> logs in again. Read-only; page content is treated as data, not instructions.</p>
+    </section>
+
+    <section class="card" id="files">
+      <h2>Directories &amp; files <code>files</code></h2>
+      <p>A directory or file on an SSH host – e.g. a local repository or a config folder – without a bind mount. <code>ssh_host</code> may be left empty when the service belongs to a system with an SSH host; <code>sudo: true</code> uses that host's sudo prefix.</p>
+      <pre class="rc">"files": {"ssh_host": "nas", "path": "/srv/config", "access": "ro", "sudo": false}</pre>
+      <p>Claude: <code>svc files &lt;name&gt; ls|tree|cat|grep [path]</code> reads on the host; <code>pull [path]</code> copies into <code>/workspace/files/&lt;name&gt;/</code>, <code>diff</code> shows what would change and <code>push</code> writes back (<code>rw</code> only, no deletions). Paths are relative to the service path, <code>..</code> is refused.</p>
+    </section>
+
+    <section class="card" id="git">
+      <h2>Git repositories</h2>
+<pre>"git": {
+  "url": "https://github.com/OWNER/REPO.git",     // or git@github.com:OWNER/REPO.git (SSH)
+  "access": "ro",                                   // ro = read only, rw = commit + push
+  "branch": "main",                                 // optional
+  "path": "/workspace/repos/REPO",                  // optional, default /workspace/repos/&lt;name&gt;
+  "auth": { "type": "token", "token": "${GH_TOKEN}", "username": "x-access-token" }   // or { "type": "none" }
+}</pre>
+      <ul>
+        <li><strong>ro</strong>: push is blocked twice (blocked push URL + pre-push hook). Ideal for public repositories or third-party code as reference.</li>
+        <li><strong>rw</strong>: Claude may commit and push – when you ask for it.</li>
+        <li>Tokens never end up in <code>.git/config</code>: a credential helper (<code>svc git-credential</code>) reads them from <code>.env</code> when needed.</li>
+        <li>SSH URLs use the tentaclaude key – add it as deploy key in the repository (see <a href="/ssh">SSH</a>).</li>
+        <li>Cloning happens on sync or with the “Clone” button; “Fetch” pulls changes and re-applies ro/rw.</li>
+        <li>Usernames per provider: GitHub <code>x-access-token</code>, GitLab <code>oauth2</code>, Gitea/Forgejo any.</li>
+      </ul>
+    </section>
+
+    <section class="card" id="templates">
+      <h2>Templates</h2>
+      <p>Pick a template when creating a service – then adjust URL and token variables. Setup hints end up in the service's notes. <code>{{ '{{DOMAIN}}' }}</code> in templates is replaced by <code>TC_DOMAIN</code>.</p>
+      <table>
+        <tr><th>Category</th><th>Templates</th></tr>
+        {% for cat, items in templates_list | groupby("category") %}
+        <tr><td style="white-space:nowrap"><strong>{{ cat }}</strong></td><td>{% for t in items %}{{ t.title }}{{ ", " if not loop.last }}{% endfor %}</td></tr>
+        {% endfor %}
+      </table>
+      <p class="muted small">Own templates: put a JSON file into <code>services/_templates/</code> (with <code>"_meta": {"title", "category", "setup"}</code>).</p>
+    </section>
+
+    <section class="card" id="inventory">
+      <h2>System inventory</h2>
+      <p>This is how Claude gets to know a new site. Start: <strong>Overview → System inventory</strong>, terminal tab “System inventory” or <code>./tentaclaude.sh inventory</code>.</p>
+      <ol>
+        <li><code>tc-scan</code> collects read-only for every docker host (local and via SSH): system (OS, Docker, resources), all stacks and containers (images, status, ports, proxy hosts, mounts), networks, connected services with a test call, git repositories and the SSH hosts. Environment variables and <code>.env</code> contents are never read.</li>
+        <li>Claude summarizes and asks short rounds of questions: purpose and criticality of the stacks, taboos, container manager, proxy/DNS, backups, access, conventions.</li>
+        <li>Claude shows a draft for <code>local/CLAUDE.md</code> and writes it only after your approval (with a backup copy).</li>
+      </ol>
+      <p class="muted small">Report only: <code>./tentaclaude.sh scan</code> or <code>tc-scan</code> in the container. The inventory can be repeated at any time – existing knowledge is kept.</p>
+    </section>
+
+    <section class="card" id="systems">
+      <h2>Systems</h2>
+      <p>A <strong>system</strong> groups the services that belong to one host or appliance – e.g. the SSH access, the docker host and the API of the same server. It has a description, an optional <strong>SSH host</strong> and <strong>rules</strong> that apply to every member. Services join with <code>"system": "&lt;name&gt;"</code> in their JSON (set it on the system's page under Services); services without a system stand alone.</p>
+      <ul>
+        <li>Files: <code>systems/&lt;name&gt;.json</code> (example: <code>systems/_example.json</code>).</li>
+        <li>Docker services of mode <code>ssh</code> without their own <code>ssh_host</code> use the system's SSH host.</li>
+        <li>Claude sees systems in the service catalog and via <code>svc systems [name]</code>; <code>svc info &lt;service&gt;</code> also prints the system's rules.</li>
+      </ul>
+    </section>
+
+    <section class="card" id="topology">
+      <h2>Topology</h2>
+      <p>Graph of what Claude can reach: tentaclaude in the middle, systems as dashed boxes with their services and SSH host, standalone services around it. Disabled services are hidden; a yellow <strong>!</strong> marks a missing token. Docker over SSH is drawn through the SSH host; SSH hosts are colored by a live login check (green / yellow = sudo fails / red).</p>
+      <ul>
+        <li><strong>Containers</strong> loads stacks and containers of all active docker hosts live (read-only <code>docker ps</code>) and arranges them around their host; red dots are stopped containers.</li>
+        <li><strong>Search</strong> highlights matching nodes (name, description, image, URL) and dims the rest; Enter zooms to the matches.</li>
+        <li>Drag nodes to arrange them – the layout is saved (<code>data/control/topology-layout.json</code>); <strong>Reset layout</strong> arranges automatically again. <strong>Refresh</strong> reloads status and containers, <strong>PNG</strong> downloads the graph.</li>
+        <li>Click a node for details and actions (test connection, open service/system/SSH), double-click to open it.</li>
+      </ul>
+    </section>
+
+    <section class="card" id="ssh">
+      <h2>SSH targets</h2>
+      <p>tentaclaude has its own key (<code>ssh/keys/tentaclaude_ed25519</code>). Each host is a file in <code>ssh/config.d/</code>. “Add host” opens a terminal with <code>ssh-host.sh add</code>: confirm the host key fingerprint, enter the target's password once – done.</p>
+      <h4>Hosts without root login: sudo</h4>
+      <p>If the SSH user is not root, enable <strong>use sudo</strong> (when adding the host, or later in the <em>sudo</em> column). The prefix (default <code>sudo -n</code>, also e.g. <code>doas</code>) is stored as <code># tentaclaude: sudo=…</code> in the host's block. <code>svc docker</code>/<code>svc compose</code> and <code>tc-scan</code> use it automatically (such docker hosts run through ssh instead of a docker context), and Claude's instructions list it per host for admin commands.</p>
+      <p>It is non-interactive: the user needs passwordless sudo, ideally limited, e.g. <code>/etc/sudoers.d/tentaclaude</code>: <code>deploy ALL=(root) NOPASSWD: /usr/bin/docker</code>. “Test” checks login and sudo.</p>
+    </section>
+
+    <section class="card" id="settings">
+      <h2>Settings</h2>
+      <p>Edits the stack's <code>.env</code>. Secrets (names containing TOKEN, KEY, PASSWORD, SECRET) are never shown – leaving the field empty keeps the value, the “clear” checkbox removes it. Changes that need a new container show “Apply now” at the top (running sessions end); remote control changes only need “Restart” on the overview.</p>
+    </section>
+
+    <section class="card" id="updates">
+      <h2>Updates</h2>
+      <p>Claude Code is installed when the image is built. “Update now” rebuilds the image (with a fresh base image) and recreates the container. Pin a version with <code>CLAUDE_CODE_VERSION</code> in the settings. tentacontrol itself is updated on the host: <code>docker compose up -d --build control</code>.</p>
+    </section>
+
+    <section class="card" id="cli">
+      <h2>Commands</h2>
+<pre>cc [dir]                  Claude in tmux (attaches if running) · cc rc = remote control session
+svc list | info &lt;name&gt;     services and status / details
+svc test &lt;name&gt;           connection test of every part of a service
+svc &lt;name&gt; GET /path       API call, e.g. svc arcane GET /environments
+svc docker [&lt;host&gt; …]     docker hosts / docker CLI against one host (svc docker vps1 ps)
+svc compose &lt;host&gt; &lt;stack&gt; …   compose in the stack directory of that host (local or via SSH)
+svc git | svc git sync    repositories: status / clone + fetch
+svc sync                  register MCP, docker contexts, clone missing repos, write SERVICES.md
+tc-scan                   read-only inventory report
+/inventory · /onboard &lt;service&gt;   Claude commands (inside a Claude session)
+gh …                      GitHub CLI (GH_TOKEN)
+ssh &lt;host&gt;                SSH targets from ssh/config.d</pre>
+      <p>On the host (<code>{{ site.tc_dir }}</code>): <code>./tentaclaude.sh [init|host|rc|shell|login|status|svc|scan|inventory|passwd|setup-url]</code>, <code>./ssh-host.sh add|remove|list|test</code>.</p>
+    </section>
+
+    <section class="card" id="security">
+      <h2>Security</h2>
+      <ul>
+        <li>tentacontrol has the Docker socket of this host (to run tentaclaude) – that is <strong>root on {{ site.hostname }}</strong>. Choose the tentacontrol password accordingly.</li>
+        <li>tentaclaude has Docker access only through docker services. An <code>rw</code> docker service is root on that host; <code>ro</code> blocks changing commands in <code>svc</code> but is no hard boundary while socket or SSH access exists.</li>
+        <li>Login: bcrypt hash, 12 h session, <code>SameSite=Strict</code> cookie (Secure behind https), origin check for forms and the terminal, throttling after failed attempts.</li>
+        <li>Secrets never reach the browser; <code>svc</code> passes them to curl through temporary 0600 files on tmpfs, not on the command line.</li>
+        <li>Claude keeps asking before actions – the rules are in its instructions (generic rules + <code>local/CLAUDE.md</code>).</li>
+        <li>Forgot the password: <code>./tentaclaude.sh passwd</code> on the host.</li>
+      </ul>
+    </section>
+
+    <section class="card" id="troubleshooting">
+      <h2>Troubleshooting</h2>
+      <table>
+        <tr><td>“token missing” although it was entered</td><td>compare the variable name in the JSON and in <code>.env</code> (case sensitive).</td></tr>
+        <tr><td>API test returns HTTP 401/403</td><td>wrong token or missing permissions; for <code>header</code> auth check the prefix (e.g. <code>Token …</code> vs. <code>Bearer …</code>).</td></tr>
+        <tr><td>TLS errors</td><td>own CA → <code>CA_CERT</code>; single self-signed device → <code>"insecure_tls": true</code>.</td></tr>
+        <tr><td>Docker host via SSH fails</td><td>SSH target works? (<a href="/ssh">SSH</a> → Test) Is the user allowed to run docker? Then <code>svc test &lt;host&gt;</code>.</td></tr>
+        <tr><td>No remote control session</td><td>Claude signed in? <code>RC_ENABLED</code> on? Open the session in the terminal and confirm the prompts.</td></tr>
+        <tr><td>Cloning fails</td><td>check URL/token; private repositories need <code>auth.type = token</code>, SSH URLs a deploy key.</td></tr>
+        <tr><td>MCP server missing in Claude</td><td>“Sync”, then <code>/mcp</code> → reconnect in Claude.</td></tr>
+      </table>
+    </section>
+
+    <section class="card" id="roadmap">
+      <h2>Roadmap</h2>
+      <ul>
+        <li><strong>Audit log</strong>: every write action through <code>svc</code> (non-GET requests, rw docker/compose commands, SQL writes) is logged and viewable in tentacontrol.</li>
+        <li><strong>Access mode <code>confirm</code></strong>: in addition to ro/rw, write actions need approval with a click in tentacontrol.</li>
+        <li><strong>Scheduled jobs</strong>: run Claude tasks on a schedule (e.g. patch report, certificate expiry); per-service monitoring builds on this.</li>
+        <li><strong>Monitoring per service</strong>: Claude checks connected services regularly and reports status and recommendations.</li>
+        <li><strong>Topology</strong>: next – connections between systems and containers (reverse proxy → container, tunnels), status from monitoring.</li>
+        <li><strong>Export/import</strong>: configuration and templates, e.g. for a second installation or to share templates.</li>
+        <li><strong>AI assistant</strong> in tentacontrol for the whole configuration (can be switched off).</li>
+        <li><strong>OAuth with browser login</strong> (authorization code, e.g. Google) as auth type, with templates. Client credentials already exist.</li>
+        <li><strong>Real sandbox &amp; security</strong>: harden the container (non-root, read-only root filesystem, no capabilities), egress allowlist (only service hosts reachable), keep secrets away from Claude (secret broker instead of a readable <code>.env</code>), Docker socket only through a filtering proxy, preconfigured Claude Code permissions/sandbox, prompt-injection safeguards for content from services.</li>
+        <li><strong>SSH hosts fully in the UI</strong>: add and edit hosts with a form instead of the terminal (alias, user@host, port, optional ProxyJump), confirm the host key fingerprint in the UI, enter the password once to deploy the key (never stored), automatic test afterwards.</li>
+        <li><strong>Edit SSH targets</strong>: change existing hosts in the UI (hostname, user, port, ProxyJump, rename the alias including references in docker services and systems); today only the sudo setting is editable.</li>
+      </ul>
+    </section>
+  </div>
+</div>
+{% endblock %}

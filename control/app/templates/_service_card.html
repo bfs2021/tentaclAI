@@ -1,0 +1,71 @@
+{% from "_icons.html" import icon %}
+{% macro service_card(s, systems=[]) %}
+  <div class="card service-card">
+    <div class="between">
+      <h2 style="margin:0">{{ s.name }}</h2>
+      <span class="pill {{ s.state }}">{{ s.label }}</span>
+    </div>
+    <div class="row">{% for k in s.kinds %}<span class="tag">{{ k }}</span>{% endfor %}</div>
+    <div class="desc">{{ s.description or s.error or "–" }}</div>
+    {% if s.base_url %}<div class="small mono faint" style="word-break:break-all">{{ s.base_url }}</div>{% endif %}
+    {% if s.docker %}
+    <div class="small">
+      <span class="pill {{ 'accent' if s.docker.access == 'rw' else 'info' }}">{{ 'manage (rw)' if s.docker.access == 'rw' else 'read only (ro)' }}</span>
+      <span class="pill info">{{ 'local' if s.docker.mode == 'socket' else 'ssh ' ~ s.docker.target }}</span>
+      <div class="mono faint" style="margin-top:6px">{{ s.docker.stacks_dir or '–' }}</div>
+    </div>
+    {% endif %}
+    {% if s.git %}
+    <div class="small" style="word-break:break-all">
+      <span class="pill {{ 'accent' if s.git.access == 'rw' else 'info' }}">{{ 'read + write' if s.git.access == 'rw' else 'read only' }}</span>
+      <span class="pill {{ 'ok' if s.git.cloned else 'off' }}">{{ 'cloned' if s.git.cloned else 'not cloned' }}</span>
+      <div class="mono faint" style="margin-top:6px">{{ s.git.url }}</div>
+    </div>
+    {% endif %}
+    {% if s.db %}
+    <div class="small" style="word-break:break-all">
+      <span class="pill {{ 'accent' if s.db.access == 'rw' else 'info' }}">{{ 'read + write' if s.db.access == 'rw' else 'read only' }}</span>
+      <span class="pill info">{{ s.db.engine }}</span>
+      <div class="mono faint" style="margin-top:6px">{{ s.db.target }}</div>
+    </div>
+    {% endif %}
+    {% if s.web %}
+    <div class="small" style="word-break:break-all">
+      <span class="pill info">auth: {{ s.web.auth }}</span>
+      <div class="mono faint" style="margin-top:6px">{{ s.web.url }}</div>
+    </div>
+    {% endif %}
+    {% if s.files %}
+    <div class="small" style="word-break:break-all">
+      <span class="pill {{ 'accent' if s.files.access == 'rw' else 'info' }}">{{ 'read + write' if s.files.access == 'rw' else 'read only' }}</span>
+      {% if s.files.sudo %}<span class="pill accent">sudo</span>{% endif %}
+      <div class="mono faint" style="margin-top:6px">{{ s.files.target }}</div>
+    </div>
+    {% endif %}
+    {% if s.vars %}
+    <div class="row small">
+      {% for v in s.vars %}<span class="pill {{ 'ok' if v.set else 'warn' }}" title="{{ 'set' if v.set else 'empty' }}">{{ '✓' if v.set else '○' }} {{ v.name }}</span>{% endfor %}
+    </div>
+    {% endif %}
+    <div class="row" style="margin-top:auto">
+      <a class="btn sm primary" href="/services/{{ s.name }}">Edit</a>
+      <button class="btn sm" hx-post="/services/{{ s.name }}/toggle">{{ 'Disable' if s.enabled else 'Enable' }}</button>
+      {% if systems %}
+      <details class="menu">
+        <summary class="btn sm ghost" title="More actions" aria-label="More actions">{{ icon('more') }}</summary>
+        <div class="menu-pop">
+          <div class="menu-label">Move to system</div>
+          {% for x in systems if x.name != s.system %}
+          <button class="menu-item" hx-post="/services/{{ s.name }}/system" hx-vals='{"system": "{{ x.name }}"}'>{{ icon('server') }}{{ x.name }}</button>
+          {% endfor %}
+          {% if s.system %}
+          <div class="menu-sep"></div>
+          <button class="menu-item" hx-post="/services/{{ s.name }}/system" hx-vals='{"system": ""}'>Make standalone</button>
+          {% endif %}
+        </div>
+      </details>
+      {% endif %}
+      {% if s.git and s.state == 'ok' %}<button class="btn sm" hx-post="/services/{{ s.name }}/git-sync" title="clone or fetch">{{ icon('refresh') }}{{ 'Fetch' if s.git.cloned else 'Clone' }}</button>{% endif %}
+    </div>
+  </div>
+{% endmacro %}

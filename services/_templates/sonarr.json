@@ -1,0 +1,17 @@
+{
+  "_meta": {
+    "title": "Sonarr / Radarr",
+    "category": "Apps"
+  },
+  "description": "Sonarr/Radarr (*arr) – series/movies, queue",
+  "api": {
+    "base_url": "https://sonarr.{{DOMAIN}}/api/v3",
+    "auth": {
+      "type": "header",
+      "header": "X-Api-Key",
+      "value": "${SONARR_API_KEY}"
+    },
+    "docs": "https://sonarr.tv/docs/api/"
+  },
+  "test_path": "/system/status"
+}

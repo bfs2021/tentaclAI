@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+# Runs `claude remote-control` in a loop. Reads RC_* from $TC_DIR/.env before every start:
+#   RC_ENABLED       true|false          (false: wait and re-check)
+#   RC_NAME          session name in claude.ai/code and the app
+#   RC_WORKDIR       start directory
+#   RC_EXTRA_ARGS    additional arguments for `claude remote-control`
+#   RC_RESTART_DELAY seconds to wait after the session ended (default 30)
+ENV_FILE="${TC_DIR:-/opt/tentaclaude}/.env"
+
+val() {  # key default
+    local v
+    v="$(sed -n "s/^$1=//p" "$ENV_FILE" 2>/dev/null | tail -1)"
+    v="${v%\"}"; v="${v#\"}"; v="${v%\'}"; v="${v#\'}"
+    echo "${v:-$2}"
+}
+
+while true; do
+    if [ "$(val RC_ENABLED true)" != "true" ]; then
+        clear; echo "Remote control is disabled (RC_ENABLED=false) – checking again every 60 s."
+        sleep 60; continue
+    fi
+    name="$(val RC_NAME tentaclaude)"; dir="$(val RC_WORKDIR /workspace)"; extra="$(val RC_EXTRA_ARGS "")"
+    delay="$(val RC_RESTART_DELAY 30)"
+    [ -d "$dir" ] || dir=/workspace
+    cd "$dir" || cd /workspace
+    # RC_ENABLED=true is the consent – skip the interactive "Enable Remote Control? (y/n)" prompt
+    node -e 'const fs=require("fs"),f=process.env.HOME+"/.claude.json";
+        try { const d=JSON.parse(fs.readFileSync(f,"utf8")); if (!d.remoteDialogSeen) { d.remoteDialogSeen=true; fs.writeFileSync(f, JSON.stringify(d,null,2)); } } catch (e) {}' || true
+    echo "▶ claude remote-control --name '$name' $extra   (in $dir)"
+    # shellcheck disable=SC2086
+    claude remote-control --name "$name" $extra
+    echo; echo "remote-control ended – restarting in ${delay} s (Ctrl+C ends the loop)"
+    sleep "$delay"
+done

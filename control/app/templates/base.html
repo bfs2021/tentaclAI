@@ -1,0 +1,49 @@
+{% from "_icons.html" import icon %}<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Overview{% endblock %} · tentaclaude</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐙</text></svg>">
+  <link rel="stylesheet" href="/static/app.css?v={{ asset_v }}">
+  {% block head %}{% endblock %}
+  <script src="/vendor/htmx.min.js" defer></script>
+  <script src="/static/app.js?v={{ asset_v }}" defer></script>
+</head>
+<body hx-headers='{"X-Requested-With": "htmx"}'>
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand"><div class="logo">🐙</div><div>tentaclaude<small>Eight arms, one brain</small></div></div>
+    <nav class="nav">
+      <a href="/" class="{{ 'active' if nav == 'dashboard' }}">{{ icon('home') }}Overview</a>
+      <a href="/terminal" class="{{ 'active' if nav == 'terminal' }}">{{ icon('terminal') }}Terminal</a>
+      <a href="/services" class="{{ 'active' if nav in ('services', 'service_edit', 'system_edit') }}">{{ icon('plug') }}Services</a>
+      <a href="/topology" class="{{ 'active' if nav == 'topology' }}">{{ icon('topology') }}Topology</a>
+      <a href="/settings" class="{{ 'active' if nav == 'settings' }}">{{ icon('settings') }}Settings</a>
+      <a href="/ssh" class="{{ 'active' if nav == 'ssh' }}">{{ icon('key') }}SSH</a>
+      <a href="/updates" class="{{ 'active' if nav in ('updates', 'job') }}">{{ icon('refresh') }}Updates</a>
+      <a href="/logs" class="{{ 'active' if nav == 'logs' }}">{{ icon('logs') }}Logs</a>
+      <a href="/help" class="{{ 'active' if nav == 'help' }}">{{ icon('help') }}Help</a>
+    </nav>
+    <div class="spacer"></div>
+    <div class="cstate">
+      <span class="dot {{ 'ok' if cstatus.running else ('err' if cstatus.exists else '') }}"></span>
+      tentaclaude {{ cstatus.state }}{% if cstatus.running %} · {{ cstatus.uptime }}{% endif %}
+    </div>
+    <form method="post" action="/logout"><button class="btn ghost sm" style="width:100%">{{ icon('logout') }}Sign out</button></form>
+  </aside>
+  <main class="main">
+    {% if restart_needed %}
+    <div class="banner">
+      <div><strong>Configuration changed.</strong> <span class="muted">tentaclaude has to be recreated for the changes to take effect – running Claude sessions will end.</span></div>
+      <button class="btn primary sm" hx-post="/container/recreate" hx-confirm="Recreate tentaclaude now? Running sessions will end.">{{ icon('refresh') }}Apply now</button>
+    </div>
+    {% endif %}
+    {% block content %}{% endblock %}
+  </main>
+</div>
+<div id="toasts"></div>
+{% if flash %}<span id="flash" data-msg="{{ flash.msg }}" data-kind="{{ flash.kind }}" hidden></span>{% endif %}
+{% block scripts %}{% endblock %}
+</body>
+</html>

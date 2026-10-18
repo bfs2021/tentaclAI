@@ -1,0 +1,16 @@
+{
+  "_meta": {
+    "title": "Git repo (Gitea/Forgejo)",
+    "category": "Git repos"
+  },
+  "description": "Repo on your own Gitea/Forgejo",
+  "git": {
+    "url": "https://git.{{DOMAIN}}/OWNER/REPO.git",
+    "access": "rw",
+    "auth": {
+      "type": "token",
+      "token": "${GITEA_TOKEN}",
+      "username": "tentaclaude"
+    }
+  }
+}

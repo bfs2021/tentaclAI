@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% from "_service_card.html" import service_card %}
+{% block title %}Services{% endblock %}
+{% block content %}
+<div class="header">
+  <div><h1>Services</h1><div class="sub">One file per service in <code>services/</code> – Docker host, API, MCP, git repo, database, web source or files; tokens in <code>.env</code></div></div>
+  <div class="row">
+    <button class="btn" hx-post="/services/sync">{{ icon('refresh') }}Sync</button>
+    <a class="btn ghost" href="/help#services">Help</a>
+  </div>
+</div>
+<div class="card flat" style="margin-bottom:18px">
+  <form class="row" hx-post="/services/new" style="align-items:flex-end">
+    <div style="flex:2;min-width:260px">
+      <label for="tpl-search">Template</label>
+      <div class="combo" data-combo id="tpl">
+        <input type="hidden" name="template" value="">
+        <input type="text" id="tpl-search" class="combo-input" value="Custom (own definition)" placeholder="Search templates…" autocomplete="off" spellcheck="false" role="combobox" aria-expanded="false" aria-controls="tpl-list">
+        <div class="combo-list" id="tpl-list" role="listbox" hidden>
+          <div class="combo-opt" role="option" data-value="" data-label="Custom (own definition)" data-desc="">Custom <span class="faint">(own definition)</span></div>
+          {% for cat, items in templates_list | groupby("category") %}
+          <div class="combo-group">{{ cat }}</div>
+          {% for t in items %}<div class="combo-opt" role="option" data-value="{{ t.id }}" data-label="{{ t.title }}" data-search="{{ cat }} {{ t.description }}" data-desc="{{ t.description }}{% if t.setup %} – {{ t.setup }}{% endif %}">{{ t.title }}<span class="combo-kinds">{{ t.kinds | join('+') }}</span></div>{% endfor %}
+          {% endfor %}
+          <div class="combo-empty" hidden>No matching template</div>
+        </div>
+      </div>
+    </div>
+    <div style="flex:1;min-width:180px">
+      <label>Name</label>
+      <input type="text" id="svc-name" name="name" placeholder="e.g. n8n" pattern="[a-z0-9][a-z0-9_-]*" required oninput="this.dataset.touched=1">
+    </div>
+    <button class="btn primary">{{ icon('plus') }}Create service</button>
+  </form>
+  <div class="help" id="tpl-hint">{{ templates_list | length }} templates: docker hosts, smart home, automation, infrastructure, monitoring, network, security, apps, development, git repos, databases, web sources, files.</div>
+  <script>
+    document.getElementById("tpl").addEventListener("combo-change", function (e) {
+      document.getElementById("tpl-hint").textContent = e.detail.desc;
+      var n = document.getElementById("svc-name");
+      if (!n.dataset.touched) n.value = e.detail.value.replace(/^custom-.*/, "");
+    });
+  </script>
+</div>
+{% if services %}
+{% set by_system = {} %}
+{% for s in services %}{% set _ = by_system.setdefault(s.system if s.system in system_names else '', []).append(s) %}{% endfor %}
+<div class="between section-head">
+  <h2 style="margin:0">Systems</h2>
+  <form class="row" hx-post="/systems/new" style="gap:6px">
+    <input type="text" name="name" placeholder="new system, e.g. nas" pattern="[a-z0-9][a-z0-9_-]*" required style="width:220px">
+    <button class="btn">{{ icon('plus') }}Add system</button>
+  </form>
+</div>
+<p class="help" style="margin:-4px 0 14px">A system groups the services of one host or appliance (e.g. SSH + docker + API of the same server) with a shared SSH host and rules. Services can also stand alone.</p>
+{% for sysd in systems %}
+<div class="system-block">
+  <div class="between system-head">
+    <div>
+      <h3 style="margin:0">{{ icon('server') }}{{ sysd.name }}</h3>
+      <div class="small muted">{{ sysd.description or '–' }}</div>
+    </div>
+    <div class="row">
+      {% if sysd.ssh_host %}<span class="pill info mono">ssh {{ sysd.ssh_host }}</span>{% endif %}
+      {% if sysd.notes %}<span class="pill warn" title="{{ sysd.notes | join('\n') }}">{{ sysd.notes | length }} rule{{ 's' if sysd.notes | length != 1 }}</span>{% endif %}
+      <a class="btn sm" href="/systems/{{ sysd.name }}">Edit</a>
+    </div>
+  </div>
+  {% if by_system.get(sysd.name) %}
+  <div class="grid">{% for s in by_system[sysd.name] %}{{ service_card(s, systems) }}{% endfor %}</div>
+  {% else %}<div class="empty small">No services yet – assign them under “Edit”.</div>{% endif %}
+</div>
+{% endfor %}
+{% if not systems %}<div class="empty small" style="margin-bottom:18px">No systems yet – all services stand alone.</div>{% endif %}
+{% if by_system.get('') %}
+<h2 class="section-head">{{ 'Standalone services' if systems else 'Services' }}</h2>
+<div class="grid">{% for s in by_system[''] %}{{ service_card(s, systems) }}{% endfor %}</div>
+{% endif %}
+{% else %}
+<div class="empty">No services yet. Create one above.</div>
+{% endif %}
+{% endblock %}

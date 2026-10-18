@@ -1,0 +1,28 @@
+{
+  "_meta": {
+    "title": "GitHub (API + MCP)",
+    "category": "Development",
+    "setup": "Fine-grained PAT with access to the repos you want."
+  },
+  "description": "GitHub – repos, issues, PRs, releases",
+  "api": {
+    "base_url": "https://api.github.com",
+    "auth": {
+      "type": "bearer",
+      "token": "${GH_TOKEN}"
+    },
+    "headers": {
+      "Accept": "application/vnd.github+json",
+      "X-GitHub-Api-Version": "2022-11-28"
+    },
+    "docs": "https://docs.github.com/rest"
+  },
+  "mcp": {
+    "type": "http",
+    "url": "https://api.githubcopilot.com/mcp/",
+    "headers": {
+      "Authorization": "Bearer ${GH_TOKEN}"
+    }
+  },
+  "test_path": "/user"
+}

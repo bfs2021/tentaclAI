@@ -1,0 +1,16 @@
+{
+  "_meta": {
+    "title": "Git repo (GitLab)",
+    "category": "Git repos"
+  },
+  "description": "Repo on GitLab",
+  "git": {
+    "url": "https://gitlab.com/OWNER/REPO.git",
+    "access": "rw",
+    "auth": {
+      "type": "token",
+      "token": "${GITLAB_TOKEN}",
+      "username": "oauth2"
+    }
+  }
+}

@@ -1,0 +1,112 @@
+"""Browser terminal: xterm.js <-> websocket <-> `docker exec -it` in the claude container."""
+import asyncio
+import json
+import re
+import shlex
+import socket
+import threading
+
+from fastapi import WebSocket, WebSocketDisconnect
+
+from .config import CLAUDE_CONTAINER, STACK_DIR
+from .dockerops import client
+
+ALIAS = re.compile(r"^[A-Za-z0-9._-]{1,40}$")
+TARGET = re.compile(r"^[A-Za-z0-9._-]{1,64}@[A-Za-z0-9.-]{1,253}(:\d{1,5})?$")
+
+# Fixed commands only – the browser picks an id, never sends a command line.
+PROFILES = {
+    "claude":    {"title": "Claude · /workspace", "cmd": ["cc"]},
+    "login":     {"title": "Claude login", "cmd": ["bash", "-lc", "claude auth login; echo; claude auth status --text; echo; read -rp 'Press Enter to close. '"]},
+    "rc":        {"title": "Remote control session", "cmd": ["bash", "-lc", "tmux has-session -t claude-rc 2>/dev/null && exec tmux attach -t claude-rc || { echo 'No claude-rc session (container just started?).'; sleep 600; }"]},
+    "shell":     {"title": "Shell", "cmd": ["bash", "-l"]},
+    "svc":       {"title": "svc list", "cmd": ["bash", "-lc", "svc list; echo; svc docker; echo; exec bash -l"]},
+    "inventory": {"title": "System inventory", "cmd": ["tmux", "new-session", "-A", "-s", "claude-inventory", "-c", "/workspace", "claude", "/inventory"]},
+}
+
+
+def ssh_add_cmd(alias, target, sudo=""):
+    if not ALIAS.match(alias or "") or not TARGET.match(target or ""):
+        raise ValueError("invalid alias or target (user@host[:port])")
+    cmd = [f"{STACK_DIR}/ssh-host.sh", "add", alias, target]
+    if sudo:
+        if not re.match(r"^[A-Za-z0-9 ._/=-]{1,60}$", sudo):
+            raise ValueError("invalid sudo command")
+        cmd += ["--sudo-cmd", sudo]
+    # keep the terminal open after the script so the result stays readable
+    return ["bash", "-lc", shlex.join(cmd) + "; echo; read -rp 'Done – press Enter to close the terminal. '"]
+
+
+def onboard_cmd(name):
+    """Claude service onboarding (/onboard <name>) in its own persistent tmux session"""
+    if not re.match(r"^[a-z0-9][a-z0-9_-]{0,40}$", name or ""):
+        raise ValueError("invalid service name")
+    return ["tmux", "new-session", "-A", "-s", f"claude-onboard-{name}", "-c", "/workspace", "claude", f"/onboard {name}"]
+
+
+def ssh_remove_cmd(alias):
+    if not ALIAS.match(alias or ""):
+        raise ValueError("invalid alias")
+    cmd = [f"{STACK_DIR}/ssh-host.sh", "remove", alias]
+    return ["bash", "-lc", shlex.join(cmd) + "; echo; read -rp 'Done – press Enter to close the terminal. '"]
+
+
+async def bridge(ws: WebSocket, cmd, workdir="/workspace"):
+    api = client().api
+    exec_id = api.exec_create(CLAUDE_CONTAINER, cmd, tty=True, stdin=True, workdir=workdir,
+                              environment={"TERM": "xterm-256color", "COLORTERM": "truecolor", "LANG": "C.UTF-8"})["Id"]
+    sock = api.exec_start(exec_id, tty=True, socket=True)
+    raw = getattr(sock, "_sock", sock)
+    # docker-py gives the socket its 60 s API timeout – a terminal can be silent much longer (reading, thinking)
+    raw.settimeout(None)
+    loop = asyncio.get_running_loop()
+    queue: asyncio.Queue = asyncio.Queue()
+
+    def reader():
+        try:
+            while True:
+                data = raw.recv(65536)
+                if not data:
+                    break
+                loop.call_soon_threadsafe(queue.put_nowait, data)
+        except OSError:
+            pass
+        loop.call_soon_threadsafe(queue.put_nowait, None)
+
+    threading.Thread(target=reader, daemon=True).start()
+
+    async def pump_out():
+        while True:
+            data = await queue.get()
+            if data is None:
+                await ws.send_text(json.dumps({"type": "exit"}))
+                return
+            await ws.send_bytes(data)
+
+    async def pump_in():
+        while True:
+            msg = json.loads(await ws.receive_text())
+            if msg.get("type") == "input":
+                raw.sendall(msg["data"].encode())
+            elif msg.get("type") == "ping":  # keepalive: the answer is traffic from upstream, so reverse proxies keep the socket open
+                await ws.send_text(json.dumps({"type": "pong"}))
+            elif msg.get("type") == "resize":
+                try:
+                    api.exec_resize(exec_id, height=int(msg["rows"]), width=int(msg["cols"]))
+                except Exception:  # noqa: BLE001
+                    pass
+
+    out_task = asyncio.create_task(pump_out())
+    in_task = asyncio.create_task(pump_in())
+    try:
+        await asyncio.wait({out_task, in_task}, return_when=asyncio.FIRST_COMPLETED)
+    except WebSocketDisconnect:
+        pass
+    finally:
+        for t in (out_task, in_task):
+            t.cancel()
+        try:
+            raw.shutdown(socket.SHUT_RDWR)
+        except OSError:
+            pass
+        raw.close()

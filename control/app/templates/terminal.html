@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% block title %}Terminal{% endblock %}
+{% block head %}<link rel="stylesheet" href="/vendor/xterm.css">{% endblock %}
+{% block content %}
+<div class="header">
+  <div><h1>Terminal</h1><div class="sub">{{ title }} – sessions keep running in tmux when you leave the page.</div></div>
+  <div class="row"><span id="term-state" class="pill info">connecting …</span>
+    <button class="btn sm" id="reconnect" hidden>{{ icon('refresh') }}Reconnect</button></div>
+</div>
+<div class="tabs">
+  {% for key, prof in profiles.items() %}
+  <a href="/terminal?p={{ key }}" class="{{ 'active' if current == key }}">{{ prof.title }}</a>
+  {% endfor %}
+  {% for name, dir in hosts.items() %}
+  <a href="/terminal?p=host&alias={{ name | urlencode }}" class="{{ 'active' if current == 'host' and params.alias == name }}" title="{{ dir }}">Claude · {{ name }}</a>
+  {% endfor %}
+  {% if current in ('sshadd', 'sshremove', 'onboard') %}<a class="active">{{ title }}</a>{% endif %}
+</div>
+<div class="term-wrap"><div id="term" style="height:100%"></div></div>
+<p class="help">tmux: scroll with the mouse wheel · leave a session without ending it: <code>Ctrl+B</code>, then <code>D</code> · paste: <code>Ctrl+Shift+V</code> or right click</p>
+{% endblock %}
+{% block scripts %}
+<script src="/vendor/xterm.js"></script>
+<script src="/vendor/addon-fit.js"></script>
+<script>
+(function () {
+  var params = new URLSearchParams({p: {{ current | tojson }}, alias: {{ params.alias | tojson }}, target: {{ params.target | tojson }}, sudo: {{ (params.sudo or '') | tojson }}});
+  var state = document.getElementById("term-state"), btn = document.getElementById("reconnect");
+  var css = getComputedStyle(document.documentElement);
+  var term = new Terminal({
+    cursorBlink: true, fontSize: 13.5, scrollback: 5000, allowProposedApi: true,
+    fontFamily: 'ui-monospace, "SF Mono", "JetBrains Mono", "Cascadia Code", Menlo, Consolas, monospace',
+    theme: {background: "#0b0e14", foreground: "#d6dbe5", cursor: "#a78bfa", selectionBackground: "rgba(167,139,250,.35)",
+            black: "#1b2130", brightBlack: "#5c6679", magenta: "#c4a7ff", brightMagenta: "#d8c4ff", cyan: "#22d3ee", blue: "#60a5fa"}
+  });
+  var fit = new FitAddon.FitAddon();
+  term.loadAddon(fit);
+  term.open(document.getElementById("term"));
+  fit.fit();
+  var ws, ping, retries = 0, ended = false;
+  var reattach = {{ 'true' if reattach else 'false' }};  // tmux sessions survive a lost connection → reconnect on our own
+  function setState(txt, kind) { state.textContent = txt; state.className = "pill " + kind; }
+  function connect() {
+    btn.hidden = true; ended = false; setState("connecting …", "info");
+    ws = new WebSocket((location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/ws/terminal?" + params);
+    ws.binaryType = "arraybuffer";
+    ws.onopen = function () {
+      setState("connected", "ok"); retries = 0; sendSize(); term.focus();
+      clearInterval(ping);
+      ping = setInterval(function () { if (ws.readyState === 1) ws.send(JSON.stringify({type: "ping"})); }, 25000);
+    };
+    ws.onmessage = function (e) {
+      if (typeof e.data === "string") {
+        var m = JSON.parse(e.data);
+        if (m.type === "exit") { ended = true; setState("ended", "off"); btn.hidden = false; term.write("\r\n\x1b[90m[session ended]\x1b[0m\r\n"); }
+        if (m.type === "pong") return;
+        if (m.type === "error") { setState("error", "err"); btn.hidden = false; term.write("\r\n\x1b[31m" + m.msg + "\x1b[0m\r\n"); }
+        return;
+      }
+      term.write(new Uint8Array(e.data));
+    };
+    ws.onclose = function (e) {
+      clearInterval(ping);
+      if (e.code === 4401) { location.href = "/login"; return; }
+      if (ended || state.className.indexOf("err") >= 0) return;
+      if (reattach && retries < 5) {  // reattach to the running tmux session
+        retries++; setState("reconnecting …", "warn");
+        term.write("\r\n\x1b[90m[connection lost – reconnecting]\x1b[0m\r\n");
+        setTimeout(function () { term.reset(); connect(); }, 1500 * retries);
+        return;
+      }
+      setState("disconnected", "warn"); btn.hidden = false;
+    };
+  }
+  function sendSize() { if (ws && ws.readyState === 1) ws.send(JSON.stringify({type: "resize", cols: term.cols, rows: term.rows})); }
+  term.onData(function (d) { if (ws && ws.readyState === 1) ws.send(JSON.stringify({type: "input", data: d})); });
+  window.addEventListener("resize", function () { fit.fit(); sendSize(); });
+  term.onResize(sendSize);
+  btn.addEventListener("click", function () { term.reset(); connect(); });
+  connect();
+})();
+</script>
+{% endblock %}

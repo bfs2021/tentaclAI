@@ -1,0 +1,18 @@
+{
+  "_meta": {
+    "title": "PatchMon",
+    "category": "Docker & Infra"
+  },
+  "description": "PatchMon – patch level and packages of all hosts",
+  "api": {
+    "base_url": "https://patchmon.{{DOMAIN}}/api/v1",
+    "auth": {
+      "type": "bearer",
+      "token": "${PATCHMON_API_TOKEN}"
+    },
+    "docs": "https://patchmon.{{DOMAIN}}/api-docs"
+  },
+  "notes": [
+    "Check the auth scheme when creating the token."
+  ]
+}

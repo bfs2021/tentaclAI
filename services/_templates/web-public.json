@@ -1,0 +1,15 @@
+{
+  "_meta": {
+    "title": "Website (public)",
+    "category": "Web sources"
+  },
+  "description": "Website / documentation without login",
+  "web": {
+    "base_url": "https://docs.example.org",
+    "auth": { "type": "none" }
+  },
+  "examples": [
+    "svc web NAME /",
+    "svc web NAME --links /"
+  ]
+}

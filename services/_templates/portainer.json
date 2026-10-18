@@ -1,0 +1,19 @@
+{
+  "_meta": {
+    "title": "Portainer",
+    "category": "Docker & Infra",
+    "setup": "My account → Access tokens"
+  },
+  "description": "Portainer – containers/stacks on several hosts",
+  "api": {
+    "base_url": "https://portainer.{{DOMAIN}}/api",
+    "auth": {
+      "type": "header",
+      "header": "X-API-Key",
+      "value": "${PORTAINER_API_KEY}"
+    },
+    "insecure_tls": true,
+    "docs": "https://docs.portainer.io/api/docs"
+  },
+  "test_path": "/endpoints"
+}

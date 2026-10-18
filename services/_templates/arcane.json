@@ -1,0 +1,24 @@
+{
+  "_meta": {
+    "title": "Arcane",
+    "category": "Docker & Infra",
+    "setup": "Settings → API Keys"
+  },
+  "description": "Arcane – stacks, updates, vulnerability scans",
+  "api": {
+    "base_url": "https://arcane.{{DOMAIN}}/api",
+    "auth": {
+      "type": "header",
+      "header": "X-API-Key",
+      "value": "${ARCANE_API_KEY}"
+    },
+    "docs": "https://arcane.{{DOMAIN}}/api/docs"
+  },
+  "test_path": "/environments",
+  "examples": [
+    "svc NAME GET /environments"
+  ],
+  "notes": [
+    "Never delete projects via the API (deletes the stack directory + volumes)."
+  ]
+}

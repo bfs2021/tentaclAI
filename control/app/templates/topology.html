@@ -1,0 +1,351 @@
+{% extends "base.html" %}
+{% block title %}Topology{% endblock %}
+{% block content %}
+<div class="header">
+  <div><h1>Topology</h1><div class="sub">What Claude can reach and how – systems, services, SSH hosts and (optionally) containers. Disabled services are hidden.</div></div>
+</div>
+<div class="topo-toolbar card flat">
+  <input type="search" id="topo-q" placeholder="Search nodes …" autocomplete="off" spellcheck="false">
+  <label class="check"><input type="checkbox" id="topo-containers"> Containers</label>
+  <span class="topo-sep"></span>
+  <button class="btn sm" id="topo-refresh" title="Reload status and containers">{{ icon('refresh') }}Refresh</button>
+  <button class="btn sm" id="topo-fit" title="Fit to screen">Fit</button>
+  <button class="btn sm" id="topo-reset" title="Forget moved positions and arrange automatically">Reset layout</button>
+  <button class="btn sm" id="topo-png" title="Download as PNG">PNG</button>
+  <span class="small faint" id="topo-msg"></span>
+</div>
+<div class="topo-wrap">
+  <div class="card topo-canvas">
+    <div id="cy"></div>
+    <div class="topo-empty" id="topo-loading">Loading …</div>
+    <div class="topo-legend small">
+      <span><i class="lg core"></i>tentaclaude</span><span><i class="lg system"></i>system</span>
+      <span><i class="lg ok"></i>service</span><span><i class="lg warn">!</i>token missing</span>
+      <span><i class="lg ssh"></i>SSH host (yellow = sudo fails, red = unreachable)</span><span><i class="lg stack"></i>stack</span><span><i class="lg ctr"></i>container</span>
+      <span class="faint">drag to move · scroll to zoom</span>
+    </div>
+  </div>
+  <div class="card topo-panel" id="topo-panel"></div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="/vendor/cytoscape.min.js"></script>
+<script>
+(function () {
+  "use strict";
+  var css = getComputedStyle(document.documentElement);
+  function v(n, d) { return (css.getPropertyValue(n) || "").trim() || d; }
+  var C = { text: v("--text", "#e6e8ee"), muted: v("--muted", "#8b93a7"), faint: v("--faint", "#5b6375"), border: v("--border", "#2a3040"),
+            panel: v("--panel", "#161a22"), bg: v("--bg-2", "#11141b"), accent: v("--accent", "#8b6cf6"), ok: v("--ok", "#3ecf8e"),
+            warn: v("--warn", "#f5a524"), err: v("--err", "#f06272"), info: v("--info", "#5aa9ff") };
+  var stateColor = { ok: C.ok, warn: C.warn, err: C.err, off: C.muted, error: C.err };
+  var esc = function (s) { var d = document.createElement("div"); d.textContent = s == null ? "" : String(s); return d.innerHTML; };
+  var $ = function (id) { return document.getElementById(id); };
+  // the octopus in the central tentaclaude node (own vector drawing, white on the accent color)
+  var octopus = "data:image/svg+xml;utf8," + encodeURIComponent("<svg xmlns='http://www.w3.org/2000/svg' width='96' height='96' viewBox='0 0 48 48'>" +
+    "<g fill='none' stroke='#fff' stroke-width='3.2' stroke-linecap='round'>" +
+    "<path d='M15 27c-3 3-6 5-8 9 0 2 2 3 3 1'/><path d='M19 29c-1 4-3 7-3 11 0 2 2 2 3 0'/>" +
+    "<path d='M24 30v11c0 2 2 2 2 0'/><path d='M29 29c1 4 3 7 3 11 0 2-2 2-3 0'/><path d='M33 27c3 3 6 5 8 9 0 2-2 3-3 1'/></g>" +
+    "<path fill='#fff' d='M24 5c-8 0-13 6-13 13 0 6 4 11 13 11s13-5 13-11C37 11 32 5 24 5z'/>" +
+    "<circle cx='19.5' cy='18' r='2.4' fill='" + C.accent + "'/><circle cx='28.5' cy='18' r='2.4' fill='" + C.accent + "'/></svg>");
+  var mark = "data:image/svg+xml;utf8," + encodeURIComponent("<svg xmlns='http://www.w3.org/2000/svg' width='40' height='40' viewBox='0 0 20 20'>" +
+    "<text x='10' y='15.5' text-anchor='middle' font-family='sans-serif' font-size='16' font-weight='700' fill='" + C.warn + "'>!</text></svg>");
+
+  var cy = cytoscape({
+    container: $("cy"), wheelSensitivity: 0.25, minZoom: 0.15, maxZoom: 3,
+    style: [
+      { selector: "node", style: { "label": "data(label)", "color": C.text, "font-size": 11, "text-valign": "bottom", "text-margin-y": 5,
+          "background-color": C.panel, "border-width": 2, "border-color": C.border, "width": 26, "height": 26,
+          "text-background-color": C.bg, "text-background-opacity": 0.7, "text-background-padding": 1, "text-background-shape": "roundrectangle" } },
+      { selector: "node[kind='core']", style: { "background-color": C.accent, "border-color": C.accent, "width": 52, "height": 52,
+          "font-size": 13, "font-weight": 700, "background-image": octopus, "background-fit": "contain", "background-width": "76%",
+          "background-height": "76%", "background-clip": "none" } },
+      { selector: "node[kind='service']", style: { "shape": "round-rectangle", "width": 30, "height": 22,
+          "border-color": function (n) { return stateColor[n.data("state")] || C.border; } } },
+      { selector: "node[kind='service'][state='warn']", style: { "background-image": mark, "background-fit": "contain",
+          "background-width": "70%", "background-height": "70%", "background-clip": "none" } },
+      { selector: "node[kind='ssh']", style: { "shape": "diamond", "width": 24, "height": 24,
+          "border-color": function (n) { var l = n.data("live"); return l === "warn" ? C.warn : l === "err" ? C.err : C.info; },
+          "background-color": function (n) { return n.data("live") === "err" ? C.err : C.panel; },
+          "background-opacity": function (n) { return n.data("live") === "err" ? 0.25 : 1; } } },
+      { selector: "node[kind='stack']", style: { "shape": "ellipse", "width": 13, "height": 13, "font-size": 8, "border-width": 1.5,
+          "color": C.muted, "border-color": function (n) { return n.data("down") ? C.warn : C.ok; } } },
+      { selector: "node[kind='container']", style: { "shape": "ellipse", "width": 7, "height": 7, "label": "", "font-size": 8,
+          "border-width": 1.5, "color": C.muted, "border-color": function (n) { return n.data("state") === "running" ? C.ok : C.err; } } },
+      { selector: "node[kind='container']:selected", style: { "label": "data(label)" } },
+      { selector: "node[kind='system']", style: { "shape": "round-rectangle", "background-color": C.bg, "background-opacity": 0.55,
+          "border-style": "dashed", "border-color": C.accent, "border-width": 1.5, "text-valign": "top", "text-halign": "center",
+          "text-margin-y": -6, "font-size": 12, "font-weight": 600, "color": C.accent, "padding": 22, "text-background-opacity": 0 } },
+      { selector: "edge", style: { "width": 1.4, "line-color": C.border, "curve-style": "bezier", "target-arrow-shape": "triangle",
+          "target-arrow-color": C.border, "arrow-scale": 0.8, "label": "data(label)", "font-size": 8, "color": C.muted,
+          "text-background-color": C.panel, "text-background-opacity": 1, "text-background-padding": 2 } },
+      { selector: "edge[kind='ssh']", style: { "line-style": "dashed", "line-color": C.info, "target-arrow-color": C.info, "label": "" } },
+      { selector: "edge[kind='docker']", style: { "line-color": C.info, "target-arrow-color": C.info } },
+      { selector: "edge[kind='runs']", style: { "width": 1, "target-arrow-shape": "none", "label": "", "opacity": 0.5 } },
+      { selector: ".dim", style: { "opacity": 0.12 } },
+      { selector: ".hit", style: { "border-width": 3, "border-color": C.accent } },
+      { selector: ":selected", style: { "border-color": C.accent, "border-width": 3, "line-color": C.accent, "target-arrow-color": C.accent } }
+    ]
+  });
+
+  // ---------- state
+  var saved = {};            // node id -> {x, y} the user arranged
+  var box = $("topo-containers");
+  var msg = function (t) { $("topo-msg").textContent = t || ""; };
+  function prefs(k, val) { try { if (val === undefined) return localStorage.getItem(k); localStorage.setItem(k, val); } catch (e) { return null; } }
+
+  // ---------- layout
+  function ring(n) {  // radius of the stack ring around a docker host – the layout keeps that much room
+    var k = cy.nodes("[kind='stack'][owner='" + n.id() + "']").length;
+    return k ? 70 + k * 9 + 25 : 0;
+  }
+  function autoLayout() {
+    cy.elements().not("[kind='container'], [kind='stack'], [kind='runs']").layout({
+      name: "cose", animate: false, padding: 30, randomize: true, numIter: 2500, gravity: 0.6, nestingFactor: 0.9,
+      nodeRepulsion: function (n) { var r = ring(n); return 9000 * (1 + (r / 45) * (r / 45)); },
+      idealEdgeLength: function (e) { return 90 + ring(e.source()) + ring(e.target()); }
+    }).run();
+    placeSsh();
+    placeAround();
+    separate();
+  }
+  // docker over ssh: put the SSH host between tentaclaude and the docker host, outside the stack ring
+  function placeSsh() {
+    var core = cy.$("#core").position();
+    cy.edges("[kind='docker']").forEach(function (e) {
+      var h = e.target(), s = e.source(), r = ring(h);
+      if (!r) return;
+      var p = h.position(), dx = core.x - p.x, dy = core.y - p.y, len = Math.sqrt(dx * dx + dy * dy) || 1;
+      s.position({ x: p.x + dx / len * (r + 45), y: p.y + dy / len * (r + 45) });
+    });
+  }
+  function placeAround(onlyNew) {
+    cy.nodes("[kind='service']").forEach(function (h) {
+      var stacks = cy.nodes("[kind='stack'][owner='" + h.id() + "']");
+      if (!stacks.length) return;
+      var c = h.position(), R = 70 + stacks.length * 9;
+      stacks.forEach(function (st, i) {
+        var a = 2 * Math.PI * i / stacks.length - Math.PI / 2, p = { x: c.x + R * Math.cos(a), y: c.y + R * Math.sin(a) };
+        if (!(onlyNew && saved[st.id()])) st.position(p);
+        p = st.position();
+        var cs = cy.nodes("[kind='container'][stack='" + st.id() + "']"), r = 13 + cs.length * 1.5;
+        cs.forEach(function (ct, j) {
+          if (onlyNew && saved[ct.id()]) return;
+          var b = 2 * Math.PI * j / Math.max(cs.length, 1);
+          ct.position({ x: p.x + r * Math.cos(b), y: p.y + r * Math.sin(b) });
+        });
+      });
+    });
+  }
+  // push overlapping groups apart: a system with everything inside, or a top-level node with its stacks/containers
+  function separate() {
+    var groups = [];
+    cy.nodes("[kind='system']").forEach(function (sn) { if (sn.descendants().length) groups.push(sn.descendants()); });
+    cy.nodes().orphans().filter(function (n) { return n.data("kind") !== "system" && !n.data("owner") && !n.data("stack"); }).forEach(function (n) {
+      var st = cy.nodes("[owner='" + n.id() + "']").filter(function (x) { return x.isOrphan(); }), ids = {};
+      st.forEach(function (x) { ids[x.id()] = 1; });
+      groups.push(n.union(st).union(cy.nodes("[kind='container']").filter(function (c) { return c.isOrphan() && ids[c.data("stack")]; })));
+    });
+    for (var it = 0; it < 100; it++) {
+      var moved = false;
+      for (var i = 0; i < groups.length; i++) for (var j = i + 1; j < groups.length; j++) {
+        var a = groups[i].boundingBox(), b = groups[j].boundingBox();
+        var ox = Math.min(a.x2, b.x2) - Math.max(a.x1, b.x1) + 30, oy = Math.min(a.y2, b.y2) - Math.max(a.y1, b.y1) + 30;
+        if (ox <= 0 || oy <= 0) continue;
+        var dx = (b.x1 + b.x2 - a.x1 - a.x2) / 2, dy = (b.y1 + b.y2 - a.y1 - a.y2) / 2;
+        var mv = ox < oy ? { x: (dx >= 0 ? 1 : -1) * ox / 2, y: 0 } : { x: 0, y: (dy >= 0 ? 1 : -1) * oy / 2 };
+        groups[i].shift({ x: -mv.x, y: -mv.y }); groups[j].shift(mv); moved = true;
+      }
+      if (!moved) break;
+    }
+  }
+  // saved positions win; anything new is placed automatically
+  function arrange() {
+    var base = cy.nodes().not("[kind='system']").not("[kind='stack']").not("[kind='container']");
+    var known = base.filter(function (n) { return saved[n.id()]; });
+    if (known.length && known.length === base.length) {
+      base.forEach(function (n) { n.position(saved[n.id()]); });
+      placeAround(true);
+      cy.nodes("[kind='stack'], [kind='container']").forEach(function (n) { if (saved[n.id()]) n.position(saved[n.id()]); });
+    } else {
+      autoLayout();
+      known.forEach(function (n) { n.position(saved[n.id()]); });
+    }
+  }
+  var saveTimer;
+  function saveLayout() {
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(function () {
+      var pos = {};
+      cy.nodes().not("[kind='system']").forEach(function (n) { var p = n.position(); pos[n.id()] = { x: Math.round(p.x), y: Math.round(p.y) }; });
+      saved = pos;
+      fetch("/topology/layout", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(pos) })
+        .then(function () { msg("Layout saved"); setTimeout(function () { msg(""); }, 1500); });
+    }, 600);
+  }
+  cy.on("dragfree", "node", saveLayout);
+
+  // ---------- data
+  function loadGraph() {
+    return Promise.all([fetch("/topology.json").then(function (r) { return r.json(); }),
+                        fetch("/topology/layout").then(function (r) { return r.json(); })])
+      .then(function (res) { cy.elements().remove(); saved = res[1] || {}; cy.add(res[0].elements); });
+  }
+  function loadContainers() {
+    cy.remove(cy.nodes("[kind='container'], [kind='stack']"));
+    if (!box.checked) return Promise.resolve();
+    var hostsN = cy.nodes("[kind='service']").filter(function (n) { return (n.data("kinds") || []).indexOf("docker") >= 0 && n.data("state") === "ok"; });
+    msg("Loading containers …");
+    return Promise.all(hostsN.map(function (n) {
+      return fetch("/topology/docker/" + encodeURIComponent(n.data("label"))).then(function (r) { return r.json(); }).then(function (res) {
+        if (res.error) { n.data("dockerError", res.error); return; }
+        n.removeData("dockerError");
+        var add = [], parent = n.data("parent");
+        res.stacks.forEach(function (s) {
+          var sid = n.id() + "/" + s.name;
+          var sd = { id: sid, label: s.name + " (" + s.running + "/" + s.total + ")", name: s.name, kind: "stack", owner: n.id(),
+                     host: n.data("label"), down: s.running < s.total, running: s.running, total: s.total, containers: s.containers };
+          if (parent) sd.parent = parent;
+          add.push({ data: sd }, { data: { id: sid + "-e", source: n.id(), target: sid, kind: "runs" } });
+          s.containers.forEach(function (c) {
+            var cd = { id: sid + "/" + c.name, label: c.name, kind: "container", stack: sid, stackName: s.name, host: n.data("label"),
+                       state: c.state, image: c.image, status: c.status };
+            if (parent) cd.parent = parent;
+            add.push({ data: cd });
+          });
+        });
+        cy.add(add);
+      });
+    })).then(function () { msg(""); });
+  }
+  function loadSshStatus() {
+    return fetch("/topology/ssh-status").then(function (r) { return r.json(); }).then(function (st) {
+      Object.keys(st).forEach(function (a) {
+        var n = cy.$id("ssh:" + a);
+        if (n.length) { n.data("live", st[a].state); n.data("liveTitle", st[a].title); }
+      });
+      var sel = cy.$(":selected");
+      if (sel.length === 1) show(sel[0]);
+    });
+  }
+  function build() {
+    $("topo-loading").hidden = false;
+    return loadGraph().then(loadContainers).then(function () {
+      arrange(); cy.fit(undefined, 30); $("topo-loading").hidden = true; applySearch(); showSummary();
+      loadSshStatus();
+    }).catch(function (e) { $("topo-loading").textContent = "Could not load the topology: " + e; });
+  }
+
+  // ---------- search
+  function applySearch() {
+    var q = $("topo-q").value.trim().toLowerCase();
+    cy.elements().removeClass("dim hit");
+    if (!q) return;
+    var hits = cy.nodes().filter(function (n) {
+      var d = n.data();
+      return [d.label, d.info, d.image, d.url, d.host].join(" ").toLowerCase().indexOf(q) >= 0;
+    });
+    var keep = hits.union(hits.ancestors());
+    cy.elements().not(keep).not(hits.connectedEdges()).addClass("dim");
+    hits.addClass("hit");
+    msg(hits.length + " match" + (hits.length === 1 ? "" : "es"));
+  }
+  $("topo-q").addEventListener("input", applySearch);
+  $("topo-q").addEventListener("keydown", function (e) {
+    if (e.key === "Enter") { var h = cy.nodes(".hit"); if (h.length) cy.animate({ fit: { eles: h, padding: 80 } }, { duration: 300 }); }
+    if (e.key === "Escape") { this.value = ""; applySearch(); }
+  });
+
+  // ---------- details panel
+  var panel = $("topo-panel");
+  var KIND = { core: "Sandbox", system: "System", service: "Service", ssh: "SSH host", stack: "Stack", container: "Container" };
+  function row(k, val) { return val ? "<dt>" + esc(k) + "</dt><dd>" + val + "</dd>" : ""; }
+  function pill(cls, t) { return "<span class='pill " + cls + "'>" + esc(t) + "</span>"; }
+  function showSummary() {
+    var n = function (s) { return cy.nodes(s).length; };
+    panel.innerHTML = "<h2 style='margin:0 0 10px'>Overview</h2><dl class='kv'>" +
+      row("Systems", n("[kind='system']")) + row("Services", n("[kind='service']")) + row("SSH hosts", n("[kind='ssh']")) +
+      (box.checked ? row("Stacks", n("[kind='stack']")) + row("Containers", n("[kind='container']")) +
+        row("Stopped", n("[kind='container'][state!='running']") || "0") : "") +
+      "</dl><p class='help'>Click a node for details and actions, double-click to open it.</p>";
+  }
+  function show(node) {
+    var d = node.data(), h = "<div class='between' style='align-items:flex-start'><div><h2 style='margin:0'>" + esc(d.label) +
+      "</h2><div class='small muted'>" + esc(KIND[d.kind] || d.kind) + "</div></div></div>", dl = "", actions = "";
+    if (d.kind === "core") {
+      dl = row("Reaches", cy.nodes("[kind='service']").length + " services, " + cy.nodes("[kind='ssh']").length + " SSH hosts");
+      h += "<p class='small'>" + esc(d.info) + "</p>";
+    } else if (d.kind === "system") {
+      h += d.info ? "<p class='small'>" + esc(d.info) + "</p>" : "";
+      dl = row("SSH host", d.ssh ? "<code>" + esc(d.ssh) + "</code>" : "") + row("Services", (d.members || []).map(esc).join(", "));
+      if (d.notes && d.notes.length) h += "<div class='small' style='margin-top:8px'>" + d.notes.map(function (x) { return "<div>⚠ " + esc(x) + "</div>"; }).join("") + "</div>";
+      actions = "<a class='btn sm primary' href='" + esc(d.href) + "'>Edit system</a>";
+    } else if (d.kind === "service") {
+      h += "<div class='row' style='margin:8px 0'>" + pill(d.state, d.status) + (d.kinds || []).map(function (k) { return "<span class='tag'>" + esc(k) + "</span>"; }).join("") +
+        (d.access ? pill(d.access === "rw" ? "accent" : "info", d.access) : "") + "</div>";
+      h += d.info ? "<p class='small'>" + esc(d.info) + "</p>" : "";
+      dl = row("System", d.system ? "<a href='/systems/" + esc(d.system) + "'>" + esc(d.system) + "</a>" : "–") +
+           row("URL", d.url ? "<span class='mono small' style='word-break:break-all'>" + esc(d.url) + "</span>" : "") +
+           row("Docker", d.docker ? esc(d.docker) : "") +
+           row("Missing", (d.missing || []).length ? "<span class='mono small'>" + (d.missing || []).map(esc).join(", ") + "</span>" : "") +
+           row("Containers", d.dockerError ? "<span class='small' style='color:var(--err)'>" + esc(d.dockerError) + "</span>" : "");
+      actions = "<button class='btn sm' hx-post='/services/" + encodeURIComponent(d.label) + "/svc-test' hx-target='#topo-out'>Test connection</button>" +
+                "<a class='btn sm primary' href='" + esc(d.href) + "'>Open</a>";
+    } else if (d.kind === "ssh") {
+      h += "<div class='row' style='margin:8px 0'>" + (d.live ? pill(d.live, { ok: "reachable", warn: "sudo fails", err: "unreachable" }[d.live] || d.live) : pill("off", "checking …")) +
+        (d.sudo ? pill("accent", "sudo") : "") + "</div>";
+      dl = row("Login", "<span class='mono small'>" + esc(d.info) + "</span>") + row("sudo", d.sudo ? "<code>" + esc(d.sudo) + "</code>" : "–") +
+           row("System", d.system ? esc(d.system) : "–") + row("Status", d.liveTitle ? "<span class='small'>" + esc(d.liveTitle) + "</span>" : "");
+      actions = "<button class='btn sm' hx-post='/ssh/" + encodeURIComponent(d.label) + "/test' hx-target='#topo-out'>Test</button>" +
+                "<a class='btn sm primary' href='/ssh'>Open SSH</a>";
+    } else if (d.kind === "stack") {
+      dl = row("Host", esc(d.host)) + row("Containers", d.running + " of " + d.total + " running");
+      h += "<div class='ctr-list'>" + (d.containers || []).map(function (c) {
+        return "<div><span class='dot " + (c.state === "running" ? "ok" : "err") + "'></span><span class='mono small'>" + esc(c.name) +
+               "</span><span class='small faint'>" + esc(c.status) + "</span></div>"; }).join("") + "</div>";
+    } else if (d.kind === "container") {
+      h += "<div class='row' style='margin:8px 0'>" + pill(d.state === "running" ? "ok" : "err", d.state) + "</div>";
+      dl = row("Image", "<span class='mono small' style='word-break:break-all'>" + esc(d.image) + "</span>") + row("Status", esc(d.status)) +
+           row("Stack", esc(d.stackName)) + row("Host", esc(d.host));
+    }
+    panel.innerHTML = h + (dl ? "<dl class='kv' style='margin-top:10px'>" + dl + "</dl>" : "") +
+      (actions ? "<div class='row' style='margin-top:14px'>" + actions + "</div>" : "") + "<div id='topo-out' style='margin-top:10px'></div>";
+    if (window.htmx) htmx.process(panel);
+  }
+  cy.on("tap", "node", function (e) { show(e.target); });
+  cy.on("tap", function (e) { if (e.target === cy) showSummary(); });
+  cy.on("dbltap", "node", function (e) { if (e.target.data("href")) location.href = e.target.data("href"); });
+
+  // ---------- toolbar
+  box.checked = prefs("topo-containers") === "1";
+  box.onchange = function () {
+    prefs("topo-containers", box.checked ? "1" : "0");
+    box.disabled = true;
+    loadContainers().then(function () { arrange(); cy.fit(undefined, 30); applySearch(); showSummary(); })
+      .finally(function () { box.disabled = false; });
+  };
+  $("topo-fit").onclick = function () { cy.fit(undefined, 30); };
+  $("topo-refresh").onclick = function () {
+    var b = this; b.disabled = true;
+    var sel = cy.$(":selected").map(function (n) { return n.id(); });
+    // keep the current arrangement while reloading
+    cy.nodes().not("[kind='system']").forEach(function (n) { var p = n.position(); saved[n.id()] = saved[n.id()] || { x: p.x, y: p.y }; });
+    loadGraph().then(loadContainers).then(function () {
+      arrange(); applySearch(); sel.forEach(function (id) { cy.$id(id).select(); });
+      if (sel.length === 1 && cy.$id(sel[0]).length) show(cy.$id(sel[0])); else showSummary();
+      return loadSshStatus();
+    }).finally(function () { b.disabled = false; });
+  };
+  $("topo-reset").onclick = function () {
+    fetch("/topology/layout", { method: "DELETE" }).then(function () { saved = {}; autoLayout(); cy.fit(undefined, 30); msg("Layout reset"); });
+  };
+  $("topo-png").onclick = function () {
+    var a = document.createElement("a");
+    a.href = cy.png({ full: true, scale: 2, bg: C.panel });
+    a.download = "tentaclaude-topology.png"; a.click();
+  };
+
+  build();
+})();
+</script>
+{% endblock %}

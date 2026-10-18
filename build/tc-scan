@@ -1,0 +1,322 @@
+#!/usr/bin/env python3
+"""tc-scan – read-only inventory of all docker services (hosts, stacks, containers), services and SSH hosts.
+
+Never prints environment variables, .env contents or other secrets. Used by the /inventory command.
+  tc-scan            full report
+  tc-scan --no-ssh   skip SSH hosts
+  tc-scan --no-svc   skip service checks
+"""
+import glob
+import json
+import os
+import re
+import shlex
+import subprocess
+import sys
+
+SSH_CONF_D = os.path.expanduser("~/.ssh/config.d")
+
+
+def sh(cmd, timeout=20):
+    try:
+        r = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+        out = r.stdout.strip()
+        if r.returncode != 0 and r.stderr.strip():
+            out = (out + "\n" + r.stderr.strip()).strip()
+        return r.returncode, out
+    except (subprocess.TimeoutExpired, FileNotFoundError) as e:
+        return 1, str(e)
+
+
+def section(title):
+    print(f"\n## {title}\n")
+
+
+def host(ctx, label):
+    section(f"Docker host `{ctx}` ({label})")
+    code, out = sh(["svc", "docker", ctx, "info", "--format", "{{json .}}"], timeout=40)
+    if code != 0:
+        print(f"docker info failed: {out[-200:]}")
+        return False
+    i = json.loads(out)
+    rows = [
+        ("Name", i.get("Name")), ("OS", i.get("OperatingSystem")), ("Kernel", i.get("KernelVersion")),
+        ("Architecture", i.get("Architecture")), ("CPUs", i.get("NCPU")),
+        ("RAM", f"{round(i.get('MemTotal', 0) / 2**30, 1)} GiB"), ("Docker", i.get("ServerVersion")),
+        ("Storage driver", i.get("Driver")), ("Docker Root Dir", i.get("DockerRootDir")),
+        ("Containers (running/total)", f"{i.get('ContainersRunning')}/{i.get('Containers')}"), ("Images", i.get("Images")),
+    ]
+    for k, v in rows:
+        print(f"- **{k}:** {v}")
+    return True
+
+
+def containers(ctx):
+    code, out = sh(["svc", "docker", ctx, "ps", "-a", "--format", "{{json .}}"], timeout=40)
+    res = []
+    for line in out.splitlines() if code == 0 else []:
+        c = json.loads(line)
+        res.append(c)
+    return res
+
+
+def inspect(ctx, ids):
+    if not ids:
+        return {}
+    code, out = sh(["svc", "docker", ctx, "inspect", *ids], timeout=90)
+    if code != 0:
+        return {}
+    data = {}
+    for c in json.loads(out):
+        data[c["Id"][:12]] = c
+    return data
+
+
+def env_names_only(env):
+    """only names of 'interesting' non-secret routing variables, never values of anything else"""
+    keep = {}
+    for e in env or []:
+        k, _, v = e.partition("=")
+        if k in ("VIRTUAL_HOST", "VIRTUAL_PORT", "LETSENCRYPT_HOST"):
+            keep[k] = v
+    return keep
+
+
+REMOTE_DIRS = r"""for d in "$1"/*/; do d=${d%/}; n=${d##*/}; c=-; for f in compose.yaml compose.yml docker-compose.yml docker-compose.yaml; do [ -f "$d/$f" ] && c=$f && break; done; e=0; [ -f "$d/.env" ] && e=1; g=0; [ -d "$d/.git" ] && g=1; r=$(ls "$d" 2>/dev/null | grep -iE '^(readme|agents|claude)\.md$' | head -1); echo "$n|$c|$e|$g|$r"; done"""
+
+
+def stack_dirs(stacks_dir, ssh_host):
+    dirs = {}
+    if not stacks_dir:
+        return dirs
+    if ssh_host:
+        code, out = sh(["ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=8", ssh_host, "sh", "-c",
+                        "'" + REMOTE_DIRS.replace("'", "'\\''") + "'", "x", stacks_dir], timeout=30)
+        for line in out.splitlines() if code == 0 else []:
+            parts = line.split("|")
+            if len(parts) == 5 and parts[0] != "*":
+                dirs[parts[0]] = {"compose": None if parts[1] == "-" else parts[1], "env": parts[2] == "1",
+                                  "git": parts[3] == "1", "readme": parts[4] or None}
+        return dirs
+    if os.path.isdir(stacks_dir):
+        for d in sorted(os.listdir(stacks_dir)):
+            p = os.path.join(stacks_dir, d)
+            if not os.path.isdir(p):
+                continue
+            files = [f for f in ("compose.yaml", "compose.yml", "docker-compose.yml", "docker-compose.yaml") if os.path.isfile(os.path.join(p, f))]
+            dirs[d] = {"compose": files[0] if files else None, "env": os.path.isfile(os.path.join(p, ".env")),
+                       "git": os.path.isdir(os.path.join(p, ".git")),
+                       "readme": next((f for f in os.listdir(p) if f.lower() in ("readme.md", "agents.md", "claude.md")), None)}
+    return dirs
+
+
+def stacks(cs, info, stacks_dir, ssh_host):
+    print("### Stacks & containers\n")
+    projects = {}
+    standalone = []
+    for c in cs:
+        d = info.get(c["ID"][:12], {})
+        labels = (d.get("Config") or {}).get("Labels") or {}
+        proj = labels.get("com.docker.compose.project")
+        entry = {
+            "name": c["Names"], "image": c["Image"], "state": c["State"], "status": c["Status"],
+            "service": labels.get("com.docker.compose.service", ""),
+            "workdir": labels.get("com.docker.compose.project.working_dir", ""),
+            "ports": c.get("Ports", ""),
+            "routing": env_names_only((d.get("Config") or {}).get("Env")),
+            "traefik": {k: v for k, v in labels.items() if k.startswith("traefik.http.routers.") and k.endswith(".rule")},
+            "mounts": [m.get("Source") if m.get("Type") == "bind" else f"volume:{m.get('Name')}"
+                       for m in d.get("Mounts", []) if m.get("Destination") not in ("/etc/localtime", "/etc/timezone")],
+            "restart": ((d.get("HostConfig") or {}).get("RestartPolicy") or {}).get("Name", ""),
+            "network_mode": (d.get("HostConfig") or {}).get("NetworkMode", ""),
+        }
+        if proj:
+            projects.setdefault(proj, []).append(entry)
+        else:
+            standalone.append(entry)
+
+    dirs = stack_dirs(stacks_dir, ssh_host)
+
+    for proj in sorted(set(projects) | set(dirs)):
+        items = projects.get(proj, [])
+        meta = dirs.get(proj, {})
+        wd = items[0]["workdir"] if items else (os.path.join(stacks_dir, proj) if meta else "")
+        flags = []
+        if meta.get("compose"):
+            flags.append(f"`{meta['compose']}`")
+        if meta.get("env"):
+            flags.append("`.env`")
+        if meta.get("git"):
+            flags.append("git repo")
+        if meta.get("readme"):
+            flags.append(f"docs: `{meta['readme']}`")
+        if proj in dirs and not items:
+            flags.append("**no running project**")
+        print(f"#### {proj}\n")
+        if wd:
+            print(f"- Directory: `{wd}`" + (f" – {', '.join(flags)}" if flags else ""))
+        for e in items:
+            line = f"- `{e['service'] or e['name']}`: {e['image']} – {e['state']} ({e['status']})"
+            if e["restart"]:
+                line += f", restart={e['restart']}"
+            if e["network_mode"] and e["network_mode"] not in ("default",) and not e["network_mode"].endswith("_default"):
+                line += f", network={e['network_mode']}"
+            print(line)
+            if e["ports"]:
+                print(f"  - Ports: {e['ports']}")
+            for k, v in e["routing"].items():
+                print(f"  - {k}={v}")
+            for k, v in e["traefik"].items():
+                print(f"  - Traefik: {v}")
+            if e["mounts"]:
+                print(f"  - Mounts: {', '.join(m for m in e['mounts'] if m)[:400]}")
+        print()
+
+    if standalone:
+        print("#### Containers without compose project\n")
+        for e in standalone:
+            print(f"- `{e['name']}`: {e['image']} – {e['state']}" + (f", Ports: {e['ports']}" if e["ports"] else ""))
+
+
+def networks(ctx):
+    print("\n### Networks & volumes\n")
+    code, out = sh(["svc", "docker", ctx, "network", "ls", "--format", "{{.Name}} ({{.Driver}})"], timeout=30)
+    nets = [n for n in out.splitlines() if not n.startswith(("bridge ", "host ", "none "))] if code == 0 else []
+    print(f"- Networks ({len(nets)}): " + ", ".join(nets[:40]))
+    code, out = sh(["svc", "docker", ctx, "volume", "ls", "-q"], timeout=30)
+    vols = out.splitlines() if code == 0 else []
+    named = [v for v in vols if not re.fullmatch(r"[0-9a-f]{64}", v)]
+    print(f"- Volumes: {len(vols)} (benannt: {len(named)}) – " + ", ".join(named[:40]))
+
+
+def services():
+    section("Connected services (svc)")
+    code, out = sh(["svc", "list"])
+    print("```\n" + out + "\n```")
+    tc_dir = os.environ.get("TC_DIR", "")
+    for p in sorted(glob.glob(os.path.join(tc_dir, "services", "*.json"))):
+        name = os.path.basename(p)[:-5]
+        if name.startswith("_"):
+            continue
+        try:
+            d = json.load(open(p))
+        except ValueError:
+            continue
+        if "api" in d and d.get("enabled", True) is not False:
+            path = d.get("test_path", "/")
+            code, out = sh(["svc", name, "GET", path, "-o", "/dev/null", "-w", "%{http_code}", "--max-time", "8"], timeout=15)
+            if code == 0 and out.isdigit():
+                res = f"HTTP {out}"
+            else:
+                last = out.splitlines()[-1] if out else "error"
+                res = last.replace(f"svc: {name} ", "")[:120]
+            print(f"- `{name}` GET {path}: {res}")
+    code, out = sh(["svc", "git"])
+    if out and "No git" not in out:
+        print("\nGit repos:\n```\n" + out + "\n```")
+
+
+SSH_META = re.compile(r"^\s*#\s*tentaclaude:\s*sudo\s*=\s*(.*?)\s*$")
+
+
+def ssh_sudo_map():
+    """alias -> sudo prefix from '# tentaclaude: sudo=…' lines in ssh/config.d"""
+    res = {}
+    for f in sorted(glob.glob(os.path.join(SSH_CONF_D, "*.conf"))):
+        current = []
+        for line in open(f):
+            m = SSH_META.match(line)
+            if m:
+                res.update({a: m.group(1) for a in current})
+                continue
+            parts = line.split()
+            if parts and parts[0].lower() == "host":
+                current = parts[1:]
+    return res
+
+
+def ssh_hosts():
+    section("SSH hosts")
+    hosts = []
+    for f in sorted(glob.glob(os.path.join(SSH_CONF_D, "*.conf"))):
+        for line in open(f):
+            parts = line.split()
+            if len(parts) >= 2 and parts[0].lower() == "host":
+                hosts += [h for h in parts[1:] if "*" not in h]
+    if not hosts:
+        print("No SSH hosts configured.")
+        return
+    sudo_map = ssh_sudo_map()
+    probe = ("echo \"host=$(hostname)\"; echo \"user=$(whoami)\"; . /etc/os-release 2>/dev/null && echo \"os=$PRETTY_NAME\"; "
+             "echo \"kernel=$(uname -r)\"; echo \"uptime=$(uptime -p 2>/dev/null)\"; "
+             "[ -n \"$S\" ] && { $S true 2>/dev/null && echo \"sudo=ok ($S)\" || echo \"sudo=FAILED ($S) – needs NOPASSWD\"; }; "
+             "command -v docker >/dev/null && echo \"docker=$($S docker ps -q 2>/dev/null | wc -l) containers: $($S docker ps --format '{{.Names}}' 2>/dev/null | head -40 | tr '\\n' ' ')\"; "
+             "df -h / 2>/dev/null | awk 'NR==2{print \"disk_root=\"$5\" of \"$2}'")
+    for h in hosts:
+        remote = f"S={shlex.quote(sudo_map.get(h, ''))}; {probe}"
+        code, out = sh(["ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=8", h, remote], timeout=25)
+        print(f"### {h}\n")
+        if code != 0:
+            print(f"- not reachable / no access: {(out.splitlines() or ['?'])[-1][:150]}\n")
+            continue
+        for line in out.splitlines():
+            if "=" in line:
+                k, _, v = line.partition("=")
+                print(f"- {k}: {v}")
+        print()
+
+
+def docker_hosts():
+    """docker services from services/*.json (rendered like svc does)"""
+    tc_dir = os.environ.get("TC_DIR", "")
+    env = {}
+    try:
+        for line in open(os.path.join(tc_dir, ".env")):
+            m = re.match(r"^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=(.*)$", line)
+            if m:
+                env[m.group(1)] = m.group(2).strip().strip("'\"")
+    except OSError:
+        pass
+    res = []
+    for p in sorted(glob.glob(os.path.join(tc_dir, "services", "*.json"))):
+        if os.path.basename(p).startswith("_"):
+            continue
+        try:
+            svc = json.load(open(p))
+        except ValueError:
+            continue
+        d = svc.get("docker")
+        if not d or svc.get("enabled", True) is False:
+            continue
+        sub = lambda v: re.sub(r"\$\{([A-Za-z_][A-Za-z0-9_]*)\}", lambda m: env.get(m.group(1), ""), str(v or ""))
+        res.append({"name": svc.get("name") or os.path.basename(p)[:-5], "mode": d.get("mode", "socket"),
+                    "ssh_host": d.get("ssh_host") if d.get("mode") == "ssh" else None,
+                    "stacks_dir": sub(d.get("stacks_dir")), "access": d.get("access", "ro")})
+    return res
+
+
+def main():
+    args = set(sys.argv[1:])
+    print("# System inventory (tc-scan)\n\n_read-only, no secrets_")
+    hosts = docker_hosts()
+    if not hosts:
+        section("Docker")
+        print("No docker services configured (services/*.json with \"docker\").")
+    for h in hosts:
+        label = f"{'local' if h['mode'] == 'socket' else 'ssh ' + h['ssh_host']}, access {h['access']}"
+        if not host(h["name"], label):
+            continue
+        if h["stacks_dir"]:
+            print(f"- **Stacks directory:** `{h['stacks_dir']}`")
+        print()
+        cs = containers(h["name"])
+        stacks(cs, inspect(h["name"], [c["ID"] for c in cs]), h["stacks_dir"], h["ssh_host"])
+        networks(h["name"])
+    if "--no-svc" not in args:
+        services()
+    if "--no-ssh" not in args:
+        ssh_hosts()
+
+
+if __name__ == "__main__":
+    main()

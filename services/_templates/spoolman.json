@@ -1,0 +1,15 @@
+{
+  "_meta": {
+    "title": "Spoolman",
+    "category": "Apps"
+  },
+  "description": "Spoolman – filament spools, vendors",
+  "api": {
+    "base_url": "https://spoolman.{{DOMAIN}}/api/v1",
+    "auth": {
+      "type": "none"
+    },
+    "docs": "https://spoolman.{{DOMAIN}}/api/v1/docs"
+  },
+  "test_path": "/info"
+}

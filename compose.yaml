@@ -1,0 +1,78 @@
+# tentaclaude – sandbox + service gateway for Claude Code 🐙  (generic – site specifics go into .env / compose.override.yaml)
+#
+#   first time:  ./tentaclaude.sh init          (guided setup, creates .env)
+#   start:       docker compose up -d control   (web admin) – then everything else in tentacontrol
+#   cli:         ./tentaclaude.sh [rc|shell|svc|scan|anamnese|passwd|setup-url]
+#
+# Files (COMPOSE_FILE in .env): compose.yaml (this, generic) + compose.generated.yaml (mounts derived from
+# docker services, written by tentacontrol) + compose.override.yaml (your site additions).
+# tentaclaude itself has NO Docker access – that comes only from services of type "docker" (local socket or ssh).
+services:
+  claude:
+    build:
+      context: ./build
+      args:
+        CLAUDE_CODE_VERSION: ${CLAUDE_CODE_VERSION:-latest}
+    image: local/tentaclaude:latest
+    container_name: tentaclaude
+    hostname: tentaclaude
+    restart: unless-stopped
+    init: true
+    stdin_open: true
+    tty: true
+    working_dir: /workspace
+    # every variable from .env reaches the container (tokens, git identity, ...)
+    env_file: .env
+    environment:
+      TZ: ${TZ:-UTC}
+      TC_DIR: ${TC_DIR:?TC_DIR not set – run ./tentaclaude.sh init}
+      # system bundle incl. the optional site CA (added by the entrypoint)
+      NODE_EXTRA_CA_CERTS: /etc/ssl/certs/ca-certificates.crt
+    volumes:
+      # this stack (.env, services/, ssh/, scripts), same path as on the host
+      - ${TC_DIR}:${TC_DIR}
+      # optional: host documentation for Claude (imported into its CLAUDE.md) – /dev/null = none
+      - ${HOST_DOCS:-/dev/null}:/etc/tentaclaude/host-docs.md:ro
+      # optional: own root CA (PEM) for internal https services – /dev/null = none
+      - ${CA_CERT:-/dev/null}:/etc/tentaclaude/ca.crt:ro
+      # persistent home: Claude login/settings, ~/.config, shell history
+      - ./data/home:/root
+      # ssh: config + config.d/<host>.conf, own key pair, known_hosts
+      - ./ssh:/root/.ssh
+      # projects, repos (git services), generated SERVICES.md
+      - ./workspace:/workspace
+    extra_hosts:
+      # the host running tentaclaude (e.g. for an ssh docker service on the same machine)
+      - host.docker.internal:host-gateway
+    deploy:
+      resources:
+        limits:
+          cpus: "${CLAUDE_CPUS:-4}"
+          memory: ${CLAUDE_MEMORY:-8g}
+
+  # tentacontrol – web admin: status, browser terminal (login/RC), settings, services, SSH, updates, logs, help
+  control:
+    build: ./control
+    image: local/tentacontrol:latest
+    container_name: tentacontrol
+    hostname: tentacontrol
+    restart: unless-stopped
+    environment:
+      TZ: ${TZ:-UTC}
+      STACK_DIR: ${TC_DIR:?TC_DIR not set – run ./tentaclaude.sh init}
+      DATA_DIR: /data
+    ports:
+      # default: only reachable from the host itself; expose via reverse proxy (see compose.override.example.yaml)
+      - "${CONTROL_BIND:-127.0.0.1}:${CONTROL_PORT:-8484}:8080"
+    volumes:
+      # runtime: tentacontrol manages the tentaclaude container on THIS host (status, terminal, rebuild)
+      - ${DOCKER_SOCKET:-/var/run/docker.sock}:/var/run/docker.sock
+      # this stack under the same path as on the host (compose build/up of the claude service)
+      - ${TC_DIR}:${TC_DIR}
+      # admin password hash + session secret
+      - ./data/control:/data
+    deploy:
+      resources:
+        limits:
+          cpus: "1"
+          memory: 512m

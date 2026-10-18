@@ -1,0 +1,17 @@
+{
+  "_meta": {
+    "title": "Zigbee2MQTT (frontend API)",
+    "category": "Smart Home"
+  },
+  "description": "Zigbee2MQTT – devices/status (only if used)",
+  "api": {
+    "base_url": "https://z2m.{{DOMAIN}}/api",
+    "auth": {
+      "type": "bearer",
+      "token": "${Z2M_TOKEN}"
+    }
+  },
+  "notes": [
+    "Many functions run over MQTT, not HTTP."
+  ]
+}

@@ -1,0 +1,29 @@
+{
+  "_meta": {
+    "title": "n8n",
+    "category": "Automation",
+    "setup": "Settings → n8n API → API key (N8N_API_KEY); Settings → MCP access → Token (N8N_MCP_TOKEN). If you only want one: delete the other part from the JSON."
+  },
+  "description": "n8n – workflows (public API + MCP)",
+  "api": {
+    "base_url": "https://n8n.{{DOMAIN}}/api/v1",
+    "auth": {
+      "type": "header",
+      "header": "X-N8N-API-KEY",
+      "value": "${N8N_API_KEY}"
+    },
+    "docs": "https://docs.n8n.io/api/"
+  },
+  "mcp": {
+    "type": "http",
+    "url": "https://n8n.{{DOMAIN}}/mcp-server/http",
+    "headers": {
+      "Authorization": "Bearer ${N8N_MCP_TOKEN}"
+    }
+  },
+  "test_path": "/workflows?limit=1",
+  "examples": [
+    "svc NAME GET /workflows",
+    "svc NAME GET /executions?limit=5"
+  ]
+}

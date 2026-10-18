@@ -1,0 +1,20 @@
+{
+  "_meta": {
+    "title": "Git repo (GitHub, private/rw)",
+    "category": "Git repos"
+  },
+  "description": "Your own GitHub repo – clone, commit, push",
+  "git": {
+    "url": "https://github.com/OWNER/REPO.git",
+    "access": "rw",
+    "branch": "main",
+    "auth": {
+      "type": "token",
+      "token": "${GH_TOKEN}",
+      "username": "x-access-token"
+    }
+  },
+  "notes": [
+    "Set access to \"ro\" if Claude should only read."
+  ]
+}

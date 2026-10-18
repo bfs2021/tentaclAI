@@ -1,0 +1,17 @@
+{
+  "_meta": {
+    "title": "Paperless-ngx",
+    "category": "Apps"
+  },
+  "description": "Paperless-ngx – search documents, tags, correspondents",
+  "api": {
+    "base_url": "https://paperless.{{DOMAIN}}/api",
+    "auth": {
+      "type": "header",
+      "header": "Authorization",
+      "value": "Token ${PAPERLESS_TOKEN}"
+    },
+    "docs": "https://docs.paperless-ngx.com/api/"
+  },
+  "test_path": "/documents/?page_size=1"
+}

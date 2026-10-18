@@ -1,0 +1,19 @@
+{
+  "_meta": {
+    "title": "Uptime Kuma (Metrics)",
+    "category": "Monitoring"
+  },
+  "description": "Uptime Kuma – monitor status via /metrics (Prometheus format)",
+  "api": {
+    "base_url": "https://uptime.{{DOMAIN}}",
+    "auth": {
+      "type": "basic",
+      "user": "",
+      "password": "${UPTIMEKUMA_API_KEY}"
+    }
+  },
+  "test_path": "/metrics",
+  "notes": [
+    "Uptime Kuma has no full REST API; /metrics returns the status of all monitors."
+  ]
+}

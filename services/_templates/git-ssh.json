@@ -1,0 +1,17 @@
+{
+  "_meta": {
+    "title": "Git repo (SSH)",
+    "category": "Git repos"
+  },
+  "description": "Repo over SSH (add the tentaclaude key as deploy key)",
+  "git": {
+    "url": "git@github.com:OWNER/REPO.git",
+    "access": "rw",
+    "auth": {
+      "type": "none"
+    }
+  },
+  "notes": [
+    "Add the public key from tentacontrol → SSH as deploy key (write access only for rw)."
+  ]
+}

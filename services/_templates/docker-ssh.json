@@ -1,0 +1,21 @@
+{
+  "_meta": {
+    "title": "Docker host (remote, SSH)",
+    "category": "Docker hosts",
+    "setup": "Add the host under SSH first (alias = ssh_host). The SSH user must be allowed to run docker. Compose commands run on the host in the stack's directory."
+  },
+  "description": "Remote docker host – manage stacks and containers",
+  "docker": {
+    "mode": "ssh",
+    "ssh_host": "ALIAS",
+    "stacks_dir": "/srv/stacks",
+    "access": "ro"
+  },
+  "examples": [
+    "svc docker NAME ps",
+    "svc compose NAME <stack> ps"
+  ],
+  "notes": [
+    "Default is ro – set to rw if Claude may change stacks there."
+  ]
+}

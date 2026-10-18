@@ -1,0 +1,17 @@
+{
+  "_meta": {
+    "title": "Grafana",
+    "category": "Monitoring",
+    "setup": "Administration → Service accounts → Token (role Viewer is enough for reading)"
+  },
+  "description": "Grafana – dashboards, data sources, alerts",
+  "api": {
+    "base_url": "https://grafana.{{DOMAIN}}/api",
+    "auth": {
+      "type": "bearer",
+      "token": "${GRAFANA_TOKEN}"
+    },
+    "docs": "https://grafana.com/docs/grafana/latest/developers/http_api/"
+  },
+  "test_path": "/health"
+}

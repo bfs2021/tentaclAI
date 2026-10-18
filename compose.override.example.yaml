@@ -1,0 +1,28 @@
+# Copy to compose.override.yaml (loaded automatically by docker compose) for site-specific additions.
+# Pick what fits your setup – everything here is optional.
+services:
+  control:
+    # --- Reverse proxy: nginx-proxy (jwilder) ---
+    # environment:
+    #   VIRTUAL_HOST: tentacontrol.example.lan
+    #   VIRTUAL_PORT: "8080"
+    # ports: !reset []          # no host port when the proxy is used
+
+    # --- Reverse proxy: Traefik ---
+    # labels:
+    #   traefik.enable: "true"
+    #   traefik.http.routers.tentacontrol.rule: Host(`tentacontrol.example.lan`)
+    #   traefik.http.services.tentacontrol.loadbalancer.server.port: "8080"
+    # networks: [proxy]
+
+  claude:
+    # --- extra mounts, e.g. a Docker data root or other directories Claude should see ---
+    # volumes:
+    #   - /srv/projects:/srv/projects
+    # --- labels for your container manager (e.g. keep updaters away from locally built images) ---
+    # labels:
+    #   com.getarcaneapp.arcane.updater: "false"
+
+# networks:
+#   proxy:
+#     external: true

@@ -1,0 +1,42 @@
+# tentaclaude – everything site-specific or secret stays out of the repository.
+# Tracked: generic code (build/, control/, compose.yaml, scripts), *.example files, service templates.
+
+# settings & secrets
+.env
+.env.*
+!.env.example
+*.bak
+*.bak-*
+
+# site configuration
+compose.override.yaml
+compose.generated.yaml
+local/*
+!local/CLAUDE.example.md
+
+# instance services (templates and the blank template are tracked)
+services/*.json
+!services/_template.json
+# instance systems (groups of services)
+systems/*.json
+!systems/_example.json
+
+# ssh: keys, known hosts, host entries, control sockets
+ssh/keys/
+ssh/known_hosts
+ssh/known_hosts.old
+ssh/cm-*
+ssh/config.d/*
+!ssh/config.d/example.conf.example
+
+# runtime data: Claude login/home, tentacontrol password hash + session secret
+data/
+
+# workspace: projects, cloned repos, generated catalog (only the stub CLAUDE.md is tracked)
+workspace/*
+!workspace/CLAUDE.md
+
+# python / editor noise
+__pycache__/
+*.pyc
+.DS_Store

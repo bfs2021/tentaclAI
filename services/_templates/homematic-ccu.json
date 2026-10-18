@@ -1,0 +1,27 @@
+{
+  "_meta": {
+    "title": "Homematic CCU (XML API)",
+    "category": "Smart Home",
+    "setup": "Install the “XML-API” add-on, create a token via tokenregister.cgi. Alternative without add-on token: CCU-Jack (REST, basic auth)."
+  },
+  "description": "Homematic CCU3 / RaspberryMatic via the XML-API add-on",
+  "api": {
+    "base_url": "http://ccu.{{DOMAIN}}/addons/xmlapi",
+    "auth": {
+      "type": "query",
+      "param": "sid",
+      "value": "${CCU_XMLAPI_TOKEN}"
+    },
+    "docs": "https://github.com/homematic-community/XML-API"
+  },
+  "test_path": "/version.cgi",
+  "examples": [
+    "svc NAME GET /devicelist.cgi",
+    "svc NAME GET /statelist.cgi",
+    "svc NAME GET '/state.cgi?datapoint_id=1234'"
+  ],
+  "notes": [
+    "Responses are XML.",
+    "Write (statechange.cgi) only when explicitly asked."
+  ]
+}

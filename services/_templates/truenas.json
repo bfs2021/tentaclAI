@@ -1,0 +1,17 @@
+{
+  "_meta": {
+    "title": "TrueNAS",
+    "category": "Docker & Infra"
+  },
+  "description": "TrueNAS – pools, datasets, shares, apps",
+  "api": {
+    "base_url": "https://nas.{{DOMAIN}}/api/v2.0",
+    "auth": {
+      "type": "bearer",
+      "token": "${TRUENAS_API_KEY}"
+    },
+    "insecure_tls": true,
+    "docs": "https://www.truenas.com/docs/api/"
+  },
+  "test_path": "/system/info"
+}

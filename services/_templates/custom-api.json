@@ -1,0 +1,15 @@
+{
+  "_meta": {
+    "title": "Custom REST API",
+    "category": "General"
+  },
+  "description": "Any REST API",
+  "api": {
+    "base_url": "https://example.{{DOMAIN}}/api",
+    "auth": {
+      "type": "bearer",
+      "token": "${EXAMPLE_TOKEN}"
+    }
+  },
+  "test_path": "/"
+}

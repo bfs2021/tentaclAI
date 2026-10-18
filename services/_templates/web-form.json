@@ -1,0 +1,25 @@
+{
+  "_meta": {
+    "title": "Website (form login)",
+    "category": "Web sources",
+    "setup": "Look at the login form (field names, action URL, hidden CSRF field) and adjust login_url, fields and csrf_field. Credentials of a read-only account into .env."
+  },
+  "description": "Wiki / web app with a login form",
+  "web": {
+    "base_url": "https://wiki.{{DOMAIN}}",
+    "auth": {
+      "type": "form",
+      "login_url": "/login",
+      "fields": { "username": "${EXAMPLE_USER}", "password": "${EXAMPLE_PASSWORD}" },
+      "csrf_field": ""
+    },
+    "paths": []
+  },
+  "examples": [
+    "svc web NAME --login",
+    "svc web NAME /"
+  ],
+  "notes": [
+    "paths: optional list of allowed path prefixes, e.g. [\"/wiki/\"]."
+  ]
+}

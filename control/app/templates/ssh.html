@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% block title %}SSH{% endblock %}
+{% block content %}
+<div class="header">
+  <div><h1>SSH targets</h1><div class="sub">One file per host in <code>ssh/config.d/</code>, own key <code>tentaclaude_ed25519</code></div></div>
+  <div class="row">
+    <button class="btn" onclick="document.getElementById('dlg-pubkey').showModal()">{{ icon('key') }}Public key</button>
+    <button class="btn primary" onclick="document.getElementById('dlg-add').showModal()">{{ icon('plus') }}Add host</button>
+  </div>
+</div>
+<div class="card" style="margin-bottom:16px">
+    <h2>Hosts</h2>
+    {% if hosts %}
+    <div class="table-wrap"><table>
+      <thead><tr><th>Alias</th><th>Target</th><th>sudo</th><th>File</th><th></th></tr></thead>
+      <tbody>
+      {% for h in hosts %}
+        <tr>
+          <td><span class="row" style="gap:10px;flex-wrap:nowrap">
+            <span hx-get="/ssh/{{ h.alias }}/status" hx-trigger="load, every 120s" hx-swap="innerHTML" class="ssh-dot"><span class="dot" title="checking …"></span></span>
+            <strong>{{ h.alias }}</strong></span></td>
+          <td class="mono small">{{ h.user }}@{{ h.hostname }}{% if h.port != '22' %}:{{ h.port }}{% endif %}
+            <div class="ssh-result" id="t-{{ loop.index }}"></div></td>
+          <td>
+            <details class="sudo-edit">
+              <summary>{% if h.sudo %}<span class="pill accent mono">{{ h.sudo }}</span>{% else %}<span class="faint small">–</span>{% endif %}</summary>
+              <form class="sudo-form" hx-post="/ssh/{{ h.alias }}/sudo">
+                <label class="check"><input type="checkbox" name="use_sudo" value="1" {{ 'checked' if h.sudo }}
+                  onchange="this.form.sudo.disabled = !this.checked"> use sudo</label>
+                <input type="text" name="sudo" class="mono" value="{{ h.sudo or 'sudo -n' }}" {{ '' if h.sudo else 'disabled' }}>
+                <button class="btn sm primary">Save</button>
+              </form>
+            </details>
+          </td>
+          <td class="faint small">{{ h.file }}</td>
+          <td style="text-align:right;white-space:nowrap">
+            <button class="btn sm" hx-post="/ssh/{{ h.alias }}/test" hx-target="#t-{{ loop.index }}">Test</button>
+            <a class="btn sm ghost" href="/terminal?p=sshremove&alias={{ h.alias | urlencode }}" title="Remove the key on the target and delete the entry">{{ icon('trash') }}</a>
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table></div>
+    {% else %}<div class="empty">No hosts configured.</div>{% endif %}
+</div>
+<dialog class="modal" id="dlg-add">
+  <div class="card-head"><h2>Add host</h2><button class="btn sm ghost" onclick="this.closest('dialog').close()" aria-label="Close">✕</button></div>
+  <form method="get" action="/terminal">
+        <input type="hidden" name="p" value="sshadd">
+        <div class="fields">
+          <div class="field"><label>Alias</label><input type="text" name="alias" placeholder="nas" pattern="[A-Za-z0-9._-]+" required></div>
+          <div class="field"><label>Target</label><input type="text" name="target" placeholder="admin@nas.{{ site.domain }}" class="mono" required>
+            <div class="help">user@host or user@host:port</div></div>
+        </div>
+        <div class="field">
+          <label class="check"><input type="checkbox" onchange="var s=document.getElementById('add-sudo');s.disabled=!this.checked;s.hidden=!this.checked">
+            Use sudo – the user is not root</label>
+          <input type="text" id="add-sudo" name="sudo" value="sudo -n" class="mono" style="margin-top:8px" disabled hidden>
+          <div class="help">Privileged commands (docker, compose, admin tasks) then run as <code>sudo -n …</code>. Non-interactive: the user needs passwordless sudo (<code>NOPASSWD</code>), ideally limited to what Claude needs.</div>
+        </div>
+        <button class="btn primary">{{ icon('terminal') }}Set up in terminal</button>
+        <p class="help">The terminal shows the host key fingerprint for confirmation and asks once for the target's password (like <code>ssh-copy-id</code>).</p>
+      </form>
+</dialog>
+<dialog class="modal" id="dlg-pubkey">
+  <div class="card-head"><h2>Public key</h2>
+    <div class="row"><button class="btn sm" data-copy="#pubkey">{{ icon('copy') }}Copy</button>
+    <button class="btn sm ghost" onclick="this.closest('dialog').close()" aria-label="Close">✕</button></div></div>
+  <pre class="rc" id="pubkey" style="word-break:break-all">{{ pubkey or "– no key found –" }}</pre>
+      <p class="help">For adding it to <code>authorized_keys</code> on a target by hand.</p>
+</dialog>
+<script>
+  // close a dialog by clicking the backdrop
+  document.querySelectorAll("dialog.modal").forEach(function (d) {
+    d.addEventListener("click", function (e) { if (e.target === d) d.close(); });
+  });
+</script>
+{% endblock %}

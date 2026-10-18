@@ -1,0 +1,18 @@
+{
+  "_meta": {
+    "title": "NetBird",
+    "category": "Network",
+    "setup": "Settings → Personal Access Tokens. Self-hosted: change base_url to https://<management>/api."
+  },
+  "description": "NetBird – peers, groups, policies, routes",
+  "api": {
+    "base_url": "https://api.netbird.io/api",
+    "auth": {
+      "type": "header",
+      "header": "Authorization",
+      "value": "Token ${NETBIRD_PAT}"
+    },
+    "docs": "https://docs.netbird.io/api"
+  },
+  "test_path": "/peers"
+}

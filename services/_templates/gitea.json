@@ -1,0 +1,17 @@
+{
+  "_meta": {
+    "title": "Gitea / Forgejo",
+    "category": "Development"
+  },
+  "description": "Gitea/Forgejo – repos, issues, PRs",
+  "api": {
+    "base_url": "https://git.{{DOMAIN}}/api/v1",
+    "auth": {
+      "type": "header",
+      "header": "Authorization",
+      "value": "token ${GITEA_TOKEN}"
+    },
+    "docs": "https://git.{{DOMAIN}}/api/swagger"
+  },
+  "test_path": "/user"
+}

@@ -1,0 +1,18 @@
+{
+  "_meta": {
+    "title": "Pangolin",
+    "category": "Network"
+  },
+  "description": "Pangolin – sites, resources, tunnels (Integration API)",
+  "api": {
+    "base_url": "https://api.pangolin.{{DOMAIN}}/v1",
+    "auth": {
+      "type": "bearer",
+      "token": "${PANGOLIN_API_KEY}"
+    },
+    "docs": "https://docs.pangolin.net"
+  },
+  "notes": [
+    "The Integration API must be enabled (flags.enable_integration_api) – a Pangolin restart drops all tunnels."
+  ]
+}

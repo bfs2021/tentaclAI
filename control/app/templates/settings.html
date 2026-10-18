@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block title %}Settings{% endblock %}
+{% block content %}
+<div class="header">
+  <div><h1>Settings</h1><div class="sub">Values from <code>{{ site.tc_dir }}/.env</code>. Secrets are never shown. Reverse proxy and extra mounts: <code>compose.override.yaml</code> (see <a href="/help#site">help</a>).</div></div>
+</div>
+<form hx-post="/settings" autocomplete="off" class="stack">
+  {% for group, items in groups %}
+  <div class="card">
+    <h2>{{ group }}</h2>
+    <div class="fields">
+      {% for key, label, help, kind in items %}
+      <div class="field">
+        <label for="f-{{ key }}">{{ label }} <span class="faint mono small">{{ key }}</span></label>
+        {% if kind == 'readonly' %}
+        <input id="f-{{ key }}" type="text" value="{{ env.get(key, '') }}" disabled>
+        {% elif is_secret(key) %}
+        <div class="secret-row">
+          <input id="f-{{ key }}" type="password" name="k_{{ key }}" placeholder="{{ 'set – leave unchanged' if env.get(key) else 'empty' }}" autocomplete="new-password">
+          {% if env.get(key) %}<label class="check"><input type="checkbox" name="clear_{{ key }}"> clear</label>{% endif %}
+        </div>
+        {% elif kind == 'bool' %}
+        <select id="f-{{ key }}" name="k_{{ key }}">
+          <option value="true" {{ 'selected' if env.get(key, 'true') != 'false' }}>on</option>
+          <option value="false" {{ 'selected' if env.get(key) == 'false' }}>off</option>
+        </select>
+        {% else %}
+        <input id="f-{{ key }}" type="text" name="k_{{ key }}" value="{{ env.get(key, '') }}">
+        {% endif %}
+        {% if help %}<div class="help">{{ help }}</div>{% endif %}
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endfor %}
+
+  <div class="card">
+    <h2>Other variables</h2>
+    <p class="muted small">Variables used neither above nor by a service. Service tokens are managed on the <a href="/services">services</a> pages.</p>
+    {% if other %}
+    <div class="fields">
+      {% for key in other %}
+      <div class="field">
+        <label class="mono small">{{ key }}</label>
+        {% if is_secret(key) %}
+        <div class="secret-row">
+          <input type="password" name="k_{{ key }}" placeholder="{{ 'set – leave unchanged' if env.get(key) else 'empty' }}" autocomplete="new-password">
+          {% if env.get(key) %}<label class="check"><input type="checkbox" name="clear_{{ key }}"> clear</label>{% endif %}
+        </div>
+        {% else %}
+        <input type="text" name="k_{{ key }}" value="{{ env.get(key, '') }}">
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+    <div class="fields" style="margin-top:6px">
+      <div class="field"><label>New variable</label><input type="text" name="new_key" placeholder="NAME" class="mono"></div>
+      <div class="field"><label>Value</label><input type="text" name="new_val" placeholder="value"></div>
+    </div>
+  </div>
+
+  <div class="row">
+    <button class="btn primary">{{ icon('check') }}Save</button>
+    <span class="help">Remote control settings apply after “Restart” on the overview; others show “Apply now” at the top.</span>
+  </div>
+</form>
+{% endblock %}

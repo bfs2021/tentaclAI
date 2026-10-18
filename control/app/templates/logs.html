@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}Logs{% endblock %}
+{% block content %}
+<div class="header">
+  <div><h1>Logs</h1><div class="sub">Container log of tentaclaude (startup, svc sync, errors) – live</div></div>
+  <div class="row"><span id="live" class="pill info">connecting …</span><button class="btn sm" onclick="document.getElementById('out').textContent=''">Clear</button></div>
+</div>
+<pre class="console" id="out">{{ logs }}</pre>
+{% endblock %}
+{% block scripts %}
+<script>
+(function () {
+  var out = document.getElementById("out"), live = document.getElementById("live");
+  out.scrollTop = out.scrollHeight;
+  var es = new EventSource("/logs/stream");
+  es.onopen = function () { live.className = "pill ok"; live.textContent = "live"; };
+  es.onmessage = function (e) {
+    var atBottom = out.scrollTop + out.clientHeight >= out.scrollHeight - 30;
+    out.textContent += JSON.parse(e.data) + "\n";
+    if (atBottom) out.scrollTop = out.scrollHeight;
+  };
+  es.onerror = function () { live.className = "pill warn"; live.textContent = "disconnected"; };
+})();
+</script>
+{% endblock %}

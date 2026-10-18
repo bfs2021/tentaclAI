@@ -1,0 +1,22 @@
+{
+  "_meta": {
+    "title": "Directory / file on an SSH host",
+    "category": "Files",
+    "setup": "Add the host under SSH first (or put the service into a system with an SSH host). path = absolute directory or file on that host."
+  },
+  "description": "Directory on a host, e.g. a local repository or config folder",
+  "files": {
+    "ssh_host": "",
+    "path": "/srv/example",
+    "access": "ro",
+    "sudo": false
+  },
+  "examples": [
+    "svc files NAME tree",
+    "svc files NAME cat README.md",
+    "svc files NAME pull && svc files NAME diff"
+  ],
+  "notes": [
+    "sudo: true uses the host's sudo prefix (for files the SSH user can't read)."
+  ]
+}

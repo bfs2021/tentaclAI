@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}{{ job.title }}{% endblock %}
+{% block content %}
+<div class="header">
+  <div><h1>{{ job.title }}</h1><div class="sub">Live output – you can close the page, the job keeps running.</div></div>
+  <span id="job-state" class="pill info"><span class="spinner"></span>running</span>
+</div>
+<pre class="console" id="out"></pre>
+<div class="row" style="margin-top:14px"><a class="btn" href="/">Back to overview</a></div>
+{% endblock %}
+{% block scripts %}
+<script>
+(function () {
+  var out = document.getElementById("out"), st = document.getElementById("job-state");
+  var es = new EventSource("/jobs/{{ job.id }}/stream");
+  es.onmessage = function (e) {
+    var atBottom = out.scrollTop + out.clientHeight >= out.scrollHeight - 30;
+    out.textContent += JSON.parse(e.data) + "\n";
+    if (atBottom) out.scrollTop = out.scrollHeight;
+  };
+  es.addEventListener("done", function (e) {
+    var ok = JSON.parse(e.data).ok; es.close();
+    st.className = "pill " + (ok ? "ok" : "err"); st.textContent = ok ? "succeeded" : "failed";
+    tcToast(ok ? "Done" : "Failed – see output", ok ? "ok" : "err");
+  });
+  es.onerror = function () { if (es.readyState === 2) return; };
+})();
+</script>
+{% endblock %}

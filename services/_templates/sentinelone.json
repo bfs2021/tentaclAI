@@ -1,0 +1,27 @@
+{
+  "_meta": {
+    "title": "SentinelOne",
+    "category": "Security",
+    "setup": "Console → Settings → Users → create a service user with role “Viewer” → generate an API token (it expires, note the date). Put the tenant URL into base_url."
+  },
+  "description": "SentinelOne – agents, threats, alerts, sites (read only recommended)",
+  "api": {
+    "base_url": "https://TENANT.sentinelone.net/web/api/v2.1",
+    "auth": {
+      "type": "header",
+      "header": "Authorization",
+      "value": "ApiToken ${S1_API_TOKEN}"
+    },
+    "docs": "https://TENANT.sentinelone.net/api-doc/overview"
+  },
+  "test_path": "/system/status",
+  "examples": [
+    "svc NAME GET '/agents?limit=10'",
+    "svc NAME GET '/threats?limit=10&resolved=false'",
+    "svc NAME GET /sites"
+  ],
+  "notes": [
+    "Read only. Never trigger actions (isolate, uninstall, mitigation, exclusions) unless explicitly asked.",
+    "API tokens expire – renew the token on 401."
+  ]
+}

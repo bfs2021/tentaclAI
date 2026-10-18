@@ -1,0 +1,17 @@
+{
+  "_meta": {
+    "title": "InfluxDB 2",
+    "category": "Monitoring"
+  },
+  "description": "InfluxDB 2 – buckets, Flux queries",
+  "api": {
+    "base_url": "https://influx.{{DOMAIN}}/api/v2",
+    "auth": {
+      "type": "header",
+      "header": "Authorization",
+      "value": "Token ${INFLUX_TOKEN}"
+    },
+    "docs": "https://docs.influxdata.com/influxdb/v2/api/"
+  },
+  "test_path": "/buckets"
+}

@@ -1,0 +1,102 @@
+// tentacontrol – toasts, confirm dialogs, small helpers (htmx does the rest)
+(function () {
+  function toast(msg, kind) {
+    var box = document.getElementById("toasts");
+    if (!box) return;
+    var el = document.createElement("div");
+    el.className = "toast " + (kind || "ok");
+    el.textContent = msg;
+    box.appendChild(el);
+    setTimeout(function () { el.style.opacity = "0"; el.style.transition = "opacity .3s"; }, 3800);
+    setTimeout(function () { el.remove(); }, 4200);
+  }
+  window.tcToast = toast;
+
+  document.body.addEventListener("toast", function (e) { toast(e.detail.msg, e.detail.kind); });
+  document.body.addEventListener("htmx:responseError", function (e) {
+    toast("Error " + e.detail.xhr.status + ": " + (e.detail.xhr.responseText || "").slice(0, 140), "err");
+  });
+  document.body.addEventListener("htmx:sendError", function () { toast("No connection to tentacontrol", "err"); });
+
+  // flash message rendered by the server after a reload
+  var flash = document.getElementById("flash");
+  if (flash) toast(flash.dataset.msg, flash.dataset.kind);
+
+  // copy-to-clipboard buttons
+  document.addEventListener("click", function (e) {
+    var b = e.target.closest("[data-copy]");
+    if (!b) return;
+    var src = document.querySelector(b.dataset.copy);
+    navigator.clipboard.writeText((src.value || src.innerText || src.textContent || "").trim()).then(function () { toast("Copied", "info"); });
+  });
+  // searchable select: <div data-combo> with hidden input + text input + .combo-opt list
+  function initCombo(box) {
+    var hidden = box.querySelector("input[type=hidden]"), input = box.querySelector(".combo-input");
+    var list = box.querySelector(".combo-list"), empty = box.querySelector(".combo-empty");
+    var opts = Array.prototype.slice.call(box.querySelectorAll(".combo-opt"));
+    var groups = Array.prototype.slice.call(box.querySelectorAll(".combo-group"));
+    var active = null;
+    function current() { return opts.filter(function (o) { return o.dataset.value === hidden.value; })[0]; }
+    function visible() { return opts.filter(function (o) { return !o.hidden; }); }
+    function setActive(o) {
+      if (active) active.classList.remove("active");
+      active = o || null;
+      if (active) { active.classList.add("active"); active.scrollIntoView({ block: "nearest" }); }
+    }
+    function filter(q) {
+      var words = q.toLowerCase().split(/\s+/).filter(Boolean);
+      opts.forEach(function (o) {
+        var hay = (o.dataset.label + " " + o.dataset.value + " " + (o.dataset.search || "")).toLowerCase();
+        o.hidden = !words.every(function (w) { return hay.indexOf(w) >= 0; });
+      });
+      groups.forEach(function (g) {  // hide a heading when all its options are hidden
+        var n = g.nextElementSibling, any = false;
+        while (n && n.classList.contains("combo-opt")) { if (!n.hidden) any = true; n = n.nextElementSibling; }
+        g.hidden = !any;
+      });
+      if (empty) empty.hidden = visible().length > 0;
+      setActive(visible()[0]);
+    }
+    function open() {
+      list.hidden = false; input.setAttribute("aria-expanded", "true");
+      filter("");
+      var c = current();
+      opts.forEach(function (o) { o.classList.toggle("selected", o === c); });
+      setActive(c);
+    }
+    function close() {
+      list.hidden = true; input.setAttribute("aria-expanded", "false");
+      var c = current(); input.value = c ? c.dataset.label : "";
+    }
+    function choose(o) {
+      hidden.value = o.dataset.value;
+      close();
+      box.dispatchEvent(new CustomEvent("combo-change", { bubbles: true, detail: { value: o.dataset.value, desc: o.dataset.desc || "" } }));
+    }
+    input.addEventListener("focus", function () { open(); input.select(); });
+    input.addEventListener("click", function () { if (list.hidden) open(); });
+    input.addEventListener("input", function () { if (list.hidden) open(); filter(input.value); });
+    input.addEventListener("blur", function () { setTimeout(close, 120); });
+    input.addEventListener("keydown", function (e) {
+      var v = visible(), i = v.indexOf(active);
+      if (e.key === "ArrowDown") { e.preventDefault(); if (list.hidden) open(); else setActive(v[Math.min(i + 1, v.length - 1)]); }
+      else if (e.key === "ArrowUp") { e.preventDefault(); setActive(v[Math.max(i - 1, 0)]); }
+      else if (e.key === "Enter") { if (!list.hidden) { e.preventDefault(); if (active) choose(active); } }
+      else if (e.key === "Escape") { if (!list.hidden) { e.preventDefault(); close(); } }
+    });
+    list.addEventListener("mousedown", function (e) { e.preventDefault(); });  // keep focus in the input
+    list.addEventListener("click", function (e) { var o = e.target.closest(".combo-opt"); if (o) choose(o); });
+    list.addEventListener("mousemove", function (e) { var o = e.target.closest(".combo-opt"); if (o && o !== active) setActive(o); });
+  }
+  Array.prototype.forEach.call(document.querySelectorAll("[data-combo]"), initCombo);
+
+  // "⋯" menus (<details class="menu">): close on outside click, Escape, or after choosing an item
+  document.addEventListener("click", function (e) {
+    document.querySelectorAll("details.menu[open]").forEach(function (m) {
+      if (!m.contains(e.target) || e.target.closest(".menu-item")) m.removeAttribute("open");
+    });
+  });
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape") document.querySelectorAll("details.menu[open]").forEach(function (m) { m.removeAttribute("open"); });
+  });
+})();

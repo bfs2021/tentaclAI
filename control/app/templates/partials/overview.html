@@ -1,0 +1,160 @@
+{% from "_icons.html" import icon %}
+{% set active = services | selectattr("state", "equalto", "ok") | list %}
+{% set warn = services | selectattr("state", "equalto", "warn") | list %}
+<div class="grid">
+  <!-- container -->
+  <div class="card">
+    <div class="card-head">
+      <h2>{{ icon('server') }}Container</h2>
+      {% if st.running %}<span class="pill ok"><span class="dot ok"></span>running</span>
+      {% elif st.exists %}<span class="pill err">{{ st.state }}</span>
+      {% else %}<span class="pill off">not created</span>{% endif %}
+    </div>
+    {% if st.exists %}
+    <dl class="kv">
+      <dt>Uptime</dt><dd>{{ st.uptime }}</dd>
+      <dt>Image</dt><dd class="mono">{{ st.image }}</dd>
+      <dt>Image built</dt><dd>{{ st.image_age }}</dd>
+    </dl>
+    {% if stats %}
+    <div style="margin-top:14px" class="stack">
+      <div><div class="between small"><span class="muted">CPU</span><span>{{ stats.cpu }} %</span></div><div class="bar"><span style="width:{{ [stats.cpu / 4, 100] | min }}%"></span></div></div>
+      <div><div class="between small"><span class="muted">RAM</span><span>{{ stats.mem_mb }} / {{ stats.mem_limit_mb }} MB</span></div><div class="bar"><span style="width:{{ stats.mem_pct }}%"></span></div></div>
+    </div>
+    {% endif %}
+    <div class="row" style="margin-top:16px">
+      {% if st.running %}
+      <button class="btn sm" hx-post="/container/restart" hx-confirm="Restart tentaclaude? Running Claude sessions will end.">{{ icon('refresh') }}Restart</button>
+      <button class="btn sm danger" hx-post="/container/stop" hx-confirm="Stop tentaclaude? Running Claude sessions and remote control will end.">{{ icon('stop') }}Stop</button>
+      {% else %}
+      <button class="btn sm primary" hx-post="/container/start">{{ icon('play') }}Start</button>
+      {% endif %}
+    </div>
+    {% else %}
+    <p class="muted">The container has not been created yet. Check the <a href="/settings">settings</a> first, then start it.</p>
+    <button class="btn primary" hx-post="/container/create">{{ icon('play') }}Create &amp; start</button>
+    {% endif %}
+  </div>
+
+  <!-- claude -->
+  <div class="card">
+    <div class="card-head">
+      <h2>{{ icon('sparkle') }}Claude Code</h2>
+      {% if logged %}<span class="pill ok">signed in</span>{% else %}<span class="pill warn">not signed in</span>{% endif %}
+    </div>
+    <dl class="kv">
+      <dt>Version</dt><dd class="mono">{{ version or "–" }}</dd>
+      <dt>Sessions</dt><dd>{{ sessions | length }}</dd>
+    </dl>
+    {% if sessions %}
+    <div style="margin-top:10px" class="stack small">
+      {% for s in sessions %}
+      <div class="between"><span class="mono">{{ s.name }}</span><span class="muted">{{ "attached · " if s.attached }}{{ s.age }}</span></div>
+      {% endfor %}
+    </div>
+    {% endif %}
+    <div class="row" style="margin-top:16px">
+      {% if not logged %}
+      <a class="btn sm primary" href="/terminal?p=login">{{ icon('key') }}Sign in now</a>
+      {% endif %}
+      <a class="btn sm" href="/terminal?p=claude">{{ icon('terminal') }}Workspace</a>
+      {% for s in services if s.docker and s.docker.mode == 'socket' and s.state == 'ok' %}<a class="btn sm" href="/terminal?p=host&alias={{ s.name | urlencode }}">{{ icon('terminal') }}{{ s.name }}</a>{% endfor %}
+    </div>
+    {% if not logged %}<p class="help">“Sign in now” runs <code>claude auth login</code>: open the link in your browser, sign in with your claude.ai account, paste the code into the terminal.</p>{% endif %}
+  </div>
+
+  <!-- remote control -->
+  <div class="card">
+    <div class="card-head">
+      <h2>{{ icon('cloud') }}Remote Control</h2>
+      {% if rc is none %}{% if st.running %}<span class="pill warn">no session</span>{% else %}<span class="pill off">–</span>{% endif %}
+      {% elif rc.state == 'connected' %}<span class="pill ok"><span class="dot ok"></span>connected</span>
+      {% elif rc.state == 'confirm' %}<span class="pill warn">waiting for confirmation</span>
+      {% elif rc.state == 'disabled' %}<span class="pill off">disabled</span>
+      {% elif rc.state == 'restarting' %}<span class="pill warn">restarting</span>
+      {% else %}<span class="pill info">starting</span>{% endif %}
+    </div>
+    {% if rc is none %}
+      {% if st.running %}<p class="muted small">No <code>claude-rc</code> session. Is the container running?</p>{% endif %}
+    {% else %}
+      {% if rc.state == 'connected' and rc.url %}
+      <div class="rc-connect">
+        <div class="rc-qr" title="Scan with your phone">{{ rc.qr | safe }}</div>
+        <div class="rc-links">
+          <div class="small muted">Scan with your phone or</div>
+          <div class="row" style="flex-wrap:nowrap;gap:4px">
+            <a class="btn sm" href="{{ rc.url }}" target="_blank" rel="noopener">{{ icon('cloud') }}Open in browser</a>
+            <button class="btn sm ghost" data-copy="#rc-url" title="Copy URL">{{ icon('copy') }}</button>
+            <span id="rc-url" hidden>{{ rc.url }}</span>
+          </div>
+          {% if rc.capacity %}<div class="help" style="margin:0">{{ rc.capacity.split('·')[0] }}</div>{% endif %}
+        </div>
+      </div>
+      {% elif rc.state == 'confirm' %}
+      <p class="small">Remote control is waiting for a confirmation – open the session and answer the prompt.</p>
+      {% elif rc.state == 'disabled' %}
+      <p class="small muted">Disabled in the settings (<code>RC_ENABLED</code>).</p>
+      {% endif %}
+      <details class="rc-details"><summary class="small muted">Terminal output</summary><pre class="rc">{{ rc.tail }}</pre></details>
+    {% endif %}
+    <div class="row" style="margin-top:10px">
+      <a class="btn sm" href="/terminal?p=rc">{{ icon('terminal') }}Open session</a>
+      {% if rc is not none %}
+        {% if rc.state == 'disabled' %}<button class="btn sm primary" hx-post="/rc/toggle">{{ icon('play') }}Enable</button>
+        {% else %}<button class="btn sm" hx-post="/rc/toggle" hx-confirm="Disable remote control? Connected remote sessions will be disconnected.">{{ icon('stop') }}Disable</button>{% endif %}
+      {% endif %}
+      {% if rc is not none and rc.state != 'disabled' %}<button class="btn sm" hx-post="/rc/restart" hx-confirm="Restart remote control? Connected remote sessions will be disconnected.">{{ icon('refresh') }}Restart</button>{% endif %}
+    </div>
+    {% if not rc or rc.state != 'connected' %}<p class="help">First start: sign in, open the session and confirm the prompts. It then shows up in claude.ai/code and the Claude app. Settings changes apply after “Restart”.</p>{% endif %}
+  </div>
+
+  <!-- services -->
+  <div class="card">
+    <div class="card-head"><h2>{{ icon('plug') }}Services</h2><a class="btn sm ghost" href="/services">Manage →</a></div>
+    <div class="row" style="margin-bottom:12px">
+      <span class="stat">{{ active | length }}</span><span class="muted">of {{ services | length }} active</span>
+    </div>
+    <div class="row">
+      {% for s in services %}<span class="pill {{ s.state }}" title="{{ s.label }}">{{ s.name }}</span>{% endfor %}
+    </div>
+    {% if warn %}<p class="help" style="margin-top:10px">{{ warn | length }} service(s) waiting for a token.</p>{% endif %}
+  </div>
+
+  <!-- docker hosts -->
+  {% set dockers = services | selectattr("docker") | list %}
+  <div class="card">
+    <div class="card-head"><h2>{{ icon('server') }}Docker hosts</h2><a class="btn sm ghost" href="/services">Manage →</a></div>
+    {% if dockers %}
+    <div class="stack small">
+      {% for s in dockers %}
+      <div class="between">
+        <span class="row" style="gap:8px;flex-wrap:nowrap"><span class="dot {{ 'ok' if s.state == 'ok' else 'warn' if s.state == 'warn' else '' }}"></span>
+          <strong>{{ s.name }}</strong><span class="muted">{{ 'local' if s.docker.mode == 'socket' else 'ssh ' ~ s.docker.target }}</span></span>
+        <span class="pill {{ 'accent' if s.docker.access == 'rw' else 'info' }}">{{ s.docker.access }}</span>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="muted small">No docker hosts connected – Claude has no Docker access. Use the templates “Docker host (local/SSH)” under Services.</p>
+    {% endif %}
+  </div>
+
+  <!-- ssh -->
+  <div class="card">
+    <div class="card-head"><h2>{{ icon('key') }}SSH targets</h2><a class="btn sm ghost" href="/ssh">Manage →</a></div>
+    {% if hosts %}
+    <div class="stack small">
+      {% for h in hosts %}
+      <div class="between">
+        <span class="row" style="gap:8px;flex-wrap:nowrap">
+          <span class="ssh-dot" hx-get="/ssh/{{ h.alias }}/status" hx-trigger="load" hx-swap="innerHTML"><span class="dot" title="checking …"></span></span>
+          <strong>{{ h.alias }}</strong><span class="muted">{{ h.user }}@{{ h.hostname }}</span></span>
+        <span class="pill {{ 'accent' if h.sudo else 'info' }}">{{ 'sudo' if h.sudo else ('root' if h.user == 'root' else 'user') }}</span>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="muted small">No SSH hosts – add them under SSH.</p>
+    {% endif %}
+  </div>
+</div>

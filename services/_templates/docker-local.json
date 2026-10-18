@@ -1,0 +1,22 @@
+{
+  "_meta": {
+    "title": "Docker host (local, socket)",
+    "category": "Docker hosts",
+    "setup": "For the host tentaclaude runs on. Socket and stacks directory are mounted into the container after “Apply now” (compose.generated.yaml)."
+  },
+  "description": "Docker host – manage stacks and containers",
+  "docker": {
+    "mode": "socket",
+    "socket": "/var/run/docker.sock",
+    "stacks_dir": "/srv/stacks",
+    "access": "rw"
+  },
+  "examples": [
+    "svc docker NAME ps",
+    "svc compose NAME <stack> ps",
+    "svc compose NAME <stack> logs --tail 50"
+  ],
+  "notes": [
+    "Ask and back up before restarts, updates and deletions."
+  ]
+}

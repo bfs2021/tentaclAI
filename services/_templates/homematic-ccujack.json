@@ -1,0 +1,22 @@
+{
+  "_meta": {
+    "title": "Homematic CCU (CCU-Jack)",
+    "category": "Smart Home",
+    "setup": "CCU-Jack add-on, create a user in the CCU-Jack web UI."
+  },
+  "description": "Homematic CCU via CCU-Jack (REST/VEAP)",
+  "api": {
+    "base_url": "https://ccu.{{DOMAIN}}:2122",
+    "auth": {
+      "type": "basic",
+      "user": "${CCUJACK_USER}",
+      "password": "${CCUJACK_PASSWORD}"
+    },
+    "insecure_tls": true,
+    "docs": "https://github.com/mdzio/ccu-jack"
+  },
+  "test_path": "/",
+  "examples": [
+    "svc NAME GET /device"
+  ]
+}

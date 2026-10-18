@@ -1,0 +1,16 @@
+{
+  "_meta": {
+    "title": "Mealie",
+    "category": "Apps"
+  },
+  "description": "Mealie – recipes, ingredients, shopping lists",
+  "api": {
+    "base_url": "https://mealie.{{DOMAIN}}/api",
+    "auth": {
+      "type": "bearer",
+      "token": "${MEALIE_API_TOKEN}"
+    },
+    "docs": "https://mealie.{{DOMAIN}}/docs"
+  },
+  "test_path": "/app/about"
+}

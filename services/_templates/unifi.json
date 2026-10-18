@@ -1,0 +1,18 @@
+{
+  "_meta": {
+    "title": "UniFi Network",
+    "category": "Network"
+  },
+  "description": "UniFi Network (Integration API) – sites, devices, clients",
+  "api": {
+    "base_url": "https://unifi.{{DOMAIN}}/proxy/network/integration/v1",
+    "auth": {
+      "type": "header",
+      "header": "X-API-KEY",
+      "value": "${UNIFI_API_KEY}"
+    },
+    "insecure_tls": true,
+    "docs": "UniFi Network → Settings → Control Plane → Integrations"
+  },
+  "test_path": "/sites"
+}

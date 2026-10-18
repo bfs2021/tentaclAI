@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}Updates{% endblock %}
+{% block content %}
+<div class="header">
+  <div><h1>Updates</h1><div class="sub">Claude Code is installed when the image is built – an update rebuilds the image and recreates the container.</div></div>
+</div>
+<div class="grid two">
+  <div hx-get="/partials/versions" hx-trigger="load" hx-swap="outerHTML"><div class="skeleton"></div></div>
+  <div class="card">
+    <h2>What happens during an update?</h2>
+    <ol class="muted small" style="padding-left:18px;margin:0">
+      <li><code>docker compose build --pull claude</code> – fresh base image and the requested Claude Code version</li>
+      <li><code>docker compose up -d --force-recreate claude</code> – recreate the container</li>
+      <li>remove old, unused images of the stack</li>
+    </ol>
+    <p class="small" style="margin-top:12px">Login, settings, SSH, services and projects are kept (they live on the host).</p>
+    {% if sessions %}
+    <div class="banner info" style="margin:12px 0 0">
+      <div class="small"><strong>{{ sessions | length }} running session(s)</strong> – will end during the update: {% for s in sessions %}<code>{{ s.name }}</code> {% endfor %}</div>
+    </div>
+    {% endif %}
+    <p class="help" style="margin-top:12px">tentacontrol itself is updated on the host: <code>docker compose up -d --build control</code></p>
+  </div>
+</div>
+{% endblock %}

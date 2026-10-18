@@ -1,0 +1,21 @@
+{
+  "_meta": {
+    "title": "Nextcloud",
+    "category": "Apps",
+    "setup": "Settings → Security → App password"
+  },
+  "description": "Nextcloud – files (WebDAV), users, shares (OCS)",
+  "api": {
+    "base_url": "https://cloud.{{DOMAIN}}",
+    "auth": {
+      "type": "basic",
+      "user": "${NEXTCLOUD_USER}",
+      "password": "${NEXTCLOUD_APP_PASSWORD}"
+    },
+    "headers": {
+      "OCS-APIRequest": "true"
+    },
+    "docs": "https://docs.nextcloud.com/server/latest/developer_manual/client_apis/"
+  },
+  "test_path": "/ocs/v2.php/cloud/capabilities?format=json"
+}

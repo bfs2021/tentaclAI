@@ -1,0 +1,30 @@
+{
+  "_meta": {
+    "title": "Home Assistant",
+    "category": "Smart Home",
+    "setup": "Profile → Security → Long-lived access token. HA_URL e.g. http://homeassistant.{{DOMAIN}}:8123"
+  },
+  "description": "Home Assistant – states, logbook, history, automations, dashboards",
+  "api": {
+    "base_url": "${HA_URL}/api",
+    "auth": {
+      "type": "bearer",
+      "token": "${HA_TOKEN}"
+    },
+    "docs": "https://developers.home-assistant.io/docs/api/rest/"
+  },
+  "mcp": {
+    "type": "http",
+    "url": "${HA_URL}/api/mcp",
+    "headers": {
+      "Authorization": "Bearer ${HA_TOKEN}"
+    }
+  },
+  "test_path": "/",
+  "examples": [
+    "svc NAME GET /states/sun.sun"
+  ],
+  "notes": [
+    "MCP needs the HA integration “Model Context Protocol Server”."
+  ]
+}

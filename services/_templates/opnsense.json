@@ -1,0 +1,18 @@
+{
+  "_meta": {
+    "title": "OPNsense",
+    "category": "Network"
+  },
+  "description": "OPNsense – firewall, DHCP, diagnostics",
+  "api": {
+    "base_url": "https://opnsense.{{DOMAIN}}/api",
+    "auth": {
+      "type": "basic",
+      "user": "${OPNSENSE_KEY}",
+      "password": "${OPNSENSE_SECRET}"
+    },
+    "insecure_tls": true,
+    "docs": "https://docs.opnsense.org/development/api.html"
+  },
+  "test_path": "/core/firmware/status"
+}

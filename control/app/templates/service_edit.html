@@ -1,0 +1,131 @@
+{% extends "base.html" %}
+{% block title %}{{ svc.name }}{% endblock %}
+{% block content %}
+<div class="header">
+  <div>
+    <div class="small"><a href="/services">← Services</a></div>
+    <h1 class="row">{{ svc.name }} <span class="pill {{ svc.state }}">{{ svc.label }}</span></h1>
+    <div class="sub">{{ svc.description }}</div>
+    <div class="row small" style="margin-top:8px">
+      <span class="muted">System</span>
+      <select name="system" class="sys-select" hx-post="/services/{{ svc.name }}/system" hx-trigger="change">
+        <option value="">– standalone –</option>
+        {% for x in systems %}<option value="{{ x.name }}" {{ 'selected' if x.name == svc.system }}>{{ x.name }}</option>{% endfor %}
+      </select>
+      {% if svc.system %}<a href="/systems/{{ svc.system }}">rules &amp; details →</a>{% endif %}
+    </div>
+  </div>
+  <div class="row">
+    <button class="btn" hx-post="/services/{{ svc.name }}/svc-test" hx-target="#svc-test" hx-indicator="#svc-test-spin">{{ icon('check') }}Test connection</button>
+    <a class="btn primary" href="/terminal?p=onboard&alias={{ svc.name | urlencode }}" title="Claude tests and explores the service and agrees on purpose, scope and rules with you">{{ icon('sparkle') }}Onboard with Claude</a>
+    <button class="btn" hx-post="/services/{{ svc.name }}/toggle">{{ 'Disable' if svc.enabled else 'Enable' }}</button>
+    <button class="btn danger" hx-post="/services/{{ svc.name }}/delete" hx-confirm="Delete service {{ svc.name }}? (tokens in .env are kept)">{{ icon('trash') }}Delete</button>
+  </div>
+</div>
+
+<div id="svc-test-wrap" class="card flat" style="margin-bottom:16px">
+  <div class="between"><strong>Connection test</strong><span id="svc-test-spin" class="spinner htmx-indicator"></span></div>
+  <div id="svc-test" class="small muted" style="margin-top:6px">Checks every part of the service (API, MCP, git, Docker, database, web source, files). “Onboard with Claude” also tests, explores the service and records its purpose, scope and rules with you.</div>
+</div>
+<div class="grid two">
+  <div class="stack">
+    <div class="card">
+      <h2>Tokens &amp; variables</h2>
+      {% if svc.vars %}
+      <form hx-post="/services/{{ svc.name }}/tokens" autocomplete="off">
+        {% for v in svc.vars %}
+        <div class="field">
+          <label class="between">{{ v.name }} <span class="pill {{ 'ok' if v.set else 'warn' }}">{{ 'set' if v.set else 'empty' }}</span></label>
+          {% if v.secret %}
+          <div class="secret-row">
+            <input type="password" name="var_{{ v.name }}" placeholder="{{ 'leave unchanged' if v.set else 'enter value' }}" autocomplete="new-password">
+            {% if v.set %}<label class="check"><input type="checkbox" name="clear_{{ v.name }}"> clear</label>{% endif %}
+          </div>
+          {% else %}
+          <input type="text" name="var_{{ v.name }}" value="{{ v.value }}" placeholder="enter value">
+          {% endif %}
+        </div>
+        {% endfor %}
+        <button class="btn primary">{{ icon('check') }}Save</button>
+        <p class="help">Values are never shown. API calls through <code>svc</code> use new tokens immediately; <code>GH_TOKEN</code> only after the container is recreated.</p>
+      </form>
+      {% else %}
+      <p class="muted">This service uses no <code>${VAR}</code> placeholders.</p>
+      {% endif %}
+    </div>
+
+    {% if svc.docker %}
+    <div class="card">
+      <div class="card-head"><h2>Docker host</h2>
+        <span class="pill {{ 'accent' if svc.docker.access == 'rw' else 'info' }}">{{ 'manage (rw)' if svc.docker.access == 'rw' else 'read only (ro)' }}</span></div>
+      <dl class="kv">
+        <dt>Connection</dt><dd>{{ 'local socket' if svc.docker.mode == 'socket' else 'SSH' }}</dd>
+        <dt>{{ 'Socket' if svc.docker.mode == 'socket' else 'SSH host' }}</dt><dd class="mono small">{{ svc.docker.target }}</dd>
+        <dt>Stacks directory</dt><dd class="mono small">{{ svc.docker.stacks_dir or '–' }}</dd>
+      </dl>
+      <p class="help">Claude uses <code>svc docker {{ svc.name }} …</code> and <code>svc compose {{ svc.name }} &lt;stack&gt; …</code>. With <code>ro</code> only read-only commands are allowed.
+      {% if svc.docker.mode == 'socket' %}Socket and stacks directory are mounted via <code>compose.generated.yaml</code> – after changes use “Apply now”.{% else %}The SSH user must be allowed to run <code>docker</code>.{% endif %}</p>
+    </div>
+    {% endif %}
+
+    {% if svc.git %}
+    <div class="card">
+      <div class="card-head"><h2>Git repository</h2>
+        <span class="pill {{ 'accent' if svc.git.access == 'rw' else 'info' }}">{{ 'read + write (rw)' if svc.git.access == 'rw' else 'read only (ro)' }}</span></div>
+      <dl class="kv">
+        <dt>URL</dt><dd class="mono small" style="word-break:break-all">{{ svc.git.url }}</dd>
+        <dt>Branch</dt><dd class="mono">{{ svc.git.branch or "default" }}</dd>
+        <dt>Path in the container</dt><dd class="mono small">{{ svc.git.path }}</dd>
+        <dt>Authentication</dt><dd>{{ {'token': 'token (credential helper)', 'none': 'none / SSH key'}.get(svc.git.auth, svc.git.auth) }}</dd>
+        <dt>Status</dt><dd><span class="pill {{ 'ok' if svc.git.cloned else 'off' }}">{{ 'cloned' if svc.git.cloned else 'not cloned' }}</span></dd>
+      </dl>
+      <div class="row" style="margin-top:14px">
+        <button class="btn sm primary" hx-post="/services/{{ svc.name }}/git-sync" {{ 'disabled' if svc.state != 'ok' }}>{{ icon('refresh') }}{{ 'Fetch & apply protection' if svc.git.cloned else 'Clone now' }}</button>
+      </div>
+      <p class="help">ro: push is blocked by push URL and pre-push hook. To change access set <code>"access"</code> to <code>"ro"</code>/<code>"rw"</code> in the JSON and save – applied immediately.</p>
+    </div>
+    {% endif %}
+
+    {% if 'api' in svc.kinds %}
+    <div class="card">
+      <h2>Test API</h2>
+      <form class="row" hx-post="/services/{{ svc.name }}/test" hx-target="#test-result" hx-indicator="#test-spin">
+        <input type="text" name="path" value="{{ svc.data.get('test_path', '/') }}" style="flex:1" class="mono">
+        <button class="btn">GET</button>
+        <span id="test-spin" class="spinner htmx-indicator"></span>
+      </form>
+      <div id="test-result" style="margin-top:10px"></div>
+      <p class="help">Runs <code>svc {{ svc.name }} GET &lt;path&gt;</code> in the container and shows the HTTP status.</p>
+    </div>
+    {% endif %}
+
+    {% if svc.data.get('examples') or svc.data.get('notes') %}
+    <div class="card">
+      <h2>Examples &amp; notes</h2>
+      {% for e in svc.data.get('examples', []) %}<div class="mono small" style="margin-bottom:6px">$ {{ e }}</div>{% endfor %}
+      {% for n in svc.data.get('notes', []) %}<p class="small" style="margin-top:8px">⚠ {{ n }}</p>{% endfor %}
+    </div>
+    {% endif %}
+  </div>
+
+  <div class="card">
+    <div class="card-head"><h2>Definition (JSON)</h2><span class="faint small">services/{{ svc.name }}.json</span></div>
+    <form hx-post="/services/{{ svc.name }}/json">
+      <textarea name="raw" spellcheck="false" id="raw">{{ raw }}</textarea>
+      <div class="row" style="margin-top:12px">
+        <button class="btn primary">{{ icon('check') }}Save &amp; sync</button>
+        <button type="button" class="btn ghost" onclick="try{var t=document.getElementById('raw');t.value=JSON.stringify(JSON.parse(t.value),null,2);tcToast('Valid JSON','info')}catch(e){tcToast(e.message,'err')}">Validate &amp; format</button>
+      </div>
+    </form>
+    <details style="margin-top:14px" class="small">
+      <summary class="muted">Fields</summary>
+      <div class="muted" style="margin-top:8px">
+        <code>docker</code> {mode socket|ssh, socket, ssh_host, stacks_dir, access ro|rw},
+        <code>api.base_url</code>, <code>api.auth.type</code> = <code>none</code> | <code>bearer {token}</code> | <code>header {header, value}</code> | <code>basic {user, password}</code> | <code>query {param, value}</code> | <code>oauth2_client_credentials {token_url, client_id, client_secret, scope}</code>,
+        <code>api.insecure_tls</code>, <code>api.docs</code>, <code>mcp</code> (like <code>.mcp.json</code>: <code>type</code> http/sse + <code>url</code>/<code>headers</code> or stdio + <code>command</code>/<code>args</code>/<code>env</code>),
+        <code>git</code> {url, access, branch, path, auth}, <code>examples</code>, <code>notes</code>, <code>test_path</code>, <code>enabled</code>. Secrets only as <code>${VAR}</code>.
+      </div>
+    </details>
+  </div>
+</div>
+{% endblock %}

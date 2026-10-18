@@ -1,0 +1,16 @@
+{
+  "_meta": {
+    "title": "Website (basic auth)",
+    "category": "Web sources",
+    "setup": "User and password of a (ideally read-only) account into .env."
+  },
+  "description": "Wiki / intranet page behind basic auth",
+  "web": {
+    "base_url": "https://wiki.{{DOMAIN}}",
+    "auth": { "type": "basic", "user": "${EXAMPLE_USER}", "password": "${EXAMPLE_PASSWORD}" }
+  },
+  "examples": [
+    "svc web NAME /",
+    "svc web NAME --links /"
+  ]
+}

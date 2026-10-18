@@ -1,0 +1,14 @@
+{
+  "_meta": {
+    "title": "Git repo (public, read only)",
+    "category": "Git repos"
+  },
+  "description": "Public repo as reference – read only",
+  "git": {
+    "url": "https://github.com/OWNER/REPO.git",
+    "access": "ro",
+    "auth": {
+      "type": "none"
+    }
+  }
+}

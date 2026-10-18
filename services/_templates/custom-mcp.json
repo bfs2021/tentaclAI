@@ -1,0 +1,14 @@
+{
+  "_meta": {
+    "title": "Custom MCP server (HTTP)",
+    "category": "General"
+  },
+  "description": "Any MCP server over HTTP",
+  "mcp": {
+    "type": "http",
+    "url": "https://example.{{DOMAIN}}/mcp",
+    "headers": {
+      "Authorization": "Bearer ${EXAMPLE_TOKEN}"
+    }
+  }
+}

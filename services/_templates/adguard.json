@@ -1,0 +1,17 @@
+{
+  "_meta": {
+    "title": "AdGuard Home",
+    "category": "Network"
+  },
+  "description": "AdGuard Home – filters, clients, statistics",
+  "api": {
+    "base_url": "https://adguard.{{DOMAIN}}/control",
+    "auth": {
+      "type": "basic",
+      "user": "${ADGUARD_USER}",
+      "password": "${ADGUARD_PASSWORD}"
+    },
+    "docs": "https://github.com/AdguardTeam/AdGuardHome/tree/master/openapi"
+  },
+  "test_path": "/status"
+}

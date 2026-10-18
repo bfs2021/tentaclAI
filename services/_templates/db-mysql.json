@@ -1,0 +1,24 @@
+{
+  "_meta": {
+    "title": "MySQL / MariaDB database",
+    "category": "Databases",
+    "setup": "Ideally a dedicated read-only user: CREATE USER 'claude_ro'@'%' IDENTIFIED BY '…'; GRANT SELECT, SHOW VIEW ON app.* TO 'claude_ro'@'%'; Put user and password into .env."
+  },
+  "description": "MySQL / MariaDB database",
+  "db": {
+    "engine": "mysql",
+    "host": "db.{{DOMAIN}}",
+    "port": 3306,
+    "database": "app",
+    "user": "${EXAMPLE_DB_USER}",
+    "password": "${EXAMPLE_DB_PASSWORD}",
+    "access": "ro"
+  },
+  "examples": [
+    "svc db NAME tables",
+    "svc db NAME \"SELECT count(*) FROM users\""
+  ],
+  "notes": [
+    "ro: the session is read-only – a read-only database user is the real protection."
+  ]
+}
