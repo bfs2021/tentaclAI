@@ -1,0 +1,14 @@
+version: 2
+updates:
+  - package-ecosystem: pip
+    directory: /control
+    schedule:
+      interval: monthly
+  - package-ecosystem: docker
+    directory: /control
+    schedule:
+      interval: monthly
+  - package-ecosystem: docker
+    directory: /build
+    schedule:
+      interval: monthly

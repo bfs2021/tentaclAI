@@ -11,6 +11,7 @@ Sandbox + service gateway for Claude Code.</p>
 <p align="center">
   <img alt="Claude Code" src="https://img.shields.io/badge/Claude_Code-sandbox-7c5cf0">
   <img alt="Docker" src="https://img.shields.io/badge/runs_on-Docker-22d3ee">
+  <img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-5b6375">
   <img alt="Services" src="https://img.shields.io/badge/services-docker%20·%20api%20·%20mcp%20·%20git%20·%20db%20·%20web%20·%20files-a78bfa">
 </p>
 
@@ -280,6 +281,10 @@ What it does **not** (yet) do – keep it in mind:
 - **SSH:** add and edit hosts completely in the UI
 - **tentacontrol:** AI assistant for the configuration · OAuth with browser login · export/import of configuration and templates
 - **Topology:** connections between systems and containers (reverse proxy → container, tunnels) · monitoring status
+
+## License
+
+MIT – see [LICENSE](LICENSE). Contributions welcome, see [CONTRIBUTING.md](CONTRIBUTING.md); security reports: [SECURITY.md](SECURITY.md).
 
 ## Notice
 

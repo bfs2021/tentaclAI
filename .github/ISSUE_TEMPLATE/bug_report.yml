@@ -1,0 +1,32 @@
+name: Bug report
+description: Something does not work as described
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: "Please remove tokens, hostnames and other private details from logs and screenshots. Security issues: use *Security → Report a vulnerability* instead."
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What did you do, what did you expect, what happened instead?
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options: [svc / services, tentacontrol (web admin), Remote Control / terminal, SSH hosts, topology, install / tentaclai.sh, other]
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs / output
+      description: e.g. `svc test <name>`, `docker logs tentaclai`, tentacontrol → Logs
+      render: text
+  - type: input
+    id: version
+    attributes:
+      label: Version / commit
+      placeholder: v0.1.0 or commit hash
