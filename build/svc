@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""svc – homelab service registry for tentaclai.
+"""svc – the service gateway of tentaclAI: credentials, access modes (ro/rw/confirm) and audit for every tentacle.
 
 One JSON file per service in $TC_DIR/services/*.json.
 A service can have an "api", an "mcp" and/or a "git" part. Secrets are ${VAR} placeholders,

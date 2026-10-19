@@ -33,7 +33,7 @@ Every connection is a **service** you add on purpose, with its own access mode: 
 ## Why
 
 Claude Code is great at operating systems – reading logs, fixing a compose file, querying an API, writing an automation.
-Pointed at a real homelab or server landscape, two questions come up immediately: *what may it touch?* and *how does it know
+Pointed at real infrastructure – servers, a homelab, company or cloud services – two questions come up immediately: *what may it touch?* and *how does it know
 my setup?* tentaclAI answers both:
 
 - **Explicit reach.** Claude sees nothing by default. Each Docker host, API, database or folder is connected as a service
