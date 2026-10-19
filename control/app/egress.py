@@ -90,7 +90,7 @@ def origin(host, port, tent=None, r=None):
     if name:
         return "tentacle", name
     if any(tclib.egress_match(p, host, port) for p in default_list()):
-        return "default", "default list"
+        return "default", "built-in list"
     if any(tclib.egress_match(p, host, port) for p in r["allow"]):
         return "allow", "own allowlist"
     return "unknown", ""
