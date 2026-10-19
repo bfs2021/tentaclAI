@@ -25,6 +25,12 @@ All notable changes, newest first. Every release lists **upgrade steps** from th
   (`egress-seen.json`). `EGRESS_MODE=permissive` (default) allows everything – allow/block lists and approvals follow.
 - **Network** page in tentacontrol: every destination with connections, first/last use and its origin – a
   tentacle, Claude/Anthropic or unknown.
+- **Allow and block lists, enforce mode** – own allowlist and blocklist (Network → tabs, or *Allow*/*Block* on a seen
+  destination), the shipped default list (Anthropic, GitHub, PyPI, npm) and the tentacles, derived live from your
+  services and SSH hosts. `EGRESS_MODE=enforce` (switch on the Network page) holds unknown destinations up to 60 s and
+  asks in Activity: *Allow 10 min*, *Allow 1 h*, *Always*, *Deny*, *Block*.
+- **Public sources need no service** – the templates `web-public`, `git-public` and `context7` are gone; allow such
+  hosts under Network and Claude uses them directly. Existing services of that kind keep working.
 - **Tentacles** is the new name of the *Connections* area and the collective term for everything Claude can reach
   (services, SSH hosts, systems).
 

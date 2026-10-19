@@ -239,6 +239,7 @@
       <ul>
         <li>Files: <code>systems/&lt;name&gt;.json</code> (example: <code>systems/_example.json</code>).</li>
         <li>Docker services of mode <code>ssh</code> without their own <code>ssh_host</code> use the system's SSH host.</li>
+        <li>A service is only needed for credentials or write access – public, read-only sources (docs, registries, public repos, websites) just need an entry under <a href="/network?tab=allow">Network → Allowlist</a>; Claude uses them directly.</li>
         <li>Rule of thumb: one <em>service</em> = one way in with one set of credentials (an API and its MCP server may share a file); one <em>system</em> = one machine or appliance.</li>
         <li>Claude sees systems in the service catalog and via <code>svc systems [name]</code>; <code>svc info &lt;service&gt;</code> also prints the system's rules.</li>
       </ul>

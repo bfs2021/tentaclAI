@@ -25,7 +25,7 @@ RUN mkdir -p /app/vendor \
     && curl -fsSL -o /app/vendor/addon-fit.js https://cdn.jsdelivr.net/npm/@xterm/addon-fit@0.10.0/lib/addon-fit.js \
     && curl -fsSL -o /app/vendor/cytoscape.min.js https://cdn.jsdelivr.net/npm/cytoscape@3.30.2/dist/cytoscape.min.js
 
-COPY lib/tclib.py /app/tclib.py
+COPY lib/tclib.py lib/egress-default.txt /app/
 COPY VERSION /app/VERSION
 COPY control/app/ /app/app/
 COPY control/passwd.py /usr/local/bin/tentacontrol-passwd

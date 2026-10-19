@@ -12,10 +12,18 @@
         </div>
       </div>
       <div class="row" style="margin-top:10px">
+        {% if a.part == 'network' %}
+        <button class="btn primary" hx-post="/approvals/{{ a.id }}/net10" hx-target="#approvals" hx-swap="outerHTML">{{ icon('check') }}Allow 10 min</button>
+        <button class="btn" hx-post="/approvals/{{ a.id }}/net60" hx-target="#approvals" hx-swap="outerHTML">Allow 1 h</button>
+        <button class="btn" hx-post="/approvals/{{ a.id }}/always" hx-target="#approvals" hx-swap="outerHTML" title="add {{ a.service }} to the allowlist">Always</button>
+        <button class="btn danger" hx-post="/approvals/{{ a.id }}/deny" hx-target="#approvals" hx-swap="outerHTML">Deny</button>
+        <button class="btn danger" hx-post="/approvals/{{ a.id }}/block" hx-target="#approvals" hx-swap="outerHTML" title="add {{ a.service }} to the blocklist">Block</button>
+        {% else %}
         <button class="btn primary" hx-post="/approvals/{{ a.id }}/approve" hx-target="#approvals" hx-swap="outerHTML">{{ icon('check') }}Approve</button>
         {% if a.part not in no_grant %}<button class="btn" hx-post="/approvals/{{ a.id }}/approve15" hx-target="#approvals" hx-swap="outerHTML"
           title="Approve this and every further write of {{ a.service }} ({{ a.part }}) for the next 15 minutes">Approve + 15 min</button>{% endif %}
         <button class="btn danger" hx-post="/approvals/{{ a.id }}/deny" hx-target="#approvals" hx-swap="outerHTML">Deny</button>
+        {% endif %}
       </div>
     </div>
     {% endfor %}

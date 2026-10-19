@@ -51,8 +51,12 @@ def _expire():
 
 
 def create(service, part, action):
-    """new request; approved at once while a grant for this service + part is active"""
+    """new request; approved at once while a grant for this service + part is active; one pending request per network target"""
     _expire()
+    if part == "network":
+        same = next((a for a in APPROVALS.values() if a["status"] == "pending" and a["service"] == service and a["part"] == part), None)
+        if same:
+            return same["id"]
     rid = str(next(_ids))
     a = {"id": rid, "service": str(service)[:60], "part": str(part)[:20], "action": str(action)[:500],
          "created": time.time(), "status": "pending", "by": "", "event": asyncio.Event()}
@@ -64,14 +68,14 @@ def create(service, part, action):
     return rid
 
 
-def decide(rid, approve, who="tentacontrol", grant=False):
+def decide(rid, approve, who="tentacontrol", grant=False, seconds=None):
     a = APPROVALS.get(rid)
     if not a or a["status"] != "pending":
         return False
     a.update(status="approved" if approve else "denied", decided=time.time(), by=who)
     if approve and grant and a["part"] not in NO_GRANT_PARTS:
-        GRANTS[(a["service"], a["part"])] = {"until": time.time() + GRANT_SECONDS, "by": who}
-        a["by"] = who + " + 15 min"
+        GRANTS[(a["service"], a["part"])] = {"until": time.time() + (seconds or GRANT_SECONDS), "by": who}
+        a["by"] = who + f" + {(seconds or GRANT_SECONDS) // 60} min"
     a["event"].set()
     return True
 

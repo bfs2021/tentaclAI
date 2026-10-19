@@ -1,30 +1,64 @@
 {% extends "base.html" %}
 {% from "_icons.html" import icon %}
 {% block title %}Network{% endblock %}
+{% macro rule_btn(kind, entry, label, cls="") -%}
+<form class="inline" hx-post="/network/rule"><input type="hidden" name="kind" value="{{ kind }}"><input type="hidden" name="entry" value="{{ entry }}"><button class="btn sm {{ cls }}">{{ label }}</button></form>
+{%- endmacro %}
 {% block content %}
 <div class="header">
-  <div><h1>Network</h1><div class="sub">Every destination the sandbox connected to through the egress gateway. Tentacles are allowed automatically; allow/block lists and approvals follow.</div></div>
-  <span class="pill {{ 'warn' if mode == 'permissive' else 'ok' }}" title="EGRESS_MODE in Settings">{{ mode }}</span>
+  <div><h1>Network</h1><div class="sub">The sandbox reaches the outside only through the egress gateway. Tentacles and the default list are always allowed; everything else follows your lists – and in <strong>enforce</strong> mode waits for your approval in Activity.</div></div>
+  <div class="row"><span class="pill {{ 'warn' if mode == 'permissive' else 'ok' }}">{{ mode }}</span>
+    <button class="btn sm" hx-post="/network/mode" hx-confirm="{{ 'Switch to enforce? Unknown destinations then wait for your approval in Activity (up to 60 s) and are refused otherwise.' if mode == 'permissive' else 'Switch to permissive? Every destination is allowed again (and recorded).' }}">{{ 'Enforce' if mode == 'permissive' else 'Permissive' }}</button></div>
 </div>
+<nav class="conn-tabs" aria-label="Network">
+  <a href="/network?tab=seen" class="{{ 'active' if tab == 'seen' }}">{{ icon('activity') }}Seen</a>
+  <a href="/network?tab=allow" class="{{ 'active' if tab == 'allow' }}">{{ icon('check') }}Allowlist</a>
+  <a href="/network?tab=block" class="{{ 'active' if tab == 'block' }}">{{ icon('stop') }}Blocklist</a>
+</nav>
+{% if tab == 'seen' %}
 <div class="card">
   <div class="card-head"><h2>Seen destinations</h2>
-    <span class="small muted">{{ counts.tentacle }} tentacles · {{ counts.anthropic }} Claude/Anthropic · {{ counts.other }} other</span></div>
+    <span class="small muted">{{ counts.tentacle }} tentacles · {{ counts.default + counts.allow }} allowed · {{ counts.unknown }} unknown · {{ counts.blocked }} blocked</span></div>
   {% if rows %}
   <div class="table-wrap"><table>
-    <thead><tr><th>Destination</th><th>Origin</th><th style="text-align:right">Connections</th><th>First</th><th>Last</th></tr></thead>
+    <thead><tr><th>Destination</th><th>Origin</th><th>Last decision</th><th style="text-align:right">Connections</th><th>Last</th><th></th></tr></thead>
     <tbody>
     {% for r in rows %}
       <tr>
         <td class="mono small">{{ r.host }}<span class="faint">:{{ r.port }}</span></td>
-        <td>{% if r.kind == 'tentacle' %}<span class="pill ok">{{ r.origin }}</span>{% elif r.kind == 'anthropic' %}<span class="pill info">{{ r.origin }}</span>{% else %}<span class="pill warn">unknown</span>{% endif %}</td>
+        <td>{% if r.kind == 'tentacle' %}<span class="pill ok">{{ r.label }}</span>{% elif r.kind in ('default', 'allow') %}<span class="pill info">{{ r.label }}</span>{% elif r.kind == 'blocked' %}<span class="pill err">blocked</span>{% else %}<span class="pill warn">unknown</span>{% endif %}</td>
+        <td class="small muted">{{ r.decision }}</td>
         <td style="text-align:right;font-variant-numeric:tabular-nums">{{ r.count }}</td>
-        <td class="small muted">{{ r.first_s }}</td><td class="small muted">{{ r.last_s }}</td>
+        <td class="small muted">{{ r.last_s }}</td>
+        <td style="text-align:right;white-space:nowrap">{% if r.kind == 'unknown' %}{{ rule_btn('allow', r.host ~ ':' ~ r.port, 'Allow') }} {{ rule_btn('block', r.host ~ ':' ~ r.port, 'Block', 'ghost') }}{% endif %}</td>
       </tr>
     {% endfor %}
     </tbody>
   </table></div>
-  {% else %}
-  <div class="empty small">Nothing recorded yet – the list fills as soon as the sandbox connects somewhere.</div>
-  {% endif %}
+  {% else %}<div class="empty small">Nothing recorded yet – the list fills as soon as the sandbox connects somewhere.</div>{% endif %}
 </div>
+{% else %}
+{% set kind = tab %}
+<div class="card" style="margin-bottom:16px">
+  <div class="card-head"><h2>{{ 'Your allowlist' if kind == 'allow' else 'Blocklist' }}</h2></div>
+  <form class="row" hx-post="/network/rule" style="margin-bottom:12px"><input type="hidden" name="kind" value="{{ kind }}">
+    <input type="text" name="entry" class="mono" placeholder="host · *.domain · host:port" required style="max-width:340px">
+    <button class="btn sm primary">{{ icon('plus') }}Add</button></form>
+  {% if rules[kind] %}
+  <div class="stack">{% for e in rules[kind] %}
+    <div class="between"><span class="mono small">{{ e }}</span>
+      <form class="inline" hx-post="/network/rule"><input type="hidden" name="kind" value="{{ kind }}"><input type="hidden" name="entry" value="{{ e }}"><input type="hidden" name="op" value="remove"><button class="btn sm ghost">{{ icon('trash') }}</button></form></div>
+  {% endfor %}</div>
+  {% else %}<div class="empty small">{{ 'No own entries yet – add them here or with “Allow” on the Seen tab.' if kind == 'allow' else 'Nothing blocked. Blocked destinations are refused even if a tentacle or the default list would allow them.' }}</div>{% endif %}
+</div>
+{% if kind == 'allow' %}
+<div class="grid2">
+  <div class="card"><div class="card-head"><h2>Tentacles</h2><span class="small muted">automatic</span></div>
+    <p class="help">Hosts of your active services and SSH hosts – they follow your tentacles, nothing to maintain.</p>
+    <div class="stack">{% for h, n in tentacles %}<div class="between"><span class="mono small">{{ h }}</span><span class="pill ok">{{ n }}</span></div>{% endfor %}</div></div>
+  <div class="card"><div class="card-head"><h2>Default list</h2><span class="small muted">shipped with tentaclAI</span></div>
+    <div class="stack">{% for e in default %}<div class="mono small">{{ e }}</div>{% endfor %}</div></div>
+</div>
+{% endif %}
+{% endif %}
 {% endblock %}

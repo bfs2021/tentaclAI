@@ -16,7 +16,7 @@ from . import activity, auth, dockerops, jobs, services_store, sshhosts, sshops,
 from .config import CLAUDE_SERVICE, COMPOSE, DATA_DIR, SERVICES_DIR, STACK_DIR, RC_VARS, RESTART_VARS, SETTINGS_GROUPS, is_secret, site
 from .envfile import read_env, update_env
 from .terminal import PROFILES, bridge, onboard_cmd
-from . import generated
+from . import egress, generated
 import tclib  # noqa: E402  shared with the sandbox tools
 
 BASE = os.path.dirname(__file__)
@@ -419,10 +419,14 @@ async def approval_count():
 
 @app.post("/approvals/{rid}/{verdict}", response_class=HTMLResponse)
 async def approval_decide(request: Request, rid: str, verdict: str):
-    if verdict not in ("approve", "approve15", "deny"):
+    if verdict not in ("approve", "approve15", "deny", "net10", "net60", "always", "block"):
         return PlainTextResponse("", status_code=400)
-    ok = activity.decide(rid, verdict != "deny", who="tentacontrol (" + (request.client.host if request.client else "?") + ")",
-                         grant=verdict == "approve15")
+    who = "tentacontrol (" + (request.client.host if request.client else "?") + ")"
+    a = activity.APPROVALS.get(rid) or {}
+    if verdict in ("always", "block") and a.get("part") == "network" and a.get("status") == "pending":
+        egress.add("allow" if verdict == "always" else "block", a["service"])  # host:port
+    ok = activity.decide(rid, verdict not in ("deny", "block"), who=who, grant=verdict in ("approve15", "net10", "net60"),
+                         seconds={"net10": 600, "net60": 3600}.get(verdict))
     resp = await approvals_partial(request)
     if not ok:
         resp.headers.update(toast("Request no longer pending", "warn"))
@@ -431,28 +435,75 @@ async def approval_decide(request: Request, rid: str, verdict: str):
 
 # ---------------------------------------------------------------- topology (prototype)
 
-@app.get("/network", response_class=HTMLResponse)
-async def network_page(request: Request):
-    """egress gateway: every destination the sandbox connected to, with its origin (a tentacle, Anthropic, unknown)"""
+def _from_proxy(request):
+    """the egress endpoints are for the gateway in the sandbox network – not for requests through the reverse proxy"""
+    return any(h in request.headers for h in ("x-forwarded-for", "x-real-ip", "forwarded"))
+
+
+@app.get("/internal/egress/policy")
+async def internal_egress_policy(request: Request):
+    """for the egress gateway (inside the sandbox network) – host lists only, no secrets"""
+    if _from_proxy(request):
+        return JSONResponse({"error": "forbidden"}, status_code=403)
+    return JSONResponse(await asyncio.to_thread(egress.policy))
+
+
+@app.post("/internal/egress/ask")
+async def internal_egress_ask(request: Request):
+    """the gateway asks about an unknown destination (enforce) – only creates a request, the user decides"""
+    if _from_proxy(request):
+        return JSONResponse({"error": "forbidden"}, status_code=403)
+    data = await request.json()
     try:
-        seen = json.load(open("/egress/egress-seen.json"))
-    except (OSError, ValueError):
-        seen = {}
-    env = read_env()
-    reaches = tclib.reach_hosts(tclib.load_services(SERVICES_DIR, tclib.load_systems(STACK_DIR)), env, sshhosts.hosts())
-    rows = []
-    for key, e in seen.items():
-        host, _, port = key.rpartition(":")
-        origin = reaches.get((host, int(port) if port.isdigit() else None)) or reaches.get((host, None))
-        kind = "tentacle" if origin else ("anthropic" if host == "claude.ai" or host.endswith((".anthropic.com", ".claude.ai")) or host == "anthropic.com" else "other")
-        rows.append({"host": host, "port": port, "origin": origin or ("Claude / Anthropic" if kind == "anthropic" else ""), "kind": kind,
-                     "count": e.get("count", 0), "first": e.get("first", 0), "last": e.get("last", 0), "decision": e.get("decision", "")})
-    rows.sort(key=lambda r: -r["last"])
+        host, port = egress.normalize(str(data.get("host", ""))), int(data.get("port", 0))
+    except (ValueError, TypeError):
+        return JSONResponse({"error": "bad target"}, status_code=400)
+    rid = activity.create(f"{host}:{port}", "network", f"connect to {host}:{port}")
+    return JSONResponse({"id": rid})
+
+
+@app.get("/internal/egress/wait/{rid}")
+async def internal_egress_wait(rid: str, wait: int = 20):
+    a = activity.APPROVALS.get(rid)
+    if not a or a["part"] != "network":
+        return JSONResponse({"status": "error"})
+    return JSONResponse(await activity.wait(rid, wait))
+
+
+@app.post("/network/rule", response_class=HTMLResponse)
+async def network_rule(request: Request, kind: str = Form(...), entry: str = Form(...), op: str = Form("add")):
+    if kind not in ("allow", "block"):
+        return PlainTextResponse("", status_code=400)
+    try:
+        if op == "remove":
+            egress.remove(kind, entry)
+            msg = f"{entry} removed from the {kind}list"
+        else:
+            msg = f"{egress.add(kind, entry)} added to the {kind}list"
+    except ValueError as e:
+        return respond(request, f"Invalid entry: {e}", "err")
+    return respond(request, msg, refresh=True)
+
+
+@app.post("/network/mode", response_class=HTMLResponse)
+async def network_mode(request: Request):
+    new = "enforce" if egress.mode() == "permissive" else "permissive"
+    update_env({"EGRESS_MODE": new})
+    return respond(request, f"Network mode: {new} (the gateway applies it within 15 s)", refresh=True)
+
+
+@app.get("/network", response_class=HTMLResponse)
+async def network_page(request: Request, tab: str = "seen"):
+    """egress gateway: seen destinations, allow and block lists, mode"""
+    rows = await asyncio.to_thread(egress.seen_rows)
     fmt = lambda ts: time.strftime("%Y-%m-%d %H:%M", time.localtime(ts)) if ts else "–"  # noqa: E731
     for r in rows:
-        r["first_s"], r["last_s"] = fmt(r["first"]), fmt(r["last"])
-    return page(request, "network.html", rows=rows, mode=(env.get("EGRESS_MODE") or "permissive"),
-                counts={k: sum(1 for r in rows if r["kind"] == k) for k in ("tentacle", "anthropic", "other")})
+        r["first_s"], r["last_s"] = fmt(r.get("first")), fmt(r.get("last"))
+    tent = await asyncio.to_thread(egress.tentacles)
+    return page(request, "network.html", tab=tab if tab in ("seen", "allow", "block") else "seen", rows=rows, mode=egress.mode(),
+                rules=egress.rules(), default=egress.default_list(),
+                tentacles=sorted((f"{h}:{p}" if p else h, n) for (h, p), n in tent.items()),
+                counts={k: sum(1 for r in rows if r["kind"] == k) for k in ("tentacle", "default", "allow", "unknown", "blocked")})
 
 
 @app.get("/topology", response_class=HTMLResponse)

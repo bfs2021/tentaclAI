@@ -170,6 +170,23 @@ def reach_hosts(services, env, ssh_hosts_list=()):
     return out
 
 
+def egress_patterns(text):
+    """patterns from an allow/block list (comments and blank lines ignored)"""
+    return [l.split("#", 1)[0].strip().lower() for l in text.splitlines() if l.split("#", 1)[0].strip()]
+
+
+def egress_match(pattern, host, port):
+    """host[:port] pattern with an optional leading '*.' wildcard; no port in the pattern = any port"""
+    p_host, _, p_port = pattern.rpartition(":") if pattern.count(":") == 1 else (pattern, "", "")
+    p_host = p_host or pattern
+    if p_port and p_port != str(port):
+        return False
+    host = host.lower().rstrip(".")
+    if p_host.startswith("*."):
+        return host.endswith(p_host[1:])
+    return host == p_host
+
+
 # ---------------------------------------------------------------- SSH hosts (ssh/config.d/*.conf)
 
 META = re.compile(r"^\s*#\s*tentacl(?:ai|aude):\s*(sudo|access)\s*=\s*(.*?)\s*$")

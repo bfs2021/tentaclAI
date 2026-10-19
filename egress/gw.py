@@ -2,22 +2,85 @@
 """tentaclAI egress gateway – the only way out of the sandbox network.
 
 Forward proxy for CONNECT (any TCP port – HTTPS, ssh, databases; TLS is not opened) and plain HTTP requests.
-EGRESS_MODE=permissive: everything is allowed and recorded (learning); enforce: see policy() – next step.
+Policy (from tentacontrol, refreshed every 15 s): blocklist → default + own allowlist → tentacles → grants →
+EGRESS_MODE permissive (allow, record as "unlisted") or enforce (hold the connection and ask in Activity).
 Every destination is counted in $DATA_DIR/egress-seen.json (host:port → first, last, count, last decision).
 """
 import asyncio
 import json
 import os
+import sys
 import time
+import urllib.request
+
+sys.path.insert(0, "/app")
+import tclib  # noqa: E402
 
 LISTEN = int(os.environ.get("EGRESS_PORT", "3128"))
-MODE = os.environ.get("EGRESS_MODE", "permissive")
+CONTROL = os.environ.get("TC_CONTROL_INTERNAL", "http://tentacontrol:8080")
 DATA = os.environ.get("DATA_DIR", "/data")
 SEEN_FILE = os.path.join(DATA, "egress-seen.json")
+DEFAULT = tclib.egress_patterns(open("/app/egress-default.txt").read())
 IDLE = 3600  # seconds a tunnel may stay silent (ssh sessions, long polls)
+HOLD = 60  # seconds an unknown destination waits for the user's decision (enforce)
 
-seen = {}
-dirty = False
+seen, dirty = {}, False
+pol = {"mode": os.environ.get("EGRESS_MODE", "permissive"), "allow": [], "block": [], "tentacles": {}, "grants": {}, "ok": False}
+
+
+def control(path, payload=None, timeout=30):
+    req = urllib.request.Request(CONTROL + path, data=json.dumps(payload).encode() if payload is not None else None,
+                                 headers={"Content-Type": "application/json"}, method="POST" if payload is not None else "GET")
+    with urllib.request.urlopen(req, timeout=timeout) as r:
+        return json.load(r)
+
+
+def refresh():
+    """policy from tentacontrol; keeps the last known one (or permissive defaults) when it is unreachable"""
+    try:
+        p = control("/internal/egress/policy", timeout=10)
+    except Exception as e:  # noqa: BLE001
+        if pol["ok"]:
+            print(f"policy refresh failed: {e}", flush=True)
+        return
+    pol.update(mode=p.get("mode", "permissive"), allow=p.get("allow", []), block=p.get("block", []), ok=True,
+               tentacles={(h, pt): n for h, pt, n in p.get("tentacles", [])}, grants=dict(p.get("grants", {})))
+
+
+async def refresher():
+    while True:
+        await asyncio.to_thread(refresh)
+        await asyncio.sleep(15)
+
+
+def decide(host, port):
+    """(allow?, reason)"""
+    if any(tclib.egress_match(p, host, port) for p in pol["block"]):
+        return False, "blocked"
+    if any(tclib.egress_match(p, host, port) for p in DEFAULT + pol["allow"]):
+        return True, "allowlist"
+    if (host, port) in pol["tentacles"] or (host, None) in pol["tentacles"]:
+        return True, "tentacle"
+    if pol["grants"].get(f"{host}:{port}", 0) > time.time():
+        return True, "grant"
+    if pol["mode"] != "enforce":
+        return True, "unlisted"
+    return None, "ask"
+
+
+async def ask(host, port):
+    """enforce: request an approval in tentacontrol and hold the connection up to HOLD seconds"""
+    try:
+        rid = (await asyncio.to_thread(control, "/internal/egress/ask", {"host": host, "port": port}))["id"]
+        end = time.time() + HOLD
+        while time.time() < end:
+            st = await asyncio.to_thread(control, f"/internal/egress/wait/{rid}?wait=20", None, 30)
+            if st.get("status") != "pending":
+                await asyncio.to_thread(refresh)
+                return st.get("status") == "approved"
+    except Exception as e:  # noqa: BLE001
+        print(f"approval for {host}:{port} failed: {e}", flush=True)
+    return False
 
 
 def load_seen():
@@ -30,9 +93,8 @@ def load_seen():
 
 def record(host, port, decision):
     global dirty
-    k = f"{host}:{port}"
     now = int(time.time())
-    e = seen.setdefault(k, {"first": now, "count": 0})
+    e = seen.setdefault(f"{host}:{port}", {"first": now, "count": 0})
     e.update(last=now, count=e["count"] + 1, decision=decision)
     dirty = True
 
@@ -43,24 +105,18 @@ async def flush():
         await asyncio.sleep(10)
         if dirty:
             dirty = False
-            tmp = SEEN_FILE + ".tmp"
-            with open(tmp, "w") as f:
+            with open(SEEN_FILE + ".tmp", "w") as f:
                 json.dump(seen, f, indent=1, sort_keys=True)
-            os.replace(tmp, SEEN_FILE)
-
-
-def policy(host, port):
-    """'allow' | 'deny' – permissive allows everything (and records it)"""
-    return "allow"
+            os.replace(SEEN_FILE + ".tmp", SEEN_FILE)
 
 
 def split_hostport(s, default):
     s = s.strip()
     if s.startswith("["):  # [v6]:port
         h, _, rest = s[1:].partition("]")
-        return h, int(rest[1:] or default)
+        return h.lower(), int(rest[1:] or default)
     h, _, p = s.rpartition(":") if s.count(":") == 1 else (s, "", "")
-    return (h or s).lower(), int(p or default)
+    return (h or s).lower().rstrip("."), int(p or default)
 
 
 async def pipe(r, w):
@@ -80,43 +136,43 @@ async def pipe(r, w):
             pass
 
 
+def refuse(cw, code, text):
+    cw.write(f"HTTP/1.1 {code}\r\nConnection: close\r\nContent-Type: text/plain\r\n\r\n{text}\n".encode())
+    cw.close()
+
+
 async def handle(cr, cw):
     try:
         head = await asyncio.wait_for(cr.readuntil(b"\r\n\r\n"), 30)
-    except (asyncio.TimeoutError, asyncio.IncompleteReadError, asyncio.LimitOverrunError, ConnectionError):
+        method, target, version = head.decode("latin-1").split("\r\n")[0].split(" ", 2)
+    except (asyncio.TimeoutError, asyncio.IncompleteReadError, asyncio.LimitOverrunError, ConnectionError, ValueError):
         cw.close()
         return
     lines = head.decode("latin-1").split("\r\n")
     try:
-        method, target, version = lines[0].split(" ", 2)
+        if method.upper() == "CONNECT":
+            host, port = split_hostport(target, 443)
+            rest = b""
+        elif target.startswith("http://"):  # plain HTTP: absolute URI → origin form, one request per connection
+            hostpart, _, path = target[7:].partition("/")
+            host, port = split_hostport(hostpart, 80)
+            hdrs = [l for l in lines[1:] if l and not l.lower().startswith(("proxy-", "connection:", "keep-alive:"))]
+            rest = (f"{method} /{path} {version}\r\n" + "\r\n".join(hdrs) + "\r\nConnection: close\r\n\r\n").encode("latin-1")
+        else:
+            return refuse(cw, "400 Bad Request", "tentaclAI egress: proxy requests only")
     except ValueError:
-        cw.close()
-        return
-    if method.upper() == "CONNECT":
-        host, port = split_hostport(target, 443)
-        rest = b""
-    else:  # plain HTTP: absolute URI → origin form, one request per connection
-        if not target.startswith("http://"):
-            cw.write(b"HTTP/1.1 400 Bad Request\r\nConnection: close\r\n\r\n")
-            cw.close()
-            return
-        hostpart, _, path = target[7:].partition("/")
-        host, port = split_hostport(hostpart, 80)
-        hdrs = [l for l in lines[1:] if l and not l.lower().startswith(("proxy-", "connection:", "keep-alive:"))]
-        rest = (f"{method} /{path} {version}\r\n" + "\r\n".join(hdrs) + "\r\nConnection: close\r\n\r\n").encode("latin-1")
-    decision = policy(host, port)
-    record(host, port, decision)
-    if decision != "allow":
-        cw.write(b"HTTP/1.1 403 Forbidden\r\nConnection: close\r\nContent-Type: text/plain\r\n\r\n"
-                 + f"tentaclAI egress: {host}:{port} is not allowed – approve it in tentacontrol\n".encode())
-        cw.close()
-        return
+        return refuse(cw, "400 Bad Request", "tentaclAI egress: bad host or port")
+    ok, why = decide(host, port)
+    if ok is None:
+        ok = await ask(host, port)
+        why = "approved" if ok else "denied"
+    record(host, port, why)
+    if not ok:
+        return refuse(cw, "403 Forbidden", f"tentaclAI egress: {host}:{port} is {why} – allow it in tentacontrol → Network or approve it in Activity")
     try:
         ur, uw = await asyncio.wait_for(asyncio.open_connection(host, port), 20)
     except (OSError, asyncio.TimeoutError) as e:
-        cw.write(f"HTTP/1.1 502 Bad Gateway\r\nConnection: close\r\n\r\n{host}:{port}: {e}\n".encode())
-        cw.close()
-        return
+        return refuse(cw, "502 Bad Gateway", f"{host}:{port}: {e}")
     if method.upper() == "CONNECT":
         cw.write(b"HTTP/1.1 200 Connection established\r\n\r\n")
         await cw.drain()
@@ -129,8 +185,9 @@ async def main():
     os.makedirs(DATA, exist_ok=True)
     load_seen()
     server = await asyncio.start_server(handle, "0.0.0.0", LISTEN, limit=65536)
-    print(f"tentaclAI egress gateway on :{LISTEN}, mode {MODE}", flush=True)
+    print(f"tentaclAI egress gateway on :{LISTEN}", flush=True)
     asyncio.create_task(flush())
+    asyncio.create_task(refresher())
     async with server:
         await server.serve_forever()
 

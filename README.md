@@ -128,7 +128,7 @@ the containers (`--check` only shows). tentacontrol also shows “Update availab
   <img src="docs/screenshots/services.png" alt="Services grouped by system" width="900">
 </p>
 
-1. **Create from a template.** Tentacles → Services → search the template list (50 templates: Docker hosts, Home Assistant, Proxmox,
+1. **Create from a template.** Tentacles → Services → search the template list (47 templates: Docker hosts, Home Assistant, Proxmox,
    Grafana, n8n, GitHub, PostgreSQL, wikis with login, folders on a NAS, …) → name → *Create service*.
 2. **Fill in the details.** Adjust URL/host/path in the JSON editor; enter tokens under *Tokens & variables*. Tokens are
    write-only: they go into `.env` and are never shown again.
@@ -229,7 +229,7 @@ secrets are never logged.
 
 A part stays inactive while one of its `${VAR}`s is empty; `"enabled": false` parks the whole service.
 
-**Rule of thumb:** one *service* = one way in with one set of credentials (an API and its MCP server may share a file);
+**Rule of thumb:** a *service* is only needed for credentials or write access – public, read-only sources (docs, registries, public repos) just need an entry in tentacontrol → Network. One *service* = one way in with one set of credentials (an API and its MCP server may share a file);
 one *system* = one machine or appliance that groups several services.
 Systems: `systems/<name>.json` with `description`, `ssh_host`, `notes` (rules for every member) – see `systems/_example.json`.
 SSH hosts: tentacontrol → Tentacles → SSH hosts, or `./ssh-host.sh list|add|sudo|hostkey|remove|test` (same logic, e.g.
@@ -273,7 +273,7 @@ tentaclai/
 │   ├── commands/              /inventory, /onboard
 │   └── entrypoint.sh, start.sh, rc-loop, cc
 ├── control/                   tentacontrol (FastAPI, HTMX, xterm.js, cytoscape.js – vendored, no CDN at runtime)
-├── services/                  your services (git-ignored) + _template.json + _templates/ (50 templates)
+├── services/                  your services (git-ignored) + _template.json + _templates/ (47 templates)
 ├── systems/                   your systems (git-ignored) + _example.json
 ├── ssh/                       /root/.ssh of the sandbox (root only – used by svc): config, config.d/, keys/ (git-ignored)
 ├── local/                     CLAUDE.md with your site rules (template: CLAUDE.example.md)
