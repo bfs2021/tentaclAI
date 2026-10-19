@@ -302,3 +302,11 @@ form.inline { display: inline; margin: 0; }
 .switch[aria-checked="true"]::after { transform: translateX(18px); }
 .switch:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 @media (prefers-reduced-motion: reduce) { .switch, .switch::after { transition: none; } }
+/* segmented control (two exclusive options, the active one coloured) */
+.seg { display: inline-flex; border: 1px solid var(--border); border-radius: 10px; padding: 3px; background: var(--panel-2); gap: 3px; }
+.seg > * { padding: 6px 14px; border-radius: 7px; font-size: 13px; color: var(--muted); display: inline-flex; gap: 6px; align-items: center;
+  border: 0; background: none; font: inherit; font-size: 13px; }
+.seg button { cursor: pointer; } .seg button:hover { color: var(--text); background: var(--panel); }
+.seg .seg-on.warn { background: var(--warn-soft); color: var(--warn); font-weight: 600; box-shadow: inset 0 0 0 1px var(--warn); }
+.seg .seg-on.ok { background: var(--ok-soft); color: var(--ok); font-weight: 600; box-shadow: inset 0 0 0 1px var(--ok); }
+.seg-ico { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }

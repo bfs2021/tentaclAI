@@ -7,11 +7,13 @@
 {% block content %}
 <div class="header">
   <div><h1>Network</h1><div class="sub">The sandbox reaches the outside only through the egress gateway. Tentacles and the default list are always allowed; everything else follows your lists – and in <strong>enforce</strong> mode waits for your approval in Activity.</div></div>
-  <div class="switch-row" title="permissive: every destination is allowed and recorded · enforce: unknown destinations wait for your approval in Activity">
-    <span class="{{ 'on' if mode == 'permissive' }}">permissive</span>
-    <button class="switch" role="switch" aria-checked="{{ 'true' if mode == 'enforce' else 'false' }}" aria-label="Network mode: enforce" hx-post="/network/mode"
-      hx-confirm="{{ 'Switch to permissive? Every destination is allowed again (and recorded).' if mode == 'enforce' else 'Switch to enforce? Unknown destinations then wait for your approval in Activity (up to 60 s) and are refused otherwise.' }}"></button>
-    <span class="{{ 'on' if mode == 'enforce' }}">enforce</span>
+  <div class="seg" role="radiogroup" aria-label="Network mode">
+    {% if mode == 'permissive' %}<span class="seg-on warn" role="radio" aria-checked="true" title="Every destination is allowed and recorded"><svg class="seg-ico" viewBox="0 0 24 24"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>permissive</span>
+    <button role="radio" aria-checked="false" hx-post="/network/mode" title="Unknown destinations wait for your approval in Activity"
+      hx-confirm="Switch to enforce? Unknown destinations then wait for your approval in Activity (up to 60 s) and are refused otherwise."><svg class="seg-ico" viewBox="0 0 24 24"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/></svg>enforce</button>
+    {% else %}<button role="radio" aria-checked="false" hx-post="/network/mode" title="Every destination is allowed and recorded"
+      hx-confirm="Switch to permissive? Every destination is allowed again (and recorded)."><svg class="seg-ico" viewBox="0 0 24 24"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>permissive</button>
+    <span class="seg-on ok" role="radio" aria-checked="true" title="Unknown destinations wait for your approval in Activity"><svg class="seg-ico" viewBox="0 0 24 24"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/></svg>enforce</span>{% endif %}
   </div>
 </div>
 <nav class="conn-tabs" aria-label="Network">
