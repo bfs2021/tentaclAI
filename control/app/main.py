@@ -308,7 +308,8 @@ async def terminal_page(request: Request, p: str = "claude", alias: str = ""):
         title = f"Claude · {hosts.get(alias, alias)}"
     else:
         title = PROFILES.get(p, PROFILES["claude"])["title"]
-    return page(request, "terminal.html", profiles=PROFILES, hosts=hosts, current=p, title=title,
+    logged = await asyncio.to_thread(dockerops.logged_in_claude)
+    return page(request, "terminal.html", profiles=PROFILES, hosts=hosts, current=p, title=title, logged=logged,
                 params={"alias": alias},
                 reattach=p in ("claude", "rc", "inventory", "onboard", "host"))  # tmux-based: safe to reconnect automatically
 
