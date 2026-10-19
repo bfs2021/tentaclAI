@@ -479,7 +479,11 @@ async def network_rule(request: Request, kind: str = Form(...), entry: str = For
             egress.remove(kind, entry)
             msg = f"{entry} removed from the {kind}list"
         else:
-            msg = f"{egress.add(kind, entry)} added to the {kind}list"
+            e = egress.add(kind, entry)
+            msg = f"{e} added to the {kind}list"
+            still = egress.still_blocked(e) if kind == "allow" else ""
+            if still:
+                return respond(request, f"{e} allowed, but the blocklist entry {still} still blocks it", "warn", refresh=True)
     except ValueError as e:
         return respond(request, f"Invalid entry: {e}", "err")
     return respond(request, msg, refresh=True)

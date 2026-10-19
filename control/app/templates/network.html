@@ -46,7 +46,9 @@
                                     'approved': 'approved', 'denied': 'denied', 'blocked': 'blocked'}.get(r.decision, r.decision) }}</td>
         <td style="text-align:right;font-variant-numeric:tabular-nums">{{ r.count }}</td>
         <td class="small muted">{{ r.last_s }}</td>
-        <td style="text-align:right;white-space:nowrap">{% if r.kind == 'unknown' %}{{ rule_btn('allow', r.host ~ ':' ~ r.port, 'Allow', 'soft-ok') }} {{ rule_btn('block', r.host ~ ':' ~ r.port, 'Block', 'soft-err') }}{% endif %}</td>
+        <td style="text-align:right;white-space:nowrap">{% set e = r.host ~ ':' ~ r.port %}
+          {% if r.kind in ('unknown', 'blocked') %}{{ rule_btn('allow', e, 'Allow', 'soft-ok') }}{% endif %}
+          {% if r.kind != 'blocked' %}{{ rule_btn('block', e, 'Block', 'soft-err') }}{% endif %}</td>
       </tr>
     {% endfor %}
     </tbody>
@@ -87,7 +89,8 @@
   {% if rules[kind] %}
   <div class="stack">{% for e in rules[kind] %}
     <div class="between"><span class="mono small">{{ e }}</span>
-      <form class="inline" hx-post="/network/rule"><input type="hidden" name="kind" value="{{ kind }}"><input type="hidden" name="entry" value="{{ e }}"><input type="hidden" name="op" value="remove"><button class="btn sm ghost">{{ icon('trash') }}</button></form></div>
+      <span class="row" style="gap:6px">{{ rule_btn('block', e, 'Block', 'soft-err') if kind == 'allow' else rule_btn('allow', e, 'Allow', 'soft-ok') }}
+      <form class="inline" hx-post="/network/rule"><input type="hidden" name="kind" value="{{ kind }}"><input type="hidden" name="entry" value="{{ e }}"><input type="hidden" name="op" value="remove"><button class="btn sm ghost" title="remove">{{ icon('trash') }}</button></form></span></div>
   {% endfor %}</div>
   {% else %}<div class="empty small">{{ 'No own entries yet – add them here or with “Allow” on the Seen tab.' if kind == 'allow' else 'Nothing blocked. Blocked destinations are refused even if a tentacle or the built-in list would allow them.' }}</div>{% endif %}
 </div>

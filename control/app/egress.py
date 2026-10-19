@@ -49,7 +49,8 @@ def add(kind, entry):
     e = normalize(entry)
     r = rules()
     other = "block" if kind == "allow" else "allow"
-    r[other] = [x for x in r[other] if x != e]  # an entry lives in one list only
+    host = e.rsplit(":", 1)[0] if ":" in e else e
+    r[other] = [x for x in r[other] if x not in (e, host)]  # an entry lives in one list only (host:port or the plain host)
     if e not in r[kind]:
         r[kind].append(e)
     _save(r)
@@ -60,6 +61,12 @@ def remove(kind, entry):
     r = rules()
     r[kind] = [x for x in r[kind] if x != entry]
     _save(r)
+
+
+def still_blocked(entry):
+    """a wildcard on the blocklist that keeps blocking this host:port after it was allowed, else ''"""
+    host, _, port = entry.rpartition(":") if ":" in entry else (entry, "", "443")
+    return next((p for p in rules()["block"] if tclib.egress_match(p, host, int(port or 443))), "")
 
 
 def mode():
