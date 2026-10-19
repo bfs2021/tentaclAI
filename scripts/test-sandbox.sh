@@ -15,7 +15,9 @@ cleanup() {
     [ -n "${KEEP:-}" ] && { echo "stack kept: cd $T && docker compose down -v"; return; }
     (cd "$T" && docker compose down -v >/dev/null 2>&1) || true
     docker image rm local/tentaclai:test local/tentacontrol:test local/tentaclai-egress:test >/dev/null 2>&1 || true
-    rm -rf "$T"
+    # files there belong to root / the sandbox users now – remove them through a container
+    docker run --rm -v "$T:/t" alpine:3.20 sh -c 'rm -rf /t/* /t/.[!.]* 2>/dev/null; true' >/dev/null 2>&1 || true
+    rmdir "$T" 2>/dev/null || true
 }
 trap cleanup EXIT
 
