@@ -243,6 +243,9 @@ async def overview(request: Request):
     if st["running"]:
         ctx.update(stats=dockerops.stats(), version=dockerops.claude_version(),
                    sessions=dockerops.tmux_sessions(), rc=dockerops.rc_info())
+    rows = egress.seen_rows()
+    ctx["net"] = {"mode": egress.mode(), "total": len(rows), "unknown": sum(1 for r in rows if r["kind"] == "unknown"),
+                  "pending": sum(1 for a in activity.pending() if a["part"] == "network")}
     if ctx["rc"] and ctx["rc"]["url"]:
         ctx["rc"]["qr"] = segno.make(ctx["rc"]["url"], error="m").svg_inline(scale=4, border=2, dark="#111", light="#fff", omitsize=True)
     return templates.TemplateResponse(request, "partials/overview.html", ctx)

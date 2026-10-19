@@ -33,6 +33,8 @@ All notable changes, newest first. Every release lists **upgrade steps** from th
   resolves every name itself, checks IP/CIDR rules against the resolved addresses and connects to exactly those – a
   blocked range can't be reached through an allowed name. **Direct IPs** (Network page): in `enforce` mode a bare IP
   address without a rule is blocked (default) or asked about (`EGRESS_DIRECT_IP=block|ask`).
+- **Overview** shows a Network card: mode, number of destinations, destinations without a rule, pending network approvals.
+- The gateway caches the last rules and waits for the first ones after a start – no wrong denials while tentacontrol restarts.
 - **Clear** on the Network page empties the list of seen destinations (rules and approvals stay).
 - The built-in list (Anthropic, GitHub, PyPI, npm) can't be blocked – it keeps Claude Code itself working.
 - **Claude Code without telemetry** by default – `DISABLE_TELEMETRY`, `DISABLE_ERROR_REPORTING` and

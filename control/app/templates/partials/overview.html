@@ -160,4 +160,18 @@
     <p class="muted small">No SSH hosts – add them under SSH.</p>
     {% endif %}
   </div>
+
+  <!-- network -->
+  <div class="card">
+    <div class="card-head"><h2>{{ icon('globe') }}Network</h2><a class="btn sm ghost" href="/network">Manage →</a></div>
+    <div class="between" style="margin-bottom:10px">
+      <span class="small muted">Mode</span>
+      {% if net.mode == 'enforce' %}<span class="pill ok" title="unknown destinations need your approval">enforce</span>{% else %}<span class="pill warn" title="everything is allowed and recorded">permissive</span>{% endif %}
+    </div>
+    <dl class="kv">
+      <dt>Destinations</dt><dd>{{ net.total }}</dd>
+      <dt>Without a rule</dt><dd>{% if net.unknown %}<a href="/network">{{ net.unknown }}</a>{% else %}0{% endif %}</dd>
+      <dt>Waiting for approval</dt><dd>{% if net.pending %}<a href="/activity"><span class="pill warn">{{ net.pending }}</span></a>{% else %}0{% endif %}</dd>
+    </dl>
+  </div>
 </div>

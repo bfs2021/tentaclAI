@@ -195,7 +195,7 @@ def rc_info():
         state = "restarting"
     elif last.rstrip().endswith("(y/n)"):
         state = "confirm"
-    elif urls and "Connected" in text:
+    elif urls and re.search(r"\b(re)?connected\b", text, re.I):
         state = "connected"
     else:
         state = "starting"

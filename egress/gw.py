@@ -21,6 +21,7 @@ LISTEN = int(os.environ.get("EGRESS_PORT", "3128"))
 CONTROL = os.environ.get("TC_CONTROL_INTERNAL", "http://tentacontrol:8080")
 DATA = os.environ.get("DATA_DIR", "/data")
 SEEN_FILE = os.path.join(DATA, "egress-seen.json")
+POLICY_CACHE = os.path.join(DATA, "policy.json")  # last policy from tentacontrol – decisions work right after a restart
 DEFAULT = tclib.egress_patterns(open("/app/egress-default.txt").read())
 IDLE = 3600  # seconds a tunnel may stay silent (ssh sessions, long polls)
 HOLD = 60  # seconds an unknown destination waits for the user's decision (enforce)
@@ -37,14 +38,21 @@ def control(path, payload=None, timeout=30):
         return json.load(r)
 
 
-def refresh():
-    """policy from tentacontrol; keeps the last known one (or permissive defaults) when it is unreachable"""
-    try:
-        p = control("/internal/egress/policy", timeout=10)
-    except Exception as e:  # noqa: BLE001
-        if pol["ok"]:
-            print(f"policy refresh failed: {e}", flush=True)
-        return
+def refresh(p=None):
+    """policy from tentacontrol (cached on disk); keeps the last known one when tentacontrol is unreachable"""
+    if p is None:
+        try:
+            p = control("/internal/egress/policy", timeout=10)
+        except Exception as e:  # noqa: BLE001
+            if pol["ok"]:
+                print(f"policy refresh failed: {e}", flush=True)
+            return
+        try:
+            with open(POLICY_CACHE + ".tmp", "w") as f:
+                json.dump(p, f)
+            os.replace(POLICY_CACHE + ".tmp", POLICY_CACHE)
+        except OSError:
+            pass
     global seen, dirty, cleared
     if p.get("cleared", 0) > cleared:  # "Clear" on the Network page
         seen, dirty = {k: v for k, v in seen.items() if v.get("last", 0) > p["cleared"]}, True
@@ -56,7 +64,15 @@ def refresh():
 async def refresher():
     while True:
         await asyncio.to_thread(refresh)
-        await asyncio.sleep(15)
+        await asyncio.sleep(15 if pol["ok"] else 2)  # retry quickly until the first policy arrived
+
+
+async def policy_ready(seconds=30):
+    """no policy yet (first start, tentacontrol still starting): wait for it instead of deciding without rules"""
+    end = time.time() + seconds
+    while not pol["ok"] and time.time() < end:
+        await asyncio.sleep(0.5)
+    return pol["ok"]
 
 
 def decide(host, port, ips):
@@ -184,6 +200,8 @@ async def handle(cr, cw):
     except ValueError:
         return refuse(cw, "400 Bad Request", "tentaclAI egress: bad host or port")
     ips = await resolve(host, port)
+    if not await policy_ready():
+        return refuse(cw, "503 Service Unavailable", "tentaclAI egress: no rules from tentacontrol yet – try again in a moment")
     ok, why = decide(host, port, ips)
     if ok is None:
         ok = await ask(host, port)
@@ -208,6 +226,10 @@ async def handle(cr, cw):
 async def main():
     os.makedirs(DATA, exist_ok=True)
     load_seen()
+    try:
+        refresh(json.load(open(POLICY_CACHE)))
+    except (OSError, ValueError):
+        pass
     server = await asyncio.start_server(handle, "0.0.0.0", LISTEN, limit=65536)
     print(f"tentaclAI egress gateway on :{LISTEN}", flush=True)
     asyncio.create_task(flush())
