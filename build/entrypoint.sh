@@ -28,6 +28,8 @@ chmod 644 /etc/tentaclai/tc-dir /etc/tentaclai/proxy
 # Secrets: root only (also fixes installations from before the privilege separation)
 chmod 600 "$TC_DIR"/.env "$TC_DIR"/.env.* 2>/dev/null || true
 chmod 700 /root "$TC_DIR/data/control" 2>/dev/null || true
+# ssh refuses a config owned by another user (e.g. a clone made as a normal user) – the ssh dir belongs to root
+chown -R root:root /root/.ssh 2>/dev/null || true
 chmod 700 /root/.ssh /root/.ssh/keys 2>/dev/null || true
 chmod 600 /root/.ssh/config /root/.ssh/keys/*_ed25519 2>/dev/null || true
 

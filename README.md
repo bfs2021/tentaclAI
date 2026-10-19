@@ -17,7 +17,7 @@ Sandbox + service gateway for Claude Code.</p>
 
 tentaclAI runs [Claude Code](https://claude.com/claude-code) in its own container and gives it **controlled access to
 your infrastructure** – Docker hosts, APIs, MCP servers, git repositories, databases, websites and files on other machines.
-Every connection is a **service** you add on purpose, with its own rules (read-only or read-write). A web admin,
+Every connection is a **service** you add on purpose, with its own access mode: read-only (`ro`), read-write (`rw`) or every write waits for your approval (`confirm`). A web admin,
 **tentacontrol**, sets it all up, and you talk to Claude from the browser, from your phone or from the terminal.
 
 <p align="center">
