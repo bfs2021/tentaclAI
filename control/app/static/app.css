@@ -315,3 +315,5 @@ form.inline { display: inline; margin: 0; }
 .btn.soft-err { background: var(--err-soft); color: var(--err); border-color: transparent; }
 .btn.soft-ok:hover { box-shadow: inset 0 0 0 1px var(--ok); } .btn.soft-err:hover { box-shadow: inset 0 0 0 1px var(--err); }
 .seg .seg-on.sel { background: var(--panel); color: var(--text); font-weight: 600; box-shadow: inset 0 0 0 1px var(--border); }
+.mode-grid { display: grid; grid-template-columns: auto auto; gap: 8px 12px; align-items: center; justify-items: start; }
+.mode-label { font-size: 13px; color: var(--muted); text-align: right; justify-self: end; }

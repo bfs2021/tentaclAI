@@ -7,7 +7,8 @@
 {% block content %}
 <div class="header">
   <div><h1>Network</h1><div class="sub">The sandbox reaches the outside only through the egress gateway. Tentacles and the built-in list are always allowed; everything else follows your lists – and in <strong>enforce</strong> mode waits for your approval in Activity.</div></div>
-  <div class="stack" style="gap:8px;align-items:flex-end">
+  <div class="mode-grid">
+  <span class="mode-label">Mode</span>
   <div class="seg" role="radiogroup" aria-label="Network mode">
     {% if mode == 'permissive' %}<span class="seg-on warn" role="radio" aria-checked="true" title="Every destination is allowed and recorded"><svg class="seg-ico" viewBox="0 0 24 24"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>permissive</span>
     <button role="radio" aria-checked="false" hx-post="/network/mode" title="Unknown destinations wait for your approval in Activity"
@@ -16,8 +17,8 @@
       hx-confirm="Switch to permissive? Every destination is allowed again (and recorded)."><svg class="seg-ico" viewBox="0 0 24 24"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>permissive</button>
     <span class="seg-on ok" role="radio" aria-checked="true" title="Unknown destinations wait for your approval in Activity"><svg class="seg-ico" viewBox="0 0 24 24"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/></svg>enforce</span>{% endif %}
   </div>
-  <div class="seg" role="radiogroup" aria-label="Direct IP addresses" title="connections to a bare IP address that no rule covers (enforce mode)">
-    <span style="padding-right:4px">Direct IPs</span>
+  <span class="mode-label" title="connections to a bare IP address that no rule covers (enforce mode)">Direct IPs</span>
+  <div class="seg" role="radiogroup" aria-label="Direct IP addresses">
     {% for v, t in (('ask', 'ask'), ('block', 'block')) %}{% if direct_ip == v %}<span class="seg-on {{ 'ok' if v == 'block' else 'warn' }}" role="radio" aria-checked="true">{{ t }}</span>{% else %}<button role="radio" aria-checked="false" hx-post="/network/direct-ip">{{ t }}</button>{% endif %}{% endfor %}
   </div>
   </div>
