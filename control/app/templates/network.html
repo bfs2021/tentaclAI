@@ -24,11 +24,11 @@
 {% if tab == 'seen' %}
 <div class="card">
   <div class="card-head"><h2>Seen destinations</h2>
-    <span class="small muted">{{ counts.tentacle }} tentacles · {{ counts.default + counts.allow }} allowed · {{ counts.unknown }} unknown · {{ counts.blocked }} blocked</span></div>
+    <span class="small muted">{{ counts.tentacle }} tentacles · {{ counts.default + counts.allow }} on a list · {{ counts.unknown }} without a rule · {{ counts.blocked }} blocked</span></div>
   {% if rows %}
   <div class="row net-filter" style="margin-bottom:12px">
     <div class="seg" role="radiogroup" aria-label="Filter">
-      {% for k, label, n in (('all', 'All', rows|length), ('unknown', 'Unknown', counts.unknown), ('tentacle', 'Tentacles', counts.tentacle),
+      {% for k, label, n in (('all', 'All', rows|length), ('unknown', 'No rule', counts.unknown), ('tentacle', 'Tentacles', counts.tentacle),
                              ('allowed', 'Allowed', counts.default + counts.allow), ('blocked', 'Blocked', counts.blocked)) %}
       <button type="button" role="radio" data-filter="{{ k }}" aria-checked="{{ 'true' if k == 'all' else 'false' }}" class="{{ 'seg-on sel' if k == 'all' }}">{{ label }} <span class="faint">{{ n }}</span></button>
       {% endfor %}
@@ -36,13 +36,14 @@
     <input type="search" id="net-q" class="mono" placeholder="Filter by host …" style="max-width:260px">
   </div>
   <div class="table-wrap"><table id="net-seen">
-    <thead><tr><th>Destination</th><th>Origin</th><th>Last decision</th><th style="text-align:right">Connections</th><th>Last</th><th></th></tr></thead>
+    <thead><tr><th>Destination</th><th title="why the destination is allowed or not">Rule</th><th title="what happened the last time">Last connection</th><th style="text-align:right">Connections</th><th>Last</th><th></th></tr></thead>
     <tbody>
     {% for r in rows %}
       <tr data-kind="{{ 'allowed' if r.kind in ('default', 'allow') else r.kind }}" data-host="{{ r.host }}:{{ r.port }}">
         <td class="mono small">{{ r.host }}<span class="faint">:{{ r.port }}</span></td>
-        <td>{% if r.kind == 'tentacle' %}<span class="pill ok">{{ r.label }}</span>{% elif r.kind in ('default', 'allow') %}<span class="pill info">{{ r.label }}</span>{% elif r.kind == 'blocked' %}<span class="pill err">blocked</span>{% else %}<span class="pill warn">unknown</span>{% endif %}</td>
-        <td class="small muted">{{ r.decision }}</td>
+        <td>{% if r.kind == 'tentacle' %}<span class="pill ok" title="host of an active service or SSH host">Tentacle · {{ r.label }}</span>{% elif r.kind == 'default' %}<span class="pill info" title="shipped with tentaclAI">Default list</span>{% elif r.kind == 'allow' %}<span class="pill info">Your allowlist</span>{% elif r.kind == 'blocked' %}<span class="pill err">Blocklist</span>{% else %}<span class="pill warn" title="in enforce mode this needs your approval">No rule</span>{% endif %}</td>
+        <td class="small muted">{{ {'allowlist': 'allowed', 'tentacle': 'allowed', 'grant': 'allowed temporarily', 'unlisted': 'allowed – no rule (permissive)',
+                                    'approved': 'approved', 'denied': 'denied', 'blocked': 'blocked'}.get(r.decision, r.decision) }}</td>
         <td style="text-align:right;font-variant-numeric:tabular-nums">{{ r.count }}</td>
         <td class="small muted">{{ r.last_s }}</td>
         <td style="text-align:right;white-space:nowrap">{% if r.kind == 'unknown' %}{{ rule_btn('allow', r.host ~ ':' ~ r.port, 'Allow', 'soft-ok') }} {{ rule_btn('block', r.host ~ ':' ~ r.port, 'Block', 'soft-err') }}{% endif %}</td>
