@@ -95,7 +95,7 @@ check "psql shell escape runs as tcrun" "$(echo '\! id -un' | $CI svc db testdbr
 echo "== svc through the gateway"
 check "API call with injected token" "$($C svc testapi GET / 2>/dev/null)" '{"auth_ok": true}'
 check "database query" "$($C svc db testdb 'select 41+1' 2>/dev/null | sed -n 3p | tr -d ' ')" "42"
-check "ssh (tentacle, rw)" "$($C svc ssh testssh echo ssh-ok 2>/dev/null | tail -1)" "ssh-ok"
+check "ssh (tentacle, rw)" "$($C svc ssh testssh echo ssh-ok 2>&1 | tail -1)" "ssh-ok"
 check "plain ssh has no key" "$($C ssh -o BatchMode=yes testssh true >/dev/null 2>&1 && echo yes || echo no)" "no"
 
 echo "== egress gateway"
