@@ -1,0 +1,48 @@
+#!/usr/bin/env python3
+"""ssh ProxyCommand: connect stdin/stdout to host:port – through the egress gateway when there is one.
+  ProxyCommand tc-connect %h %p   (ssh/config, Host *)"""
+import os
+import select
+import socket
+import sys
+
+host, port = sys.argv[1], int(sys.argv[2])
+proxy = ""
+try:
+    proxy = open("/etc/tentaclai/proxy").read().strip()  # e.g. http://egress:3128, written by the entrypoint
+except OSError:
+    pass
+if proxy:
+    ph, _, pp = proxy.split("//", 1)[-1].rstrip("/").partition(":")
+    s = socket.create_connection((ph, int(pp or 3128)), 20)
+    s.sendall(f"CONNECT {host}:{port} HTTP/1.1\r\nHost: {host}:{port}\r\n\r\n".encode())
+    resp = b""
+    while b"\r\n\r\n" not in resp:
+        chunk = s.recv(4096)
+        if not chunk:
+            break
+        resp += chunk
+    head, _, extra = resp.partition(b"\r\n\r\n")
+    if b" 200 " not in head.split(b"\r\n")[0]:
+        sys.stderr.write(head.decode(errors="replace").split("\r\n")[0] + " " + extra.decode(errors="replace").strip() + "\n")
+        sys.exit(1)
+    if extra:
+        os.write(1, extra)
+else:
+    s = socket.create_connection((host, port), 20)
+s.settimeout(None)
+fds = [0, s]
+while True:
+    r, _, _ = select.select(fds, [], [])
+    if 0 in r:
+        d = os.read(0, 65536)
+        if not d:
+            s.shutdown(socket.SHUT_WR)
+            fds.remove(0)
+        else:
+            s.sendall(d)
+    if s in r:
+        d = s.recv(65536)
+        if not d:
+            break
+        os.write(1, d)

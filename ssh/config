@@ -11,6 +11,8 @@
 Include ~/.ssh/config.d/*.conf
 
 Host *
+    # every connection leaves through the egress gateway (direct when there is none)
+    ProxyCommand tc-connect %h %p
     IdentityFile ~/.ssh/keys/tentaclai_ed25519
     IdentitiesOnly yes
     # New hosts are trusted on first connect, changed keys are refused

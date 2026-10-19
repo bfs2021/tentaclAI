@@ -20,9 +20,10 @@ if [ -s /etc/tentaclai/ca.crt ]; then
     update-ca-certificates >/dev/null 2>&1 || true
 fi
 
-# svc runs through sudo with a reset environment – it finds the stack here
+# svc runs through sudo with a reset environment – it finds the stack and the egress gateway here
 echo "$TC_DIR" > /etc/tentaclai/tc-dir
-chmod 644 /etc/tentaclai/tc-dir
+echo "${HTTPS_PROXY:-}" > /etc/tentaclai/proxy
+chmod 644 /etc/tentaclai/tc-dir /etc/tentaclai/proxy
 
 # Secrets: root only (also fixes installations from before the privilege separation)
 chmod 600 "$TC_DIR"/.env "$TC_DIR"/.env.* 2>/dev/null || true
@@ -86,4 +87,6 @@ svc sync || echo "svc sync failed – container starts anyway"
 # CMD as Claude, with a clean environment
 exec setpriv --reuid=claude --regid=claude --init-groups env -i HOME=/home/claude USER=claude LOGNAME=claude SHELL=/bin/bash \
     PATH="$PATH" LANG="${LANG:-C.UTF-8}" LC_ALL="${LC_ALL:-C.UTF-8}" TERM="${TERM:-xterm-256color}" TZ="${TZ:-UTC}" \
-    TC_DIR="$TC_DIR" NODE_EXTRA_CA_CERTS="${NODE_EXTRA_CA_CERTS:-}" DISABLE_AUTOUPDATER="${DISABLE_AUTOUPDATER:-1}" "$@"
+    TC_DIR="$TC_DIR" NODE_EXTRA_CA_CERTS="${NODE_EXTRA_CA_CERTS:-}" DISABLE_AUTOUPDATER="${DISABLE_AUTOUPDATER:-1}" \
+    HTTP_PROXY="${HTTP_PROXY:-}" HTTPS_PROXY="${HTTPS_PROXY:-}" NO_PROXY="${NO_PROXY:-}" \
+    http_proxy="${HTTP_PROXY:-}" https_proxy="${HTTPS_PROXY:-}" no_proxy="${NO_PROXY:-}" "$@"

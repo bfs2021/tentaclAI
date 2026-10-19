@@ -3,5 +3,6 @@
 !build/
 !control/
 !lib/
+!egress/
 !VERSION
 **/__pycache__

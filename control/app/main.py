@@ -251,14 +251,15 @@ async def overview(request: Request):
 async def container_action(request: Request, action: str):
     if action == "create":
         try:
-            job = jobs.start("Create & start tentaclai", [COMPOSE + ["up", "-d", "--no-deps", CLAUDE_SERVICE]])
+            job = jobs.start("Create & start tentaclai", [COMPOSE + ["up", "-d", "--no-deps", "egress"], COMPOSE + ["up", "-d", "--no-deps", CLAUDE_SERVICE]])
         except RuntimeError as e:
             return PlainTextResponse("", headers=toast(str(e), "err"))
         return PlainTextResponse("", headers={"HX-Redirect": f"/jobs/{job.id}"})
     if action == "recreate":
         try:
             job = jobs.start("Recreate tentaclai (apply configuration)",
-                             [COMPOSE + ["up", "-d", "--no-deps", "--force-recreate", CLAUDE_SERVICE]])
+                             [COMPOSE + ["up", "-d", "--no-deps", "egress"],
+                              COMPOSE + ["up", "-d", "--no-deps", "--force-recreate", CLAUDE_SERVICE]])
         except RuntimeError as e:
             return PlainTextResponse("", headers=toast(str(e), "err"))
         return PlainTextResponse("", headers={"HX-Redirect": f"/jobs/{job.id}"})
@@ -1096,6 +1097,7 @@ async def update_check_now(request: Request):
 async def update_claude():
     steps = [
         COMPOSE + ["build", "--pull", "--build-arg", f"CACHE_BUST={int(time.time())}", CLAUDE_SERVICE],
+        COMPOSE + ["up", "-d", "--no-deps", "egress"],
         COMPOSE + ["up", "-d", "--no-deps", "--force-recreate", CLAUDE_SERVICE],
         ["docker", "image", "prune", "-f", "--filter", "label=com.docker.compose.project=tentaclai"],
     ]

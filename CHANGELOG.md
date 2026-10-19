@@ -15,6 +15,21 @@ All notable changes, newest first. Every release lists **upgrade steps** from th
   sessions are off limits (also through `svc docker` on their host), an approval doesn't replace asking about risky
   changes. The generated `SERVICES.md` describes git via `svc git push` and the `confirm` mode.
 
+## Unreleased (network)
+
+### Highlights
+- **Egress gateway** – the sandbox now sits in an internal Docker network without a route to the outside. Its only way
+  out is the new container `tentaclai-egress`, a small forward proxy (CONNECT for any TCP port, plain HTTP; TLS is not
+  opened). Claude Code, curl, git, pip and npm use it through `HTTPS_PROXY`; svc tunnels ssh/rsync (ProxyCommand
+  `tc-connect`) and databases (local port forward) through it. Every destination is recorded
+  (`egress-seen.json`). `EGRESS_MODE=permissive` (default) allows everything – allow/block lists and approvals follow.
+
+### Upgrade
+`git pull`, `docker compose build`, `docker compose up -d` – creates the networks and the `tentaclai-egress` container
+and recreates `tentaclai` (sessions and Remote Control end). `ssh/config` gains `ProxyCommand tc-connect %h %p` with
+`git pull` – if you changed that file yourself, merge it. Programs in the sandbox that ignore `HTTPS_PROXY` can't
+connect any more.
+
 ## v0.5.0 – 2026-10-19
 
 ### Highlights

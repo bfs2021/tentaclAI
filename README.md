@@ -299,7 +299,8 @@ What it does **not** (yet) do – keep it in mind:
   `socket` mode is root on the tentaclAI host, and with it everything in the stack directory – prefer `ssh` mode.
 - `tcrun` holds one secret at a time while a client runs: a shell escape in the interactive SQL shell (`\!`, approved
   separately in `confirm` mode) gets that user, its database password and the web cookie jars – not `.env` or the SSH key.
-- There is no egress filter yet: the sandbox can reach the network (a Claude session could send out what it can read).
+- **Egress gateway:** the sandbox has no route to the outside; all traffic goes through `tentaclai-egress`, which records
+  every destination. In the default `permissive` mode it allows everything – allow/block lists with approvals are next.
 - tentacontrol holds the host's Docker socket – protect it with a strong password and keep it off the internet.
 - `data/home` holds the Claude login and `ssh/keys` the private key – back them up and protect them.
 

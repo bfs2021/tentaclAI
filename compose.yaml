@@ -34,6 +34,10 @@ services:
     environment:
       TZ: ${TZ:-UTC}
       TC_DIR: ${TC_DIR:?TC_DIR not set – run ./tentaclai.sh init}
+      # the sandbox network has no way out – everything goes through the egress gateway
+      HTTP_PROXY: http://egress:3128
+      HTTPS_PROXY: http://egress:3128
+      NO_PROXY: localhost,127.0.0.1,tentacontrol
       # system bundle incl. the optional site CA (added by the entrypoint)
       NODE_EXTRA_CA_CERTS: /etc/ssl/certs/ca-certificates.crt
     volumes:
@@ -54,6 +58,8 @@ services:
     # svc/sudo need SETUID/SETGID; root needs CHOWN/DAC_OVERRIDE/FOWNER for the hand-over of files – nothing else
     cap_drop: [ALL]
     cap_add: [CHOWN, DAC_OVERRIDE, FOWNER, SETUID, SETGID, KILL, AUDIT_WRITE]
+    networks: [sandbox]
+    depends_on: [egress]
     extra_hosts:
       # the host running tentaclai (e.g. for an ssh docker service on the same machine)
       - host.docker.internal:host-gateway
@@ -62,6 +68,32 @@ services:
         limits:
           cpus: "${CLAUDE_CPUS:-4}"
           memory: ${CLAUDE_MEMORY:-8g}
+
+  # egress gateway – the sandbox's only way out: forward proxy, records every destination (EGRESS_MODE)
+  egress:
+    build:
+      context: .
+      dockerfile: egress/Dockerfile
+    image: local/tentaclai-egress:latest
+    container_name: tentaclai-egress
+    hostname: egress
+    restart: unless-stopped
+    logging: *logging
+    environment:
+      TZ: ${TZ:-UTC}
+      EGRESS_MODE: ${EGRESS_MODE:-permissive}
+    volumes:
+      - egress-data:/data
+    extra_hosts:
+      - host.docker.internal:host-gateway
+    networks:
+      sandbox: {aliases: [egress]}
+      outside: {}
+    deploy:
+      resources:
+        limits:
+          cpus: "1"
+          memory: 128m
 
   # tentacontrol – web admin: status, browser terminal (login/RC), settings, services, SSH, updates, logs, help
   control:
@@ -87,8 +119,20 @@ services:
       - ${TC_DIR}:${TC_DIR}
       # admin password hash + session secret
       - ./data/control:/data
+      # destinations seen by the egress gateway (read only)
+      - egress-data:/egress:ro
     deploy:
       resources:
         limits:
           cpus: "1"
           memory: 512m
+    networks: [sandbox, outside]
+
+networks:
+  # internal: no route to the outside – the sandbox reaches only tentacontrol and the egress gateway
+  sandbox:
+    internal: true
+  outside: {}
+
+volumes:
+  egress-data: {}

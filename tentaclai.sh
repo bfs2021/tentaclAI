@@ -189,6 +189,7 @@ cmd_update() {  # git pull + changelog of the new versions + rebuild + recreate 
     if ask_yn "Recreate tentacontrol now (the web admin restarts briefly)?" y; then
         docker compose up -d --no-deps control
     fi
+    docker compose up -d --no-deps egress   # the sandbox's way out – cuts open connections only when it changed
     if ask_yn "Recreate tentaclai now? Running Claude sessions and Remote Control end." n; then
         docker compose up -d --no-deps --force-recreate claude
     else

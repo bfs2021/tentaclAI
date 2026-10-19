@@ -318,6 +318,7 @@ gh …                      GitHub CLI without credentials (public data)</pre>
       <ul>
         <li>tentacontrol has the Docker socket of this host (to run tentaclAI) – that is <strong>root on {{ site.hostname }}</strong>. Choose the tentacontrol password accordingly.</li>
         <li>In tentaclAI, Claude runs as the unprivileged user <code>claude</code>. <code>.env</code>, the SSH key, the service files and the audit log belong to root; <code>svc</code> (via sudo) is the only way to services and enforces <code>ro</code>/<code>rw</code>/<code>confirm</code>. Client tools run as a third user (<code>tcrun</code>) with only their own secret.</li>
+        <li>The sandbox sits in an internal network without a route to the outside; everything leaves through the <strong>egress gateway</strong> (<code>tentaclai-egress</code>), which records every destination. <code>EGRESS_MODE=permissive</code> (default) allows all – allow/block lists and approvals follow.</li>
         <li>An <code>rw</code> docker service is root on that host. A docker service in <code>socket</code> mode is root on this host – and so can read everything in the stack, secrets included; prefer <code>ssh</code> mode.</li>
         <li>Login: bcrypt hash, 12 h session, <code>SameSite=Strict</code> cookie (Secure behind https), origin check for forms and the terminal, throttling after failed attempts.</li>
         <li>Secrets never reach the browser; <code>svc</code> passes them to curl through temporary 0600 files on tmpfs, not on the command line.</li>

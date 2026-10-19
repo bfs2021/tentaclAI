@@ -62,6 +62,14 @@ def _read(path):
 
 
 CLAUDE_USER, RUN_USER = "claude", "tcrun"
+# egress gateway (all outbound traffic of the sandbox) – also under sudo, where the environment is reset
+PROXY = _read("/etc/tentaclai/proxy")
+if PROXY:
+    for _k in ("http_proxy", "https_proxy", "HTTP_PROXY", "HTTPS_PROXY"):
+        os.environ.setdefault(_k, PROXY)
+    for _k in ("no_proxy", "NO_PROXY"):
+        os.environ.setdefault(_k, "localhost,127.0.0.1,tentacontrol")
+PROXY_VARS = ("http_proxy", "https_proxy", "HTTP_PROXY", "HTTPS_PROXY", "no_proxy", "NO_PROXY")
 # under sudo the environment is reset – the stack path then comes from a root-owned file written by the entrypoint
 TC_DIR = os.environ.get("TC_DIR") or _read("/etc/tentaclai/tc-dir") or "/opt/tentaclai"
 SERVICES_DIR = os.environ.get("SVC_DIR", os.path.join(TC_DIR, "services"))
@@ -112,7 +120,7 @@ def _account(user):
 def as_user(user, env=None, cwd=None):
     """subprocess kwargs to run a command as another user with a minimal environment (no secrets of other parts)"""
     pw = _account(user) if privileged() else None
-    base = {k: os.environ[k] for k in ("PATH", "LANG", "LC_ALL", "TERM", "TZ", "COLUMNS", "LINES") if k in os.environ}
+    base = {k: os.environ[k] for k in ("PATH", "LANG", "LC_ALL", "TERM", "TZ", "COLUMNS", "LINES") + PROXY_VARS if k in os.environ}
     base.setdefault("PATH", "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin")
     if pw is None:  # not root (tests outside the image) – run as ourselves
         return {"env": {**os.environ, **(env or {})}, **({"cwd": cwd} if cwd else {})}
@@ -750,6 +758,65 @@ def part_services(services, part):
     return {n: s for n, s in services.items() if part in s}
 
 
+def tunnel(host, port):
+    """local port that leads to host:port through the egress gateway (for clients without proxy support, e.g. psql);
+    returns (address, port) – the target itself when there is no gateway"""
+    if not PROXY:
+        return str(host), int(port)
+    import socket
+    import threading
+    ph, _, pp = PROXY.split("//", 1)[-1].rstrip("/").partition(":")
+    srv = socket.socket()
+    srv.bind(("127.0.0.1", 0))
+    srv.listen(8)
+
+    def relay(a, b):
+        try:
+            while True:
+                d = a.recv(65536)
+                if not d:
+                    break
+                b.sendall(d)
+        except OSError:
+            pass
+        finally:
+            for s in (a, b):
+                try:
+                    s.shutdown(socket.SHUT_RDWR)
+                except OSError:
+                    pass
+
+    def serve():
+        while True:
+            c, _ = srv.accept()
+            try:
+                u = socket.create_connection((ph, int(pp or 3128)), 20)
+                u.sendall(f"CONNECT {host}:{port} HTTP/1.1\r\nHost: {host}:{port}\r\n\r\n".encode())
+                resp = b""
+                while b"\r\n\r\n" not in resp:
+                    chunk = u.recv(4096)
+                    if not chunk:
+                        break
+                    resp += chunk
+                head, _, extra = resp.partition(b"\r\n\r\n")
+                status = head.split(b"\r\n")[0].decode(errors="replace")
+                if " 200 " not in status:
+                    print(f"svc: egress gateway: {status}", file=sys.stderr)
+                    c.close()
+                    continue
+                if extra:
+                    c.sendall(extra)
+            except OSError as e:
+                print(f"svc: egress gateway not reachable: {e}", file=sys.stderr)
+                c.close()
+                continue
+            threading.Thread(target=relay, args=(c, u), daemon=True).start()
+            threading.Thread(target=relay, args=(u, c), daemon=True).start()
+
+    threading.Thread(target=serve, daemon=True).start()
+    return "127.0.0.1", srv.getsockname()[1]
+
+
 def _shm_file(content):
     """0600 file on tmpfs for secrets, readable by tcrun only (the client tool) – caller deletes it"""
     with tempfile.NamedTemporaryFile("w", dir="/dev/shm", delete=False) as fh:
@@ -781,7 +848,8 @@ def db_run(name, db, sql=None, fmt="table", interactive=False):
     if sql is not None and ro and DB_RO_BYPASS.search(sql):
         sys.exit(f"svc: {name} is read-only – statements that change the transaction mode are not allowed")
     if db_engine(db) == "postgres":
-        env = dict(PGHOST=str(db.get("host", "")), PGPORT=str(db.get("port", 5432)),
+        addr, lport = tunnel(db.get("host", ""), db.get("port", 5432))
+        env = dict(PGHOST=str(db.get("host", "")), PGHOSTADDR=addr, PGPORT=str(lport),
                    PGDATABASE=str(db.get("database", "")), PGUSER=str(db.get("user", "")), PGPASSWORD=str(db.get("password", "")),
                    PGSSLMODE=pg_sslmode(db), PGAPPNAME="tentaclai", PGCONNECT_TIMEOUT="10")
         if ro:
@@ -793,8 +861,9 @@ def db_run(name, db, sql=None, fmt="table", interactive=False):
             cmd += ["-c", sql]
         # psql runs as tcrun: shell escapes (\!) in the interactive shell get that user, not root
         return subprocess.call(cmd, **runner(env)) if interactive or sql is not None else 0
+    addr, lport = tunnel(db.get("host", ""), db.get("port", 3306))
     cfg = _shm_file("[client]\n" + "".join(f"{k}={v}\n" for k, v in (
-        ("host", db.get("host", "")), ("port", db.get("port", 3306)), ("user", db.get("user", "")),
+        ("host", addr), ("port", lport), ("user", db.get("user", "")),
         ("password", db.get("password", "")), ("database", db.get("database", ""))) if v != ""))
     try:
         cmd = ["mariadb", f"--defaults-extra-file={cfg}", "--connect-timeout=10", "--sandbox"]
@@ -852,13 +921,15 @@ def cmd_db(services, args):
 def db_test(name, db):
     """(ok, detail)"""
     if db_engine(db) == "postgres":
-        env = dict(PGHOST=str(db.get("host", "")), PGPORT=str(db.get("port", 5432)), PGDATABASE=str(db.get("database", "")),
+        addr, lport = tunnel(db.get("host", ""), db.get("port", 5432))
+        env = dict(PGHOST=str(db.get("host", "")), PGHOSTADDR=addr, PGPORT=str(lport), PGDATABASE=str(db.get("database", "")),
                    PGUSER=str(db.get("user", "")), PGPASSWORD=str(db.get("password", "")), PGSSLMODE=pg_sslmode(db),
                    PGCONNECT_TIMEOUT="8", PGOPTIONS="-c default_transaction_read_only=on")
         r = subprocess.run(["psql", "-X", "-At", "-c", "SELECT version()"], capture_output=True, text=True, timeout=20, **runner(env))
     else:
+        addr, lport = tunnel(db.get("host", ""), db.get("port", 3306))
         cfg = _shm_file("[client]\n" + "".join(f"{k}={v}\n" for k, v in (
-            ("host", db.get("host", "")), ("port", db.get("port", 3306)), ("user", db.get("user", "")),
+            ("host", addr), ("port", lport), ("user", db.get("user", "")),
             ("password", db.get("password", "")), ("database", db.get("database", ""))) if v != ""))
         try:
             r = subprocess.run(["mariadb", f"--defaults-extra-file={cfg}", "--connect-timeout=8", "-N", "-e", "SELECT VERSION()"],
