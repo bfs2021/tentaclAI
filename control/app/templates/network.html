@@ -26,11 +26,20 @@
   <div class="card-head"><h2>Seen destinations</h2>
     <span class="small muted">{{ counts.tentacle }} tentacles · {{ counts.default + counts.allow }} allowed · {{ counts.unknown }} unknown · {{ counts.blocked }} blocked</span></div>
   {% if rows %}
-  <div class="table-wrap"><table>
+  <div class="row net-filter" style="margin-bottom:12px">
+    <div class="seg" role="radiogroup" aria-label="Filter">
+      {% for k, label, n in (('all', 'All', rows|length), ('unknown', 'Unknown', counts.unknown), ('tentacle', 'Tentacles', counts.tentacle),
+                             ('allowed', 'Allowed', counts.default + counts.allow), ('blocked', 'Blocked', counts.blocked)) %}
+      <button type="button" role="radio" data-filter="{{ k }}" aria-checked="{{ 'true' if k == 'all' else 'false' }}" class="{{ 'seg-on sel' if k == 'all' }}">{{ label }} <span class="faint">{{ n }}</span></button>
+      {% endfor %}
+    </div>
+    <input type="search" id="net-q" class="mono" placeholder="Filter by host …" style="max-width:260px">
+  </div>
+  <div class="table-wrap"><table id="net-seen">
     <thead><tr><th>Destination</th><th>Origin</th><th>Last decision</th><th style="text-align:right">Connections</th><th>Last</th><th></th></tr></thead>
     <tbody>
     {% for r in rows %}
-      <tr>
+      <tr data-kind="{{ 'allowed' if r.kind in ('default', 'allow') else r.kind }}" data-host="{{ r.host }}:{{ r.port }}">
         <td class="mono small">{{ r.host }}<span class="faint">:{{ r.port }}</span></td>
         <td>{% if r.kind == 'tentacle' %}<span class="pill ok">{{ r.label }}</span>{% elif r.kind in ('default', 'allow') %}<span class="pill info">{{ r.label }}</span>{% elif r.kind == 'blocked' %}<span class="pill err">blocked</span>{% else %}<span class="pill warn">unknown</span>{% endif %}</td>
         <td class="small muted">{{ r.decision }}</td>
@@ -41,6 +50,30 @@
     {% endfor %}
     </tbody>
   </table></div>
+  <div id="net-none" class="empty small" hidden>No destination matches the filter.</div>
+  <script>
+  (function () {
+    var f = "all", q = document.getElementById("net-q"), rows = document.querySelectorAll("#net-seen tbody tr");
+    function apply() {
+      var t = (q.value || "").trim().toLowerCase(), shown = 0;
+      rows.forEach(function (r) {
+        var ok = (f === "all" || r.dataset.kind === f) && (!t || r.dataset.host.indexOf(t) !== -1);
+        r.hidden = !ok; if (ok) shown++;
+      });
+      document.getElementById("net-none").hidden = shown > 0;
+    }
+    document.querySelectorAll(".net-filter [data-filter]").forEach(function (b) {
+      b.addEventListener("click", function () {
+        f = b.dataset.filter;
+        document.querySelectorAll(".net-filter [data-filter]").forEach(function (x) {
+          var on = x === b; x.classList.toggle("seg-on", on); x.classList.toggle("sel", on); x.setAttribute("aria-checked", on ? "true" : "false");
+        });
+        apply();
+      });
+    });
+    q.addEventListener("input", apply);
+  })();
+  </script>
   {% else %}<div class="empty small">Nothing recorded yet – the list fills as soon as the sandbox connects somewhere.</div>{% endif %}
 </div>
 {% else %}
