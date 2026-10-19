@@ -2,7 +2,7 @@
 """tentaclAI egress gateway – the only way out of the sandbox network.
 
 Forward proxy for CONNECT (any TCP port – HTTPS, ssh, databases; TLS is not opened) and plain HTTP requests.
-Policy (from tentacontrol, refreshed every 15 s): blocklist → default + own allowlist → tentacles → grants →
+Policy (from tentacontrol, refreshed every 15 s): built-in list → blocklist → own allowlist → tentacles → grants →
 EGRESS_MODE permissive (allow, record as "unlisted") or enforce (hold the connection and ask in Activity).
 Every destination is counted in $DATA_DIR/egress-seen.json (host:port → first, last, count, last decision).
 """
@@ -55,9 +55,11 @@ async def refresher():
 
 def decide(host, port):
     """(allow?, reason)"""
+    if any(tclib.egress_match(p, host, port) for p in DEFAULT):  # built-in: Claude Code itself – never blockable
+        return True, "allowlist"
     if any(tclib.egress_match(p, host, port) for p in pol["block"]):
         return False, "blocked"
-    if any(tclib.egress_match(p, host, port) for p in DEFAULT + pol["allow"]):
+    if any(tclib.egress_match(p, host, port) for p in pol["allow"]):
         return True, "allowlist"
     if (host, port) in pol["tentacles"] or (host, None) in pol["tentacles"]:
         return True, "tentacle"

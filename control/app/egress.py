@@ -47,6 +47,10 @@ def normalize(entry):
 
 def add(kind, entry):
     e = normalize(entry)
+    if kind == "block":
+        host, _, port = e.rpartition(":") if ":" in e else (e, "", "443")
+        if any(tclib.egress_match(p, host.lstrip("*."), int(port or 443)) for p in default_list()):
+            raise ValueError(f"{e} is on the built-in list (Claude Code itself) and can't be blocked")
     r = rules()
     other = "block" if kind == "allow" else "allow"
     host = e.rsplit(":", 1)[0] if ":" in e else e
@@ -88,16 +92,16 @@ def policy():
 
 
 def origin(host, port, tent=None, r=None):
-    """(kind, label): blocked / tentacle / default / allow / unknown"""
+    """(kind, label): default (built-in, never blocked) / blocked / tentacle / allow / unknown"""
     tent = tentacles() if tent is None else tent
     r = rules() if r is None else r
+    if any(tclib.egress_match(p, host, port) for p in default_list()):
+        return "default", "built-in"
     if any(tclib.egress_match(p, host, port) for p in r["block"]):
         return "blocked", "blocklist"
     name = tent.get((host, port)) or tent.get((host, None))
     if name:
         return "tentacle", name
-    if any(tclib.egress_match(p, host, port) for p in default_list()):
-        return "default", "built-in"
     if any(tclib.egress_match(p, host, port) for p in r["allow"]):
         return "allow", "own allowlist"
     return "unknown", ""

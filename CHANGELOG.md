@@ -29,6 +29,7 @@ All notable changes, newest first. Every release lists **upgrade steps** from th
   destination), the shipped built-in list (Anthropic, GitHub, PyPI, npm) and the tentacles, derived live from your
   services and SSH hosts. `EGRESS_MODE=enforce` (switch on the Network page) holds unknown destinations up to 60 s and
   asks in Activity: *Allow 10 min*, *Allow 1 h*, *Always*, *Deny*, *Block*.
+- The built-in list (Anthropic, GitHub, PyPI, npm) can't be blocked – it keeps Claude Code itself working.
 - **Claude Code without non-essential traffic** by default – no telemetry (Datadog), error reports, `/bug`,
   publishing or Claude Design; set through `env` in Claude's settings.json. `CLAUDE_TELEMETRY=true` (Settings) turns it
   back on.
