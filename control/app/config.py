@@ -28,6 +28,7 @@ SETTINGS_GROUPS = [
         ("CONTROL_URL", "tentacontrol address", "for the setup link and help, e.g. https://tentacontrol.example.lan", "text"),
         ("TZ", "Time zone", "e.g. Europe/Vienna", "text"),
         ("CLAUDE_CODE_VERSION", "Claude Code version", "latest or a fixed version – applied with the next update", "text"),
+        ("CLAUDE_TELEMETRY", "Claude Code non-essential traffic", "off (default): no telemetry, error reports, /bug, publishing or Claude Design – API, login and remote control are not affected; applied on the next start", "bool"),
         ("GIT_USER_NAME", "Git name", "for commits in /workspace", "text"),
         ("GIT_USER_EMAIL", "Git email", "", "text"),
     ]),
@@ -55,7 +56,7 @@ SETTINGS_GROUPS = [
 ]
 
 # read at container start (not by svc) -> claude container must be recreated
-RESTART_VARS = {"TZ", "TC_HOSTNAME", "CONTROL_URL", "GIT_USER_NAME", "GIT_USER_EMAIL",
+RESTART_VARS = {"TZ", "TC_HOSTNAME", "CONTROL_URL", "GIT_USER_NAME", "GIT_USER_EMAIL", "CLAUDE_TELEMETRY",
                 "HOST_DOCS", "CA_CERT", "CLAUDE_CPUS", "CLAUDE_MEMORY"}
 # RC_* are read by rc-loop on every restart -> "Restart" of remote control is enough
 RC_VARS = {"RC_ENABLED", "RC_NAME", "RC_WORKDIR", "RC_EXTRA_ARGS", "RC_RESTART_DELAY"}

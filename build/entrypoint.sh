@@ -63,8 +63,10 @@ fi
 as_claude mkdir -p /home/claude/.claude/commands
 claude-instructions | as_claude sh -c 'cat > /home/claude/.claude/CLAUDE.md' || echo "could not generate CLAUDE.md"
 as_claude sh -c 'cp -f /etc/tentaclai/commands/*.md /home/claude/.claude/commands/' 2>/dev/null || true
-# status line (caged octopus + pending approvals) – only if the user has none of their own
-as_claude python3 - <<'PY' || echo "could not set the status line"
+# status line (caged octopus + pending approvals) – only if the user has none of their own;
+# non-essential traffic (telemetry, error reports, /bug …) off unless CLAUDE_TELEMETRY=true in .env
+TRAFFIC_OFF="$( [ "$(envval CLAUDE_TELEMETRY | tr A-Z a-z)" = "true" ] || echo 1 )"
+as_claude env TRAFFIC_OFF="$TRAFFIC_OFF" python3 - <<'PY' || echo "could not set Claude's settings"
 import json, os
 p = "/home/claude/.claude/settings.json"
 try:
@@ -74,8 +76,15 @@ except (OSError, ValueError):
 cur = s.get("statusLine") or {}
 if not cur or cur.get("command") == "tc-statusline":
     s["statusLine"] = {"type": "command", "command": "tc-statusline", "padding": 0, "refreshInterval": 5}
-    open(p + ".tmp", "w").write(json.dumps(s, indent=2) + "\n")
-    os.replace(p + ".tmp", p)
+env = s.setdefault("env", {})
+if os.environ.get("TRAFFIC_OFF"):
+    env["CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC"] = "1"
+else:
+    env.pop("CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC", None)
+if not env:
+    s.pop("env")
+open(p + ".tmp", "w").write(json.dumps(s, indent=2) + "\n")
+os.replace(p + ".tmp", p)
 PY
 
 # Services (services/*.json): MCP -> Claude config, clone missing repos, regenerate /workspace/SERVICES.md
