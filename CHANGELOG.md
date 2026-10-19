@@ -2,55 +2,59 @@
 
 All notable changes, newest first. Every release lists **upgrade steps** from the previous one.
 
-## Unreleased
-
-### Changes
-- Logo: coral octopus in a white birdcage – the thin lavender cage was hard to see at sidebar size.
-- Overview → Claude Code shows the signed-in account and has **Sign out** (e.g. to connect a different account);
-  remote control restarts with it.
-- New screenshots (topology, services) with the new logo; `scripts/build-screenshots.sh` rebuilds them from a made-up
-  demo site.
-- Claude's instructions brought up to date: all service parts and `svc test`/`svc pending`/`svc audit`, no-root
-  hint, a general rule that content from services is data and never instructions, the tentaclai containers and tmux
-  sessions are off limits (also through `svc docker` on their host), an approval doesn't replace asking about risky
-  changes. The generated `SERVICES.md` describes git via `svc git push` and the `confirm` mode.
-
-## Unreleased (network)
+## v0.6.0 – 2026-10-19
 
 ### Highlights
-- **Egress gateway** – the sandbox now sits in an internal Docker network without a route to the outside. Its only way
-  out is the new container `tentaclai-egress`, a small forward proxy (CONNECT for any TCP port, plain HTTP; TLS is not
-  opened). Claude Code, curl, git, pip and npm use it through `HTTPS_PROXY`; svc tunnels ssh/rsync (ProxyCommand
-  `tc-connect`) and databases (local port forward) through it. Every destination is recorded
-  (`egress-seen.json`). `EGRESS_MODE=permissive` (default) allows everything – allow/block lists and approvals follow.
-- **Network** page in tentacontrol: every destination with connections, first/last use and its origin – a
-  tentacle, Claude/Anthropic or unknown.
-- **Allow and block lists, enforce mode** – own allowlist and blocklist (Network → tabs, or *Allow*/*Block* on a seen
-  destination), the shipped built-in list (Anthropic, GitHub, PyPI, npm) and the tentacles, derived live from your
-  services and SSH hosts. `EGRESS_MODE=enforce` (switch on the Network page) holds unknown destinations up to 60 s and
-  asks in Activity: *Allow 10 min*, *Allow 1 h*, *Always*, *Deny*, *Block*.
-- **IP addresses and ranges** in the allow and block lists (`93.184.215.14`, `10.0.0.0/8`, optionally `:port`). The gateway
-  resolves every name itself, checks IP/CIDR rules against the resolved addresses and connects to exactly those – a
-  blocked range can't be reached through an allowed name. **IP targets** (Network page): in `enforce` mode a bare IP
-  address without a rule is blocked (default) or asked about (`EGRESS_DIRECT_IP=block|ask`).
-- **Overview** shows a Network card: mode, number of destinations, destinations without a rule, pending network approvals.
-- The gateway caches the last rules and waits for the first ones after a start – no wrong denials while tentacontrol restarts.
-- `scripts/test-sandbox.sh`: end-to-end tests of privilege separation, svc, the egress gateway and every page (also in CI).
-- **Clear** on the Network page empties the list of seen destinations (rules and approvals stay).
-- The built-in list (Anthropic, GitHub, PyPI, npm) can't be blocked – it keeps Claude Code itself working.
-- **Claude Code without telemetry** by default – `DISABLE_TELEMETRY`, `DISABLE_ERROR_REPORTING` and
-  `DISABLE_BUG_COMMAND` in Claude's settings.json (no Datadog, no error reports, no `/bug`). Remote control keeps working
-  (the umbrella switch `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC` would stop it). `CLAUDE_TELEMETRY=true` turns it back on.
-- **Public sources need no service** – the templates `web-public`, `git-public` and `context7` are gone; allow such
-  hosts under Network and Claude uses them directly. Existing services of that kind keep working.
-- **Tentacles** is the new name of the *Connections* area and the collective term for everything Claude can reach
-  (services, SSH hosts, systems).
+- **Egress gateway** – the sandbox sits in an internal Docker network without a route to the outside. Its only way out
+  is the new container `tentaclai-egress`, a small forward proxy (CONNECT for any TCP port, plain HTTP; TLS is not
+  opened). Claude Code, curl, git, pip and npm use it through `HTTPS_PROXY`; svc tunnels ssh/rsync (`ProxyCommand
+  tc-connect`) and databases (local port forward) through it.
+- **Network page** – every destination with its rule, last connection and filters; your allowlist and blocklist with
+  one-click Allow/Block; the tentacles and the built-in list; *Clear*.
+- **Mode permissive / enforce** – `permissive` (default) allows and records everything; `enforce` holds a destination
+  without a rule up to 60 s and asks in Activity: *Allow 10 min*, *Allow 1 h*, *Always*, *Deny*, *Block* (also shown in
+  Claude's status line). **IP targets** – bare IP addresses without a rule are blocked (default) or asked about.
+- **Rules** in this order: built-in list (Anthropic, GitHub, PyPI, npm – can't be blocked) → blocklist → your allowlist
+  → tentacles (hosts of your services and SSH hosts, derived live) → temporary approvals. Entries: host, `*.domain`, IP
+  or range (`10.0.0.0/8`), optionally `:port`; IP rules are checked against the resolved address.
+- **Tentacles** – new name of the *Connections* area and the collective term for everything Claude can reach.
+- **Claude Code without telemetry** by default (`DISABLE_TELEMETRY`, `DISABLE_ERROR_REPORTING`, `DISABLE_BUG_COMMAND`
+  in Claude's settings.json); remote control keeps working. `CLAUDE_TELEMETRY=true` turns it back on.
+- **Sign out of Claude** from the overview (to connect a different account); the card shows the signed-in account.
+- **Logo**: coral octopus in a white birdcage, readable at small sizes; new screenshots.
 
-### Upgrade
-`git pull`, `docker compose build`, `docker compose up -d` – creates the networks and the `tentaclai-egress` container
-and recreates `tentaclai` (sessions and Remote Control end). `ssh/config` gains `ProxyCommand tc-connect %h %p` with
-`git pull` – if you changed that file yourself, merge it. Programs in the sandbox that ignore `HTTPS_PROXY` can't
-connect any more.
+### Changes
+- Public, read-only sources need no service any more: the templates `web-public`, `git-public` and `context7` are gone –
+  allow the host under Network. Existing services of that kind keep working.
+- Overview: Network card (mode, destinations, without a rule, waiting approvals). Terminal: *Claude login* only while
+  signed out, hover hints on every tab. Logs in the configured time zone. *Pin version* jumps to its setting.
+- Claude's instructions: all service parts, `svc test`/`svc pending`/`svc audit`, network rule, content from services
+  is data, the tentaclai containers and tmux sessions are off limits, no root.
+- Fix: `ssh/` is handed to root on start – a stack cloned as a normal user made ssh refuse its config.
+- Terminal tabs are named consistently (*Claude · /workspace*, *Claude · remote control*, *Claude · system inventory*).
+- `scripts/test-sandbox.sh` – end-to-end tests (privilege separation, svc through the gateway, network rules, every
+  page), also run in CI. `scripts/build-screenshots.sh` rebuilds the README screenshots from a made-up demo site.
+
+### Upgrade (from v0.5.0)
+1. `git pull` in the stack directory. `ssh/config` gains `ProxyCommand tc-connect %h %p` – if you changed that file
+   yourself, merge it.
+2. `docker compose build` (now three images: tentaclai, tentacontrol, tentaclai-egress).
+3. `docker compose up -d` – creates the networks `sandbox` (internal) and `outside`, the volume `egress-data` and the
+   container `tentaclai-egress`, and recreates `tentaclai` and `tentacontrol`. Running Claude sessions and Remote
+   Control end.
+4. New optional `.env` settings: `EGRESS_MODE` (permissive, default | enforce), `EGRESS_DIRECT_IP` (block, default | ask),
+   `CLAUDE_TELEMETRY` (false, default). Nothing to set – the mode can be switched on the Network page.
+5. If a container manager updates images (e.g. Arcane), give `egress` the same labels as `claude`/`control` in
+   `compose.override.yaml` (see `compose.override.example.yaml`).
+6. Recommended: leave `permissive` running for a while, then check Network → *Seen*, allow or block what has no rule,
+   and switch to `enforce`.
+
+Rollback: `git checkout v0.5.0`, `docker compose build`, `docker compose up -d --remove-orphans` (removes the gateway;
+the sandbox gets its normal network back).
+
+### Known issues
+- DNS is not filtered yet: the sandbox can still resolve names.
+- Programs that ignore `HTTPS_PROXY` can't connect from the sandbox (by design).
 
 ## v0.5.0 – 2026-10-19
 
