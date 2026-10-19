@@ -31,7 +31,7 @@ All notable changes, newest first. Every release lists **upgrade steps** from th
 - Claude's instructions: all service parts, `svc test`/`svc pending`/`svc audit`, network rule, content from services
   is data, the tentaclai containers and tmux sessions are off limits, no root.
 - Fix: `ssh/` is handed to root on start – a stack cloned as a normal user made ssh refuse its config.
-- Terminal tabs are named consistently (*Claude · /workspace*, *Claude · remote control*, *Claude · system inventory*).
+- Terminal tabs are named consistently (*Claude · /workspace*, *Claude · RC*, *Claude · system inventory*).
 - `scripts/test-sandbox.sh` – end-to-end tests (privilege separation, svc through the gateway, network rules, every
   page), also run in CI. `scripts/build-screenshots.sh` rebuilds the README screenshots from a made-up demo site.
 

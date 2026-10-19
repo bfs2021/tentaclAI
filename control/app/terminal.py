@@ -15,7 +15,7 @@ from .dockerops import client
 PROFILES = {
     "claude":    {"title": "Claude · /workspace", "cmd": ["cc"], "hint": "Claude Code in /workspace – persistent tmux session claude-workspace"},
     "login":     {"title": "Claude · sign in", "hint": "Sign the sandbox in to your claude.ai account (claude auth login)", "cmd": ["bash", "-lc", "claude auth login; echo; claude auth status --text; echo; read -rp 'Press Enter to close. '"]},
-    "rc":        {"title": "Claude · remote control", "hint": "The always-running remote-control session (tmux claude-rc)", "cmd": ["bash", "-lc", "tmux has-session -t claude-rc 2>/dev/null && exec tmux attach -t claude-rc || { echo 'No claude-rc session (container just started?).'; sleep 600; }"]},
+    "rc":        {"title": "Claude · RC", "hint": "The always-running remote-control session (tmux claude-rc)", "cmd": ["bash", "-lc", "tmux has-session -t claude-rc 2>/dev/null && exec tmux attach -t claude-rc || { echo 'No claude-rc session (container just started?).'; sleep 600; }"]},
     "shell":     {"title": "Shell (user claude)", "hint": "bash in the sandbox with Claude's rights – no access to .env or the SSH key", "cmd": ["bash", "-l"]},
     "svc":       {"title": "svc list", "hint": "Status of all services and Docker hosts (svc list, svc docker), then a shell to try svc commands", "cmd": ["bash", "-lc", "svc list; echo; svc docker; echo; exec bash -l"]},
     "inventory": {"title": "Claude · system inventory", "hint": "Claude scans hosts, stacks and services and drafts your site rules (local/CLAUDE.md) – you approve before anything is written", "cmd": ["tmux", "new-session", "-A", "-s", "claude-inventory", "-c", "/workspace", "claude", "/inventory"]},
