@@ -70,6 +70,7 @@ docker compose build -q
 docker compose up -d >/dev/null 2>&1
 for _ in $(seq 1 90); do docker logs tctest-claude 2>&1 | grep -q 'CLAUDE.md updated' && break; sleep 2; done
 until docker exec tctest-pg pg_isready -q 2>/dev/null; do sleep 1; done
+for _ in $(seq 1 60); do docker exec tctest-sshd sh -c 'nc -z localhost 2222' 2>/dev/null && break; sleep 2; done  # sshd sets up slowly
 sleep 16  # first policy refresh of the gateway
 C="docker exec -u claude tctest-claude"
 CI="docker exec -i -u claude tctest-claude"
