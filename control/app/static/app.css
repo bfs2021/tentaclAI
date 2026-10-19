@@ -310,3 +310,7 @@ form.inline { display: inline; margin: 0; }
 .seg .seg-on.warn { background: var(--warn-soft); color: var(--warn); font-weight: 600; box-shadow: inset 0 0 0 1px var(--warn); }
 .seg .seg-on.ok { background: var(--ok-soft); color: var(--ok); font-weight: 600; box-shadow: inset 0 0 0 1px var(--ok); }
 .seg-ico { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+/* subtle coloured buttons (allow / block) */
+.btn.soft-ok { background: var(--ok-soft); color: var(--ok); border-color: transparent; }
+.btn.soft-err { background: var(--err-soft); color: var(--err); border-color: transparent; }
+.btn.soft-ok:hover { box-shadow: inset 0 0 0 1px var(--ok); } .btn.soft-err:hover { box-shadow: inset 0 0 0 1px var(--err); }

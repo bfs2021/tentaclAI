@@ -36,7 +36,7 @@
         <td class="small muted">{{ r.decision }}</td>
         <td style="text-align:right;font-variant-numeric:tabular-nums">{{ r.count }}</td>
         <td class="small muted">{{ r.last_s }}</td>
-        <td style="text-align:right;white-space:nowrap">{% if r.kind == 'unknown' %}{{ rule_btn('allow', r.host ~ ':' ~ r.port, 'Allow') }} {{ rule_btn('block', r.host ~ ':' ~ r.port, 'Block', 'ghost') }}{% endif %}</td>
+        <td style="text-align:right;white-space:nowrap">{% if r.kind == 'unknown' %}{{ rule_btn('allow', r.host ~ ':' ~ r.port, 'Allow', 'soft-ok') }} {{ rule_btn('block', r.host ~ ':' ~ r.port, 'Block', 'soft-err') }}{% endif %}</td>
       </tr>
     {% endfor %}
     </tbody>
