@@ -5,14 +5,23 @@ that one is generated from `build/CLAUDE.base.md` by `build/claude-instructions`
 
 ## What this is
 
-tentaclAI = sandbox + service gateway for Claude Code. Two containers (`compose.yaml`):
+tentaclAI = sandbox + service gateway for Claude Code. Three containers (`compose.yaml`):
 
 - `claude` → container **tentaclai** (`build/`): Claude Code, `svc` (service gateway), `tc-scan`, remote control loop.
+  Only in the `internal` network `sandbox` – no route out except through the egress gateway.
+- `egress` → container **tentaclai-egress** (`egress/gw.py`): forward proxy (CONNECT any port, plain HTTP, no TLS
+  interception). Gets its policy from tentacontrol (`/internal/egress/*`, cached in its volume), records every
+  destination. Order: built-in list (`lib/egress-default.txt`, never blockable) → blocklist → own allowlist → tentacles
+  (`tclib.reach_hosts`, derived live) → grants → `EGRESS_MODE` permissive/enforce (+ `EGRESS_DIRECT_IP` for IP targets).
 - `control` → container **tentacontrol** (`control/`): web admin, FastAPI + Jinja + HTMX, vendored JS (no CDN at runtime).
+  In both networks; network rules in `data/control/egress-rules.json` (`control/app/egress.py`).
+
+Two layers: `svc` decides *what* happens with a tentacle (credentials, `ro`/`rw`/`confirm`); the gateway decides *where*
+the sandbox may connect. ssh/rsync go through `ProxyCommand tc-connect`, databases through `svc`'s local `tunnel()`.
 
 Shared logic lives in **`lib/tclib.py`** (`.env`, `${VAR}`, services, systems, SSH hosts) and is copied into both images –
 `svc`, `tc-scan`, `claude-instructions` and tentacontrol use it. Never re-implement these parsers elsewhere; extend tclib.
-Both images build from the repository root (`.dockerignore` whitelists `build/`, `control/`, `lib/`).
+All images build from the repository root (`.dockerignore` whitelists `build/`, `control/`, `lib/`, `egress/`).
 
 Display name **tentaclAI**, technical name **tentaclai** (container, image, paths, scripts). See `README.md` for the
 architecture and `CONTRIBUTING.md` for the ground rules.
@@ -28,8 +37,12 @@ architecture and `CONTRIBUTING.md` for the ground rules.
   (`runner()` in svc). Code running as root must never read, write or run git in paths Claude controls (workspace, its
   home) – hand files over as the other user (`as_user`, `write_as_claude`, staging dirs) and never pass Claude's
   arguments to a root process that touches local files. New secrets go to the client tool via 0600 files/env of `tcrun`.
-- **Test in isolation**, not on a running installation: own compose project / container names / port, scratch `data/`.
+- **Test in isolation**, not on a running installation: `scripts/test-sandbox.sh` (own compose project `tctest`, scratch
+  copy, guarded with `set -e` + a cwd check). Never write `.env`/compose files or run `docker compose` before checking
+  that the current directory is the scratch copy – a failed copy step once ran test commands in the live stack.
   Recreating the real `tentaclai` container ends running sessions and Remote Control – only after asking.
+- **Templates:** render every page you touched before deploying (a stray `'` in a Jinja string is a 500). Keep user-facing
+  wording plain (e.g. *Rule*, *No rule*, *Built-in*, *IP targets*) and explain modes in README → Network control and Help.
 - Keep README, tentacontrol → Help (`control/app/templates/help.html`) and this file in sync with behaviour changes.
 
 ## Releases

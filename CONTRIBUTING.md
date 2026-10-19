@@ -17,8 +17,10 @@ Thanks for your interest in tentaclAI! Issues, ideas and pull requests are welco
 - Enable the pre-commit check once per clone: `git config core.hooksPath .githooks` – it refuses site files and
   anything that looks like a token or private key (`scripts/check-site-data.sh`). CI runs the same check on every push.
 
-- Test in an isolated instance (own compose project name, own container names and port, scratch `data/`) instead of your
-  running stack – recreating the real `tentaclai` container ends running sessions and Remote Control.
+- End-to-end tests: `scripts/test-sandbox.sh` builds the images and runs privilege separation, `svc` through the egress
+  gateway, network rules and every page in a scratch copy with its own compose project (`tctest`) – never touching your
+  running stack. CI runs it on every push. For manual experiments use the same isolation (own project, container names,
+  port, scratch `data/`) – recreating the real `tentaclai` container ends running sessions and Remote Control.
 - Quick checks: `python3 -m py_compile build/svc build/tc-scan control/app/*.py` and `bash -n *.sh build/*.sh`.
 - UI: tentacontrol is FastAPI + Jinja + HTMX; static assets are vendored in the image, no CDNs at runtime.
 

@@ -23,6 +23,11 @@ services:
     # labels:
     #   com.getarcaneapp.arcane.updater: "false"
 
+  # egress:
+  #   # the gateway is built locally too – same labels as above
+  #   labels:
+  #     com.getarcaneapp.arcane.updater: "false"
+
 # networks:
 #   proxy:
 #     external: true

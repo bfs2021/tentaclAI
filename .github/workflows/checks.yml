@@ -57,3 +57,12 @@ jobs:
               env.parse(env.loader.get_source(env, t)[0])
           print("ok")
           PY
+
+  # end-to-end: privilege separation, svc through the gateway, network rules, pages (scripts/test-sandbox.sh)
+  sandbox:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Sandbox and egress tests
+        run: scripts/test-sandbox.sh
