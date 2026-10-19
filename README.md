@@ -195,7 +195,7 @@ Claude commands: **`/onboard <service>`** and **`/inventory`** (see above).
 | **Overview** | Status of the sandbox (resources, Claude version, login), Remote Control with QR code and on/off switch, Docker and SSH hosts with live status, system inventory. |
 | **Terminal** | xterm.js terminals into the sandbox (Claude, Remote Control, shell, login). Reconnects automatically. |
 | **Tentacles** | Everything Claude can reach, in four tabs: **Services** (grouped by system, live status dot per service; templates, JSON editor, write-only tokens, connection test, onboarding, enable/disable, move between systems) · **SSH hosts** (live status; add with host key check and one-time password key deployment, edit incl. jump host, sudo and rename, remove with key revocation) · **Systems** (groups with SSH host and rules) · **Topology** (live graph incl. optional stacks/containers, search, saved layout, PNG export). |
-| **Network** | Every destination the sandbox connected to (rule, last connection, filters), your allowlist and blocklist with one-click Allow/Block, the tentacles and the built-in list, and the mode switch *permissive / enforce*. |
+| **Network** | Every destination the sandbox connected to (rule, last connection, filters), your allowlist and blocklist with one-click Allow/Block, the tentacles and the built-in list, and the switches *Mode* (permissive / enforce) and *IP targets* (ask / block) – see [Network control](#network-control). |
 | **Activity** | Pending approvals – writes of `confirm` services (Approve / Approve + 15 min / Deny) and unknown network destinations (Allow 10 min / 1 h / Always / Deny / Block), badge in the sidebar and in Claude's status line – and the audit log of all write actions with filters. |
 | **Settings** | All `.env` settings with descriptions; secrets are write-only. Shows *Apply now* when the sandbox must be recreated. |
 | **Updates** | Installed tentaclAI version, new releases with their upgrade steps (checked every 6 h, also shown in the sidebar; `UPDATE_CHECK=false` turns it off), Claude Code and image updates. |
@@ -295,6 +295,35 @@ tentaclai/
 └── docs/                      screenshots
 ```
 </details>
+
+## Network control
+
+All traffic of the sandbox leaves through the egress gateway; tentacontrol → **Network** shows and controls it.
+
+**Mode** – how the gateway treats a destination that no rule covers:
+
+| Mode | Unknown destination |
+|---|---|
+| `permissive` (default) | allowed and recorded – use it to learn what the sandbox needs |
+| `enforce` | held for up to 60 s while you decide in **Activity** (*Allow 10 min*, *Allow 1 h*, *Always*, *Deny*, *Block*); refused if nobody answers |
+
+**IP targets** – connections to a bare IP address instead of a name (`curl https://93.184.215.14`). Normal programs
+almost always use names, so in `enforce` mode such a connection without a rule is blocked (`block`, default) or asked
+about like any other unknown destination (`ask`). `EGRESS_DIRECT_IP` in `.env`.
+
+**Rules**, checked in this order:
+
+1. **Built-in** – Anthropic (Claude Code, login, remote control), GitHub, PyPI, npm. Always allowed, can't be blocked.
+2. **Blocklist** – always refused, even for tentacles.
+3. **Your allowlist** – entries you added (Network tab, *Allow* on a seen destination, or *Always* in Activity).
+4. **Tentacles** – hosts of your active services and SSH hosts, derived live (nothing to maintain).
+5. **Temporary approvals** – *Allow 10 min* / *Allow 1 h*.
+
+Entries: `host`, `*.domain` (subdomains only), an IP address or range (`10.0.0.0/8`), each optionally with `:port`.
+The gateway resolves names itself and checks IP rules against the resolved address, so a blocked range can't be reached
+through an allowed name. *Seen* lists every destination with its rule and last result (filters, **Clear**).
+
+Claude Code's telemetry, error reports and `/bug` are off by default (`CLAUDE_TELEMETRY=true` turns them on).
 
 ## Security
 

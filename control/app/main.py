@@ -502,7 +502,7 @@ async def network_clear(request: Request):
 async def network_direct_ip(request: Request):
     new = "ask" if egress.direct_ip() == "block" else "block"
     update_env({"EGRESS_DIRECT_IP": new})
-    return respond(request, f"Direct IP addresses: {new} (in enforce mode, applied within 15 s)", refresh=True)
+    return respond(request, f"IP targets: {new} (in enforce mode, applied within 15 s)", refresh=True)
 
 
 @app.post("/network/mode", response_class=HTMLResponse)

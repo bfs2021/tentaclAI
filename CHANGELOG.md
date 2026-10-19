@@ -31,7 +31,7 @@ All notable changes, newest first. Every release lists **upgrade steps** from th
   asks in Activity: *Allow 10 min*, *Allow 1 h*, *Always*, *Deny*, *Block*.
 - **IP addresses and ranges** in the allow and block lists (`93.184.215.14`, `10.0.0.0/8`, optionally `:port`). The gateway
   resolves every name itself, checks IP/CIDR rules against the resolved addresses and connects to exactly those – a
-  blocked range can't be reached through an allowed name. **Direct IPs** (Network page): in `enforce` mode a bare IP
+  blocked range can't be reached through an allowed name. **IP targets** (Network page): in `enforce` mode a bare IP
   address without a rule is blocked (default) or asked about (`EGRESS_DIRECT_IP=block|ask`).
 - **Overview** shows a Network card: mode, number of destinations, destinations without a rule, pending network approvals.
 - The gateway caches the last rules and waits for the first ones after a start – no wrong denials while tentacontrol restarts.

@@ -17,8 +17,8 @@
       hx-confirm="Switch to permissive? Every destination is allowed again (and recorded)."><svg class="seg-ico" viewBox="0 0 24 24"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>permissive</button>
     <span class="seg-on ok" role="radio" aria-checked="true" title="Unknown destinations wait for your approval in Activity"><svg class="seg-ico" viewBox="0 0 24 24"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/></svg>enforce</span>{% endif %}
   </div>
-  <span class="mode-label" title="connections to a bare IP address that no rule covers (enforce mode)">Direct IPs</span>
-  <div class="seg" role="radiogroup" aria-label="Direct IP addresses">
+  <span class="mode-label" title="connections to a bare IP address that no rule covers (enforce mode)">IP targets</span>
+  <div class="seg" role="radiogroup" aria-label="IP targets">
     {% for v, t in (('ask', 'ask'), ('block', 'block')) %}{% if direct_ip == v %}<span class="seg-on {{ 'ok' if v == 'block' else 'warn' }}" role="radio" aria-checked="true">{{ t }}</span>{% else %}<button role="radio" aria-checked="false" hx-post="/network/direct-ip">{{ t }}</button>{% endif %}{% endfor %}
   </div>
   </div>
@@ -51,7 +51,7 @@
         <td class="mono small">{{ r.host }}<span class="faint">:{{ r.port }}</span></td>
         <td>{% if r.kind == 'tentacle' %}<span class="pill ok" title="host of an active service or SSH host">Tentacle · {{ r.label }}</span>{% elif r.kind == 'default' %}<span class="pill info" title="shipped with tentaclAI">Built-in</span>{% elif r.kind == 'allow' %}<span class="pill info">Your allowlist</span>{% elif r.kind == 'blocked' %}<span class="pill err">Blocklist</span>{% else %}<span class="pill warn" title="in enforce mode this needs your approval">No rule</span>{% endif %}</td>
         <td class="small muted">{{ {'allowlist': 'allowed', 'tentacle': 'allowed', 'grant': 'allowed temporarily', 'unlisted': 'allowed – no rule (permissive)',
-                                    'approved': 'approved', 'denied': 'denied', 'blocked': 'blocked', 'direct-ip': 'blocked – direct IP'}.get(r.decision, r.decision) }}</td>
+                                    'approved': 'approved', 'denied': 'denied', 'blocked': 'blocked', 'direct-ip': 'blocked – IP target'}.get(r.decision, r.decision) }}</td>
         <td style="text-align:right;font-variant-numeric:tabular-nums">{{ r.count }}</td>
         <td class="small muted">{{ r.last_s }}</td>
         <td style="text-align:right;white-space:nowrap">{% set e = r.host ~ ':' ~ r.port %}
