@@ -7,11 +7,12 @@
 {% block content %}
 <div class="header">
   <div><h1>Network</h1><div class="sub">The sandbox reaches the outside only through the egress gateway. Tentacles and the default list are always allowed; everything else follows your lists – and in <strong>enforce</strong> mode waits for your approval in Activity.</div></div>
-  <label class="switch-row" title="{{ 'Unknown destinations wait for your approval in Activity' if mode == 'enforce' else 'Every destination is allowed and recorded' }}">
-    <span>Ask before unknown destinations<br><strong>{{ 'On – enforce' if mode == 'enforce' else 'Off – permissive' }}</strong></span>
-    <button class="switch" role="switch" aria-checked="{{ 'true' if mode == 'enforce' else 'false' }}" aria-label="Ask before unknown destinations" hx-post="/network/mode"
-      hx-confirm="{{ 'Turn off? Every destination is allowed again (and recorded).' if mode == 'enforce' else 'Turn on? Unknown destinations then wait for your approval in Activity (up to 60 s) and are refused otherwise.' }}"></button>
-  </label>
+  <div class="switch-row" title="permissive: every destination is allowed and recorded · enforce: unknown destinations wait for your approval in Activity">
+    <span class="{{ 'on' if mode == 'permissive' }}">permissive</span>
+    <button class="switch" role="switch" aria-checked="{{ 'true' if mode == 'enforce' else 'false' }}" aria-label="Network mode: enforce" hx-post="/network/mode"
+      hx-confirm="{{ 'Switch to permissive? Every destination is allowed again (and recorded).' if mode == 'enforce' else 'Switch to enforce? Unknown destinations then wait for your approval in Activity (up to 60 s) and are refused otherwise.' }}"></button>
+    <span class="{{ 'on' if mode == 'enforce' }}">enforce</span>
+  </div>
 </div>
 <nav class="conn-tabs" aria-label="Network">
   <a href="/network?tab=seen" class="{{ 'active' if tab == 'seen' }}">{{ icon('activity') }}Seen</a>
