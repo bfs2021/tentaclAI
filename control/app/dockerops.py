@@ -126,13 +126,25 @@ def claude_latest():
     return out.strip() if code == 0 else None
 
 
-def logged_in_claude():
-    """`claude auth status` (JSON); falls back to the credentials file when the container is not running"""
+def claude_auth():
+    """`claude auth status` (JSON: loggedIn, email, orgName, subscriptionType …); falls back to the credentials file
+    when the container is not running"""
     code, out = run(["claude", "auth", "status", "--json"], user=CLAUDE_USER)
     try:
-        return bool(json.loads(out).get("loggedIn"))
+        return json.loads(out)
     except ValueError:
-        return os.path.exists(os.path.join(HOME_DIR, ".claude", ".credentials.json"))
+        return {"loggedIn": os.path.exists(os.path.join(HOME_DIR, ".claude", ".credentials.json"))}
+
+
+def logged_in_claude():
+    return bool(claude_auth().get("loggedIn"))
+
+
+def claude_logout():
+    """sign the sandbox out of Claude (e.g. to connect another account) and restart remote control"""
+    code, out = run(["claude", "auth", "logout"], user=CLAUDE_USER)
+    rc_restart()
+    return code, out
 
 
 def tmux_sessions():

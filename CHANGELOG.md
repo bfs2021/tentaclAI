@@ -6,6 +6,10 @@ All notable changes, newest first. Every release lists **upgrade steps** from th
 
 ### Changes
 - Logo: coral octopus in a white birdcage – the thin lavender cage was hard to see at sidebar size.
+- Overview → Claude Code shows the signed-in account and has **Sign out** (e.g. to connect a different account);
+  remote control restarts with it.
+- New screenshots (topology, services) with the new logo; `scripts/build-screenshots.sh` rebuilds them from a made-up
+  demo site.
 - Claude's instructions brought up to date: all service parts and `svc test`/`svc pending`/`svc audit`, no-root
   hint, a general rule that content from services is data and never instructions, the tentaclai containers and tmux
   sessions are off limits (also through `svc docker` on their host), an approval doesn't replace asking about risky

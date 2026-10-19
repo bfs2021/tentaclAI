@@ -307,8 +307,7 @@ What it does **not** (yet) do – keep it in mind:
 
 - **Security:** egress allowlist, read-only root filesystem, Docker socket proxy, prompt-injection safeguards
 - **Automation:** scheduled Claude jobs · monitoring per service with status and recommendations
-- **tentacontrol:** AI assistant for the configuration · OAuth with browser login · export/import of configuration and templates ·
-  sign out of Claude (e.g. to connect a different account)
+- **tentacontrol:** AI assistant for the configuration · OAuth with browser login · export/import of configuration and templates
 - **Topology:** connections between systems and containers (reverse proxy → container, tunnels) · monitoring status
 
 ## License

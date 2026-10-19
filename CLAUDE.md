@@ -58,3 +58,5 @@ isolated instance when the Upgrade section is more than a plain rebuild.
 `docs/brand/*.png` (GitHub social preview, wordmarks) are generated: edit slogan, subtitle and styles in
 `docs/brand/src/gen.py`, then run `scripts/build-brand.sh` (Docker + Playwright). The slogan also appears in
 `README.md` and the brand block of `control/app/templates/base.html` / `login.html` – keep them in sync.
+`docs/screenshots/*.png` come from `scripts/build-screenshots.sh` (made-up demo site, local tentacontrol image) – run it
+before `build-brand.sh` when the UI changed, the social preview uses the topology screenshot.

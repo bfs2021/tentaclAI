@@ -91,6 +91,7 @@
     <section class="card" id="rc">
       <h2>Remote control</h2>
       <p>The tmux session <code>claude-rc</code> runs <code>claude remote-control</code> permanently; when it ends it restarts after a delay. Requirements: Claude signed in with a claude.ai account (an API key is not enough) and a one-time confirmation in the terminal.</p>
+      <p><strong>Other account:</strong> Overview → Claude Code → <em>Sign out</em> ends the login of the sandbox (the card shows which account is signed in) and restarts remote control; then <em>Sign in now</em> with the other account. Running Claude sessions stop working until then.</p>
       <table>
         <tr><td><code>RC_ENABLED</code></td><td>on/off</td></tr><tr><td><code>RC_NAME</code></td><td>session name in claude.ai/code and the app</td></tr>
         <tr><td><code>RC_WORKDIR</code></td><td>start directory (e.g. /workspace or a stacks directory)</td></tr>
@@ -345,7 +346,6 @@ gh …                      GitHub CLI without credentials (public data)</pre>
         <li><strong>Monitoring per service</strong>: Claude checks connected services regularly and reports status and recommendations.</li>
         <li><strong>Topology</strong>: next – connections between systems and containers (reverse proxy → container, tunnels), status from monitoring.</li>
         <li><strong>Export/import</strong>: configuration and templates, e.g. for a second installation or to share templates.</li>
-        <li><strong>Sign out of Claude</strong>: end the Claude login of the sandbox from tentacontrol (and restart Remote Control), e.g. to connect a different account.</li>
         <li><strong>AI assistant</strong> in tentacontrol for the whole configuration (can be switched off).</li>
         <li><strong>OAuth with browser login</strong> (authorization code, e.g. Google) as auth type, with templates. Client credentials already exist.</li>
         <li><strong>More sandbox</strong>: egress allowlist (only service hosts reachable), read-only root filesystem, Docker socket only through a filtering proxy, preconfigured Claude Code permissions, prompt-injection safeguards for content from services.</li>

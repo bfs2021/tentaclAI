@@ -236,7 +236,8 @@ async def dashboard(request: Request):
 @app.get("/partials/overview", response_class=HTMLResponse)
 async def overview(request: Request):
     st = dockerops.status()
-    ctx = {"st": st, "stats": None, "version": None, "logged": dockerops.logged_in_claude(),
+    auth = dockerops.claude_auth()
+    ctx = {"st": st, "stats": None, "version": None, "logged": bool(auth.get("loggedIn")), "auth": auth,
            "sessions": [], "rc": None, "services": services_store.load_all(), "hosts": sshhosts.hosts()}
     if st["running"]:
         ctx.update(stats=dockerops.stats(), version=dockerops.claude_version(),
@@ -275,6 +276,13 @@ async def rc_toggle(request: Request):
     update_env({"RC_ENABLED": "true" if enable else "false"})
     await asyncio.to_thread(dockerops.rc_restart)
     return respond(request, "Remote control enabled" if enable else "Remote control disabled", refresh=True)
+
+
+@app.post("/claude/logout")
+async def claude_logout(request: Request):
+    code, out = await asyncio.to_thread(dockerops.claude_logout)
+    return respond(request, "Signed out of Claude – sign in again with “Sign in now”" if code == 0 else f"Sign-out failed: {out.strip()[:120]}",
+                   "ok" if code == 0 else "err", refresh=True)
 
 
 @app.post("/rc/restart")
