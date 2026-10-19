@@ -1245,7 +1245,7 @@ async def logs_stream():
     def follow():
         try:
             for chunk in c.logs(stream=True, follow=True, since=int(time.time()), timestamps=True):
-                loop.call_soon_threadsafe(queue.put_nowait, chunk.decode(errors="replace"))
+                loop.call_soon_threadsafe(queue.put_nowait, dockerops.local_ts(chunk.decode(errors="replace")))
         except Exception:  # noqa: BLE001
             pass
         loop.call_soon_threadsafe(queue.put_nowait, None)

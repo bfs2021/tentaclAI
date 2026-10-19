@@ -208,11 +208,22 @@ def rc_restart():
     return run(["tmux", "respawn-pane", "-k", "-t", "claude-rc"], user=CLAUDE_USER)
 
 
+LOG_TS = re.compile(r"^(\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d)(?:\.\d+)?Z", re.M)
+
+
+def local_ts(text):
+    """Docker log timestamps are UTC – show them in the configured time zone (TZ)"""
+    def conv(m):
+        t = dt.datetime.strptime(m.group(1), "%Y-%m-%dT%H:%M:%S").replace(tzinfo=dt.timezone.utc)
+        return t.astimezone().strftime("%Y-%m-%d %H:%M:%S")
+    return LOG_TS.sub(conv, text)
+
+
 def logs(tail=300):
     c = container()
     if c is None:
         return ""
-    return c.logs(tail=tail, timestamps=True).decode(errors="replace")
+    return local_ts(c.logs(tail=tail, timestamps=True).decode(errors="replace"))
 
 
 def lifecycle(action):
