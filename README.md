@@ -183,6 +183,7 @@ svc git push|pull|fetch <repo> [branch]     # through svc's mirror – access mo
 svc ssh <host> [command]                    # command or shell on an SSH host (status commands free, others need approval)
 svc config put service <name> <file>        # Claude proposes a service file – always needs approval
 svc pending                                 # approvals waiting in tentacontrol (also in Claude's status line)
+# tab completion for all of these in the sandbox shells
 tc-scan                                     # read-only inventory of all docker hosts, services, SSH hosts
 ```
 

@@ -14,7 +14,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         ca-certificates curl gnupg git jq ripgrep fd-find less nano vim-tiny tmux \
         openssh-client rsync unzip zip procps iputils-ping dnsutils \
         python3 python3-venv python3-pip make \
-        postgresql-client mariadb-client sshpass sudo \
+        postgresql-client mariadb-client sshpass sudo bash-completion \
     && ln -s /usr/bin/fdfind /usr/local/bin/fd \
     # Docker CLI + compose plugin (talks to the host daemon via the mounted socket)
     && install -m 0755 -d /etc/apt/keyrings \
@@ -38,6 +38,7 @@ RUN echo "cache bust: ${CACHE_BUST}" && npm install -g @anthropic-ai/claude-code
 
 COPY build/entrypoint.sh build/start.sh build/rc-loop build/cc build/svc build/claude-instructions build/tc-scan build/tc-statusline build/tc-connect /usr/local/bin/
 COPY lib/tclib.py /usr/local/lib/tentaclai/tclib.py
+COPY build/svc-completion.bash /etc/bash_completion.d/svc
 COPY VERSION /etc/tentaclai/VERSION
 COPY build/CLAUDE.base.md /etc/tentaclai/CLAUDE.base.md
 COPY build/commands/ /etc/tentaclai/commands/
@@ -52,6 +53,8 @@ RUN groupadd -g ${CLAUDE_UID} claude && useradd -m -d /home/claude -u ${CLAUDE_U
     && chmod 0440 /etc/sudoers.d/tentaclai && visudo -cq
 RUN chmod 0755 /usr/local/bin/entrypoint.sh /usr/local/bin/start.sh /usr/local/bin/rc-loop /usr/local/bin/cc /usr/local/bin/svc /usr/local/bin/claude-instructions /usr/local/bin/tc-scan /usr/local/bin/tc-statusline /usr/local/bin/tc-connect \
     # tmux: mouse scrolling, bigger scrollback, truecolor for Claude's TUI
+    # tab completion in interactive shells (Debian ships it disabled in bash.bashrc)
+    && printf '%s\n' '[ -n "$PS1" ] && [ -f /usr/share/bash-completion/bash_completion ] && . /usr/share/bash-completion/bash_completion' >> /etc/bash.bashrc \
     && printf '%s\n' 'set -g mouse on' 'set -g history-limit 50000' \
         'set -g default-terminal "tmux-256color"' 'set -ga terminal-overrides ",*:Tc"' > /etc/tmux.conf
 
