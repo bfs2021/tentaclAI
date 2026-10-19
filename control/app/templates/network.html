@@ -41,7 +41,7 @@
     {% for r in rows %}
       <tr data-kind="{{ 'allowed' if r.kind in ('default', 'allow') else r.kind }}" data-host="{{ r.host }}:{{ r.port }}">
         <td class="mono small">{{ r.host }}<span class="faint">:{{ r.port }}</span></td>
-        <td>{% if r.kind == 'tentacle' %}<span class="pill ok" title="host of an active service or SSH host">Tentacle · {{ r.label }}</span>{% elif r.kind == 'default' %}<span class="pill info" title="shipped with tentaclAI">Built-in list</span>{% elif r.kind == 'allow' %}<span class="pill info">Your allowlist</span>{% elif r.kind == 'blocked' %}<span class="pill err">Blocklist</span>{% else %}<span class="pill warn" title="in enforce mode this needs your approval">No rule</span>{% endif %}</td>
+        <td>{% if r.kind == 'tentacle' %}<span class="pill ok" title="host of an active service or SSH host">Tentacle · {{ r.label }}</span>{% elif r.kind == 'default' %}<span class="pill info" title="shipped with tentaclAI">Built-in</span>{% elif r.kind == 'allow' %}<span class="pill info">Your allowlist</span>{% elif r.kind == 'blocked' %}<span class="pill err">Blocklist</span>{% else %}<span class="pill warn" title="in enforce mode this needs your approval">No rule</span>{% endif %}</td>
         <td class="small muted">{{ {'allowlist': 'allowed', 'tentacle': 'allowed', 'grant': 'allowed temporarily', 'unlisted': 'allowed – no rule (permissive)',
                                     'approved': 'approved', 'denied': 'denied', 'blocked': 'blocked'}.get(r.decision, r.decision) }}</td>
         <td style="text-align:right;font-variant-numeric:tabular-nums">{{ r.count }}</td>
@@ -96,7 +96,7 @@
   <div class="card"><div class="card-head"><h2>Tentacles</h2><span class="small muted">automatic</span></div>
     <p class="help">Hosts of your active services and SSH hosts – they follow your tentacles, nothing to maintain.</p>
     <div class="stack">{% for h, n in tentacles %}<div class="between"><span class="mono small">{{ h }}</span><span class="pill ok">{{ n }}</span></div>{% endfor %}</div></div>
-  <div class="card"><div class="card-head"><h2>Built-in list</h2><span class="small muted">shipped with tentaclAI</span></div>
+  <div class="card"><div class="card-head"><h2>Built-in</h2><span class="small muted">shipped with tentaclAI</span></div>
     <div class="stack">{% for e in default %}<div class="mono small">{{ e }}</div>{% endfor %}</div></div>
 </div>
 {% endif %}
