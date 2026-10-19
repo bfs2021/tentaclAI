@@ -489,6 +489,19 @@ async def network_rule(request: Request, kind: str = Form(...), entry: str = For
     return respond(request, msg, refresh=True)
 
 
+@app.post("/network/clear", response_class=HTMLResponse)
+async def network_clear(request: Request):
+    egress.clear_seen()
+    return respond(request, "List cleared – it fills again with new connections", refresh=True)
+
+
+@app.post("/network/direct-ip", response_class=HTMLResponse)
+async def network_direct_ip(request: Request):
+    new = "ask" if egress.direct_ip() == "block" else "block"
+    update_env({"EGRESS_DIRECT_IP": new})
+    return respond(request, f"Direct IP addresses: {new} (in enforce mode, applied within 15 s)", refresh=True)
+
+
 @app.post("/network/mode", response_class=HTMLResponse)
 async def network_mode(request: Request):
     new = "enforce" if egress.mode() == "permissive" else "permissive"
@@ -505,6 +518,7 @@ async def network_page(request: Request, tab: str = "seen"):
         r["first_s"], r["last_s"] = fmt(r.get("first")), fmt(r.get("last"))
     tent = await asyncio.to_thread(egress.tentacles)
     return page(request, "network.html", tab=tab if tab in ("seen", "allow", "block") else "seen", rows=rows, mode=egress.mode(),
+                direct_ip=egress.direct_ip(),
                 rules=egress.rules(), default=egress.default_list(),
                 tentacles=sorted((f"{h}:{p}" if p else h, n) for (h, p), n in tent.items()),
                 counts={k: sum(1 for r in rows if r["kind"] == k) for k in ("tentacle", "default", "allow", "unknown", "blocked")})

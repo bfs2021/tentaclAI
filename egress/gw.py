@@ -9,6 +9,7 @@ Every destination is counted in $DATA_DIR/egress-seen.json (host:port → first,
 import asyncio
 import json
 import os
+import socket
 import sys
 import time
 import urllib.request
@@ -24,8 +25,9 @@ DEFAULT = tclib.egress_patterns(open("/app/egress-default.txt").read())
 IDLE = 3600  # seconds a tunnel may stay silent (ssh sessions, long polls)
 HOLD = 60  # seconds an unknown destination waits for the user's decision (enforce)
 
-seen, dirty = {}, False
-pol = {"mode": os.environ.get("EGRESS_MODE", "permissive"), "allow": [], "block": [], "tentacles": {}, "grants": {}, "ok": False}
+seen, dirty, cleared = {}, False, 0.0
+pol = {"mode": os.environ.get("EGRESS_MODE", "permissive"), "direct_ip": "block", "allow": [], "block": [], "tentacles": {},
+       "grants": {}, "ok": False}
 
 
 def control(path, payload=None, timeout=30):
@@ -43,7 +45,11 @@ def refresh():
         if pol["ok"]:
             print(f"policy refresh failed: {e}", flush=True)
         return
-    pol.update(mode=p.get("mode", "permissive"), allow=p.get("allow", []), block=p.get("block", []), ok=True,
+    global seen, dirty, cleared
+    if p.get("cleared", 0) > cleared:  # "Clear" on the Network page
+        seen, dirty = {k: v for k, v in seen.items() if v.get("last", 0) > p["cleared"]}, True
+        cleared = p["cleared"]
+    pol.update(mode=p.get("mode", "permissive"), direct_ip=p.get("direct_ip", "block"), allow=p.get("allow", []), block=p.get("block", []), ok=True,
                tentacles={(h, pt): n for h, pt, n in p.get("tentacles", [])}, grants=dict(p.get("grants", {})))
 
 
@@ -53,13 +59,13 @@ async def refresher():
         await asyncio.sleep(15)
 
 
-def decide(host, port):
-    """(allow?, reason)"""
+def decide(host, port, ips):
+    """(allow?, reason) – names are checked as requested, IP/CIDR rules also against the resolved addresses ips"""
     if any(tclib.egress_match(p, host, port) for p in DEFAULT):  # built-in: Claude Code itself – never blockable
         return True, "allowlist"
-    if any(tclib.egress_match(p, host, port) for p in pol["block"]):
+    if any(tclib.egress_match(p, host, port, ips) for p in pol["block"]):
         return False, "blocked"
-    if any(tclib.egress_match(p, host, port) for p in pol["allow"]):
+    if any(tclib.egress_match(p, host, port, ips) for p in pol["allow"]):
         return True, "allowlist"
     if (host, port) in pol["tentacles"] or (host, None) in pol["tentacles"]:
         return True, "tentacle"
@@ -67,7 +73,20 @@ def decide(host, port):
         return True, "grant"
     if pol["mode"] != "enforce":
         return True, "unlisted"
+    if tclib.is_ip(host) and pol["direct_ip"] == "block":
+        return False, "direct-ip"
     return None, "ask"
+
+
+async def resolve(host, port):
+    """addresses the gateway will connect to – checked against IP/CIDR rules, then used for the connection (no re-resolve)"""
+    if tclib.is_ip(host):
+        return [host]
+    try:
+        infos = await asyncio.get_running_loop().getaddrinfo(host, port, type=socket.SOCK_STREAM)
+    except OSError:
+        return []
+    return sorted(dict.fromkeys(i[4][0] for i in infos), key=lambda a: ":" in a)  # IPv4 first
 
 
 async def ask(host, port):
@@ -164,15 +183,18 @@ async def handle(cr, cw):
             return refuse(cw, "400 Bad Request", "tentaclAI egress: proxy requests only")
     except ValueError:
         return refuse(cw, "400 Bad Request", "tentaclAI egress: bad host or port")
-    ok, why = decide(host, port)
+    ips = await resolve(host, port)
+    ok, why = decide(host, port, ips)
     if ok is None:
         ok = await ask(host, port)
         why = "approved" if ok else "denied"
     record(host, port, why)
     if not ok:
         return refuse(cw, "403 Forbidden", f"tentaclAI egress: {host}:{port} is {why} – allow it in tentacontrol → Network or approve it in Activity")
+    if not ips:
+        return refuse(cw, "502 Bad Gateway", f"{host}: name not found")
     try:
-        ur, uw = await asyncio.wait_for(asyncio.open_connection(host, port), 20)
+        ur, uw = await asyncio.wait_for(asyncio.open_connection(ips[0], port), 20)
     except (OSError, asyncio.TimeoutError) as e:
         return refuse(cw, "502 Bad Gateway", f"{host}:{port}: {e}")
     if method.upper() == "CONNECT":

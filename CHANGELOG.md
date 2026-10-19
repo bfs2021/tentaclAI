@@ -29,6 +29,11 @@ All notable changes, newest first. Every release lists **upgrade steps** from th
   destination), the shipped built-in list (Anthropic, GitHub, PyPI, npm) and the tentacles, derived live from your
   services and SSH hosts. `EGRESS_MODE=enforce` (switch on the Network page) holds unknown destinations up to 60 s and
   asks in Activity: *Allow 10 min*, *Allow 1 h*, *Always*, *Deny*, *Block*.
+- **IP addresses and ranges** in the allow and block lists (`93.184.215.14`, `10.0.0.0/8`, optionally `:port`). The gateway
+  resolves every name itself, checks IP/CIDR rules against the resolved addresses and connects to exactly those – a
+  blocked range can't be reached through an allowed name. **Direct IPs** (Network page): in `enforce` mode a bare IP
+  address without a rule is blocked (default) or asked about (`EGRESS_DIRECT_IP=block|ask`).
+- **Clear** on the Network page empties the list of seen destinations (rules and approvals stay).
 - The built-in list (Anthropic, GitHub, PyPI, npm) can't be blocked – it keeps Claude Code itself working.
 - **Claude Code without telemetry** by default – `DISABLE_TELEMETRY`, `DISABLE_ERROR_REPORTING` and
   `DISABLE_BUG_COMMAND` in Claude's settings.json (no Datadog, no error reports, no `/bug`). Remote control keeps working

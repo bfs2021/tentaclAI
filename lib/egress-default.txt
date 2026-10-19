@@ -1,9 +1,8 @@
 # Default allowlist of the egress gateway (shipped with tentaclAI). One pattern per line:
-#   host  ·  *.domain  ·  host:port  ·  *.domain:port   (no port = any port)
+#   host · *.domain · IP · CIDR, each optionally with :port (no port = any port); *.domain does not match domain itself
 # Your own entries and the blocklist are managed in tentacontrol → Network; tentacles are allowed automatically.
 
 # Claude Code: API, login, remote control, claude.ai connectors
-api.anthropic.com:443
 *.anthropic.com:443
 claude.ai:443
 *.claude.ai:443
@@ -12,7 +11,6 @@ platform.claude.com:443
 github.com:443
 *.github.com:443
 *.githubusercontent.com:443
-codeload.github.com:443
 # package registries
 pypi.org:443
 files.pythonhosted.org:443

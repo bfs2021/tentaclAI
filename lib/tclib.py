@@ -175,13 +175,31 @@ def egress_patterns(text):
     return [l.split("#", 1)[0].strip().lower() for l in text.splitlines() if l.split("#", 1)[0].strip()]
 
 
-def egress_match(pattern, host, port):
-    """host[:port] pattern with an optional leading '*.' wildcard; no port in the pattern = any port"""
+def is_ip(s):
+    import ipaddress
+    try:
+        ipaddress.ip_address(s)
+        return True
+    except ValueError:
+        return False
+
+
+def egress_match(pattern, host, port, ips=()):
+    """pattern: host, *.domain, IP or CIDR (e.g. 10.0.0.0/8), each optionally with :port (no port = any port).
+    Names match the requested host; IPs and CIDRs match the host when it is an address, and every resolved address."""
+    import ipaddress
     p_host, _, p_port = pattern.rpartition(":") if pattern.count(":") == 1 else (pattern, "", "")
     p_host = p_host or pattern
     if p_port and p_port != str(port):
         return False
     host = host.lower().rstrip(".")
+    if "/" in p_host or is_ip(p_host):
+        try:
+            net = ipaddress.ip_network(p_host, strict=False)
+        except ValueError:
+            return False
+        addrs = ([host] if is_ip(host) else []) + list(ips)
+        return any(ipaddress.ip_address(a) in net for a in addrs if is_ip(a))
     if p_host.startswith("*."):
         return host.endswith(p_host[1:])
     return host == p_host

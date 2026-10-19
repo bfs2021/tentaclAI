@@ -11,9 +11,10 @@ from .config import DATA_DIR, SERVICES_DIR, STACK_DIR
 from .envfile import read_env
 
 RULES = os.path.join(DATA_DIR, "egress-rules.json")
+CLEARED = os.path.join(DATA_DIR, "egress-cleared")  # time of the last "Clear" – the gateway empties its list after it
 SEEN = "/egress/egress-seen.json"
 DEFAULT_FILE = "/app/egress-default.txt"
-ENTRY_RE = re.compile(r"^(\*\.)?[a-z0-9.-]{1,253}(:\d{1,5})?$")
+ENTRY_RE = re.compile(r"^((\*\.)?[a-z0-9.-]{1,253}|\d{1,3}(\.\d{1,3}){3}/\d{1,2})(:\d{1,5})?$")
 
 
 def default_list():
@@ -41,7 +42,7 @@ def _save(r):
 def normalize(entry):
     e = (entry or "").strip().lower().rstrip(".")
     if not ENTRY_RE.match(e):
-        raise ValueError("host, *.domain, host:port or *.domain:port")
+        raise ValueError("host, *.domain, IP or CIDR (10.0.0.0/8), optionally with :port")
     return e
 
 
@@ -73,6 +74,25 @@ def still_blocked(entry):
     return next((p for p in rules()["block"] if tclib.egress_match(p, host, int(port or 443))), "")
 
 
+def direct_ip():
+    """what enforce does with connections to a bare IP address that no rule covers: block (default) or ask"""
+    v = (read_env().get("EGRESS_DIRECT_IP") or "block").strip().lower()
+    return v if v in ("ask", "block") else "block"
+
+
+def cleared():
+    try:
+        return float(open(CLEARED).read().strip())
+    except (OSError, ValueError):
+        return 0.0
+
+
+def clear_seen():
+    import time
+    with open(CLEARED, "w") as f:
+        f.write(str(time.time()))
+
+
 def mode():
     m = (read_env().get("EGRESS_MODE") or "permissive").strip().lower()
     return m if m in ("permissive", "enforce") else "permissive"
@@ -87,7 +107,7 @@ def policy():
     """what the gateway needs – no secrets"""
     r = rules()
     grants = {g["service"]: g["until"] for g in activity.grants() if g["part"] == "network"}
-    return {"mode": mode(), "allow": r["allow"], "block": r["block"], "grants": grants,
+    return {"mode": mode(), "direct_ip": direct_ip(), "cleared": cleared(), "allow": r["allow"], "block": r["block"], "grants": grants,
             "tentacles": [[h, p, n] for (h, p), n in tentacles().items()]}
 
 
@@ -112,9 +132,11 @@ def seen_rows():
         seen = json.load(open(SEEN))
     except (OSError, ValueError):
         seen = {}
-    tent, r = tentacles(), rules()
+    tent, r, since = tentacles(), rules(), cleared()
     rows = []
     for key, e in seen.items():
+        if e.get("last", 0) <= since:
+            continue
         host, _, port = key.rpartition(":")
         kind, label = origin(host, int(port) if port.isdigit() else 0, tent, r)
         rows.append(dict(e, host=host, port=port, kind=kind, label=label))
