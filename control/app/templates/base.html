@@ -40,7 +40,7 @@
   <main class="main">
     {% if restart_needed %}
     <div class="banner">
-      <div><strong>Configuration changed.</strong> <span class="muted">tentaclAI has to be recreated for the changes to take effect – running Claude sessions will end.</span></div>
+      <div><strong>{{ 'A newer tentaclAI image is ready.' if newer_image else 'Configuration changed.' }}</strong> <span class="muted">tentaclAI has to be recreated for the changes to take effect – running Claude sessions will end.</span></div>
       <button class="btn primary sm" hx-post="/container/recreate" hx-confirm="Recreate tentaclAI now? Running sessions will end.">{{ icon('refresh') }}Apply now</button>
     </div>
     {% endif %}

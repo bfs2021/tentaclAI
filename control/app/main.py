@@ -95,7 +95,8 @@ async def announce_setup():
 
 def page(request, name, **ctx):
     st = dockerops.status()
-    ctx.update(request=request, nav=name.split(".")[0], cstatus=st, restart_needed=restart_needed(st), site=site(),
+    newer = dockerops.newer_image() if st.get("exists") else False
+    ctx.update(request=request, nav=name.split(".")[0], cstatus=st, restart_needed=restart_needed(st) or newer, newer_image=newer, site=site(),
                update=updatecheck.status(TC_VERSION),
                flash=request.session.pop("flash", None))
     return templates.TemplateResponse(request, name, ctx)

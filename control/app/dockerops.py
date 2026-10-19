@@ -66,6 +66,17 @@ def human_age(ts):
     return f"{s // 86400} days"
 
 
+def newer_image():
+    """True when the image tag the sandbox runs from was rebuilt after the container was created"""
+    c = container()
+    if c is None:
+        return False
+    try:
+        return client().images.get(image_name(c)).id != c.attrs.get("Image")
+    except Exception:  # noqa: BLE001 – tag gone, docker hiccup
+        return False
+
+
 def image_name(c):
     """image reference of a container – c.image fails when the image was rebuilt/removed meanwhile"""
     return c.attrs.get("Config", {}).get("Image") or c.attrs.get("Image", "")[:19]

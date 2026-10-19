@@ -127,7 +127,7 @@
 }</pre>
       <ul>
         <li><strong>Status</strong>: <span class="pill ok">active</span> all variables set · <span class="pill warn">token missing</span> at least one <code>${VAR}</code> empty · <span class="pill off">disabled</span> <code>"enabled": false</code>.</li>
-        <li>New tokens work for <code>svc</code> immediately. Only <code>GIT_*</code> and new/changed local Docker hosts need “Apply now”.</li>
+        <li>New tokens work for <code>svc</code> immediately. Only <code>GIT_*</code> and new/changed local Docker hosts need “Apply now” – the banner also appears when a newer tentaclAI image was built.</li>
         <li>Running Claude sessions see new MCP servers after <code>/mcp</code> → reconnect or in a new session.</li>
         <li>Internal https services with your own CA: set <code>CA_CERT</code> in the settings – the CA becomes trusted in the container. Single devices with self-signed certificates: <code>"insecure_tls": true</code>.</li>
         <li><strong>Self-signed certificates</strong> (routers, NAS, hypervisors): the switch <em>Ignore TLS certificate errors</em> on the service page sets <code>insecure_tls</code> for its <code>api</code>, <code>web</code>, <code>git</code> and <code>db</code> parts – encrypted, but the server is not verified. MCP connections are made by Claude Code and always verify; use <code>CA_CERT</code> for them.</li>
