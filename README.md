@@ -53,25 +53,32 @@ flowchart LR
     term["Host terminal"]
   end
   subgraph host["Docker host"]
-    control["<b>tentacontrol</b><br/>web admin"]
-    sandbox["<b>tentaclAI</b><br/>Claude Code + svc"]
+    control["<b>tentacontrol</b><br/>web admin · approvals"]
     files[("stack directory<br/>.env · services/ · systems/<br/>ssh/ · local/CLAUDE.md")]
+    subgraph inner["sandbox network – no route out"]
+      sandbox["<b>tentaclAI</b><br/>Claude Code (user claude)<br/>+ svc (credentials)"]
+    end
+    egress["<b>egress gateway</b><br/>allow · block · ask"]
   end
-  subgraph reach["Connected services"]
-    docker["Docker hosts<br/>local socket / SSH"]
+  subgraph tentacles["Tentacles"]
+    docker["Docker hosts"]
     api["APIs · MCP servers"]
     git["Git repositories"]
     db[("Databases")]
     web["Web sources"]
     fs["Files on SSH hosts"]
   end
+  net["Anthropic · GitHub · registries<br/>(built-in) and your allowlist"]
   browser --> control
-  app -. "Remote Control" .-> sandbox
+  app -. "Remote Control" .-> egress
   term --> sandbox
   control -- "build · start · terminal" --> sandbox
   control -- "edits" --> files
-  files -- "read on every call" --> sandbox
-  sandbox -->|svc| docker & api & git & db & web & fs
+  files -- "read by svc" --> sandbox
+  sandbox == "all traffic" ==> egress
+  egress -- "rules" --- control
+  egress --> docker & api & git & db & web & fs
+  egress --> net
 ```
 
 **Tentacles** are everything Claude can reach: services (APIs, MCP servers, Docker hosts, databases, web sources,
@@ -79,11 +86,16 @@ files, git repos), SSH hosts and the systems that group them. You set them up in
 has its own access mode, and `svc` is the only way to use them. Everything else on the network is the job of the
 egress gateway (tentacontrol → *Network*).
 
-The stack consists of **two containers** and one **stack directory**:
+**Two layers of control.** `svc` decides *what* happens with a tentacle (it holds the credentials and enforces
+`ro`/`rw`/`confirm`); the egress gateway decides *where* the sandbox may connect at all (built-in list, tentacles, your
+allow/block lists – and in `enforce` mode it asks you about everything else).
+
+The stack consists of **three containers** and one **stack directory**:
 
 | Part | What it is |
 |---|---|
-| **tentaclAI** (container `tentaclai`) | The sandbox: Claude Code, `svc`, git, gh, docker CLI, database clients, tmux. Runs the permanent Remote Control session and holds your workspace (`/workspace`). Has **no** Docker socket and no host access of its own – everything goes through services. |
+| **tentaclAI** (container `tentaclai`) | The sandbox: Claude Code, `svc`, git, gh, docker CLI, database clients, tmux. Runs the permanent Remote Control session and holds your workspace (`/workspace`). Has **no** Docker socket, no host access and no route to the outside of its own – services go through `svc`, all traffic through the egress gateway. |
+| **egress gateway** (container `tentaclai-egress`) | The sandbox's only way out: a small forward proxy (CONNECT for any port, plain HTTP; TLS is not opened). Allows the built-in list and your tentacles, applies your allow/block lists, records every destination and – in `enforce` mode – holds unknown destinations until you approve them in Activity. |
 | **tentacontrol** (container `tentacontrol`) | The web admin: create and edit services, systems and SSH hosts, enter tokens, test connections, start onboarding, see the topology, open terminals into the sandbox, rebuild and update it. It uses the host's Docker socket only to run the tentaclAI container. |
 | **`svc`** (inside tentaclAI) | The gateway Claude uses for every service: `svc <name> GET /path`, `svc docker`, `svc compose`, `svc db`, `svc web`, `svc files`, `svc git`. It runs as root (via sudo), injects credentials from `.env` at call time and enforces `ro`/`rw`/`confirm`; Claude itself runs as user `claude` and can't read `.env` or the SSH key. |
 | **Services** (`services/<name>.json`) | One file per thing Claude may reach. A service can combine parts: `api`, `mcp`, `git`, `docker`, `db`, `web`, `files`. Secrets are `${VAR}` placeholders, the values live in `.env`. |
@@ -183,7 +195,8 @@ Claude commands: **`/onboard <service>`** and **`/inventory`** (see above).
 | **Overview** | Status of the sandbox (resources, Claude version, login), Remote Control with QR code and on/off switch, Docker and SSH hosts with live status, system inventory. |
 | **Terminal** | xterm.js terminals into the sandbox (Claude, Remote Control, shell, login). Reconnects automatically. |
 | **Tentacles** | Everything Claude can reach, in four tabs: **Services** (grouped by system, live status dot per service; templates, JSON editor, write-only tokens, connection test, onboarding, enable/disable, move between systems) · **SSH hosts** (live status; add with host key check and one-time password key deployment, edit incl. jump host, sudo and rename, remove with key revocation) · **Systems** (groups with SSH host and rules) · **Topology** (live graph incl. optional stacks/containers, search, saved layout, PNG export). |
-| **Activity** | Pending approvals for `confirm` services (Approve / Deny, badge in the sidebar) and the audit log of all write actions with filters. |
+| **Network** | Every destination the sandbox connected to (rule, last connection, filters), your allowlist and blocklist with one-click Allow/Block, the tentacles and the built-in list, and the mode switch *permissive / enforce*. |
+| **Activity** | Pending approvals – writes of `confirm` services (Approve / Approve + 15 min / Deny) and unknown network destinations (Allow 10 min / 1 h / Always / Deny / Block), badge in the sidebar and in Claude's status line – and the audit log of all write actions with filters. |
 | **Settings** | All `.env` settings with descriptions; secrets are write-only. Shows *Apply now* when the sandbox must be recreated. |
 | **Updates** | Installed tentaclAI version, new releases with their upgrade steps (checked every 6 h, also shown in the sidebar; `UPDATE_CHECK=false` turns it off), Claude Code and image updates. |
 | **Logs / Help** | Container log; full documentation of every feature. |
@@ -304,14 +317,16 @@ What it does **not** (yet) do – keep it in mind:
   `socket` mode is root on the tentaclAI host, and with it everything in the stack directory – prefer `ssh` mode.
 - `tcrun` holds one secret at a time while a client runs: a shell escape in the interactive SQL shell (`\!`, approved
   separately in `confirm` mode) gets that user, its database password and the web cookie jars – not `.env` or the SSH key.
-- **Egress gateway:** the sandbox has no route to the outside; all traffic goes through `tentaclai-egress`, which records
-  every destination. In the default `permissive` mode it allows everything – allow/block lists with approvals are next.
+- **Egress gateway:** the sandbox has no route to the outside; all traffic goes through `tentaclai-egress`. `permissive`
+  (default) allows and records everything; `enforce` allows only the built-in list, your tentacles and your allowlist and
+  asks you about the rest. Allowed destinations are still ways out – what Claude may *do* there is up to `svc`.
+- DNS is not filtered yet: the sandbox can still resolve names (a theoretical channel for data).
 - tentacontrol holds the host's Docker socket – protect it with a strong password and keep it off the internet.
 - `data/home` holds the Claude login and `ssh/keys` the private key – back them up and protect them.
 
 ## Roadmap
 
-- **Security:** egress allowlist, read-only root filesystem, Docker socket proxy, prompt-injection safeguards
+- **Security:** DNS filter in the egress gateway, read-only root filesystem, Docker socket proxy, prompt-injection safeguards
 - **Automation:** scheduled Claude jobs · monitoring per service with status and recommendations
 - **tentacontrol:** AI assistant for the configuration · OAuth with browser login · export/import of configuration and templates
 - **Topology:** connections between systems and containers (reverse proxy → container, tunnels) · monitoring status
