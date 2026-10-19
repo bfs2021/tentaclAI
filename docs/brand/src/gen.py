@@ -29,7 +29,7 @@ page("social.html", 1280, 640, """body{background:linear-gradient(135deg,#120f24
 h1{font-size:86px;letter-spacing:-.035em;line-height:1;color:#f1f4f9;font-weight:800}
 .slogan{font-size:40px;font-weight:700;color:#eef2f8;margin-top:42px;line-height:1.15}.sub{font-size:24px;color:#93a0b6;margin-top:16px;line-height:1.4}
 .shot{position:absolute;left:700px;top:70px;width:900px;height:560px;border-radius:18px;overflow:hidden;border:1px solid #2a3344;box-shadow:0 30px 90px rgba(0,0,0,.6),0 0 0 1px rgba(167,139,250,.15);transform:perspective(1600px) rotateY(-14deg) rotateX(4deg);transform-origin:left center}
-.shot img{width:1440px;margin-left:-370px;margin-top:-170px}""",
+.shot img{width:1440px;margin-left:-330px;margin-top:-320px}""",
      f'<div class="wrap"><div class="brand">{logo}<h1>{WM}</h1></div><div class="slogan">{SLOGAN}</div>'
      f'<div class="sub">{SUBTITLE}</div></div><div class="shot"><img src="topology.png"></div>')
 
