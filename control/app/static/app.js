@@ -100,3 +100,14 @@
     if (e.key === "Escape") document.querySelectorAll("details.menu[open]").forEach(function (m) { m.removeAttribute("open"); });
   });
 })();
+
+// deep link to a settings field (#f-KEY): scroll to it, focus it and flash it once
+(function () {
+  if (!location.hash.startsWith("#f-")) return;
+  var el = document.getElementById(location.hash.slice(1));
+  if (!el) return;
+  el.scrollIntoView({ block: "center" });
+  el.focus({ preventScroll: true });
+  el.classList.add("flash");
+  setTimeout(function () { el.classList.remove("flash"); }, 2000);
+})();

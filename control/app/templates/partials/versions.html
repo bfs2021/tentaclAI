@@ -35,7 +35,7 @@
   </dl>
   <div class="row" style="margin-top:16px">
     <button class="btn primary" hx-post="/updates/claude" hx-confirm="Rebuild the image and recreate tentaclAI? Running sessions will end.">{{ icon('refresh') }}{{ 'Update now' if installed != latest else 'Rebuild' }}</button>
-    <a class="btn ghost" href="/settings">Pin version</a>
+    <a class="btn ghost" href="/settings#f-CLAUDE_CODE_VERSION" title="set CLAUDE_CODE_VERSION to a fixed version in Settings">Pin version</a>
   </div>
   {% if pin != 'latest' and latest and pin != latest %}<p class="help">Pinned to {{ pin }} – a rebuild installs this version, not {{ latest }}.</p>{% endif %}
 </div>
