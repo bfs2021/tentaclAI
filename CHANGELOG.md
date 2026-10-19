@@ -23,6 +23,10 @@ All notable changes, newest first. Every release lists **upgrade steps** from th
   opened). Claude Code, curl, git, pip and npm use it through `HTTPS_PROXY`; svc tunnels ssh/rsync (ProxyCommand
   `tc-connect`) and databases (local port forward) through it. Every destination is recorded
   (`egress-seen.json`). `EGRESS_MODE=permissive` (default) allows everything – allow/block lists and approvals follow.
+- **Network** page in tentacontrol: every destination with connections, first/last use and its origin – a
+  tentacle, Claude/Anthropic or unknown.
+- **Tentacles** is the new name of the *Connections* area and the collective term for everything Claude can reach
+  (services, SSH hosts, systems).
 
 ### Upgrade
 `git pull`, `docker compose build`, `docker compose up -d` – creates the networks and the `tentaclai-egress` container

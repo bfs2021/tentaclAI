@@ -13,10 +13,11 @@ from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
 
 from . import activity, auth, dockerops, jobs, services_store, sshhosts, sshops, systems_store, topology, updatecheck
-from .config import CLAUDE_SERVICE, COMPOSE, DATA_DIR, RC_VARS, RESTART_VARS, SETTINGS_GROUPS, is_secret, site
+from .config import CLAUDE_SERVICE, COMPOSE, DATA_DIR, SERVICES_DIR, STACK_DIR, RC_VARS, RESTART_VARS, SETTINGS_GROUPS, is_secret, site
 from .envfile import read_env, update_env
 from .terminal import PROFILES, bridge, onboard_cmd
 from . import generated
+import tclib  # noqa: E402  shared with the sandbox tools
 
 BASE = os.path.dirname(__file__)
 app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
@@ -429,6 +430,30 @@ async def approval_decide(request: Request, rid: str, verdict: str):
 
 
 # ---------------------------------------------------------------- topology (prototype)
+
+@app.get("/network", response_class=HTMLResponse)
+async def network_page(request: Request):
+    """egress gateway: every destination the sandbox connected to, with its origin (a tentacle, Anthropic, unknown)"""
+    try:
+        seen = json.load(open("/egress/egress-seen.json"))
+    except (OSError, ValueError):
+        seen = {}
+    env = read_env()
+    reaches = tclib.reach_hosts(tclib.load_services(SERVICES_DIR, tclib.load_systems(STACK_DIR)), env, sshhosts.hosts())
+    rows = []
+    for key, e in seen.items():
+        host, _, port = key.rpartition(":")
+        origin = reaches.get((host, int(port) if port.isdigit() else None)) or reaches.get((host, None))
+        kind = "tentacle" if origin else ("anthropic" if host == "claude.ai" or host.endswith((".anthropic.com", ".claude.ai")) or host == "anthropic.com" else "other")
+        rows.append({"host": host, "port": port, "origin": origin or ("Claude / Anthropic" if kind == "anthropic" else ""), "kind": kind,
+                     "count": e.get("count", 0), "first": e.get("first", 0), "last": e.get("last", 0), "decision": e.get("decision", "")})
+    rows.sort(key=lambda r: -r["last"])
+    fmt = lambda ts: time.strftime("%Y-%m-%d %H:%M", time.localtime(ts)) if ts else "–"  # noqa: E731
+    for r in rows:
+        r["first_s"], r["last_s"] = fmt(r["first"]), fmt(r["last"])
+    return page(request, "network.html", rows=rows, mode=(env.get("EGRESS_MODE") or "permissive"),
+                counts={k: sum(1 for r in rows if r["kind"] == k) for k in ("tentacle", "anthropic", "other")})
+
 
 @app.get("/topology", response_class=HTMLResponse)
 async def topology_page(request: Request):

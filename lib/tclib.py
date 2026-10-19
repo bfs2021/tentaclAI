@@ -137,6 +137,39 @@ def status_text(svc, env):
     return "missing: " + ", ".join(miss) if state == "missing" else state
 
 
+def _url_host(url):
+    m = re.match(r"^[a-z][a-z0-9+.-]*://(?:[^@/]*@)?(\[[^\]]+\]|[^:/?#]+)(?::(\d+))?", url or "", re.I)
+    if not m:
+        return None
+    default = {"https": 443, "http": 80, "ssh": 22}.get(url.split(":", 1)[0].lower())
+    return m.group(1).strip("[]").lower(), int(m.group(2)) if m.group(2) else default
+
+
+def reach_hosts(services, env, ssh_hosts_list=()):
+    """(host, port) → name of the reach (a tentacle: service or SSH host) for every active service part and SSH host;
+    port None = any port. Used by the egress gateway (auto-allow) and tentacontrol (origin of a destination)."""
+    out = {}
+    for name, svc in services.items():
+        if not enabled(svc) or missing(svc, env):
+            continue
+        r = render(svc, env)
+        for part, key in (("api", "base_url"), ("mcp", "url"), ("web", "base_url"), ("git", "url")):
+            hp = _url_host((r.get(part) or {}).get(key, ""))
+            if hp:
+                out.setdefault(hp, name)
+        g = (r.get("git") or {}).get("url", "")
+        m = re.match(r"^(?:[^@/]+@)?([^:/]+):", g)  # scp-like git@host:path
+        if m and "://" not in g:
+            out.setdefault((m.group(1).lower(), 22), name)
+        db = r.get("db") or {}
+        if db.get("host"):
+            out.setdefault((str(db["host"]).lower(), int(db.get("port") or (3306 if str(db.get("engine", "")).lower() in ("mysql", "mariadb") else 5432))), name)
+    for h in ssh_hosts_list:
+        if h.get("hostname"):
+            out.setdefault((h["hostname"].lower(), int(h.get("port") or 22)), f"ssh {h['alias']}")
+    return out
+
+
 # ---------------------------------------------------------------- SSH hosts (ssh/config.d/*.conf)
 
 META = re.compile(r"^\s*#\s*tentacl(?:ai|aude):\s*(sudo|access)\s*=\s*(.*?)\s*$")

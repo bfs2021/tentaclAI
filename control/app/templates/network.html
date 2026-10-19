@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% from "_icons.html" import icon %}
+{% block title %}Network{% endblock %}
+{% block content %}
+<div class="header">
+  <div><h1>Network</h1><div class="sub">Every destination the sandbox connected to through the egress gateway. Tentacles are allowed automatically; allow/block lists and approvals follow.</div></div>
+  <span class="pill {{ 'warn' if mode == 'permissive' else 'ok' }}" title="EGRESS_MODE in Settings">{{ mode }}</span>
+</div>
+<div class="card">
+  <div class="card-head"><h2>Seen destinations</h2>
+    <span class="small muted">{{ counts.tentacle }} tentacles · {{ counts.anthropic }} Claude/Anthropic · {{ counts.other }} other</span></div>
+  {% if rows %}
+  <div class="table-wrap"><table>
+    <thead><tr><th>Destination</th><th>Origin</th><th style="text-align:right">Connections</th><th>First</th><th>Last</th></tr></thead>
+    <tbody>
+    {% for r in rows %}
+      <tr>
+        <td class="mono small">{{ r.host }}<span class="faint">:{{ r.port }}</span></td>
+        <td>{% if r.kind == 'tentacle' %}<span class="pill ok">{{ r.origin }}</span>{% elif r.kind == 'anthropic' %}<span class="pill info">{{ r.origin }}</span>{% else %}<span class="pill warn">unknown</span>{% endif %}</td>
+        <td style="text-align:right;font-variant-numeric:tabular-nums">{{ r.count }}</td>
+        <td class="small muted">{{ r.first_s }}</td><td class="small muted">{{ r.last_s }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table></div>
+  {% else %}
+  <div class="empty small">Nothing recorded yet – the list fills as soon as the sandbox connects somewhere.</div>
+  {% endif %}
+</div>
+{% endblock %}

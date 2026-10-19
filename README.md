@@ -74,6 +74,11 @@ flowchart LR
   sandbox -->|svc| docker & api & git & db & web & fs
 ```
 
+**Tentacles** are everything Claude can reach: services (APIs, MCP servers, Docker hosts, databases, web sources,
+files, git repos), SSH hosts and the systems that group them. You set them up in tentacontrol → *Tentacles*; each one
+has its own access mode, and `svc` is the only way to use them. Everything else on the network is the job of the
+egress gateway (tentacontrol → *Network*).
+
 The stack consists of **two containers** and one **stack directory**:
 
 | Part | What it is |
@@ -108,8 +113,8 @@ Then, in tentacontrol:
 2. **Overview → Create & start** – builds and starts the tentaclAI container.
 3. **Overview → Sign in now** – `claude auth login` in a web terminal; sign in with your claude.ai account.
 4. **Overview → Remote Control** – scan the QR code or open the link; the session now shows up in claude.ai/code and the app.
-5. **Connections → SSH hosts** – add the machines Claude should reach: host key check, key deployment with a one-time password, test – all in one dialog.
-6. **Connections → Services** – connect your Docker hosts and services ([next section](#connecting-a-service)).
+5. **Tentacles → SSH hosts** – add the machines Claude should reach: host key check, key deployment with a one-time password, test – all in one dialog.
+6. **Tentacles → Services** – connect your Docker hosts and services ([next section](#connecting-a-service)).
 7. **Overview → System inventory** – Claude scans everything read-only, interviews you and writes `local/CLAUDE.md`.
 
 Without a reverse proxy tentacontrol listens on `http://127.0.0.1:8484` (`CONTROL_BIND`, `CONTROL_PORT`).
@@ -123,7 +128,7 @@ the containers (`--check` only shows). tentacontrol also shows “Update availab
   <img src="docs/screenshots/services.png" alt="Services grouped by system" width="900">
 </p>
 
-1. **Create from a template.** Connections → Services → search the template list (50 templates: Docker hosts, Home Assistant, Proxmox,
+1. **Create from a template.** Tentacles → Services → search the template list (50 templates: Docker hosts, Home Assistant, Proxmox,
    Grafana, n8n, GitHub, PostgreSQL, wikis with login, folders on a NAS, …) → name → *Create service*.
 2. **Fill in the details.** Adjust URL/host/path in the JSON editor; enter tokens under *Tokens & variables*. Tokens are
    write-only: they go into `.env` and are never shown again.
@@ -177,7 +182,7 @@ Claude commands: **`/onboard <service>`** and **`/inventory`** (see above).
 |---|---|
 | **Overview** | Status of the sandbox (resources, Claude version, login), Remote Control with QR code and on/off switch, Docker and SSH hosts with live status, system inventory. |
 | **Terminal** | xterm.js terminals into the sandbox (Claude, Remote Control, shell, login). Reconnects automatically. |
-| **Connections** | Everything Claude can reach, in four tabs: **Services** (grouped by system, live status dot per service; templates, JSON editor, write-only tokens, connection test, onboarding, enable/disable, move between systems) · **SSH hosts** (live status; add with host key check and one-time password key deployment, edit incl. jump host, sudo and rename, remove with key revocation) · **Systems** (groups with SSH host and rules) · **Topology** (live graph incl. optional stacks/containers, search, saved layout, PNG export). |
+| **Tentacles** | Everything Claude can reach, in four tabs: **Services** (grouped by system, live status dot per service; templates, JSON editor, write-only tokens, connection test, onboarding, enable/disable, move between systems) · **SSH hosts** (live status; add with host key check and one-time password key deployment, edit incl. jump host, sudo and rename, remove with key revocation) · **Systems** (groups with SSH host and rules) · **Topology** (live graph incl. optional stacks/containers, search, saved layout, PNG export). |
 | **Activity** | Pending approvals for `confirm` services (Approve / Deny, badge in the sidebar) and the audit log of all write actions with filters. |
 | **Settings** | All `.env` settings with descriptions; secrets are write-only. Shows *Apply now* when the sandbox must be recreated. |
 | **Updates** | Installed tentaclAI version, new releases with their upgrade steps (checked every 6 h, also shown in the sidebar; `UPDATE_CHECK=false` turns it off), Claude Code and image updates. |
@@ -227,7 +232,7 @@ A part stays inactive while one of its `${VAR}`s is empty; `"enabled": false` pa
 **Rule of thumb:** one *service* = one way in with one set of credentials (an API and its MCP server may share a file);
 one *system* = one machine or appliance that groups several services.
 Systems: `systems/<name>.json` with `description`, `ssh_host`, `notes` (rules for every member) – see `systems/_example.json`.
-SSH hosts: tentacontrol → Connections → SSH hosts, or `./ssh-host.sh list|add|sudo|hostkey|remove|test` (same logic, e.g.
+SSH hosts: tentacontrol → Tentacles → SSH hosts, or `./ssh-host.sh list|add|sudo|hostkey|remove|test` (same logic, e.g.
 `./ssh-host.sh add nas admin@nas.lan --jump gate --sudo`); jump hosts via `ProxyJump`; the sudo prefix is stored as
 `# tentaclai: sudo=sudo -n` in the host block and needs passwordless sudo, ideally limited to what Claude needs.
 
