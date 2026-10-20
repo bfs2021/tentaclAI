@@ -41,3 +41,11 @@ def test_lifespan_runs_every_startup_hook(app_module, monkeypatch):
     with TestClient(app_module.app):
         pass
     assert ran == ["prepare_activity", "start_notifications", "start_update_check", "announce_setup"]
+
+
+def test_skills_page_offers_no_off_for_required(client):
+    import re
+    html = client.get("/skills").text
+    assert "required by tentaclAI" in html
+    row = re.search(r'aria-label="Mode of inventory".*?</select>', html, re.S).group(0)
+    assert 'value="off"' not in row and 'value="user-invocable-only"' in row

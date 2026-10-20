@@ -24,13 +24,14 @@
   <tr>
     <td><strong class="mono small">{{ r.name }}</strong>
       {% if r.custom and r.mode != r.default %}<span class="pill info" title="default: {{ r.default }}">changed</span>{% endif %}
+      {% if r.required %}<span class="pill" title="tentacontrol starts /{{ r.name }} – it can't be switched off">required by tentaclAI</span>{% endif %}
       {% if r.description %}<div class="small muted">{{ r.description }}</div>
       {% elif not r.seen %}<div class="small faint">not seen yet – only listed with some accounts or Claude Code versions</div>{% endif %}</td>
     <td class="small muted">{{ r.source or '–' }}</td>
     <td class="small" style="text-align:right;font-variant-numeric:tabular-nums">{{ ('~%d' % r.tokens) if r.tokens else '–' }}</td>
     <td style="white-space:nowrap"><form class="inline" hx-post="/skills/mode"><input type="hidden" name="name" value="{{ r.name }}">
       <select name="mode" class="sys-select" style="min-width:150px" aria-label="Mode of {{ r.name }}" onchange="this.form.requestSubmit()">
-        {% for m in modes %}<option value="{{ m }}" {{ 'selected' if m == r.mode }}>{{ {'on': 'On', 'user-invocable-only': '/command only', 'off': 'Off'}[m] }}</option>{% endfor %}
+        {% for m in modes if not (r.required and m == 'off') %}<option value="{{ m }}" {{ 'selected' if m == r.mode }}>{{ {'on': 'On', 'user-invocable-only': '/command only', 'off': 'Off'}[m] }}</option>{% endfor %}
       </select></form></td>
   </tr>
   {% endfor %}

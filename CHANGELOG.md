@@ -5,6 +5,9 @@ All notable changes, newest first. Every release lists **upgrade steps** from th
 ## Unreleased
 
 ### Changes
+- Settings → Skills: `inventory` and `onboard` are marked *required by tentaclAI* and can't be switched off – the
+  inventory terminal and *Onboard with Claude* start them; an "off" skill can't even be called as `/command`.
+  */command only* is allowed (verified: it still runs when started as `claude /inventory`).
 - tentacontrol asks Claude Code for connectors and skills once an hour and right after a sign-in (was: connectors every
   10 minutes, skills every 30) – `claude mcp list` health-checks every MCP server each time. *Check* still works at once.
 

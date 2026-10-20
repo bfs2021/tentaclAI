@@ -117,6 +117,8 @@ def set_mode(name, mode):
     s = load()
     if name not in tclib.skill_overrides(s):
         raise ValueError("unknown skill")
+    if name in tclib.SKILLS_REQUIRED and mode == "off":
+        raise ValueError(f"{name} is required by tentaclAI (its buttons start /{name}) – /command only is possible")
     s["modes"][name] = mode
     _save(s)
     return apply(s)
@@ -128,6 +130,6 @@ def listing():
     for name, mode in tclib.skill_overrides(s).items():
         k = s["known"].get(name, {})
         rows.append(dict(k, name=name, mode=mode, default="off" if name in tclib.SKILLS_OFF_DEFAULT else "on",
-                         custom=name in s["modes"], seen=k.get("seen")))
+                         custom=name in s["modes"], seen=k.get("seen"), required=name in tclib.SKILLS_REQUIRED))
     order = {"on": 0, "user-invocable-only": 1, "off": 2}
     return sorted(rows, key=lambda r: (order[r["mode"]], r["name"]))

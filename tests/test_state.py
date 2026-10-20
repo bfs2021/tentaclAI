@@ -106,3 +106,13 @@ def test_discover_claude_runs_connectors_and_skills(app_module, monkeypatch):
     monkeypatch.setattr(skills, "discover", lambda: ran.append("skills"))
     asyncio.run(app_module.discover_claude())
     assert ran == ["connectors", "skills"]
+
+
+def test_required_skills_refuse_off(applied, app_module):
+    from app import skills
+    with pytest.raises(ValueError, match="required"):
+        skills.set_mode("inventory", "off")
+    assert skills.set_mode("onboard", "user-invocable-only")
+    rows = {r["name"]: r for r in skills.listing()}
+    assert rows["inventory"]["required"] and rows["onboard"]["mode"] == "user-invocable-only"
+    assert skills.set_mode("onboard", "on")

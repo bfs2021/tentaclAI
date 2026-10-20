@@ -150,3 +150,10 @@ def test_write_model_commands(tmp_path):
     tclib.write_model_commands({"commands": "sonnet", "commands_effort": "medium"}, str(src), str(dst))
     assert (dst / "inventory.md").read_text() == "---\ndescription: inv\nmodel: sonnet\neffort: medium\n---\nBody\n"
     assert not (dst / "onboard.md").exists()  # missing source → skipped
+
+
+def test_required_skills_never_off():
+    s = {"modes": {"inventory": "off", "onboard": "user-invocable-only"}}
+    m = tclib.skill_overrides(s)
+    assert m["inventory"] == "on" and m["onboard"] == "user-invocable-only"
+    assert tclib.skill_overrides({})["inventory"] == "on"  # listed even before discovery

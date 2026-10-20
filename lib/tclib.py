@@ -397,14 +397,19 @@ SKILLS_OFF_DEFAULT = (  # make no sense in a headless sandbox
 )
 
 
+SKILLS_REQUIRED = ("inventory", "onboard")  # tentacontrol starts `claude /inventory` and `claude /onboard <name>` – never off
+
+
 def skill_mode(state, name):
     m = (state.get("modes") or {}).get(name)
+    if name in SKILLS_REQUIRED and m == "off":
+        return "on"  # an "off" skill can't even be called as /command
     return m if m in SKILL_MODES else ("off" if name in SKILLS_OFF_DEFAULT else "on")
 
 
 def skill_overrides(state):
     """{skill: mode} for every skill tentaclai manages (known or default-off); "on" means: no override"""
-    names = set(state.get("known") or {}) | set(SKILLS_OFF_DEFAULT) | set(state.get("modes") or {})
+    names = set(state.get("known") or {}) | set(SKILLS_OFF_DEFAULT) | set(SKILLS_REQUIRED) | set(state.get("modes") or {})
     return {n: skill_mode(state, n) for n in sorted(names)}
 
 
