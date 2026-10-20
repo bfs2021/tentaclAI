@@ -2,7 +2,7 @@
 
 All notable changes, newest first. Every release lists **upgrade steps** from the previous one.
 
-## Unreleased
+## v0.8.0 – 2026-10-20
 
 ### Highlights
 - **Settings → Skills**: every skill of Claude Code and the claude.ai account with its size in tokens, set to *On*,
