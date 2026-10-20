@@ -19,7 +19,7 @@
       <span class="row" style="gap:10px"><strong>{{ ch.name }}</strong><span class="pill info">{{ ch.kind }}</span>
         {% if not urls[ch.id] %}<span class="pill warn" title="NOTIFY_URL_… is empty in .env">no URL</span>{% endif %}</span>
       <span class="row" style="gap:6px">
-        <button class="btn sm" hx-post="/notifications/channel/{{ ch.id }}/test">Send test</button>
+        <button class="btn sm" hx-post="/notifications/channel/{{ ch.id }}/test" hx-swap="none">Send test</button>
         <button class="btn sm ghost" title="remove" hx-post="/notifications/channel/{{ ch.id }}/remove" hx-confirm="Remove the channel {{ ch.name }}?">{{ icon('trash') }}</button>
       </span>
     </div>
@@ -51,7 +51,7 @@
 </div>
 
 {% if cfg.channels %}
-<form hx-post="/notifications/routes" class="card" style="margin-bottom:16px">
+<form hx-post="/notifications/routes" hx-swap="none" class="card" style="margin-bottom:16px">
   <div class="card-head"><h2>What goes where</h2><button class="btn sm primary">Save</button></div>
   <div class="table-wrap"><table>
     <thead><tr><th>Event</th>{% for ch in cfg.channels %}<th style="text-align:center">{{ ch.name }}</th>{% endfor %}</tr></thead>

@@ -111,3 +111,8 @@
   el.classList.add("flash");
   setTimeout(function () { el.classList.remove("flash"); }, 2000);
 })();
+
+// an empty response (toast / redirect / refresh only) must never wipe the element that sent the request
+document.body.addEventListener("htmx:beforeSwap", function (e) {
+  if (e.detail.xhr && e.detail.xhr.status < 300 && !(e.detail.serverResponse || "").trim()) e.detail.shouldSwap = false;
+});
