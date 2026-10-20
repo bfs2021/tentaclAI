@@ -2,13 +2,17 @@
 
 All notable changes, newest first. Every release lists **upgrade steps** from the previous one.
 
-## Unreleased
+## v0.6.1 – 2026-10-20
 
 ### Changes
 - **Tab completion for `svc`** in the sandbox shells: commands, service names per part (docker, db, git, web, files),
   SSH hosts, sub-commands.
 - The *Apply now* banner also appears when a newer sandbox image was built. Terminal tabs: *Claude · RC*,
   *Shell · svc list*. Wording no longer homelab-specific.
+
+### Upgrade (from v0.6.0)
+`git pull`, `docker compose build`, `docker compose up -d` – recreating `tentaclai` ends running sessions and Remote
+Control (or use *Apply now* in tentacontrol, which now also appears when a newer image was built). No `.env` changes.
 
 ## v0.6.0 – 2026-10-19
 
