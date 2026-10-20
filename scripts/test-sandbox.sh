@@ -146,7 +146,7 @@ check "webhook got 'Approval needed'" "$(echo "$HK" | grep -c 'Approval needed: 
 check "webhook got the blocked destination" "$(echo "$HK" | grep -c 'example.com:443 blocked' || true)" "1"
 
 echo "== tentacontrol pages render"
-for p in / /network "/network?tab=allow" "/network?tab=block" /services /ssh /activity /terminal /topology /help /settings /notifications /logs; do
+for p in / /network "/network?tab=allow" "/network?tab=block" /services /ssh /activity /terminal /topology /help /settings /notifications /usage /logs; do
     check "GET $p" "$(curl -s -b "$J" -o /dev/null -w '%{http_code}' "http://$IP:8080$p")" "200"
 done
 
