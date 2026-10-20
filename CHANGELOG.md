@@ -2,6 +2,18 @@
 
 All notable changes, newest first. Every release lists **upgrade steps** from the previous one.
 
+## Unreleased
+
+### Development
+- `scripts/release.sh` pushes main and waits for the green GitHub `checks` run of that commit before it creates the
+  release commit, tag and release – a red CI stops it before anything is tagged.
+- `scripts/test-quick.sh`: test packages in `~/.cache/tentaclai-test-deps` (outside the stack, so backups skip them),
+  the dummy stack in `/tmp` is removed after each run, `httpx2` for Starlette's TestClient (no deprecation warning left).
+
+### Upgrade (from v0.9.1)
+Nothing to do for an installation – only scripts and tests changed. Developers: the old `.cache/test-deps` in the
+stack directory can be deleted.
+
 ## v0.9.1 – 2026-10-20
 
 ### Fixes

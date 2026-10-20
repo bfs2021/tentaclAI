@@ -41,5 +41,3 @@ __pycache__/
 *.pyc
 .DS_Store
 
-# test dependencies (scripts/test-quick.sh)
-.cache/

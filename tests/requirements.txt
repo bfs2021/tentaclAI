@@ -1,3 +1,3 @@
 pytest>=8,<9
-httpx>=0.27,<1
+httpx2>=2.15,<3  # starlette's TestClient prefers it (pydantic/httpx2, by the httpx author)
 pyyaml>=6,<7

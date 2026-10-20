@@ -5,6 +5,7 @@ Docker is replaced by fake answers of `dockerops.run` (the commands tentacontrol
 """
 import json
 import os
+import shutil
 import sys
 import tempfile
 import time
@@ -82,6 +83,10 @@ def fake_run(cmd, workdir=None, user="root"):
         if key in cmd:
             return ans
     return 0, ""
+
+
+def pytest_sessionfinish(session, exitstatus):
+    shutil.rmtree(STACK, ignore_errors=True)  # the dummy stack lives in /tmp – one per run
 
 
 @pytest.fixture(scope="session")

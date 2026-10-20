@@ -5,6 +5,8 @@
 # Needs: the "## Unreleased" section in CHANGELOG.md (with an "### Upgrade" part), a clean working tree on main that is
 # not behind origin, and a GitHub token with contents:write – GH_TOKEN from the environment or the stack's .env (never
 # printed, handed to git through a credential helper). Extra commit trailers: RELEASE_TRAILERS="Co-Authored-By: …".
+# Before the release commit, main is pushed (if needed) and the GitHub "checks" workflow of that commit must be green –
+# a red CI stops the release before anything is tagged.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 DRY=""
@@ -43,6 +45,28 @@ REUSE=1 CLEAN=1 scripts/test-sandbox.sh >/dev/null 2>&1 || true   # a kept REUSE
 LOG="$(mktemp)"
 scripts/test-sandbox.sh >"$LOG" 2>&1 || { tail -30 "$LOG"; die "full sandbox test failed (log: $LOG)"; }
 grep -o 'passed: [0-9]*  failed: [0-9]*' "$LOG"; rm -f "$LOG"
+
+step "GitHub CI of $(git rev-parse --short HEAD)"
+SHA="$(git rev-parse HEAD)"
+if [ "$(git rev-list --count origin/main..HEAD)" != 0 ]; then
+    if [ -n "$DRY" ]; then echo "   (dry run: main is ahead of origin – a real run pushes it and waits for CI)"; SHA=""; else git_auth push -q origin main; fi
+fi
+api() { curl -s -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" "https://api.github.com/repos/$REPO/$1"; }
+if [ -n "$SHA" ]; then
+    end=$((SECONDS + 1200)); state=""
+    while [ $SECONDS -lt $end ]; do
+        state="$(api "actions/workflows/checks.yml/runs?head_sha=$SHA&per_page=1" | python3 -c 'import json, sys
+r = (json.load(sys.stdin).get("workflow_runs") or [{}])[0]
+print(r.get("status", "missing"), r.get("conclusion") or "-", r.get("html_url", ""))')"
+        case "$state" in completed\ *) break ;; esac
+        sleep 15
+    done
+    case "$state" in
+        "completed success "*) echo "   green: ${state##* }" ;;
+        completed\ *) die "CI failed: ${state##* } – fix it, nothing was released" ;;
+        *) die "CI did not finish within 20 minutes ($state) – nothing was released" ;;
+    esac
+fi
 
 NAME="v$VER${TITLE:+ – $TITLE}"
 if [ -n "$DRY" ]; then
