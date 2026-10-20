@@ -15,13 +15,34 @@
   {% if cfg.channels %}
   <div class="stack" style="margin-bottom:14px">
     {% for ch in cfg.channels %}
-    <div class="between">
-      <span class="row" style="gap:10px"><strong>{{ ch.name }}</strong><span class="pill info">{{ ch.kind }}</span>
-        {% if not urls[ch.id] %}<span class="pill warn" title="NOTIFY_URL_… is empty in .env">no URL</span>{% endif %}</span>
-      <span class="row" style="gap:6px">
-        <button class="btn sm" hx-post="/notifications/channel/{{ ch.id }}/test" hx-swap="none">Send test</button>
-        <button class="btn sm ghost" title="remove" hx-post="/notifications/channel/{{ ch.id }}/remove" hx-confirm="Remove the channel {{ ch.name }}?">{{ icon('trash') }}</button>
-      </span>
+    <div class="ch-row">
+      <div class="between">
+        <span class="row" style="gap:10px"><strong>{{ ch.name }}</strong><span class="pill info">{{ ch.kind }}</span>
+          {% if not ch.get('enabled', True) %}<span class="pill off">off</span>{% endif %}
+          {% if not urls[ch.id] %}<span class="pill warn" title="NOTIFY_URL_… is empty in .env">no URL</span>{% endif %}</span>
+        <span class="row" style="gap:6px">
+          <button type="button" class="btn sm ghost" aria-expanded="false" onclick="var f=this.closest('.ch-row').querySelector('.ch-edit');f.hidden=!f.hidden;this.setAttribute('aria-expanded',String(!f.hidden))">Edit</button>
+          <button type="button" class="btn sm" hx-post="/notifications/channel/{{ ch.id }}/test" hx-swap="none">Send test</button>
+          <button type="button" class="btn sm ghost" title="remove" hx-post="/notifications/channel/{{ ch.id }}/remove" hx-confirm="Remove the channel {{ ch.name }}?">{{ icon('trash') }}</button>
+        </span>
+      </div>
+      <form hx-post="/notifications/channel/{{ ch.id }}/edit" class="stack ch-edit" autocomplete="off" hidden>
+        <div class="fields">
+          <div class="field"><label for="n-{{ ch.id }}">Name</label><input id="n-{{ ch.id }}" name="name" value="{{ ch.name }}" maxlength="30"></div>
+          {% if ch.kind == 'ntfy' %}
+          <div class="field"><label for="s-{{ ch.id }}">ntfy server</label><input id="s-{{ ch.id }}" name="server" class="mono" value="{{ parts[ch.id].get('server', '') }}"></div>
+          <div class="field"><label for="t-{{ ch.id }}">Topic</label><input id="t-{{ ch.id }}" name="topic" class="mono" value="{{ parts[ch.id].get('topic', '') }}"></div>
+          <div class="field"><label for="k-{{ ch.id }}">Access token</label><input id="k-{{ ch.id }}" name="token" type="password" class="mono" placeholder="unchanged" autocomplete="new-password"></div>
+          {% elif ch.kind == 'webhook' %}
+          <div class="field"><label for="u-{{ ch.id }}">Webhook URL</label><input id="u-{{ ch.id }}" name="url" class="mono" placeholder="unchanged"></div>
+          <div class="field"><label for="h-{{ ch.id }}">Header</label><input id="h-{{ ch.id }}" name="header" class="mono" placeholder="unchanged"></div>
+          {% else %}
+          <div class="field"><label for="a-{{ ch.id }}">Apprise URL</label><input id="a-{{ ch.id }}" name="apprise" type="password" class="mono" placeholder="unchanged" autocomplete="new-password"></div>
+          {% endif %}
+        </div>
+        <div class="row"><label class="check"><input type="checkbox" name="enabled" value="1" {{ 'checked' if ch.get('enabled', True) }}> enabled</label>
+          <button class="btn sm primary">Save</button><span class="help">Empty fields keep the stored value.</span></div>
+      </form>
     </div>
     {% endfor %}
   </div>

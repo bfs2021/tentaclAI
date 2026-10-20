@@ -324,3 +324,5 @@ details.forgot summary:hover { color: var(--text); text-decoration: underline; }
 details.forgot p { margin: 8px 0 0; }
 details.add-channel > summary { list-style: none; display: inline-flex; }
 details.add-channel > summary::-webkit-details-marker { display: none; }
+.ch-row:has(.ch-edit:not([hidden])) { padding-bottom: 6px; border-bottom: 1px solid var(--border); }
+.ch-edit { margin: 12px 0 4px; }

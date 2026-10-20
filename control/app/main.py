@@ -941,6 +941,7 @@ async def notifications_page(request: Request):
     c = notify.load()
     return page(request, "notifications.html", cfg=c, events=notify.EVENTS, recent=notify.RECENT[:15],
                 urls={ch["id"]: bool(notify.channel_url(ch["id"])) for ch in c["channels"]},
+                parts={ch["id"]: notify.public_parts(ch["id"]) for ch in c["channels"]},
                 fmt=lambda ts: time.strftime("%Y-%m-%d %H:%M", time.localtime(ts)))
 
 
@@ -958,6 +959,16 @@ async def notifications_add(request: Request):
 async def notifications_test(request: Request, cid: str):
     ok, err = await asyncio.to_thread(notify.send_now, cid, "tentaclAI test", "Notifications work. 🐙")
     return respond(request, f"Test sent to {cid}" if ok else f"Test to {cid} failed: {err}", "ok" if ok else "err")
+
+
+@app.post("/notifications/channel/{cid}/edit", response_class=HTMLResponse)
+async def notifications_edit(request: Request, cid: str):
+    f = dict(await request.form())
+    try:
+        notify.update_channel(cid, f.get("name", ""), f.get("enabled"), f)
+    except ValueError as e:
+        return respond(request, f"Not saved: {e}", "err")
+    return respond(request, f"Channel {cid} saved", refresh=True)
 
 
 @app.post("/notifications/channel/{cid}/remove", response_class=HTMLResponse)

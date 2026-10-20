@@ -117,6 +117,33 @@ def add_channel(kind, name, form):
     return cid
 
 
+def public_parts(cid):
+    """non-secret parts of a channel URL for the edit form (ntfy server/topic) – never the token"""
+    import re as _re
+    m = _re.match(r"^(ntfys?)://(?:[^@/]*@)?([^/]+)/([^/?]+)", channel_url(cid))
+    if m:
+        return {"server": ("https://" if m.group(1) == "ntfys" else "http://") + m.group(2), "topic": m.group(3)}
+    return {}
+
+
+def update_channel(cid, name, enabled, form):
+    """rename / enable; new URL only when connection fields were filled in"""
+    c = load()
+    ch = next((x for x in c["channels"] if x["id"] == cid), None)
+    if ch is None:
+        raise ValueError("unknown channel")
+    ch["name"] = (name or ch["name"]).strip()[:30] or ch["name"]
+    ch["enabled"] = bool(enabled)
+    fields = {"ntfy": ("token",), "webhook": ("url", "header"), "apprise": ("apprise",)}.get(ch["kind"], ())
+    old = public_parts(cid) if ch["kind"] == "ntfy" else {}
+    changed_ntfy = ch["kind"] == "ntfy" and any((form.get(k) or "").strip() and (form.get(k) or "").strip() != old.get(k, "")
+                                               for k in ("server", "topic"))
+    if any((form.get(k) or "").strip() for k in fields) or changed_ntfy:
+        merged = dict(old, **{k: v for k, v in form.items() if (v or "").strip()})
+        update_env({env_key(cid): build_url(ch["kind"], merged)})
+    save(c)
+
+
 def remove_channel(cid):
     c = load()
     c["channels"] = [ch for ch in c["channels"] if ch["id"] != cid]
