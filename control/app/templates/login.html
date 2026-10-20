@@ -16,7 +16,10 @@
       <input id="pw" type="password" name="password" autocomplete="current-password" autofocus required>
     </div>
     <button class="btn primary" style="width:100%;justify-content:center">Sign in</button>
-    <p class="help" style="margin-top:14px">Forgot the password? On the host: <code>./tentaclai.sh passwd</code> or <code>docker exec -it tentacontrol tentacontrol-passwd</code></p>
+    <details class="help forgot" style="margin-top:14px">
+      <summary>Forgot the password?</summary>
+      <p>Set a new one on the host: <code>./tentaclai.sh passwd</code> or <code>docker exec -it tentacontrol tentacontrol-passwd</code></p>
+    </details>
   </form>
 </div>
 </body>

@@ -318,3 +318,7 @@ form.inline { display: inline; margin: 0; }
 .mode-grid { display: grid; grid-template-columns: auto auto; gap: 8px 12px; align-items: center; justify-items: start; }
 .mode-label { font-size: 13px; color: var(--muted); text-align: right; justify-self: end; }
 .flash { box-shadow: 0 0 0 3px var(--accent-soft), 0 0 0 1px var(--accent) !important; transition: box-shadow .3s; }
+details.forgot summary { cursor: pointer; color: var(--muted); list-style: none; }
+details.forgot summary::-webkit-details-marker { display: none; }
+details.forgot summary:hover { color: var(--text); text-decoration: underline; }
+details.forgot p { margin: 8px 0 0; }
