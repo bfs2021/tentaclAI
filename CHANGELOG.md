@@ -5,6 +5,9 @@ All notable changes, newest first. Every release lists **upgrade steps** from th
 ## Unreleased
 
 ### Changes
+- Services without a `test_path`: the *Test API* card warns that `svc test` only checks `GET /` (often a 404, or a
+  check that passes without the token), pre-fills the path from the template of the same name and saves it with
+  *Save as test path*; `svc test` prints the same hint.
 - Settings → Skills: `inventory` and `onboard` are marked *required by tentaclAI* and can't be switched off – the
   inventory terminal and *Onboard with Claude* start them; an "off" skill can't even be called as `/command`.
   */command only* is allowed (verified: it still runs when started as `claude /inventory`).
@@ -20,9 +23,10 @@ All notable changes, newest first. Every release lists **upgrade steps** from th
   the dummy stack in `/tmp` is removed after each run, `httpx2` for Starlette's TestClient (no deprecation warning left).
 
 ### Upgrade (from v0.9.1)
-`git pull`, `docker compose build control`, `docker compose up -d control` – only tentacontrol changed, running Claude
-sessions are not affected. Developers: the old `.cache/test-deps` in the
-stack directory can be deleted.
+`git pull`, `docker compose build`, `docker compose up -d` – recreating `tentaclai` ends running sessions and Remote
+Control; it is only needed for the `svc test` hint (`build control` + `up -d control` brings everything else).
+Services created from older templates may lack `test_path` – their service page now says so and suggests the
+template's value. Developers: the old `.cache/test-deps` in the stack directory can be deleted.
 
 ## v0.9.1 – 2026-10-20
 
