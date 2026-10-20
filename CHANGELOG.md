@@ -2,7 +2,7 @@
 
 All notable changes, newest first. Every release lists **upgrade steps** from the previous one.
 
-## Unreleased
+## v0.9.1 – 2026-10-20
 
 ### Fixes
 - tentacontrol's regular `claude -p /usage` and `/context` calls no longer leave a session file behind each time
