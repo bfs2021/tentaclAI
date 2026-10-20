@@ -341,3 +341,15 @@ input.switch-cb:checked::after { transform: translateX(18px); }
 input.switch-cb:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 th.ch-col { text-transform: none; letter-spacing: normal; }
 input[type=checkbox]:not(.switch-cb) { accent-color: var(--accent-2); }
+.usage-bars { display: flex; flex-direction: column; gap: 10px; margin-top: 12px; color: inherit; text-decoration: none; }
+.ubar-track { height: 8px; border-radius: 4px; background: var(--panel-2); overflow: hidden; margin-top: 4px; }
+.ubar-fill { height: 100%; border-radius: 4px; background: var(--accent-2); }
+.ubar-fill.warn { background: var(--warn); } .ubar-fill.err { background: var(--err); }
+.ubar-big .ubar-track { height: 12px; border-radius: 6px; }
+.uchart { display: flex; align-items: flex-end; gap: 4px; height: 160px; padding-top: 8px; }
+.uchart .col { flex: 1; display: flex; flex-direction: column-reverse; min-width: 0; border-radius: 3px 3px 0 0; overflow: hidden; }
+.uchart .seg-in { background: var(--accent-2); } .uchart .seg-out { background: var(--accent); }
+.uchart .seg-cr { background: var(--info); opacity: .55; } .uchart .seg-cw { background: var(--info); }
+.uchart-x { display: flex; gap: 4px; font-size: 11px; color: var(--muted); } .uchart-x span { flex: 1; text-align: center; min-width: 0; overflow: hidden; }
+.legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 12px; color: var(--muted); margin-top: 8px; }
+.legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }

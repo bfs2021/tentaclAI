@@ -47,6 +47,14 @@
       {% if logged and auth.email %}<dt>Account</dt><dd class="small" title="{{ auth.orgName or '' }}">{{ auth.email }}{% if auth.subscriptionType %} <span class="muted">· {{ auth.subscriptionType }}</span>{% endif %}</dd>{% endif %}
       <dt>Sessions</dt><dd>{{ sessions | length }}</dd>
     </dl>
+    {% if limits %}
+    <a href="/usage" class="usage-bars" title="Plan usage (account-wide, from Claude Code) – details">
+      {% for l in limits %}
+      <div class="ubar"><div class="between small"><span>{{ 'Session' if l.window == 'session' else 'Week' }}</span><span><strong>{{ l.percent }} %</strong> <span class="muted">· resets {{ l.resets }}</span></span></div>
+        <div class="ubar-track"><div class="ubar-fill {{ 'err' if l.percent >= 90 else ('warn' if l.percent >= 75 else '') }}" style="width:{{ [l.percent, 100] | min }}%"></div></div></div>
+      {% endfor %}
+    </a>
+    {% endif %}
     {% if sessions %}
     <div style="margin-top:10px" class="stack small">
       {% for s in sessions %}

@@ -193,7 +193,7 @@ Claude commands: **`/onboard <service>`** and **`/inventory`** (see above).
 
 | Page | Purpose |
 |---|---|
-| **Overview** | Status of the sandbox (resources, Claude version, login), Remote Control with QR code and on/off switch, Docker and SSH hosts with live status, system inventory. |
+| **Overview** | Status of the sandbox (resources, Claude version, login, plan usage as bars), Remote Control with QR code and on/off switch, Docker and SSH hosts with live status, system inventory. |
 | **Terminal** | xterm.js terminals into the sandbox (Claude, Remote Control, shell, login). Reconnects automatically. |
 | **Tentacles** | Everything Claude can reach, in four tabs: **Services** (grouped by system, live status dot per service; templates, JSON editor, write-only tokens, connection test, onboarding, enable/disable, move between systems) · **SSH hosts** (live status; add with host key check and one-time password key deployment, edit incl. jump host, sudo and rename, remove with key revocation) · **Systems** (groups with SSH host and rules) · **Topology** (live graph incl. optional stacks/containers, search, saved layout, PNG export). |
 | **Network** | Every destination the sandbox connected to (rule, last connection, filters), your allowlist and blocklist with one-click Allow/Block, the tentacles and the built-in list, and the switches *Mode* (permissive / enforce) and *IP targets* (ask / block) – see [Network control](#network-control). |
@@ -359,7 +359,6 @@ What it does **not** (yet) do – keep it in mind:
 - **Security:** two-factor sign-in (TOTP) for tentacontrol · DNS filter in the egress gateway · read-only root filesystem,
   Docker socket proxy, prompt-injection safeguards
 - **Automation:** scheduled Claude jobs (e.g. patch report, certificate expiry) with results as notifications
-- **Usage** of each Claude instance (tokens, quota, sessions) in tentacontrol
 - **Export/import** of configuration and templates
 
 ## License

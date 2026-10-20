@@ -23,6 +23,7 @@ EVENTS = {
     "logged_out": ("Claude signed out", "high", "the sandbox is no longer signed in to Claude"),
     "container":  ("Container stopped", "high", "the sandbox or the egress gateway is not running"),
     "update":     ("Update available", "low", "a new tentaclAI release is out"),
+    "quota":      ("Quota running low", "normal", "the Claude session or weekly limit passed 80 %"),
 }
 ID_RE = re.compile(r"^[a-z0-9][a-z0-9-]{0,30}$")
 

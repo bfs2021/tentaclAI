@@ -11,6 +11,11 @@ All notable changes, newest first. Every release lists **upgrade steps** from th
   destination, IP target), Remote Control down, Claude signed out, container stopped, update available. Channel URLs
   are stored in `.env` (`NOTIFY_URL_…`), never shown. *Send test* per channel.
 
+- **Usage** – the Claude Code card on the overview shows the plan limits (session and week, account-wide) as bars;
+  details on the new *Usage* page: what contributes, tokens per day, sessions of this sandbox, models. Limits come from
+  `claude -p "/usage"` every 10 minutes (no model call), token totals from the local session files (usage fields only).
+  Notification event *Quota running low* at 80 %.
+
 ### Changes
 - Login: the password reset hint sits behind *Forgot the password?*.
 

@@ -16,7 +16,7 @@ from . import activity, auth, dockerops, jobs, services_store, sshhosts, sshops,
 from .config import CLAUDE_SERVICE, COMPOSE, DATA_DIR, SERVICES_DIR, STACK_DIR, RC_VARS, RESTART_VARS, SETTINGS_GROUPS, is_secret, site
 from .envfile import read_env, update_env
 from .terminal import PROFILES, bridge, onboard_cmd
-from . import egress, generated, notify
+from . import egress, generated, notify, usage
 import tclib  # noqa: E402  shared with the sandbox tools
 
 BASE = os.path.dirname(__file__)
@@ -115,6 +115,28 @@ async def start_notifications():
                 print(f"notify watch: {e}", flush=True)
             await asyncio.sleep(60)
     loop.create_task(watch())
+
+    async def usage_loop():
+        """plan limits every 10 min (no model call), local token totals every 5 min; quota notification at 80 %"""
+        warned, n = {}, 0
+        await asyncio.sleep(20)
+        while True:
+            try:
+                await asyncio.to_thread(usage.refresh_local)
+                if n % 2 == 0 and dockerops.status().get("running") and await asyncio.to_thread(dockerops.logged_in_claude):
+                    p = await asyncio.to_thread(usage.refresh_plan)
+                    for lim in p.get("limits", []):
+                        k = f"{lim['window']}:{lim['scope']}"
+                        if lim["percent"] >= 80 and warned.get(k) != lim["resets"]:
+                            name = "session" if lim["window"] == "session" else f"week ({lim['scope'] or 'all models'})"
+                            notify.emit("quota", f"Claude {name}: {lim['percent']} % used", f"Resets {lim['resets']}.",
+                                        key=f"quota:{k}:{lim['resets']}", link=notify.control_link("/usage"))
+                            warned[k] = lim["resets"]
+            except Exception as e:  # noqa: BLE001
+                print(f"usage: {e}", flush=True)
+            n += 1
+            await asyncio.sleep(300)
+    loop.create_task(usage_loop())
 
 
 @app.on_event("startup")
@@ -282,7 +304,9 @@ async def dashboard(request: Request):
 async def overview(request: Request):
     st = dockerops.status()
     auth = dockerops.claude_auth()
+    plan = usage.plan()
     ctx = {"st": st, "stats": None, "version": None, "logged": bool(auth.get("loggedIn")), "auth": auth,
+           "limits": [l for l in plan.get("limits", []) if l["window"] == "session" or l["scope"] in ("", "all models")][:2],
            "sessions": [], "rc": None, "services": services_store.load_all(), "hosts": sshhosts.hosts()}
     if st["running"]:
         ctx.update(stats=dockerops.stats(), version=dockerops.claude_version(),
@@ -935,6 +959,24 @@ async def help_page(request: Request):
 
 
 # ---------------------------------------------------------------- settings
+
+@app.get("/usage", response_class=HTMLResponse)
+async def usage_page(request: Request, days: int = 14):
+    days = 30 if days >= 30 else 14
+    s = await asyncio.to_thread(usage.summary, days)
+    peak = max([d["input"] + d["output"] + d["cache_read"] + d["cache_write"] for d in s["series"]] + [1])
+    return page(request, "usage.html", plan=usage.plan(), s=s, days=days, peak=peak,
+                fmt=lambda ts: time.strftime("%Y-%m-%d %H:%M", time.localtime(ts)) if ts else "–",
+                tok=lambda n: f"{n/1e6:.1f} M" if n >= 1e6 else (f"{n/1e3:.0f} k" if n >= 1e3 else str(n)))
+
+
+@app.post("/usage/refresh", response_class=HTMLResponse)
+async def usage_refresh(request: Request):
+    await asyncio.to_thread(usage.refresh_local)
+    p = await asyncio.to_thread(usage.refresh_plan)
+    return respond(request, "Usage updated" if p.get("limits") else "Claude Code did not report limits – see the raw output",
+                   "ok" if p.get("limits") else "warn", refresh=True)
+
 
 @app.get("/notifications", response_class=HTMLResponse)
 async def notifications_page(request: Request):

@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% from "_icons.html" import icon %}
+{% block title %}Usage{% endblock %}
+{% block content %}
+<div class="header">
+  <div><h1>Usage</h1><div class="sub">Plan limits as Claude Code reports them (account-wide – the same numbers as in your claude.ai profile) and token totals of the sessions in this sandbox.</div></div>
+  <button class="btn sm" hx-post="/usage/refresh">{{ icon('refresh') }}Refresh</button>
+</div>
+
+<div class="card" style="margin-bottom:16px">
+  <div class="card-head"><h2>Plan limits</h2><span class="small muted">{{ plan.billing }}{% if plan.checked %} · checked {{ fmt(plan.checked) }}{% endif %}</span></div>
+  {% if plan.limits %}
+  <div class="stack" style="gap:14px">
+    {% for l in plan.limits %}
+    <div class="ubar ubar-big"><div class="between"><span>{{ 'Current session' if l.window == 'session' else 'Week' }}{% if l.scope %} <span class="muted">· {{ l.scope }}</span>{% endif %}</span>
+      <span><strong>{{ l.percent }} %</strong> <span class="muted">· resets {{ l.resets }}</span></span></div>
+      <div class="ubar-track"><div class="ubar-fill {{ 'err' if l.percent >= 90 else ('warn' if l.percent >= 75 else '') }}" style="width:{{ [l.percent, 100] | min }}%"></div></div></div>
+    {% endfor %}
+  </div>
+  {% if plan.contrib %}
+  <h3 style="margin:18px 0 6px;font-size:14px">What contributes{% if plan.requests is not none %} <span class="muted small">· last {{ plan.period }}: {{ plan.requests }} requests, {{ plan.sessions }} sessions</span>{% endif %}</h3>
+  <ul class="small" style="margin:0;padding-left:18px">{% for c in plan.contrib %}<li>{{ c }}</li>{% endfor %}</ul>
+  {% endif %}
+  {% elif plan.raw %}
+  <p class="muted small">Claude Code answered, but the limits could not be read:</p><pre class="rc">{{ plan.raw }}</pre>
+  {% else %}
+  <div class="empty small">No data yet – it is fetched every 10 minutes while Claude is signed in, or now with <em>Refresh</em>.</div>
+  {% endif %}
+</div>
+
+<div class="card" style="margin-bottom:16px">
+  <div class="card-head"><h2>Tokens per day</h2>
+    <div class="seg" role="radiogroup" aria-label="Period">
+      {% for n in (14, 30) %}{% if days == n %}<span class="seg-on sel" role="radio" aria-checked="true">{{ n }} days</span>{% else %}<a role="radio" aria-checked="false" href="/usage?days={{ n }}">{{ n }} days</a>{% endif %}{% endfor %}
+    </div>
+  </div>
+  <div class="uchart" role="img" aria-label="tokens per day">
+    {% for d in s.series %}{% set t = d.input + d.output + d.cache_read + d.cache_write %}
+    <div class="col" style="height:{{ (t / peak * 100) | round(1) }}%" title="{{ d.day }}: {{ tok(t) }} tokens · {{ d.replies }} replies">
+      {% for k, cls in (('input', 'seg-in'), ('output', 'seg-out'), ('cache_write', 'seg-cw'), ('cache_read', 'seg-cr')) %}{% if t %}<div class="{{ cls }}" style="height:{{ (d[k] / t * 100) | round(1) }}%"></div>{% endif %}{% endfor %}
+    </div>{% endfor %}
+  </div>
+  <div class="uchart-x">{% for d in s.series %}<span>{{ d.day[8:] if days == 30 and loop.index % 3 != 1 and not loop.last else d.day[5:] }}</span>{% endfor %}</div>
+  <div class="legend"><span><i class="seg-in" style="background:var(--accent-2)"></i>input</span><span><i style="background:var(--accent)"></i>output</span>
+    <span><i style="background:var(--info)"></i>cache write</span><span><i style="background:var(--info);opacity:.55"></i>cache read</span></div>
+</div>
+
+<div class="grid2">
+  <div class="card"><div class="card-head"><h2>Sessions</h2><span class="small muted">this sandbox</span></div>
+    {% if s.sessions %}<div class="table-wrap"><table>
+      <thead><tr><th>Session</th><th>Where</th><th style="text-align:right">Tokens</th><th>Last</th></tr></thead><tbody>
+      {% for x in s.sessions %}<tr><td class="small">{{ x.title or x.id[:8] }}</td><td class="small muted">{{ x.kind }}<br><span class="mono">{{ x.path }}</span></td>
+        <td style="text-align:right;font-variant-numeric:tabular-nums">{{ tok(x.tokens) }}</td><td class="small muted">{{ x['last'][:16] | replace('T', ' ') }}</td></tr>{% endfor %}
+    </tbody></table></div>{% else %}<div class="empty small">No sessions yet.</div>{% endif %}
+  </div>
+  <div class="card"><div class="card-head"><h2>Models</h2><span class="small muted">{{ days }} days</span></div>
+    {% if s.models %}<div class="stack small">{% for m, v in s.models %}<div class="between"><span class="mono">{{ m }}</span><span>{{ tok(v.tokens) }} <span class="muted">· {{ v.replies }} replies</span></span></div>{% endfor %}</div>
+    {% else %}<div class="empty small">No data yet.</div>{% endif %}
+  </div>
+</div>
+{% endblock %}
