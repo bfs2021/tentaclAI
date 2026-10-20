@@ -1,4 +1,5 @@
 /* tentacontrol – clean admin UI, dark by default, light via prefers-color-scheme */
+[hidden] { display: none !important; }  /* the hidden attribute always wins over layout classes */
 :root {
   --bg: #0d1117; --bg-2: #11161f; --panel: #161b25; --panel-2: #1c2230; --border: #262e3d;
   --text: #e6e9ef; --muted: #8b95a7; --faint: #5c6679;
