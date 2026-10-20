@@ -76,7 +76,7 @@
 <div class="card">
   <div class="card-head"><h2>What goes where</h2></div>
   <div class="table-wrap"><table>
-    <thead><tr><th>Event</th>{% for ch in cfg.channels %}<th style="text-align:center">{{ ch.name }}</th>{% endfor %}</tr></thead>
+    <thead><tr><th>Event</th>{% for ch in cfg.channels %}<th class="ch-col" style="text-align:center">{{ ch.name }}</th>{% endfor %}</tr></thead>
     <tbody>
     {% for ev, (label, prio, desc) in events.items() %}
       <tr><td><strong>{{ label }}</strong>{% if prio == 'high' %} <span class="pill warn" title="also during quiet hours">urgent</span>{% endif %}<div class="small muted">{{ desc }}</div></td>
