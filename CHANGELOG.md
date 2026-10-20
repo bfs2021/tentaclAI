@@ -4,6 +4,11 @@ All notable changes, newest first. Every release lists **upgrade steps** from th
 
 ## Unreleased
 
+### Fixes
+- Egress gateway: a service that was just enabled (or whose last token was just set) asked for a network approval
+  on its first use – the gateway only re-reads its policy every 15 s. Before it asks, it now re-reads the policy once
+  and decides again.
+
 ### Changes
 - Template **PatchMon**: the integration API takes a token *key and secret* as Basic auth under `/api/v1/api` –
   the template had a single bearer token and the wrong base URL. Existing PatchMon services: switch `auth` to

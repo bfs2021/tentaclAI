@@ -88,7 +88,7 @@ services:
   claude: {image: "local/tentaclai:test", container_name: tctest-claude}
   egress: {image: "local/tentaclai-egress:test", container_name: tctest-egress, environment: {EGRESS_REFRESH: "1"}}
   control: {image: "local/tentacontrol:test", container_name: tctest-control, environment: {CLAUDE_CONTAINER: tctest-claude}, ports: !reset []}
-  api: {image: "python:3.12-alpine", container_name: tctest-api, command: ["python", "/srv/api.py"], volumes: ["./fixtures/api.py:/srv/api.py:ro"], networks: [outside]}
+  api: {image: "python:3.12-alpine", container_name: tctest-api, command: ["python", "/srv/api.py"], volumes: ["./fixtures/api.py:/srv/api.py:ro"], networks: {outside: {aliases: [tctest-api2]}}}
   pg: {image: "postgres:16-alpine", container_name: tctest-pg, environment: {POSTGRES_PASSWORD: pg-secret-789}, networks: [outside]}
   ntfy: {image: "binwiederhier/ntfy:v2.11.0", container_name: tctest-ntfy, command: ["serve"], networks: [outside]}
   hook: {image: "python:3.12-alpine", container_name: tctest-hook, command: ["python", "/srv/hook.py"], volumes: ["./fixtures/hook.py:/srv/hook.py:ro"], networks: [outside]}
@@ -189,6 +189,14 @@ curl -s -b "$J" -H "$H" -X POST -o /dev/null "http://$IP:8080/network/rule" -d k
 curl -s -b "$J" -H "$H" -X POST -o /dev/null "http://$IP:8080/network/rule" -d kind=allow -d "entry=example.net"
 wait_for 30 sh -c "docker exec tctest-egress grep -q -- '${EX%.*}.0/24' /data/policy.json && docker exec tctest-egress grep -q example.net /data/policy.json" || true
 check "allowed name in a blocked IP range is refused" "$($C curl -s -m 10 -o /dev/null -w '%{http_code}' https://example.net || true)" "000"
+# a service enabled a moment ago must work at once – the gateway re-reads its policy before it asks for approval
+rm -f services/newapi.json
+$C curl -s -o /dev/null http://tctest-api2:8000/ >/dev/null 2>&1 &  # unknown yet: asks for approval
+wait_for 30 pending tctest-api2:8000 || true
+decide deny; wait
+echo '{"name":"newapi","api":{"base_url":"http://tctest-api2:8000","auth":{"type":"bearer","token":"${API_TOKEN}"}}}' > services/newapi.json
+check "new tentacle works at once" "$($C svc newapi GET / 2>/dev/null)" '{"auth_ok": true}'
+check "… without an approval" "$($C svc pending 2>/dev/null | grep -c 'tctest-api2' || true)" "0"
 check "built-in can't be blocked" "$(curl -s -b "$J" -H "$H" -X POST -D - -o /dev/null "http://$IP:8080/network/rule" -d kind=block -d entry=github.com | grep -ci 'built-in' || true)" "1"
 fi
 

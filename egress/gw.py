@@ -212,6 +212,9 @@ async def handle(cr, cw):
     if not await policy_ready():
         return refuse(cw, "503 Service Unavailable", "tentaclAI egress: no rules from tentacontrol yet – try again in a moment")
     ok, why = decide(host, port, ips)
+    if ok is None:  # the cached policy may predate a service enabled or a token set just now – check fresh first
+        await asyncio.to_thread(refresh)
+        ok, why = decide(host, port, ips)
     if ok is None:
         ok = await ask(host, port)
         why = "approved" if ok else "denied"
