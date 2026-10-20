@@ -5,6 +5,10 @@ All notable changes, newest first. Every release lists **upgrade steps** from th
 ## Unreleased
 
 ### Changes
+- Template **PatchMon**: the integration API takes a token *key and secret* as Basic auth under `/api/v1/api` –
+  the template had a single bearer token and the wrong base URL. Existing PatchMon services: switch `auth` to
+  `{"type": "basic", "user": "${PATCHMON_TOKEN_KEY}", "password": "${PATCHMON_TOKEN_SECRET}"}`, `base_url` to
+  `…/api/v1/api` and `test_path` to `/hosts`.
 - Services without a `test_path`: the *Test API* card warns that `svc test` only checks `GET /` (often a 404, or a
   check that passes without the token), pre-fills the path from the template of the same name and saves it with
   *Save as test path*; `svc test` prints the same hint.

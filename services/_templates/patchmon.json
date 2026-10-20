@@ -5,14 +5,19 @@
   },
   "description": "PatchMon – patch level and packages of all hosts",
   "api": {
-    "base_url": "https://patchmon.{{DOMAIN}}/api/v1",
+    "base_url": "https://patchmon.{{DOMAIN}}/api/v1/api",
     "auth": {
-      "type": "bearer",
-      "token": "${PATCHMON_API_TOKEN}"
+      "type": "basic",
+      "user": "${PATCHMON_TOKEN_KEY}",
+      "password": "${PATCHMON_TOKEN_SECRET}"
     },
     "docs": "https://patchmon.{{DOMAIN}}/api-docs"
   },
   "notes": [
-    "Check the auth scheme when creating the token."
+    "Integration API: create a token in PatchMon (Settings → Integrations → API) – it has a key and a secret; svc sends them as Basic auth (key:secret). Give it read scopes only unless Claude should change something."
+  ],
+  "test_path": "/hosts",
+  "examples": [
+    "svc patchmon GET /hosts"
   ]
 }
