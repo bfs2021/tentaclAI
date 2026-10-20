@@ -801,7 +801,8 @@ async def service_edit(request: Request, name: str):
     except ValueError as e:
         data, err = {}, str(e)
     svc = services_store.describe(name, data, error=err)
-    return page(request, "service_edit.html", svc=svc, raw=raw, systems=systems_store.load_all())
+    return page(request, "service_edit.html", svc=svc, raw=raw, systems=systems_store.load_all(),
+                suggested_test_path=services_store.template_test_path(name))
 
 
 @app.post("/services/{name}/tls")
@@ -887,7 +888,7 @@ async def service_delete(request: Request, name: str):
 
 @app.post("/services/{name}/test", response_class=HTMLResponse)
 async def service_test(request: Request, name: str, path: str = Form("/")):
-    if not path.startswith("/") or any(c in path for c in " \n\r'\""):
+    if not services_store.valid_test_path(path):
         return HTMLResponse('<span class="pill err">invalid path</span>')
     code, out = await asyncio.to_thread(dockerops.run, ["svc", name, "GET", path, "-o", "/dev/null", "-w", "%{http_code}", "--max-time", "10"])
     out = out.strip()
@@ -895,6 +896,15 @@ async def service_test(request: Request, name: str, path: str = Form("/")):
         kind = "ok" if out.startswith("2") else "warn" if out.startswith(("3", "4")) else "err"
         return HTMLResponse(f'<span class="pill {kind}">HTTP {out}</span>')
     return HTMLResponse(f'<span class="pill err">{(out or "error")[-160:]}</span>')
+
+
+@app.post("/services/{name}/test-path")
+async def service_test_path(request: Request, name: str, path: str = Form("")):
+    try:
+        services_store.set_test_path(name, path)
+    except (ValueError, OSError) as e:
+        return respond(request, f"Not saved: {e}", "err")
+    return respond(request, f"{name}: svc test now checks GET {path}", refresh=True)
 
 
 @app.post("/services/{name}/git-sync")

@@ -106,13 +106,18 @@
     {% if 'api' in svc.kinds %}
     <div class="card">
       <h2>Test API</h2>
+      {% set tp = svc.data.get('test_path') %}
+      {% if not tp %}
+      <p class="small" style="margin-top:-4px"><span class="pill warn">no test path</span> <code>svc test</code> checks <code>GET /</code> – that often doesn't exist (404) or works without the token, so a wrong token goes unnoticed. Pick an endpoint that needs the token{% if suggested_test_path %} – the template suggests <code>{{ suggested_test_path }}</code>{% endif %}, try it with GET and save it.</p>
+      {% endif %}
       <form class="row" hx-post="/services/{{ svc.name }}/test" hx-target="#test-result" hx-indicator="#test-spin">
-        <input type="text" name="path" value="{{ svc.data.get('test_path', '/') }}" style="flex:1" class="mono">
+        <input type="text" name="path" aria-label="Test path" value="{{ tp or suggested_test_path or '/' }}" style="flex:1" class="mono">
         <button class="btn">GET</button>
+        <button class="btn ghost" hx-post="/services/{{ svc.name }}/test-path" hx-target="#test-result">{{ icon('check') }}Save as test path</button>
         <span id="test-spin" class="spinner htmx-indicator"></span>
       </form>
       <div id="test-result" style="margin-top:10px"></div>
-      <p class="help">Runs <code>svc {{ svc.name }} GET &lt;path&gt;</code> in the container and shows the HTTP status.</p>
+      <p class="help">Runs <code>svc {{ svc.name }} GET &lt;path&gt;</code> in the container and shows the HTTP status. The saved test path (<code>"test_path"</code>) is what <code>svc test</code> and the status check call.</p>
     </div>
     {% endif %}
 

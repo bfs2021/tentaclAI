@@ -1562,7 +1562,8 @@ def cmd_test(services, name):
                                capture_output=True, text=True)
             code = r.stdout.strip()
             good = r.returncode == 0 and code[:1] in ("2", "3")
-            report("api", good, f"GET {path} → HTTP {code or '–'}" + ("" if good else f" {r.stderr.strip()[-120:]}"))
+            hint = "" if "test_path" in svc else " – no test_path set: GET / may not exist or may not need the token; set \"test_path\" (tentacontrol → service → Test API)"
+            report("api", good, f"GET {path} → HTTP {code or '–'}" + ("" if good else f" {r.stderr.strip()[-120:]}") + hint)
         elif part == "mcp":
             m = render(svc["mcp"])
             if m.get("type", "http") in ("http", "sse"):

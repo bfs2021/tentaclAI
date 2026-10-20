@@ -41,6 +41,8 @@ def _stack():
             json.dump(svc, f)
     with open(os.path.join(STACK, "services", "_templates", "n8n.json"), "w") as f:
         json.dump({"_meta": {"title": "n8n", "category": "Automation", "setup": "token"}, "api": {"base_url": "https://n8n.{{DOMAIN}}"}}, f)
+    with open(os.path.join(STACK, "services", "_templates", "demoapi.json"), "w") as f:
+        json.dump({"_meta": {"title": "Demo"}, "api": {"base_url": "https://x"}, "test_path": "/items?limit=1"}, f)
     with open(os.path.join(STACK, "systems", "box.json"), "w") as f:
         json.dump({"description": "Demo server", "ssh_host": "box", "rules": "ask before restarts"}, f)
     with open(os.path.join(STACK, "ssh", "config.d", "box.conf"), "w") as f:

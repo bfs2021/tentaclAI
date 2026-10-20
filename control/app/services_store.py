@@ -181,3 +181,27 @@ def set_insecure_tls(name, on):
             else:
                 data[part].pop("insecure_tls", None)
     save_raw(name, json.dumps(data, ensure_ascii=False))
+
+
+def valid_test_path(path):
+    return bool(path) and path.startswith("/") and len(path) <= 300 and not any(c in path for c in " \n\r'\"")
+
+
+def template_test_path(name):
+    """test_path of the template with the same name (services are usually created from it) – a suggestion"""
+    if not NAME.match(name):
+        return ""
+    try:
+        with open(os.path.join(TEMPLATES_DIR, f"{name}.json")) as f:
+            return json.load(f).get("test_path", "")
+    except (OSError, ValueError):
+        return ""
+
+
+def set_test_path(name, path):
+    """the endpoint `svc test` calls for the api part – one that needs the token, so a wrong token shows up"""
+    if not valid_test_path(path):
+        raise ValueError("test path: starts with /, no spaces or quotes")
+    data = json.loads(read_raw(name))
+    data["test_path"] = path
+    save_raw(name, json.dumps(data))

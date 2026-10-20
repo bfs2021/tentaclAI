@@ -49,3 +49,23 @@ def test_skills_page_offers_no_off_for_required(client):
     assert "required by tentaclAI" in html
     row = re.search(r'aria-label="Mode of inventory".*?</select>', html, re.S).group(0)
     assert 'value="off"' not in row and 'value="user-invocable-only"' in row
+
+
+def test_service_without_test_path_warns_and_suggests(client):
+    html = client.get("/services/demoapi").text
+    assert "no test path" in html and 'value="/items?limit=1"' in html  # suggestion from the template of the same name
+
+
+def test_save_test_path(client, app_module):
+    import json
+    from app import services_store
+    before = services_store.read_raw("demoapi")
+    try:
+        r = client.post("/services/demoapi/test-path", data={"path": "/items?limit=1"}, headers={"HX-Request": "true"})
+        assert r.headers.get("HX-Refresh") == "true"
+        assert json.loads(services_store.read_raw("demoapi"))["test_path"] == "/items?limit=1"
+        assert "no test path" not in client.get("/services/demoapi").text
+        r = client.post("/services/demoapi/test-path", data={"path": "items; rm"}, headers={"HX-Request": "true"})
+        assert "Not saved" in r.headers.get("HX-Trigger", "")
+    finally:
+        services_store.save_raw("demoapi", before)

@@ -116,3 +116,12 @@ def test_required_skills_refuse_off(applied, app_module):
     rows = {r["name"]: r for r in skills.listing()}
     assert rows["inventory"]["required"] and rows["onboard"]["mode"] == "user-invocable-only"
     assert skills.set_mode("onboard", "on")
+
+
+def test_test_path_helpers(app_module):
+    from app import services_store
+    assert services_store.template_test_path("demoapi") == "/items?limit=1"
+    assert services_store.template_test_path("nope") == "" and services_store.template_test_path("../x") == ""
+    for bad in ("", "items", "/a b", "/x'", '/x"'):
+        assert not services_store.valid_test_path(bad)
+    assert services_store.valid_test_path("/environments")
