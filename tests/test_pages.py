@@ -29,3 +29,15 @@ def test_skills_mode_post(client):
 def test_models_post_refuses_bad_values(client):
     r = client.post("/models", data={"main": "custom", "main_custom": "x y"}, headers={"HX-Request": "true"})
     assert "Not saved" in r.headers.get("HX-Trigger", "")
+
+
+def test_lifespan_runs_every_startup_hook(app_module, monkeypatch):
+    from fastapi.testclient import TestClient
+    ran = []
+    for name in ("prepare_activity", "start_notifications", "start_update_check", "announce_setup"):
+        async def hook(name=name):
+            ran.append(name)
+        monkeypatch.setattr(app_module, name, hook)
+    with TestClient(app_module.app):
+        pass
+    assert ran == ["prepare_activity", "start_notifications", "start_update_check", "announce_setup"]

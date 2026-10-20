@@ -84,3 +84,15 @@ def test_models_set_and_apply(app_module, monkeypatch):
         with pytest.raises(ValueError):
             models.set_values(bad)
     assert models.current() == applied  # refused input changes nothing
+
+
+def test_polling_leaves_no_session_files(app_module, monkeypatch):
+    """/usage and /context are asked every few minutes – they must not pile up as sessions in Claude's history"""
+    from app import dockerops, skills, usage
+    from conftest import fake_run
+    cmds = []
+    monkeypatch.setattr(dockerops, "run", lambda cmd, workdir=None, user="root": (cmds.append(cmd), fake_run(cmd))[1])
+    usage.refresh_plan()
+    skills.discover()
+    claude = [c for c in cmds if "claude" in c and "-p" in c]
+    assert len(claude) == 2 and all("--no-session-persistence" in c for c in claude)

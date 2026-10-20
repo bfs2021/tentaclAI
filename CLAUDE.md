@@ -72,9 +72,10 @@ Every release gets an entry in **`CHANGELOG.md`** (newest first) and the same te
    If nothing special is needed, say so explicitly (e.g. “`git pull`, `docker compose build`, `docker compose up -d`”).
 4. **Known issues** – if any.
 
-Before tagging – **mandatory**: `scripts/test-quick.sh` and the **full** `scripts/test-sandbox.sh` (no `ONLY`, no
-`REUSE` – fresh images and state; remove a reused stack first with `REUSE=1 CLEAN=1 scripts/test-sandbox.sh`), both
-green. Test the upgrade path from the previous release in an isolated instance when the Upgrade section is more than a
+Release with **`scripts/release.sh X.Y.Z "subtitle"`** (`--dry-run` first if unsure): it refuses unless main is clean
+and up to date and `## Unreleased` has an `### Upgrade` part, runs the **mandatory** tests – `scripts/test-quick.sh` and
+the **full** `scripts/test-sandbox.sh` (fresh images and state, a kept REUSE stack is removed) – and only then renames
+the section, sets `VERSION`, commits, tags, pushes and creates the GitHub release from the same notes. Test the upgrade path from the previous release in an isolated instance when the Upgrade section is more than a
 plain rebuild.
 
 ## Brand images

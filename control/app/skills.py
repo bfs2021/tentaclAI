@@ -95,7 +95,7 @@ def _descriptions(limit=20):
 
 def discover():
     """`/context` works without a model call – adds the skills Claude Code lists now"""
-    code, out = dockerops.run(["timeout", "60", "claude", "-p", "/context"], workdir="/workspace", user=dockerops.CLAUDE_USER)
+    code, out = dockerops.run(["timeout", "60", "claude", "-p", "--no-session-persistence", "/context"], workdir="/workspace", user=dockerops.CLAUDE_USER)
     rows = parse_context(out) if code == 0 else {}
     if not rows:
         return False

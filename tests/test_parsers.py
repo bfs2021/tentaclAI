@@ -45,3 +45,16 @@ def test_session_usage_counts_each_reply_once(app_module):
     s = usage.summary()
     assert s["today"]["replies"] == 1 and s["today"]["cache_read"] == 24000
     assert s["sessions"][0]["title"] == "Demo session" and s["sessions"][0]["kind"] == "Terminal"
+
+
+def test_sessions_without_replies_are_not_listed(app_module):
+    import json, os
+    from app import usage
+    p = os.path.join(usage.PROJECTS, "-workspace", "poll.jsonl")
+    with open(p, "w") as f:
+        f.write(json.dumps({"type": "user", "sessionId": "poll", "message": {"role": "user", "content": "<command-name>/usage</command-name>"}}) + "\n")
+    try:
+        usage.refresh_local()
+        assert "poll" not in [x["id"] for x in usage.summary()["sessions"]]
+    finally:
+        os.remove(p)

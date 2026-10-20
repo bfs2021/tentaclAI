@@ -40,7 +40,7 @@ def parse_plan(text):
 
 def refresh_plan():
     """ask Claude Code (`/usage` works without a model call); keeps the last good answer when it fails"""
-    code, out = dockerops.run(["timeout", "60", "claude", "-p", "/usage"], workdir="/workspace", user=dockerops.CLAUDE_USER)
+    code, out = dockerops.run(["timeout", "60", "claude", "-p", "--no-session-persistence", "/usage"], workdir="/workspace", user=dockerops.CLAUDE_USER)
     data = {"checked": time.time(), "raw": out.strip()[:4000], "ok": code == 0, **parse_plan(out)}
     if code != 0 or not data["limits"]:
         old = plan()
@@ -164,6 +164,8 @@ def summary(days=14):
         series.append(dict(tot, day=day))
     sessions = []
     for sid, s in d["sessions"].items():
+        if not s.get("replies"):
+            continue  # no model call (e.g. a local /usage or /context of older versions)
         kind, path = where(s)
         sessions.append(dict(s, id=sid, kind=kind, path=path))
     sessions.sort(key=lambda x: x.get("last", ""), reverse=True)

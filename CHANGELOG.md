@@ -2,6 +2,23 @@
 
 All notable changes, newest first. Every release lists **upgrade steps** from the previous one.
 
+## Unreleased
+
+### Fixes
+- tentacontrol's regular `claude -p /usage` and `/context` calls no longer leave a session file behind each time
+  (`--no-session-persistence`); sessions without a single reply are no longer listed on the Usage page.
+- tentacontrol starts its background tasks through FastAPI's `lifespan` instead of the deprecated `on_event`.
+
+### Development
+- `scripts/release.sh X.Y.Z "subtitle"`: checks (main, clean, not behind, Unreleased with Upgrade part), stage 1 and
+  the full sandbox test, then CHANGELOG/VERSION, commit, tag, push and the GitHub release from the changelog notes;
+  `--dry-run` changes nothing.
+
+### Upgrade (from v0.9.0)
+`git pull`, `docker compose build control`, `docker compose up -d control` – only tentacontrol changed, running Claude
+sessions are not affected. Optional: session files that only hold a `/usage` or `/context` call can be deleted from
+`data/claude/.claude/projects/` (they contain no reply).
+
 ## v0.9.0 – 2026-10-20
 
 ### Highlights

@@ -1,5 +1,6 @@
 """tentacontrol – web admin for the tentaclai sandbox + service gateway for Claude Code."""
 import asyncio
+import contextlib
 import html
 import json
 import os
@@ -20,7 +21,15 @@ from . import connectors, egress, generated, models, notify, skills, usage
 import tclib  # noqa: E402  shared with the sandbox tools
 
 BASE = os.path.dirname(__file__)
-app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
+@contextlib.asynccontextmanager
+async def lifespan(_app):
+    """startup: activity token, background loops (notifications, usage, update check), setup hint"""
+    for start in (prepare_activity, start_notifications, start_update_check, announce_setup):
+        await start()
+    yield
+
+
+app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None, lifespan=lifespan)
 templates = Jinja2Templates(directory=os.path.join(BASE, "templates"))
 # cache busting: static URLs carry the newest mtime of app.css/app.js, so browsers load a new version right after an update
 # installed tentaclAI version (VERSION file baked into the image)
@@ -69,12 +78,10 @@ async def secure_cookie(request: Request, call_next):
     return response
 
 
-@app.on_event("startup")
 async def prepare_activity():
     activity.ensure_token()
 
 
-@app.on_event("startup")
 async def start_notifications():
     loop = asyncio.get_running_loop()
     loop.create_task(notify.worker())
@@ -143,7 +150,6 @@ async def start_notifications():
     loop.create_task(usage_loop())
 
 
-@app.on_event("startup")
 async def start_update_check():
     async def loop():
         while True:  # refresh() itself only asks GitHub when the cached answer is older than 6 h
@@ -152,7 +158,6 @@ async def start_update_check():
     asyncio.get_running_loop().create_task(loop())
 
 
-@app.on_event("startup")
 async def announce_setup():
     if not auth.has_password():
         print("=" * 72, flush=True)
