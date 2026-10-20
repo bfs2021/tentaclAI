@@ -327,3 +327,6 @@ details.add-channel > summary { list-style: none; display: inline-flex; }
 details.add-channel > summary::-webkit-details-marker { display: none; }
 .ch-row:has(.ch-edit:not([hidden])) { padding-bottom: 6px; border-bottom: 1px solid var(--border); }
 .ch-edit { margin: 12px 0 4px; }
+.notify-opts { display: grid; grid-template-columns: auto auto; gap: 10px 16px; align-items: center; justify-content: start; margin-top: 16px; }
+.notify-opts .t-short { width: 110px !important; flex: none; }
+@media (max-width: 600px) { .notify-opts { grid-template-columns: 1fr; } }

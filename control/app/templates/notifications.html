@@ -83,10 +83,11 @@
     {% endfor %}
     </tbody>
   </table></div>
-  <div class="row" style="margin-top:14px;gap:18px;flex-wrap:wrap">
-    <label class="check"><input type="checkbox" name="quiet" value="1" {{ 'checked' if cfg.quiet.enabled }}> Quiet hours (only urgent events)</label>
-    <span class="row" style="gap:6px"><input type="time" name="q_from" value="{{ cfg.quiet['from'] }}" aria-label="quiet from"> – <input type="time" name="q_to" value="{{ cfg.quiet['to'] }}" aria-label="quiet to"></span>
-    <label class="row" style="gap:6px">Same event at most every <input type="number" name="dedupe" min="0" max="1440" value="{{ cfg.dedupe_min }}" style="width:70px"> min</label>
+  <div class="notify-opts">
+    <label class="check"><input type="checkbox" name="quiet" value="1" {{ 'checked' if cfg.quiet.enabled }}> Quiet hours – only urgent events</label>
+    <span class="row" style="gap:8px">from <input type="time" name="q_from" value="{{ cfg.quiet['from'] }}" aria-label="quiet hours from" class="t-short"> to <input type="time" name="q_to" value="{{ cfg.quiet['to'] }}" aria-label="quiet hours to" class="t-short"></span>
+    <span>Send the same event at most every</span>
+    <span class="row" style="gap:8px"><input type="number" name="dedupe" min="0" max="1440" value="{{ cfg.dedupe_min }}" class="t-short" aria-label="minutes"> min</span>
   </div>
 </form>
 {% endif %}
