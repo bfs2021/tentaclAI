@@ -66,6 +66,13 @@ def human_age(ts):
     return f"{s // 86400} days"
 
 
+def container_running(name):
+    try:
+        return client().containers.get(name).status == "running"
+    except Exception:  # noqa: BLE001 – missing container counts as not running
+        return False
+
+
 def newer_image():
     """True when the image tag the sandbox runs from was rebuilt after the container was created"""
     c = container()

@@ -10,6 +10,7 @@ import os
 import secrets
 import time
 
+from . import notify
 from .config import DATA_DIR
 
 TOKEN_FILE = os.path.join(DATA_DIR, "svc-token")
@@ -46,6 +47,7 @@ def _expire():
         if a["status"] == "pending" and now - a["created"] > TIMEOUT:
             a.update(status="expired", decided=now)
             a["event"].set()
+            notify.emit("expired", f"Approval expired: {a['service']}", a["action"], key=f"expired:{a['id']}")
     for k in [k for k, a in APPROVALS.items() if a["status"] != "pending" and now - a.get("decided", now) > 3600]:
         APPROVALS.pop(k, None)
 
@@ -65,6 +67,9 @@ def create(service, part, action):
         a.update(status="approved", decided=time.time(), by=f"grant until {time.strftime('%H:%M', time.localtime(g['until']))} ({g['by']})")
         a["event"].set()
     APPROVALS[rid] = a
+    if a["status"] == "pending":
+        notify.emit("approval", f"Approval needed: {a['service']} ({a['part']})", a["action"], key=f"approval:{rid}",
+                    link=notify.control_link("/activity"))
     return rid
 
 

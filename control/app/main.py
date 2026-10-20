@@ -16,7 +16,7 @@ from . import activity, auth, dockerops, jobs, services_store, sshhosts, sshops,
 from .config import CLAUDE_SERVICE, COMPOSE, DATA_DIR, SERVICES_DIR, STACK_DIR, RC_VARS, RESTART_VARS, SETTINGS_GROUPS, is_secret, site
 from .envfile import read_env, update_env
 from .terminal import PROFILES, bridge, onboard_cmd
-from . import egress, generated
+from . import egress, generated, notify
 import tclib  # noqa: E402  shared with the sandbox tools
 
 BASE = os.path.dirname(__file__)
@@ -72,6 +72,49 @@ async def secure_cookie(request: Request, call_next):
 @app.on_event("startup")
 async def prepare_activity():
     activity.ensure_token()
+
+
+@app.on_event("startup")
+async def start_notifications():
+    loop = asyncio.get_running_loop()
+    loop.create_task(notify.worker())
+
+    async def watch():
+        """state changes worth a notification – reported once per change, not every minute"""
+        state, down_since = {}, None
+        await asyncio.sleep(60)
+        while True:
+            try:
+                st = await asyncio.to_thread(dockerops.status)
+                gw = await asyncio.to_thread(dockerops.container_running, "tentaclai-egress")
+                for name, up in (("tentaclai", st.get("running")), ("tentaclai-egress", gw)):
+                    if state.get(name, True) and not up:
+                        notify.emit("container", f"{name} is not running", "Start it in tentacontrol → Overview.",
+                                    key=f"container:{name}", link=notify.control_link("/"))
+                    state[name] = up
+                if st.get("running"):
+                    logged = await asyncio.to_thread(dockerops.logged_in_claude)
+                    if state.get("logged", True) and not logged:
+                        notify.emit("logged_out", "Claude is signed out", "Sign in again: Overview → Sign in now.",
+                                    key="logged_out", link=notify.control_link("/"))
+                    state["logged"] = logged
+                    rc = await asyncio.to_thread(dockerops.rc_info)
+                    enabled = (read_env().get("RC_ENABLED", "true") or "true").lower() == "true"
+                    ok = (rc or {}).get("state") == "connected" or not enabled
+                    down_since = None if ok else (down_since or time.time())
+                    is_down = down_since is not None and time.time() - down_since > 180
+                    if is_down and not state.get("rc_down"):
+                        notify.emit("rc_down", "Remote Control is down", f"State: {(rc or {}).get('state', 'no session')}",
+                                    key="rc_down", link=notify.control_link("/"))
+                    state["rc_down"] = is_down
+                up = updatecheck.status(TC_VERSION)
+                if up.get("available") and state.get("update") != up.get("latest"):
+                    notify.emit("update", f"tentaclAI {up['latest']} is available", up.get("url", ""), key=f"update:{up['latest']}")
+                    state["update"] = up.get("latest")
+            except Exception as e:  # noqa: BLE001
+                print(f"notify watch: {e}", flush=True)
+            await asyncio.sleep(60)
+    loop.create_task(watch())
 
 
 @app.on_event("startup")
@@ -376,6 +419,29 @@ async def internal_approval_create(request: Request):
     rid = activity.create(data.get("service", "?"), data.get("part", "?"), data.get("action", "?"))
     a = activity.APPROVALS[rid]
     return JSONResponse({"id": rid, "status": a["status"], "by": a["by"]})
+
+
+@app.post("/internal/event")
+async def internal_event(request: Request):
+    """svc reports something worth a notification (e.g. a blocked write)"""
+    if not _svc_auth(request):
+        return JSONResponse({"error": "forbidden"}, status_code=403)
+    d = await request.json()
+    if d.get("event") in ("blocked",):
+        notify.emit(d["event"], str(d.get("title", ""))[:200], str(d.get("body", ""))[:500])
+    return JSONResponse({"ok": True})
+
+
+@app.post("/internal/egress/event")
+async def internal_egress_event(request: Request):
+    """the gateway reports a refused destination"""
+    if _from_proxy(request):
+        return JSONResponse({"error": "forbidden"}, status_code=403)
+    d = await request.json()
+    target = f"{str(d.get('host', ''))[:200]}:{int(d.get('port', 0) or 0)}"
+    notify.emit("blocked", f"Network: {target} {str(d.get('reason', 'refused'))[:30]}", "The sandbox tried to connect.",
+                key=f"blocked:{target}", link=notify.control_link("/network"))
+    return JSONResponse({"ok": True})
 
 
 @app.get("/internal/approvals")
@@ -869,6 +935,45 @@ async def help_page(request: Request):
 
 
 # ---------------------------------------------------------------- settings
+
+@app.get("/notifications", response_class=HTMLResponse)
+async def notifications_page(request: Request):
+    c = notify.load()
+    return page(request, "notifications.html", cfg=c, events=notify.EVENTS, recent=notify.RECENT[:15],
+                urls={ch["id"]: bool(notify.channel_url(ch["id"])) for ch in c["channels"]},
+                fmt=lambda ts: time.strftime("%Y-%m-%d %H:%M", time.localtime(ts)))
+
+
+@app.post("/notifications/channel", response_class=HTMLResponse)
+async def notifications_add(request: Request):
+    f = dict(await request.form())
+    try:
+        cid = notify.add_channel(f.get("kind", "ntfy"), (f.get("name") or "").strip(), f)
+    except ValueError as e:
+        return respond(request, f"Not added: {e}", "err")
+    return respond(request, f"Channel {cid} added – send a test", refresh=True)
+
+
+@app.post("/notifications/channel/{cid}/test", response_class=HTMLResponse)
+async def notifications_test(request: Request, cid: str):
+    ok, err = await asyncio.to_thread(notify.send_now, cid, "tentaclAI test", "Notifications work. 🐙")
+    return respond(request, f"Test sent to {cid}" if ok else f"Test to {cid} failed: {err}", "ok" if ok else "err")
+
+
+@app.post("/notifications/channel/{cid}/remove", response_class=HTMLResponse)
+async def notifications_remove(request: Request, cid: str):
+    notify.remove_channel(cid)
+    return respond(request, f"Channel {cid} removed", refresh=True)
+
+
+@app.post("/notifications/routes", response_class=HTMLResponse)
+async def notifications_routes(request: Request):
+    form = await request.form()
+    routes = {ev: form.getlist(f"r_{ev}") for ev in notify.EVENTS}
+    quiet = {"enabled": bool(form.get("quiet")), "from": form.get("q_from") or "23:00", "to": form.get("q_to") or "07:00"}
+    notify.set_routes(routes, quiet, form.get("dedupe") or 10)
+    return respond(request, "Notification settings saved")
+
 
 @app.get("/settings", response_class=HTMLResponse)
 async def settings_page(request: Request):

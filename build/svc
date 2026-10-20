@@ -1469,10 +1469,19 @@ def request_approval(service, part, action):
     return "expired", ""
 
 
+def report(event, title, body=""):
+    """tell tentacontrol about something worth a notification – best effort, never blocks for long"""
+    try:
+        _control("POST", "/internal/event", {"event": event, "title": title, "body": body}, timeout=3)
+    except Exception:  # noqa: BLE001
+        pass
+
+
 def guarded(service, part, mode, action, run):
     """run() performs a write: blocked for ro, logged for rw, approved first for confirm"""
     if mode == "ro":
         audit(service, part, mode, action, "blocked")
+        report("blocked", f"Blocked: {service} ({part}) is read-only", action)
         sys.exit(f"svc: {service} is read-only ({part}) – '{action[:80]}' is not allowed")
     decision, by = "auto", ""
     if mode == "confirm":

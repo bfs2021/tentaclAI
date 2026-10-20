@@ -120,6 +120,14 @@ async def ask(host, port):
     return False
 
 
+def report(host, port, reason):
+    """tell tentacontrol about a refused destination (notifications) – best effort"""
+    try:
+        control("/internal/egress/event", {"host": host, "port": port, "reason": reason}, timeout=5)
+    except Exception:  # noqa: BLE001
+        pass
+
+
 def load_seen():
     global seen
     try:
@@ -207,6 +215,8 @@ async def handle(cr, cw):
         ok = await ask(host, port)
         why = "approved" if ok else "denied"
     record(host, port, why)
+    if not ok and why in ("blocked", "direct-ip", "denied"):
+        asyncio.get_running_loop().run_in_executor(None, report, host, port, why)
     if not ok:
         return refuse(cw, "403 Forbidden", f"tentaclAI egress: {host}:{port} is {why} – allow it in tentacontrol → Network or approve it in Activity")
     if not ips:

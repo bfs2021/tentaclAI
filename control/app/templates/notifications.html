@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+{% from "_icons.html" import icon %}
+{% block title %}Notifications{% endblock %}
+{% block content %}
+<div class="header">
+  <div><h1>Notifications</h1><div class="sub">Where tentaclAI tells you about approvals, blocked actions and problems. Channel URLs (with tokens) are stored in <code>.env</code> as <code>NOTIFY_URL_…</code> and never shown.</div></div>
+</div>
+<nav class="conn-tabs" aria-label="Settings">
+  <a href="/settings">{{ icon('settings') }}Settings</a>
+  <a href="/notifications" class="active">{{ icon('activity') }}Notifications</a>
+</nav>
+
+<div class="card" style="margin-bottom:16px">
+  <div class="card-head"><h2>Channels</h2></div>
+  {% if cfg.channels %}
+  <div class="stack" style="margin-bottom:14px">
+    {% for ch in cfg.channels %}
+    <div class="between">
+      <span class="row" style="gap:10px"><strong>{{ ch.name }}</strong><span class="pill info">{{ ch.kind }}</span>
+        {% if not urls[ch.id] %}<span class="pill warn" title="NOTIFY_URL_… is empty in .env">no URL</span>{% endif %}</span>
+      <span class="row" style="gap:6px">
+        <button class="btn sm" hx-post="/notifications/channel/{{ ch.id }}/test">Send test</button>
+        <button class="btn sm ghost" title="remove" hx-post="/notifications/channel/{{ ch.id }}/remove" hx-confirm="Remove the channel {{ ch.name }}?">{{ icon('trash') }}</button>
+      </span>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}<p class="muted small">No channels yet – add one below.</p>{% endif %}
+
+  <details class="add-channel"{% if not cfg.channels %} open{% endif %}>
+    <summary class="btn sm">{{ icon('plus') }}Add channel</summary>
+    <form hx-post="/notifications/channel" class="stack" style="margin-top:12px" autocomplete="off">
+      <div class="seg" role="radiogroup" aria-label="Channel type" id="ch-kind">
+        <button type="button" class="seg-on sel" data-kind="ntfy">ntfy</button>
+        <button type="button" data-kind="webhook">Webhook</button>
+        <button type="button" data-kind="apprise">Other (Apprise URL)</button>
+      </div>
+      <input type="hidden" name="kind" value="ntfy" id="ch-kind-val">
+      <div class="fields">
+        <div class="field"><label for="ch-name">Name</label><input id="ch-name" name="name" placeholder="phone" maxlength="30"></div>
+        <div class="field kind-ntfy"><label for="ch-server">ntfy server</label><input id="ch-server" name="server" class="mono" value="https://ntfy.sh"></div>
+        <div class="field kind-ntfy"><label for="ch-topic">Topic</label><input id="ch-topic" name="topic" class="mono" placeholder="tentaclai-…"><div class="help">On ntfy.sh anyone who knows the topic can read it – pick a long random name or use your own server.</div></div>
+        <div class="field kind-ntfy"><label for="ch-token">Access token (optional)</label><input id="ch-token" name="token" type="password" class="mono" autocomplete="new-password"></div>
+        <div class="field kind-webhook" hidden><label for="ch-url">Webhook URL</label><input id="ch-url" name="url" class="mono" placeholder="https://n8n.example/webhook/…"><div class="help">Receives a JSON POST with title, message and type.</div></div>
+        <div class="field kind-webhook" hidden><label for="ch-header">Header (optional)</label><input id="ch-header" name="header" class="mono" placeholder="X-Token: secret"></div>
+        <div class="field kind-apprise" hidden><label for="ch-apprise">Apprise URL</label><input id="ch-apprise" name="apprise" class="mono" placeholder="tgram://bottoken/chatid"><div class="help">Telegram, Discord, Slack, Teams, e-mail, Home Assistant … – see the <a href="https://github.com/caronc/apprise/wiki" target="_blank" rel="noopener">Apprise wiki</a>.</div></div>
+      </div>
+      <div><button class="btn primary sm">Add channel</button></div>
+    </form>
+  </details>
+</div>
+
+{% if cfg.channels %}
+<form hx-post="/notifications/routes" class="card" style="margin-bottom:16px">
+  <div class="card-head"><h2>What goes where</h2><button class="btn sm primary">Save</button></div>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Event</th>{% for ch in cfg.channels %}<th style="text-align:center">{{ ch.name }}</th>{% endfor %}</tr></thead>
+    <tbody>
+    {% for ev, (label, prio, desc) in events.items() %}
+      <tr><td><strong>{{ label }}</strong>{% if prio == 'high' %} <span class="pill warn" title="also during quiet hours">urgent</span>{% endif %}<div class="small muted">{{ desc }}</div></td>
+        {% for ch in cfg.channels %}<td style="text-align:center"><input type="checkbox" name="r_{{ ev }}" value="{{ ch.id }}" aria-label="{{ label }} → {{ ch.name }}" {{ 'checked' if ch.id in cfg.routes.get(ev, []) }}></td>{% endfor %}</tr>
+    {% endfor %}
+    </tbody>
+  </table></div>
+  <div class="row" style="margin-top:14px;gap:18px;flex-wrap:wrap">
+    <label class="check"><input type="checkbox" name="quiet" value="1" {{ 'checked' if cfg.quiet.enabled }}> Quiet hours (only urgent events)</label>
+    <span class="row" style="gap:6px"><input type="time" name="q_from" value="{{ cfg.quiet['from'] }}" aria-label="quiet from"> – <input type="time" name="q_to" value="{{ cfg.quiet['to'] }}" aria-label="quiet to"></span>
+    <label class="row" style="gap:6px">Same event at most every <input type="number" name="dedupe" min="0" max="1440" value="{{ cfg.dedupe_min }}" style="width:70px"> min</label>
+  </div>
+</form>
+{% endif %}
+
+{% if recent %}
+<div class="card"><div class="card-head"><h2>Recently sent</h2></div>
+  <div class="stack small">{% for r in recent %}
+    <div class="between"><span>{{ r.title }} <span class="muted">→ {{ r.channel }}</span></span>
+      <span class="muted">{{ fmt(r.ts) }} {% if r.ok %}<span class="pill ok">sent</span>{% else %}<span class="pill err" title="{{ r.error }}">failed</span>{% endif %}</span></div>
+  {% endfor %}</div>
+</div>
+{% endif %}
+<script>
+(function () {
+  var seg = document.getElementById("ch-kind"); if (!seg) return;
+  seg.querySelectorAll("button").forEach(function (b) {
+    b.addEventListener("click", function () {
+      seg.querySelectorAll("button").forEach(function (x) { x.classList.toggle("seg-on", x === b); x.classList.toggle("sel", x === b); });
+      document.getElementById("ch-kind-val").value = b.dataset.kind;
+      ["ntfy", "webhook", "apprise"].forEach(function (k) {
+        document.querySelectorAll(".kind-" + k).forEach(function (el) { el.hidden = k !== b.dataset.kind; });
+      });
+    });
+  });
+})();
+</script>
+{% endblock %}

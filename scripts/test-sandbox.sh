@@ -47,6 +47,14 @@ class H(BaseHTTPRequestHandler):
         self.send_response(200 if ok else 401); self.end_headers(); self.wfile.write(json.dumps({"auth_ok": ok}).encode())
 HTTPServer(("0.0.0.0", 8000), H).serve_forever()
 EOF
+cat > fixtures/hook.py <<'PY'
+from http.server import BaseHTTPRequestHandler, HTTPServer
+class H(BaseHTTPRequestHandler):
+    def do_POST(self):
+        open("/tmp/hook.log", "ab").write(self.rfile.read(int(self.headers["Content-Length"])) + b"\n")
+        self.send_response(200); self.end_headers()
+HTTPServer(("0.0.0.0", 8000), H).serve_forever()
+PY
 cat > compose.test.yaml <<'EOF'
 services:
   claude: {image: "local/tentaclai:test", container_name: tctest-claude}
@@ -54,6 +62,8 @@ services:
   control: {image: "local/tentacontrol:test", container_name: tctest-control, environment: {CLAUDE_CONTAINER: tctest-claude}, ports: !reset []}
   api: {image: "python:3.12-alpine", container_name: tctest-api, command: ["python", "/srv/api.py"], volumes: ["./fixtures/api.py:/srv/api.py:ro"], networks: [outside]}
   pg: {image: "postgres:16-alpine", container_name: tctest-pg, environment: {POSTGRES_PASSWORD: pg-secret-789}, networks: [outside]}
+  ntfy: {image: "binwiederhier/ntfy:v2.11.0", container_name: tctest-ntfy, command: ["serve"], networks: [outside]}
+  hook: {image: "python:3.12-alpine", container_name: tctest-hook, command: ["python", "/srv/hook.py"], volumes: ["./fixtures/hook.py:/srv/hook.py:ro"], networks: [outside]}
   sshd:
     image: lscr.io/linuxserver/openssh-server:latest
     container_name: tctest-sshd
@@ -119,8 +129,24 @@ sleep 16
 check "allowed name in a blocked IP range is refused" "$($C curl -s -m 10 -o /dev/null -w '%{http_code}' https://example.net || true)" "000"
 check "built-in can't be blocked" "$(curl -s -b "$J" -H "$H" -X POST -D - -o /dev/null "http://$IP:8080/network/rule" -d kind=block -d entry=github.com | grep -ci 'built-in' || true)" "1"
 
+echo "== notifications"
+curl -s -b "$J" -H "$H" -o /dev/null -X POST "http://$IP:8080/notifications/channel" -d kind=ntfy -d name=phone -d server=http://tctest-ntfy -d topic=tctest
+curl -s -b "$J" -H "$H" -o /dev/null -X POST "http://$IP:8080/notifications/channel" -d kind=webhook -d name=hook -d url=http://tctest-hook:8000/n
+curl -s -b "$J" -H "$H" -o /dev/null -X POST "http://$IP:8080/notifications/routes" -d r_approval=phone -d r_approval=hook -d r_blocked=hook -d dedupe=0
+check "test button sends" "$(curl -s -b "$J" -H "$H" -X POST -D - -o /dev/null "http://$IP:8080/notifications/channel/phone/test" | grep -c 'Test sent' || true)" "1"
+( $C curl -s -m 70 -o /dev/null https://example.edu || true ) & sleep 6
+decide deny; wait
+curl -s -b "$J" -H "$H" -o /dev/null -X POST "http://$IP:8080/network/rule" -d kind=block -d entry=example.com; sleep 18
+$C curl -s -m 10 -o /dev/null https://example.com || true; sleep 4
+NT=$(docker exec tctest-ntfy wget -qO- "http://localhost/tctest/json?poll=1" 2>/dev/null || true)
+HK=$(docker exec tctest-hook cat /tmp/hook.log 2>/dev/null || true)
+check "ntfy got the test message" "$(echo "$NT" | grep -c 'tentaclAI test' || true)" "1"
+check "ntfy got 'Approval needed'" "$(echo "$NT" | grep -c 'Approval needed: example.edu' || true)" "1"
+check "webhook got 'Approval needed'" "$(echo "$HK" | grep -c 'Approval needed: example.edu' || true)" "1"
+check "webhook got the blocked destination" "$(echo "$HK" | grep -c 'example.com:443 blocked' || true)" "1"
+
 echo "== tentacontrol pages render"
-for p in / /network "/network?tab=allow" "/network?tab=block" /services /ssh /activity /terminal /topology /help /settings /logs; do
+for p in / /network "/network?tab=allow" "/network?tab=block" /services /ssh /activity /terminal /topology /help /settings /notifications /logs; do
     check "GET $p" "$(curl -s -b "$J" -o /dev/null -w '%{http_code}' "http://$IP:8080$p")" "200"
 done
 

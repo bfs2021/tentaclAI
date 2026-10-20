@@ -2,6 +2,18 @@
 
 All notable changes, newest first. Every release lists **upgrade steps** from the previous one.
 
+## Unreleased
+
+### Highlights
+- **Notifications** – Settings → *Notifications*: channels through Apprise (presets for **ntfy** and **webhook**, any
+  other Apprise URL – Telegram, Discord, Slack, Teams, e-mail, Home Assistant …), a matrix *event × channel*, quiet
+  hours (only urgent events) and dedupe. Events: approval needed, approval expired, blocked (ro write, blocklisted
+  destination, IP target), Remote Control down, Claude signed out, container stopped, update available. Channel URLs
+  are stored in `.env` (`NOTIFY_URL_…`), never shown. *Send test* per channel.
+
+### Changes
+- Login: the password reset hint sits behind *Forgot the password?*.
+
 ## v0.6.1 – 2026-10-20
 
 ### Changes

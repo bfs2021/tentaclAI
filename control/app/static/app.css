@@ -322,3 +322,5 @@ details.forgot summary { cursor: pointer; color: var(--muted); list-style: none;
 details.forgot summary::-webkit-details-marker { display: none; }
 details.forgot summary:hover { color: var(--text); text-decoration: underline; }
 details.forgot p { margin: 8px 0 0; }
+details.add-channel > summary { list-style: none; display: inline-flex; }
+details.add-channel > summary::-webkit-details-marker { display: none; }

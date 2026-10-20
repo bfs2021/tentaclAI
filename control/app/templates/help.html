@@ -287,7 +287,9 @@
     <section class="card" id="settings">
       <h2>Settings</h2>
       <p>Edits the stack's <code>.env</code>. Secrets (names containing TOKEN, KEY, PASSWORD, SECRET) are never shown – leaving the field empty keeps the value, the “clear” checkbox removes it. Changes that need a new container show “Apply now” at the top (running sessions end); remote control changes only need “Restart” on the overview.</p>
-    </section>
+          <h3>Notifications</h3>
+      <p>Settings → <a href="/notifications">Notifications</a>: add channels (ntfy, webhook, or any <a href="https://github.com/caronc/apprise/wiki" target="_blank" rel="noopener">Apprise URL</a> – Telegram, Discord, Slack, Teams, e-mail, Home Assistant), send a test, and tick which event goes to which channel. Urgent events (approval needed, Remote Control down, signed out, container stopped) also come during quiet hours; the same event is sent at most once per dedupe interval. Channel URLs are stored in <code>.env</code> as <code>NOTIFY_URL_…</code>.</p>
+</section>
 
     <section class="card" id="updates">
       <h2>Updates</h2>
@@ -351,6 +353,8 @@ gh …                      GitHub CLI without credentials (public data)</pre>
         <li><strong>Monitoring per service</strong>: Claude checks connected services regularly and reports status and recommendations.</li>
         <li><strong>Topology</strong>: next – connections between systems and containers (reverse proxy → container, tunnels), status from monitoring.</li>
         <li><strong>Export/import</strong>: configuration and templates, e.g. for a second installation or to share templates.</li>
+        <li><strong>Usage</strong> of each Claude instance (tokens, quota, sessions) shown in tentacontrol.</li>
+        <li><strong>Notifications, phase 2</strong>: approve or deny right from the notification (ntfy actions, Home Assistant), daily digest.</li>
         <li><strong>AI assistant</strong> in tentacontrol for the whole configuration (can be switched off).</li>
         <li><strong>OAuth with browser login</strong> (authorization code, e.g. Google) as auth type, with templates. Client credentials already exist.</li>
         <li><strong>More sandbox</strong>: egress allowlist (only service hosts reachable), read-only root filesystem, Docker socket only through a filtering proxy, preconfigured Claude Code permissions, prompt-injection safeguards for content from services.</li>

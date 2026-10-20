@@ -21,7 +21,7 @@
       <a href="/network" class="{{ 'active' if nav == 'network' }}">{{ icon('globe') }}Network</a>
       <a href="/activity" class="{{ 'active' if nav == 'activity' }}">{{ icon('activity') }}Activity
         <span class="nav-count" hx-get="/partials/approval-count" hx-trigger="load, every 5s" hx-swap="innerHTML"></span></a>
-      <a href="/settings" class="{{ 'active' if nav == 'settings' }}">{{ icon('settings') }}Settings</a>
+      <a href="/settings" class="{{ 'active' if nav in ('settings', 'notifications') }}">{{ icon('settings') }}Settings</a>
       <a href="/updates" class="{{ 'active' if nav in ('updates', 'job') }}">{{ icon('refresh') }}Updates</a>
       <a href="/logs" class="{{ 'active' if nav == 'logs' }}">{{ icon('logs') }}Logs</a>
       <a href="/help" class="{{ 'active' if nav == 'help' }}">{{ icon('help') }}Help</a>
