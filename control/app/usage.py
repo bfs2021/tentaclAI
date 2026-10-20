@@ -105,6 +105,11 @@ def refresh_local():
             ts = str(e.get("timestamp") or "")
             if not u or not ts:
                 continue
+            mid = m.get("id") or e.get("uuid")  # Claude Code writes each reply more than once while streaming
+            seen = d.setdefault("seen", {})
+            if mid in seen:
+                continue
+            seen[mid] = ts[:10]
             day, model = ts[:10], m.get("model") or "?"
             c = d["days"].setdefault(day, {}).setdefault(model, {"input": 0, "output": 0, "cache_read": 0, "cache_write": 0, "replies": 0})
             vals = {"input": u.get("input_tokens", 0), "output": u.get("output_tokens", 0),
@@ -120,6 +125,7 @@ def refresh_local():
         d["offsets"][path] = start + end
     cutoff = time.strftime("%Y-%m-%d", time.gmtime(time.time() - KEEP_DAYS * 86400))
     d["days"] = {k: v for k, v in d["days"].items() if k >= cutoff}
+    d["seen"] = {k: v for k, v in d.get("seen", {}).items() if v >= cutoff}
     d["sessions"] = {k: v for k, v in d["sessions"].items() if (v.get("last") or v.get("first") or "9")[:10] >= cutoff}
     d["checked"] = time.time()
     os.makedirs(DATA_DIR, exist_ok=True)
