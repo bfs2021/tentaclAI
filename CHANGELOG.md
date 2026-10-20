@@ -2,7 +2,7 @@
 
 All notable changes, newest first. Every release lists **upgrade steps** from the previous one.
 
-## Unreleased
+## v0.7.0 – 2026-10-20
 
 ### Highlights
 - **Notifications** – Settings → *Notifications*: channels through Apprise (presets for **ntfy** and **webhook**, any
@@ -10,13 +10,11 @@ All notable changes, newest first. Every release lists **upgrade steps** from th
   hours (only urgent events) and dedupe. Events: approval needed, approval expired, blocked (ro write, blocklisted
   destination, IP target), Remote Control down, Claude signed out, container stopped, update available. Channel URLs
   are stored in `.env` (`NOTIFY_URL_…`), never shown. *Send test* per channel.
-
 - **Usage** – the Claude Code card on the overview shows the plan limits (session and week, account-wide) as bars;
   details on the new *Usage* page: what contributes, tokens per day, sessions of this sandbox, models. Limits come from
   `claude -p "/usage"` every 10 minutes (no model call), token totals from the local session files (usage fields only).
   Notification event *Quota running low* at 80 %. Each reply is counted once (Claude Code stores streamed replies
   more than once).
-
 - **claude.ai connectors as built-in tentacles** – connectors of the signed-in account (Google Drive, Claude Docs …)
   are listed under Tentacles → Services and are **off by default**: they reach the outside directly, not through svc.
   Switched-off connectors go to `deniedMcpServers` in the sandbox's root-owned `/etc/claude-code/managed-settings.json`;
@@ -26,6 +24,17 @@ All notable changes, newest first. Every release lists **upgrade steps** from th
 - The host documentation (`HOST_DOCS`) is referenced in Claude's instructions instead of imported – Claude reads it
   when it works on the host; saves ~4.6k tokens of context in every request.
 - Login: the password reset hint sits behind *Forgot the password?*.
+- UI: an empty response never wipes the element that sent it; the `hidden` attribute always wins; inputs without a type,
+  number and time fields look like all others; checkboxes in the accent colour.
+
+### Upgrade (from v0.6.1)
+1. `git pull`, `docker compose build` (tentacontrol gets the `apprise` package), `docker compose up -d` – recreating
+   `tentaclai` ends running sessions and Remote Control (or *Apply now* in tentacontrol).
+2. **Behaviour change:** claude.ai connectors (Google Drive, Claude Docs …) are **off** in the sandbox after the upgrade.
+   If Claude should use one, switch it on under Tentacles → Services → *Built-in · claude.ai connectors*.
+3. Optional: add notification channels under Settings → Notifications. Their URLs are stored in `.env` as
+   `NOTIFY_URL_<ID>`; nothing to set by hand.
+4. Claude's instructions no longer import the host documentation – it is still available at `/etc/tentaclai/host-docs.md`.
 
 ## v0.6.1 – 2026-10-20
 
