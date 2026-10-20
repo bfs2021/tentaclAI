@@ -72,8 +72,9 @@
 </div>
 
 {% if cfg.channels %}
-<form hx-post="/notifications/routes" hx-swap="none" class="card" style="margin-bottom:16px">
-  <div class="card-head"><h2>What goes where</h2><button class="btn sm primary">Save</button></div>
+<form hx-post="/notifications/routes" hx-swap="none" class="stack" style="gap:16px;margin-bottom:16px">
+<div class="card">
+  <div class="card-head"><h2>What goes where</h2></div>
   <div class="table-wrap"><table>
     <thead><tr><th>Event</th>{% for ch in cfg.channels %}<th style="text-align:center">{{ ch.name }}</th>{% endfor %}</tr></thead>
     <tbody>
@@ -83,12 +84,25 @@
     {% endfor %}
     </tbody>
   </table></div>
-  <div class="notify-opts">
-    <label class="check"><input type="checkbox" name="quiet" value="1" {{ 'checked' if cfg.quiet.enabled }}> Quiet hours – only urgent events</label>
-    <span class="row" style="gap:8px">from <input type="time" name="q_from" value="{{ cfg.quiet['from'] }}" aria-label="quiet hours from" class="t-short"> to <input type="time" name="q_to" value="{{ cfg.quiet['to'] }}" aria-label="quiet hours to" class="t-short"></span>
-    <span>Send the same event at most every</span>
-    <span class="row" style="gap:8px"><input type="number" name="dedupe" min="0" max="1440" value="{{ cfg.dedupe_min }}" class="t-short" aria-label="minutes"> min</span>
+</div>
+<div class="card">
+  <div class="card-head"><h2>Delivery</h2></div>
+  <div class="opt-list">
+    <div class="opt">
+      <div><strong>Quiet hours</strong><div class="small muted">Only urgent events are sent between these times.</div></div>
+      <div class="row opt-ctl" style="gap:10px">
+        <input type="checkbox" class="switch-cb" name="quiet" value="1" aria-label="Quiet hours" {{ 'checked' if cfg.quiet.enabled }}>
+        <input type="time" name="q_from" value="{{ cfg.quiet['from'] }}" aria-label="quiet hours from" class="t-short"><span class="muted">–</span>
+        <input type="time" name="q_to" value="{{ cfg.quiet['to'] }}" aria-label="quiet hours to" class="t-short">
+      </div>
+    </div>
+    <div class="opt">
+      <div><strong>Repeat limit</strong><div class="small muted">The same event is sent at most once per interval (0 = always).</div></div>
+      <div class="row opt-ctl" style="gap:10px"><input type="number" name="dedupe" min="0" max="1440" value="{{ cfg.dedupe_min }}" class="t-short" aria-label="minutes"><span class="muted">min</span></div>
+    </div>
   </div>
+  <div class="row" style="justify-content:flex-end;margin-top:14px"><button class="btn primary">Save</button></div>
+</div>
 </form>
 {% endif %}
 
