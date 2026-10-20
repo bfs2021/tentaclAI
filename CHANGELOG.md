@@ -4,14 +4,21 @@ All notable changes, newest first. Every release lists **upgrade steps** from th
 
 ## Unreleased
 
+### Changes
+- tentacontrol asks Claude Code for connectors and skills once an hour and right after a sign-in (was: connectors every
+  10 minutes, skills every 30) – `claude mcp list` health-checks every MCP server each time. *Check* still works at once.
+
 ### Development
+- CI: `actions/checkout@v5` and `actions/setup-python@v6` (Node 20 actions are deprecated); Dependabot also watches the
+  GitHub Actions, the egress image and `tests/requirements.txt`.
 - `scripts/release.sh` pushes main and waits for the green GitHub `checks` run of that commit before it creates the
   release commit, tag and release – a red CI stops it before anything is tagged.
 - `scripts/test-quick.sh`: test packages in `~/.cache/tentaclai-test-deps` (outside the stack, so backups skip them),
   the dummy stack in `/tmp` is removed after each run, `httpx2` for Starlette's TestClient (no deprecation warning left).
 
 ### Upgrade (from v0.9.1)
-Nothing to do for an installation – only scripts and tests changed. Developers: the old `.cache/test-deps` in the
+`git pull`, `docker compose build control`, `docker compose up -d control` – only tentacontrol changed, running Claude
+sessions are not affected. Developers: the old `.cache/test-deps` in the
 stack directory can be deleted.
 
 ## v0.9.1 – 2026-10-20

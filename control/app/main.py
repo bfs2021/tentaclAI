@@ -82,6 +82,13 @@ async def prepare_activity():
     activity.ensure_token()
 
 
+async def discover_claude():
+    """claude.ai connectors (new ones start disabled) and skills – `claude mcp list` health-checks every MCP server,
+    so this runs hourly, after a sign-in and on "Check", not every few minutes"""
+    await asyncio.to_thread(connectors.discover)
+    await asyncio.to_thread(skills.discover)
+
+
 async def start_notifications():
     loop = asyncio.get_running_loop()
     loop.create_task(notify.worker())
@@ -104,6 +111,8 @@ async def start_notifications():
                     if state.get("logged", True) and not logged:
                         notify.emit("logged_out", "Claude is signed out", "Sign in again: Overview → Sign in now.",
                                     key="logged_out", link=notify.control_link("/"))
+                    if state.get("logged") is False and logged:
+                        loop.create_task(discover_claude())  # a new sign-in can bring other connectors and skills
                     state["logged"] = logged
                     rc = await asyncio.to_thread(dockerops.rc_info)
                     enabled = (read_env().get("RC_ENABLED", "true") or "true").lower() == "true"
@@ -124,16 +133,15 @@ async def start_notifications():
     loop.create_task(watch())
 
     async def usage_loop():
-        """plan limits every 10 min (no model call), local token totals every 5 min; quota notification at 80 %"""
+        """plan limits every 10 min (no model call), local token totals every 5 min, connectors and skills hourly;
+        quota notification at 80 %"""
         warned, n = {}, 0
         await asyncio.sleep(20)
         while True:
             try:
                 await asyncio.to_thread(usage.refresh_local)
-                if n % 2 == 0 and dockerops.status().get("running"):
-                    await asyncio.to_thread(connectors.discover)  # new claude.ai connectors start disabled
-                if n % 6 == 0 and dockerops.status().get("running"):
-                    await asyncio.to_thread(skills.discover)  # skills of new Claude Code versions / the account
+                if n % 12 == 0 and dockerops.status().get("running"):
+                    await discover_claude()  # hourly
                 if n % 2 == 0 and dockerops.status().get("running") and await asyncio.to_thread(dockerops.logged_in_claude):
                     p = await asyncio.to_thread(usage.refresh_plan)
                     for lim in p.get("limits", []):

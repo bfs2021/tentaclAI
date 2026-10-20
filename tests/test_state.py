@@ -96,3 +96,13 @@ def test_polling_leaves_no_session_files(app_module, monkeypatch):
     skills.discover()
     claude = [c for c in cmds if "claude" in c and "-p" in c]
     assert len(claude) == 2 and all("--no-session-persistence" in c for c in claude)
+
+
+def test_discover_claude_runs_connectors_and_skills(app_module, monkeypatch):
+    import asyncio
+    from app import connectors, skills
+    ran = []
+    monkeypatch.setattr(connectors, "discover", lambda: ran.append("connectors"))
+    monkeypatch.setattr(skills, "discover", lambda: ran.append("skills"))
+    asyncio.run(app_module.discover_claude())
+    assert ran == ["connectors", "skills"]

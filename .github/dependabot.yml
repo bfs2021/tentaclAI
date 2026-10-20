@@ -18,3 +18,19 @@ updates:
     ignore:
       - dependency-name: node
         update-types: ["version-update:semver-major"]
+  # egress gateway base image
+  - package-ecosystem: docker
+    directory: /egress
+    schedule:
+      interval: monthly
+  # test dependencies (scripts/test-quick.sh)
+  - package-ecosystem: pip
+    directory: /tests
+    versioning-strategy: increase-if-necessary
+    schedule:
+      interval: monthly
+  # GitHub Actions used by the CI (keeps them on a supported Node runtime)
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
