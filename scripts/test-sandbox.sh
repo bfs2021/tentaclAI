@@ -125,16 +125,18 @@ if docker ps -q -f name=tctest-control | grep -q .; then
     docker volume rm -f tctest_egress-data >/dev/null
     docker run --rm -v "$T/data:/d" alpine:3.20 rm -rf /d/control >/dev/null
 fi
-docker compose up -d >/dev/null 2>&1
+# a failed start step says which one and shows the containers – never a silent exit
+stuck() { echo "✗ $1"; docker compose ps -a; docker compose logs --tail 15 2>&1 | tail -80; exit 1; }
+out="$(docker compose up -d 2>&1)" || { echo "$out" | tail -25; stuck "docker compose up failed"; }
 wait_for 180 sh -c "docker logs tctest-claude 2>&1 | grep -q 'CLAUDE.md updated'" || echo "   (sandbox start not seen in the log)"
-wait_for 60 docker exec tctest-pg pg_isready -q
-wait_for 120 docker exec tctest-sshd sh -c 'nc -z localhost 2222'  # sshd sets up slowly
-wait_for 60 docker exec tctest-egress test -s /data/policy.json    # first policy of the gateway
+wait_for 60 docker exec tctest-pg pg_isready -q || stuck "postgres not ready"
+wait_for 120 docker exec tctest-sshd sh -c 'nc -z localhost 2222' || stuck "sshd not listening"  # sets up slowly
+wait_for 60 docker exec tctest-egress test -s /data/policy.json || stuck "the gateway got no policy"
 C="docker exec -u claude tctest-claude"
 CI="docker exec -i -u claude tctest-claude"
 IP=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}} {{end}}' tctest-control | awk '{print $1}')
 J="$T/cookies"; H='HX-Request: true'
-wait_for 60 sh -c "docker logs tctest-control 2>&1 | grep -q 'setup?token='"
+wait_for 60 sh -c "docker logs tctest-control 2>&1 | grep -q 'setup?token='" || stuck "tentacontrol printed no setup link"
 TOK=$(docker logs tctest-control 2>&1 | grep -o 'setup?token=[A-Za-z0-9_-]*' | tail -1 | cut -d= -f2)
 rm -f "$J"
 curl -s -c "$J" -b "$J" -o /dev/null -X POST "http://$IP:8080/setup" -d "token=$TOK&password=testpass123&password2=testpass123"
