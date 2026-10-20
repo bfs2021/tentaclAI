@@ -76,4 +76,20 @@
 {% else %}
 <div class="empty">No services yet. Create one above.</div>
 {% endif %}
+
+<div class="between" style="margin-top:22px"><h2 class="section-head" style="margin:0">Built-in · claude.ai connectors</h2>
+  <button class="btn sm ghost" hx-post="/connectors/discover">{{ icon('refresh') }}Check</button></div>
+<p class="help" style="margin-top:4px">Connectors of your claude.ai account (e.g. Google Drive) reach the outside directly – not through <code>svc</code> and its access modes. They are off by default; switch one on only if Claude should use it. Changes apply to new Claude sessions.</p>
+{% if connectors %}
+<div class="card"><div class="stack" style="gap:10px">
+  {% for c in connectors %}
+  <div class="between">
+    <span><strong>{{ c.short }}</strong> <span class="muted small mono">{{ c.url }}</span></span>
+    <form class="inline" hx-post="/connectors/toggle"><input type="hidden" name="name" value="{{ c.name }}">
+      <label class="row" style="gap:8px"><span class="small muted">{{ 'on' if c.enabled else 'off' }}</span>
+        <input type="checkbox" class="switch-cb" aria-label="{{ c.short }}" {{ 'checked' if c.enabled }} onchange="this.form.requestSubmit()"></label></form>
+  </div>
+  {% endfor %}
+</div></div>
+{% else %}<div class="empty small">None found yet – they are checked every 10 minutes while Claude is signed in, or now with <em>Check</em>.</div>{% endif %}
 {% endblock %}

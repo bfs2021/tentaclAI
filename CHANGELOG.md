@@ -14,7 +14,13 @@ All notable changes, newest first. Every release lists **upgrade steps** from th
 - **Usage** – the Claude Code card on the overview shows the plan limits (session and week, account-wide) as bars;
   details on the new *Usage* page: what contributes, tokens per day, sessions of this sandbox, models. Limits come from
   `claude -p "/usage"` every 10 minutes (no model call), token totals from the local session files (usage fields only).
-  Notification event *Quota running low* at 80 %.
+  Notification event *Quota running low* at 80 %. Each reply is counted once (Claude Code stores streamed replies
+  more than once).
+
+- **claude.ai connectors as built-in tentacles** – connectors of the signed-in account (Google Drive, Claude Docs …)
+  are listed under Tentacles → Services and are **off by default**: they reach the outside directly, not through svc.
+  Switched-off connectors go to `deniedMcpServers` in the sandbox's root-owned `/etc/claude-code/managed-settings.json`;
+  new ones are detected every 10 minutes and start disabled. Also saves context in every request.
 
 ### Changes
 - Login: the password reset hint sits behind *Forgot the password?*.

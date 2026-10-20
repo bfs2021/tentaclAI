@@ -16,7 +16,7 @@ from . import activity, auth, dockerops, jobs, services_store, sshhosts, sshops,
 from .config import CLAUDE_SERVICE, COMPOSE, DATA_DIR, SERVICES_DIR, STACK_DIR, RC_VARS, RESTART_VARS, SETTINGS_GROUPS, is_secret, site
 from .envfile import read_env, update_env
 from .terminal import PROFILES, bridge, onboard_cmd
-from . import egress, generated, notify, usage
+from . import connectors, egress, generated, notify, usage
 import tclib  # noqa: E402  shared with the sandbox tools
 
 BASE = os.path.dirname(__file__)
@@ -123,6 +123,8 @@ async def start_notifications():
         while True:
             try:
                 await asyncio.to_thread(usage.refresh_local)
+                if n % 2 == 0 and dockerops.status().get("running"):
+                    await asyncio.to_thread(connectors.discover)  # new claude.ai connectors start disabled
                 if n % 2 == 0 and dockerops.status().get("running") and await asyncio.to_thread(dockerops.logged_in_claude):
                     p = await asyncio.to_thread(usage.refresh_plan)
                     for lim in p.get("limits", []):
@@ -426,7 +428,24 @@ async def ws_terminal(ws: WebSocket, p: str = "claude", alias: str = ""):
 async def services_page(request: Request):
     systems = systems_store.load_all()
     return page(request, "services.html", services=services_store.load_all(), templates_list=services_store.list_templates(),
-                systems=systems, system_names={x["name"] for x in systems})
+                systems=systems, system_names={x["name"] for x in systems}, connectors=connectors.listing())
+
+
+@app.post("/connectors/toggle", response_class=HTMLResponse)
+async def connector_toggle(request: Request, name: str = Form(...)):
+    cur = {c["name"]: c for c in connectors.listing()}.get(name)
+    if not cur:
+        return respond(request, "Unknown connector", "err")
+    ok = await asyncio.to_thread(connectors.set_enabled, name, not cur.get("enabled"))
+    state = "enabled" if not cur.get("enabled") else "disabled"
+    return respond(request, f"{cur['short']} {state} – applies to new Claude sessions" if ok else "Saved, but the sandbox is not running – applied on its next start",
+                   "ok" if ok else "warn", refresh=True)
+
+
+@app.post("/connectors/discover", response_class=HTMLResponse)
+async def connector_discover(request: Request):
+    ok = await asyncio.to_thread(connectors.discover)
+    return respond(request, "Connectors checked" if ok else "Could not ask Claude Code (signed in?)", "ok" if ok else "warn", refresh=True)
 
 
 # ---------------------------------------------------------------- activity: approvals (confirm) and audit log

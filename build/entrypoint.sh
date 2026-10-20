@@ -92,6 +92,19 @@ open(p + ".tmp", "w").write(json.dumps(s, indent=2) + "\n")
 os.replace(p + ".tmp", p)
 PY
 
+# claude.ai connectors that are switched off in tentacontrol (default: all) – root-owned managed settings
+python3 - "$TC_DIR/data/control/connectors.json" <<'PY' || true
+import json, os, sys
+try:
+    known = json.load(open(sys.argv[1])).get("known", {})
+except (OSError, ValueError):
+    known = {}
+os.makedirs("/etc/claude-code", exist_ok=True)
+with open("/etc/claude-code/managed-settings.json", "w") as f:
+    json.dump({"deniedMcpServers": [{"serverName": n} for n, c in sorted(known.items()) if not c.get("enabled")]}, f, indent=1)
+os.chmod("/etc/claude-code/managed-settings.json", 0o644)
+PY
+
 # Services (services/*.json): MCP -> Claude config, clone missing repos, regenerate /workspace/SERVICES.md
 echo "svc sync:"
 svc sync || echo "svc sync failed – container starts anyway"
