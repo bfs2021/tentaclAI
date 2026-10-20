@@ -93,7 +93,7 @@ h1 svg { margin-right: 8px; vertical-align: -3px; color: var(--accent); }
 /* forms */
 label { display: block; font-weight: 550; font-size: 13px; margin-bottom: 5px; }
 .help { color: var(--faint); font-size: 12px; margin-top: 4px; }
-input[type=text], input[type=password], input[type=email], input[type=search], select, textarea {
+input:not([type]), input[type=text], input[type=password], input[type=email], input[type=search], input[type=number], input[type=time], select, textarea {
   width: 100%; min-height: 36px; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: var(--radius-sm);
   padding: 8px 11px; font: inherit; outline: none; transition: border-color .12s, box-shadow .12s; }
 input:focus, select:focus, textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
@@ -177,7 +177,7 @@ select { appearance: none; -webkit-appearance: none; height: 36px; padding-right
 .combo-kinds { margin-left: auto; font-size: 11.5px; color: var(--faint); font-family: var(--mono); }
 .combo-empty { padding: 10px 9px; color: var(--faint); }
 .combo [hidden] { display: none !important; }
-input[type=text], input[type=password], input[type=email], input[type=search], input[type=number] { height: 36px; }
+input:not([type]), input[type=text], input[type=password], input[type=email], input[type=search], input[type=number], input[type=time] { height: 36px; }
 
 .grid > * { min-width: 0; }
 .table-wrap { overflow-x: auto; }
