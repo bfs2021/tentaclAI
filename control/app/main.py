@@ -31,7 +31,7 @@ except OSError:
 templates.env.globals["tc_version"] = TC_VERSION
 templates.env.globals["asset_v"] = str(int(max(os.path.getmtime(os.path.join(BASE, "static", f)) for f in ("app.css", "app.js", "logo.svg"))))
 app.mount("/static", StaticFiles(directory=os.path.join(BASE, "static")), name="static")
-app.mount("/vendor", StaticFiles(directory="/app/vendor"), name="vendor")
+app.mount("/vendor", StaticFiles(directory=os.environ.get("VENDOR_DIR", "/app/vendor")), name="vendor")  # VENDOR_DIR: tests
 
 PUBLIC = ("/login", "/setup", "/static/", "/vendor/", "/healthz", "/internal/")  # /internal/: svc token, checked per route
 RESTART_FLAG = os.path.join(DATA_DIR, "restart-needed")

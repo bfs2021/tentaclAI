@@ -37,11 +37,20 @@ architecture and `CONTRIBUTING.md` for the ground rules.
   (`runner()` in svc). Code running as root must never read, write or run git in paths Claude controls (workspace, its
   home) – hand files over as the other user (`as_user`, `write_as_claude`, staging dirs) and never pass Claude's
   arguments to a root process that touches local files. New secrets go to the client tool via 0600 files/env of `tcrun`.
-- **Test in isolation**, not on a running installation: `scripts/test-sandbox.sh` (own compose project `tctest`, scratch
-  copy, guarded with `set -e` + a cwd check). Never write `.env`/compose files or run `docker compose` before checking
-  that the current directory is the scratch copy – a failed copy step once ran test commands in the live stack.
+- **Test in stages**, never on a running installation:
+  1. **After every change:** `scripts/test-quick.sh` (seconds, no Docker) – syntax, ShellCheck, site data, JSON/YAML,
+     pytest unit tests in `tests/` (tclib, parsers, connector/skill state) and every tentacontrol page rendered with
+     dummy data. New logic gets a unit test there; new pages go into `tests/test_pages.py`.
+  2. **Only for changes to security boundaries, the gateway or the entrypoint** (svc access modes, privilege
+     separation, `egress/`, `build/entrypoint.sh`, managed settings): `REUSE=1 ONLY=<sections> scripts/test-sandbox.sh`
+     – sections `priv svc egress notify skills pages`; `REUSE=1` keeps the stack in `/tmp/tctest-reuse` and rebuilds
+     only images whose sources changed.
+  3. **Only before a tag:** the full `scripts/test-sandbox.sh` (see Releases).
+  `test-sandbox.sh` works in a scratch copy with its own compose project `tctest`, guarded with `set -e` + a cwd check.
+  Never write `.env`/compose files or run `docker compose` before checking that the current directory is the scratch
+  copy – a failed copy step once ran test commands in the live stack. Waits poll for a condition, never fixed `sleep`s.
   Recreating the real `tentaclai` container ends running sessions and Remote Control – only after asking.
-- **Templates:** render every page you touched before deploying (a stray `'` in a Jinja string is a 500). Keep user-facing
+- **Templates:** every page must render in `tests/test_pages.py` (a stray `'` in a Jinja string is a 500) – add new pages there. Keep user-facing
   wording plain (e.g. *Rule*, *No rule*, *Built-in*, *IP targets*) and explain modes in README → Network control and Help.
 - Keep README, tentacontrol → Help (`control/app/templates/help.html`) and this file in sync with behaviour changes.
 
@@ -63,8 +72,10 @@ Every release gets an entry in **`CHANGELOG.md`** (newest first) and the same te
    If nothing special is needed, say so explicitly (e.g. “`git pull`, `docker compose build`, `docker compose up -d`”).
 4. **Known issues** – if any.
 
-Before tagging: run the quick checks from `CONTRIBUTING.md`, test the upgrade path from the previous release in an
-isolated instance when the Upgrade section is more than a plain rebuild.
+Before tagging – **mandatory**: `scripts/test-quick.sh` and the **full** `scripts/test-sandbox.sh` (no `ONLY`, no
+`REUSE` – fresh images and state; remove a reused stack first with `REUSE=1 CLEAN=1 scripts/test-sandbox.sh`), both
+green. Test the upgrade path from the previous release in an isolated instance when the Upgrade section is more than a
+plain rebuild.
 
 ## Brand images
 

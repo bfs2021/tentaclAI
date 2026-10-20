@@ -1,0 +1,13 @@
+Warning: claude.ai MCP server blocked by enterprise policy: claude.ai Claude Docs
+You are currently using your subscription to power your Claude Code usage
+
+Current session: 12% used · resets Oct 21, 2:40am (Europe/Vienna)
+Current week (all models): 2% used · resets Oct 22, 8am (Europe/Vienna)
+Current week (Opus): 81% used · resets Oct 22, 8am (Europe/Vienna)
+
+What's contributing to your limits usage?
+Approximate, based on local sessions on this machine.
+
+Last 7d · 116 requests · 11 sessions
+  50% of your usage went to always-on context over 40k tokens
+  Top skills: /inventory 9%, /onboard 5%

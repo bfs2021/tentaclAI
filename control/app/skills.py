@@ -19,7 +19,7 @@ from .usage import PROJECTS
 
 STATE = os.path.join(DATA_DIR, "skills.json")
 ROW = re.compile(r"^\|\s*([^|\s][^|]*?)\s*\|\s*([^|]+?)\s*\|\s*~?([\d.]+)(k?)\s*\|$")
-LISTED = re.compile(r"^- ([^:\s]+): (.+)$")
+LISTED = re.compile(r"^- (\S+?): (.+)$")  # names can hold a colon (anthropic-skills:pdf)
 APPLY = r"""
 import json, os, sys
 sys.path.insert(0, "/usr/local/lib/tentaclai")

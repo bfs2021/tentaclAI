@@ -31,7 +31,9 @@ def parse_plan(text):
     if s:
         i = next((n for n, l in enumerate(lines) if SUMMARY_RE.search(l)), None)
         contrib = [l.strip() for l in lines[i + 1:] if l.strip()] if i is not None else []
-    billing = lines[0].strip() if lines and not LIMIT_RE.match(lines[0]) else ""
+    # first line that is neither a limit nor a warning (e.g. "Warning: claude.ai MCP server blocked by enterprise policy")
+    billing = next((l.strip() for l in lines if l.strip() and not l.startswith("Warning:")), "")
+    billing = "" if LIMIT_RE.match(billing) else billing
     return {"limits": limits, "billing": billing, "period": s.group(1) if s else "",
             "requests": int(s.group(2)) if s else None, "sessions": int(s.group(3)) if s else None, "contrib": contrib}
 

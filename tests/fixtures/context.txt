@@ -1,0 +1,26 @@
+## Context Usage
+
+**Model:** claude-opus-5-5  
+**Tokens:** 16.3k / 1m (2%)
+
+### Estimated usage by category
+
+| Category | Tokens | Percentage |
+|----------|--------|------------|
+| System prompt | 1.9k | 0.2% |
+| Skills | 1.3k | 0.1% |
+
+### MCP Tools
+
+| Tool | Server | Tokens |
+|------|--------|--------|
+| mcp__demo__search | demo | 108 |
+
+### Skills
+
+| Skill | Source | Tokens |
+|-------|--------|--------|
+| inventory | User | ~50 |
+| update-config | Built-in | ~240 |
+| claude-api | Built-in | ~1.2k |
+| anthropic-skills:pdf | Plugin | ~150 |

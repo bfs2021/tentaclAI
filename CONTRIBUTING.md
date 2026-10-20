@@ -21,7 +21,9 @@ Thanks for your interest in tentaclAI! Issues, ideas and pull requests are welco
   gateway, network rules and every page in a scratch copy with its own compose project (`tctest`) – never touching your
   running stack. CI runs it on every push. For manual experiments use the same isolation (own project, container names,
   port, scratch `data/`) – recreating the real `tentaclai` container ends running sessions and Remote Control.
-- Quick checks: `python3 -m py_compile build/svc build/tc-scan control/app/*.py` and `bash -n *.sh build/*.sh`.
+- Quick checks after every change: `scripts/test-quick.sh` (no Docker, a few seconds – syntax, ShellCheck, unit tests,
+  every tentacontrol page rendered with dummy data). End-to-end: `scripts/test-sandbox.sh` – targeted with
+  `REUSE=1 ONLY=<sections>`, in full before every release (see `CLAUDE.md` → Releases).
 - UI: tentacontrol is FastAPI + Jinja + HTMX; static assets are vendored in the image, no CDNs at runtime.
 
 ## Service templates

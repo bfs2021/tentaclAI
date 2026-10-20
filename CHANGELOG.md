@@ -2,6 +2,24 @@
 
 All notable changes, newest first. Every release lists **upgrade steps** from the previous one.
 
+## Unreleased
+
+### Fixes
+- Settings → Skills: the *Mode* select was squeezed to its arrow; descriptions of skills with a colon in the name
+  (`anthropic-skills:pdf`) were missing.
+- Usage: the billing line showed Claude Code's "Warning: … blocked by enterprise policy" line instead.
+
+### Development
+- Tests in three stages: `scripts/test-quick.sh` (no Docker, seconds – syntax, ShellCheck, pytest unit tests for tclib,
+  parsers and connector/skill state, every tentacontrol page rendered with dummy data; also the CI `checks` job),
+  `REUSE=1 ONLY=<sections> scripts/test-sandbox.sh` (targeted, reuses the test stack, rebuilds only changed images) and
+  the full `scripts/test-sandbox.sh` before every release. Waits poll instead of sleeping; the gateway's policy interval
+  is configurable (`EGRESS_REFRESH`, default 15 s, 1 s in the tests). Full run: 98 s → 29 s.
+
+### Upgrade (from v0.8.0)
+`git pull`, `docker compose build`, `docker compose up -d` – recreating `tentaclai` ends running sessions and Remote
+Control. Nothing to migrate.
+
 ## v0.8.0 – 2026-10-20
 
 ### Highlights

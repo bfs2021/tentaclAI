@@ -20,6 +20,7 @@ import tclib  # noqa: E402
 LISTEN = int(os.environ.get("EGRESS_PORT", "3128"))
 CONTROL = os.environ.get("TC_CONTROL_INTERNAL", "http://tentacontrol:8080")
 DATA = os.environ.get("DATA_DIR", "/data")
+REFRESH = float(os.environ.get("EGRESS_REFRESH", "15"))  # seconds between policy fetches (the tests use 1)
 SEEN_FILE = os.path.join(DATA, "egress-seen.json")
 POLICY_CACHE = os.path.join(DATA, "policy.json")  # last policy from tentacontrol – decisions work right after a restart
 DEFAULT = tclib.egress_patterns(open("/app/egress-default.txt").read())
@@ -64,7 +65,7 @@ def refresh(p=None):
 async def refresher():
     while True:
         await asyncio.to_thread(refresh)
-        await asyncio.sleep(15 if pol["ok"] else 2)  # retry quickly until the first policy arrived
+        await asyncio.sleep(REFRESH if pol["ok"] else 2)  # retry quickly until the first policy arrived
 
 
 async def policy_ready(seconds=30):

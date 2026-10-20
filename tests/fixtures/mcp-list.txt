@@ -1,0 +1,5 @@
+Checking MCP server health…
+
+demoapi: svc mcp-proxy demoapi - ✔ Connected
+claude.ai Google Drive: https://drivemcp.example.test/mcp - ✔ Connected
+claude.ai Claude Docs: https://docs.example.test/mcp - ! Needs authentication
