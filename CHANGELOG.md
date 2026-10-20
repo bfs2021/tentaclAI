@@ -23,6 +23,8 @@ All notable changes, newest first. Every release lists **upgrade steps** from th
   new ones are detected every 10 minutes and start disabled. Also saves context in every request.
 
 ### Changes
+- The host documentation (`HOST_DOCS`) is referenced in Claude's instructions instead of imported – Claude reads it
+  when it works on the host; saves ~4.6k tokens of context in every request.
 - Login: the password reset hint sits behind *Forgot the password?*.
 
 ## v0.6.1 – 2026-10-20
