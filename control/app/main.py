@@ -17,7 +17,7 @@ from . import activity, auth, dockerops, jobs, services_store, sshhosts, sshops,
 from .config import CLAUDE_SERVICE, COMPOSE, DATA_DIR, SERVICES_DIR, STACK_DIR, RC_VARS, RESTART_VARS, SETTINGS_GROUPS, is_secret, site
 from .envfile import read_env, update_env
 from .terminal import PROFILES, bridge, onboard_cmd
-from . import connectors, egress, generated, models, notify, skills, usage
+from . import connectors, egress, generated, models, netguard, notify, skills, usage
 import tclib  # noqa: E402  shared with the sandbox tools
 
 BASE = os.path.dirname(__file__)
@@ -49,6 +49,8 @@ RESTART_FLAG = os.path.join(DATA_DIR, "restart-needed")
 @app.middleware("http")
 async def guard(request: Request, call_next):
     path = request.url.path
+    if not netguard.allowed(path, request.client.host if request.client else ""):
+        return PlainTextResponse("not from here", status_code=403)  # sandbox: svc endpoints only; gateway: egress only
     if not path.startswith(PUBLIC):
         if not auth.logged_in(request):
             if request.headers.get("hx-request"):
@@ -233,6 +235,16 @@ def mark_restart(old_env, changed):
         json.dump({"ts": time.time(), "baseline": base}, f)
 
 
+def not_applied():
+    """why a change could not be applied in the sandbox right away (it is saved and applied on the next start)"""
+    v = dockerops.sandbox_version()
+    if v is None:
+        return "Saved – the sandbox is not running, applied on its next start"
+    if v != TC_VERSION:
+        return f"Saved – the sandbox still runs {v} (tentacontrol {TC_VERSION}): recreate it with “Apply now” to use it"
+    return "Saved, but applying it in the sandbox failed – applied on its next start (see Logs)"
+
+
 def toast(msg, kind="ok"):
     return {"HX-Trigger": json.dumps({"toast": {"msg": msg, "kind": kind}})}
 
@@ -411,7 +423,7 @@ def docker_dirs():
 
 @app.websocket("/ws/terminal")
 async def ws_terminal(ws: WebSocket, p: str = "claude", alias: str = ""):
-    if not ws.session.get("auth") or not auth.same_origin(ws):
+    if not netguard.allowed("/ws/terminal", ws.client.host if ws.client else "") or not ws.session.get("auth") or not auth.same_origin(ws):
         await ws.close(code=4401)
         return
     await ws.accept()
@@ -453,7 +465,7 @@ async def connector_toggle(request: Request, name: str = Form(...)):
         return respond(request, "Unknown connector", "err")
     ok = await asyncio.to_thread(connectors.set_enabled, name, not cur.get("enabled"))
     state = "enabled" if not cur.get("enabled") else "disabled"
-    return respond(request, f"{cur['short']} {state} – applies to new Claude sessions" if ok else "Saved, but the sandbox is not running – applied on its next start",
+    return respond(request, f"{cur['short']} {state} – applies to new Claude sessions" if ok else not_applied(),
                    "ok" if ok else "warn", refresh=True)
 
 
@@ -1114,7 +1126,7 @@ async def skills_mode(request: Request, name: str = Form(...), mode: str = Form(
         ok = await asyncio.to_thread(skills.set_mode, name, mode)
     except ValueError as e:
         return respond(request, f"Not saved: {e}", "err")
-    return respond(request, f"{name}: {mode} – applies to new Claude sessions" if ok else "Saved, but the sandbox is not running – applied on its next start",
+    return respond(request, f"{name}: {mode} – applies to new Claude sessions" if ok else not_applied(),
                    "ok" if ok else "warn", refresh=True)
 
 
@@ -1136,7 +1148,7 @@ async def models_save(request: Request):
         ok = await asyncio.to_thread(models.set_values, dict(await request.form()))
     except ValueError as e:
         return respond(request, f"Not saved: {e}", "err")
-    return respond(request, "Models saved – apply to new Claude sessions" if ok else "Saved, but the sandbox is not running – applied on its next start",
+    return respond(request, "Models saved – apply to new Claude sessions" if ok else not_applied(),
                    "ok" if ok else "warn", refresh=True)
 
 

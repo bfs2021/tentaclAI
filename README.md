@@ -340,6 +340,12 @@ What tentaclAI does:
   the access modes. Client tools (curl, psql, mariadb, stdio MCP servers) run as a third user `tcrun` with only the secret
   they need. MCP servers with tokens are proxied by `svc`, git pushes go through a root-owned mirror – Claude never sees a
   token or the private key, and can't change its own access modes (`svc config put` always needs your approval).
+- **tentacontrol is out of Claude's reach:** from the sandbox only `svc`'s approval endpoints answer (with its token);
+  the admin UI, the login and the gateway's endpoints refuse the sandbox, and only the gateway may use the latter.
+- **Other services' secrets are blanked in read-only output:** `docker … inspect`, `compose … config` and
+  `systemctl show|cat` – free reads that would print container environments, interpolated `.env` values or unit
+  `Environment=` lines – run through `svc` with values of secret-looking names (password, token, key, secret, auth …)
+  and passwords in URLs replaced by `[redacted by svc]`. Logs and anything you approve explicitly are not filtered.
 
 What it does **not** (yet) do – keep it in mind:
 
@@ -350,7 +356,8 @@ What it does **not** (yet) do – keep it in mind:
 - **Egress gateway:** the sandbox has no route to the outside; all traffic goes through `tentaclai-egress`. `permissive`
   (default) allows and records everything; `enforce` allows only the built-in list, your tentacles and your allowlist and
   asks you about the rest. Allowed destinations are still ways out – what Claude may *do* there is up to `svc`.
-- DNS is not filtered yet: the sandbox can still resolve names (a theoretical channel for data).
+- DNS: the sandbox resolves only the stack's own containers – names outside are looked up by the egress gateway, so
+  DNS is no way out either.
 - tentacontrol holds the host's Docker socket – protect it with a strong password and keep it off the internet.
 - `data/home` holds the Claude login and `ssh/keys` the private key – back them up and protect them.
 

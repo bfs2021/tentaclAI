@@ -119,3 +119,44 @@ def test_shared_variable_is_shown(client, app_module):
     finally:
         for n in ("tokone", "tokrepo2"):
             s.delete(n)
+
+
+def _as(monkeypatch, who):
+    """make the TestClient's address ("testclient") look like the sandbox or the gateway"""
+    from app import netguard
+    from app.config import CLAUDE_CONTAINER
+    name = {"sandbox": CLAUDE_CONTAINER, "egress": netguard.EGRESS_NAME}.get(who)
+    monkeypatch.setattr(netguard, "_resolve", lambda n: {"testclient"} if n == name else set())
+
+
+def test_sandbox_reaches_only_the_svc_endpoints(logged_in, monkeypatch):
+    _as(monkeypatch, "sandbox")
+    for path in ("/", "/login", "/settings", "/skills", "/internal/egress/policy"):
+        assert logged_in.get(path, follow_redirects=False).status_code == 403, path  # even with a valid session
+    assert logged_in.post("/internal/egress/ask", json={"host": "evil.test", "port": 443}).status_code == 403
+    r = logged_in.get("/internal/approvals")  # reaches the endpoint – which still wants the svc token
+    assert r.status_code != 403 or "not from here" not in r.text
+
+
+def test_gateway_reaches_only_egress_endpoints(logged_in, monkeypatch):
+    _as(monkeypatch, "egress")
+    assert logged_in.get("/internal/egress/policy").status_code == 200
+    assert logged_in.get("/settings", follow_redirects=False).status_code == 403
+    assert logged_in.get("/internal/approvals").status_code == 403
+
+
+def test_others_cant_use_egress_endpoints(logged_in, monkeypatch):
+    _as(monkeypatch, "nobody")
+    assert logged_in.get("/internal/egress/policy").status_code == 403
+    assert logged_in.post("/internal/egress/ask", json={"host": "x.test", "port": 443}).status_code == 403
+    assert logged_in.get("/settings").status_code == 200
+
+
+@pytest.mark.parametrize("version,expect", [(None, "not running"), ("0.0.1", "still runs 0.0.1"), ("same", "applying it in the sandbox failed")])
+def test_not_applied_message(logged_in, app_module, monkeypatch, version, expect):
+    from app import dockerops, models
+    monkeypatch.setattr(dockerops, "sandbox_version", lambda: app_module.TC_VERSION if version == "same" else version)
+    monkeypatch.setattr(models, "set_values", lambda form: False)
+    r = logged_in.post("/models", data={}, headers={"HX-Request": "true"})
+    assert r.headers.get("HX-Refresh") == "true"
+    assert expect in logged_in.get("/models").text  # flash message after the refresh

@@ -9,7 +9,21 @@ All notable changes, newest first. Every release lists **upgrade steps** from th
   git services root's mirror and Claude's working copy (`/workspace/repos/<name>`) move together; `svc sync` updates
   the catalog and MCP entries. Tokens, system and rules stay.
 
+### Security
+- **The sandbox can no longer reach tentacontrol's admin UI:** tentacontrol shares the sandbox network for `svc`'s
+  approvals, which also exposed the login (behind it: the Docker socket) and the gateway's token-less
+  `/internal/egress/*` endpoints – Claude could have created network approvals itself. Requests are now checked by
+  their source: the sandbox gets only `svc`'s endpoints (with its token), the gateway only the egress endpoints,
+  nobody else the egress endpoints; the web terminal refuses the sandbox too.
+- **Secrets of other services are blanked** in free read-only output that `svc` passes on: `docker … inspect`
+  (container env, labels), `compose … config` (interpolated `.env` values) and `systemctl show|cat` – values of
+  secret-looking names and passwords in URLs become `[redacted by svc]`.
+- tentacontrol no longer follows symlinks in Claude's session directory (usage, skill descriptions).
+
 ### Fixes
+- A change on Settings → Skills/Models that couldn't be applied said "the sandbox is not running" even when it ran an
+  older version – the message now names the version and says to recreate it.
+- README: DNS is not a way out – the sandbox resolves only the stack's containers.
 - A second service created from the same template shared the first one's token variables (most templates use fixed
   names like `HA_TOKEN`) – entering a token for one silently changed the other. It now gets its own variables
   (`PATCHMON_TOKEN_KEY` → `PATCHMON_SKYNET_TOKEN_KEY`); services of a different kind keep sharing on purpose (e.g.

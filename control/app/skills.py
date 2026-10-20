@@ -5,7 +5,6 @@ Settings → Skills sets a mode per skill (on / only as /command / off), written
 headless sandbox start off (tclib.SKILLS_OFF_DEFAULT). Claude Code no longer lists a skill that is off, so the known
 ones are remembered in data/control/skills.json; descriptions come from the skill listing in recent session files.
 """
-import glob
 import json
 import os
 import re
@@ -15,7 +14,7 @@ import tclib
 
 from . import dockerops
 from .config import DATA_DIR
-from .usage import PROJECTS
+from .usage import session_files
 
 STATE = os.path.join(DATA_DIR, "skills.json")
 ROW = re.compile(r"^\|\s*([^|\s][^|]*?)\s*\|\s*([^|]+?)\s*\|\s*~?([\d.]+)(k?)\s*\|$")
@@ -74,7 +73,7 @@ def parse_context(text):
 def _descriptions(limit=20):
     """name → description from the skill listing Claude Code wrote into recent sessions (first lines only)"""
     found = {}
-    files = sorted(glob.glob(os.path.join(PROJECTS, "*", "*.jsonl")), key=os.path.getmtime, reverse=True)[:limit]
+    files = sorted(session_files(), key=os.path.getmtime, reverse=True)[:limit]
     for f in files:
         try:
             with open(f, errors="replace") as fh:

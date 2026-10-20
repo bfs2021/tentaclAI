@@ -313,3 +313,18 @@ def sandbox_exec(cmd, stdin=None, timeout=60):
             pass
     code = api.exec_inspect(ex["Id"]).get("ExitCode")
     return (code if code is not None else 1), out.decode(errors="replace")
+
+
+_version_cache = {}  # container id + start time -> VERSION of the image it runs
+
+
+def sandbox_version():
+    """tentaclAI version of the running sandbox (its image's /etc/tentaclai/VERSION), None if not running"""
+    c = container()
+    if c is None or c.status != "running":
+        return None
+    key = f"{c.id}:{c.attrs.get('State', {}).get('StartedAt', '')}"
+    if key not in _version_cache:
+        code, out = run(["cat", "/etc/tentaclai/VERSION"])
+        _version_cache[key] = out.strip() if code == 0 else "unknown"
+    return _version_cache[key]

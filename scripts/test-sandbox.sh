@@ -158,6 +158,11 @@ check "Claude can't change the managed settings" "$($C sh -c 'echo {} > /etc/cla
 check "sandbox skills switched off" "$($C python3 -c 'import json,os;print(json.load(open(os.path.expanduser("~/.claude/settings.json")))["skillOverrides"]["anthropic-skills:pptx"])' 2>/dev/null)" "off"
 check "sudo only for svc" "$($C sudo -n id >/dev/null 2>&1 && echo yes || echo no)" "no"
 check "SQL shell refused on a ro database" "$(echo 'select 1;' | $CI svc db testdb shell >/dev/null 2>&1 && echo yes || echo no)" "no"
+CTL() { $C curl -s -m 5 --noproxy '*' -o /dev/null -w '%{http_code}' "$@" 2>/dev/null || true; }
+check "sandbox can't open the tentacontrol login" "$(CTL http://tctest-control:8080/login)" "403"
+check "sandbox can't read the gateway policy" "$(CTL http://tctest-control:8080/internal/egress/policy)" "403"
+check "sandbox can't create network approvals" "$(CTL -X POST -H 'Content-Type: application/json' -d '{"host":"evil.test","port":443}' http://tctest-control:8080/internal/egress/ask)" "403"
+check "svc still reaches its approvals endpoint" "$($C svc pending >/dev/null 2>&1 && echo ok)" "ok"
 check "psql shell escape runs as tcrun" "$(echo '\! id -un' | $CI svc db testdbrw shell 2>/dev/null | tail -1)" "tcrun"
 fi
 

@@ -663,6 +663,40 @@ def sync_docker_contexts(services):
         json.dump(sorted(active), f)
 
 
+# Read-only commands that print other services' secrets (container env, interpolated compose files, unit
+# Environment=): svc runs them with captured output and blanks values whose name looks like a secret, plus passwords
+# in URLs – they would otherwise land in Claude's context. Streams (logs -f …) are not affected.
+_SECRET_NAME = r"[A-Za-z0-9_.-]*(?:pass|secret|token|key|credential|private|auth|salt|dsn|cookie)[A-Za-z0-9_.-]*"
+_REDACTED = "[redacted by svc]"
+
+
+def redact(text):
+    text = re.sub(r'(?i)("' + _SECRET_NAME + r'"\s*:\s*")([^"]+)(")', lambda m: m.group(1) + _REDACTED + m.group(3), text)
+    text = re.sub(r"(?i)(^|[\s\"'\[,=-])(" + _SECRET_NAME + r")(=|:[ \t]+)([^\s\"',\]]+)",
+                  lambda m: m.group(1) + m.group(2) + m.group(3) + _REDACTED, text, flags=re.M)
+    return re.sub(r"(://[^/\s:@\"']+:)[^@\s\"']+@", r"\1" + _REDACTED + "@", text)
+
+
+def sensitive_read(words, compose=False):
+    """True for docker/compose/systemctl reads whose output shows secrets (see redact)"""
+    w = [a for a in words if not a.startswith("-")]
+    if compose:
+        return bool(w) and w[0] == "config"
+    if w[:1] == ["systemctl"]:
+        return len(w) > 1 and w[1] in ("show", "cat")
+    if w[:1] == ["docker"]:
+        w = w[1:]
+    return bool(w) and (w[0] == "inspect" or (len(w) > 1 and w[1] == "inspect"))
+
+
+def call_redacted(argv, **kw):
+    """run, print the output with secrets blanked, return the exit code"""
+    r = subprocess.run(argv, capture_output=True, text=True, errors="replace", **kw)
+    sys.stdout.write(redact(r.stdout))
+    sys.stderr.write(redact(r.stderr))
+    return r.returncode
+
+
 def _ro_allowed(args, compose=False):
     words = [a for a in args if not a.startswith("-")]
     if not words:
@@ -712,7 +746,8 @@ def cmd_docker(services, args):
         return 0
     name, rest = args[0], args[1:]
     d = get_docker(services, name)
-    run = lambda: subprocess.call(docker_argv(name, d, rest))  # noqa: E731
+    call = call_redacted if sensitive_read(rest) else subprocess.call
+    run = lambda: call(docker_argv(name, d, rest))  # noqa: E731
     if _ro_allowed(rest):
         return run()
     return guarded(name, "docker", access_mode(d), "docker " + shlex.join(rest), run)
@@ -734,10 +769,13 @@ def _compose(name, d, stack, rest):
     if d.get("mode", "socket") == "ssh":
         sudo = docker_sudo(d)
         remote = f"cd {shlex.quote(path)} && {sudo + ' ' if sudo else ''}docker compose {shlex.join(rest)}"
+        if sensitive_read(rest, compose=True):
+            return call_redacted(["ssh", "-q", d["ssh_host"], remote])
         return subprocess.call(["ssh"] + (["-t", "-q"] if wants_tty(rest, compose=True) else []) + [d["ssh_host"], remote])
     if not os.path.isdir(path):
         sys.exit(f"svc: {path} not found")
-    return subprocess.call(["docker", "--context", name, "compose", *rest], cwd=path)
+    call = call_redacted if sensitive_read(rest, compose=True) else subprocess.call
+    return call(["docker", "--context", name, "compose", *rest], cwd=path)
 
 
 # ---------- shared: service part lookup ----------
@@ -1294,7 +1332,13 @@ def cmd_ssh(name_args):
     remote = " ".join(cmd)
     tty = not cmd or sys.stdin.isatty() and sys.stdout.isatty()
     argv = ["ssh"] + (["-t"] if tty else ["-T"]) + ["--", alias] + ([remote] if remote else [])
-    if ssh_read_only(alias, cmd):
+    if ssh_read_only(alias, cmd):  # free status command – the ones that print secrets get them blanked
+        words = shlex.split(remote)
+        sudo = shlex.split(ssh_sudo(alias) or "")
+        if sudo and words[:len(sudo)] == sudo:
+            words = words[len(sudo):]
+        if sensitive_read(words):
+            return call_redacted(["ssh", "-T", "--", alias, remote])
         return subprocess.call(argv)
     return guarded(alias, "ssh", mode, f"ssh {alias} {remote}" if remote else f"ssh {alias} (interactive shell)",
                    lambda: subprocess.call(argv))

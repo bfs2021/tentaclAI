@@ -58,3 +58,20 @@ def test_sessions_without_replies_are_not_listed(app_module):
         assert "poll" not in [x["id"] for x in usage.summary()["sessions"]]
     finally:
         os.remove(p)
+
+
+def test_session_files_skip_symlinks(app_module, tmp_path):
+    import os
+    from app import usage
+    secret = tmp_path / "secret.jsonl"
+    secret.write_text('{"aiTitle": "leaked"}\n')
+    link_file = os.path.join(usage.PROJECTS, "-workspace", "link.jsonl")
+    link_dir = os.path.join(usage.PROJECTS, "-linked")
+    os.symlink(secret, link_file)
+    os.symlink(tmp_path, link_dir)
+    try:
+        files = usage.session_files()
+        assert files and not any("link" in f for f in files)
+    finally:
+        os.remove(link_file)
+        os.remove(link_dir)

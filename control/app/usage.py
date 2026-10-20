@@ -72,10 +72,22 @@ def _local():
     return d
 
 
+def session_files():
+    """Claude's session files – regular files inside PROJECTS only: the directory belongs to Claude, and tentacontrol
+    (root) must not follow a symlink it put there"""
+    root = os.path.realpath(PROJECTS) + os.sep
+    out = []
+    for path in glob.glob(os.path.join(PROJECTS, "*", "*.jsonl")):
+        if os.path.islink(path) or os.path.islink(os.path.dirname(path)) or not os.path.realpath(path).startswith(root):
+            continue
+        out.append(path)
+    return out
+
+
 def refresh_local():
     """read only what was appended since the last run"""
     d = _local()
-    for path in glob.glob(os.path.join(PROJECTS, "*", "*.jsonl")):
+    for path in session_files():
         try:
             size = os.path.getsize(path)
         except OSError:
