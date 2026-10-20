@@ -136,6 +136,49 @@ def save_raw(name, text):
     os.replace(tmp, p)
 
 
+def variable_users():
+    """${VAR} name → services that use it (a token entered for one is used by all of them)"""
+    users = {}
+    for p in sorted(glob.glob(os.path.join(SERVICES_DIR, "*.json"))):
+        n = os.path.basename(p)[:-5]
+        if n.startswith("_"):
+            continue
+        try:
+            data = json.load(open(p))
+        except (OSError, ValueError):
+            continue
+        for v in variables({k: x for k, x in data.items() if k in PARTS}):
+            users.setdefault(v, []).append(n)
+    return users
+
+
+def _own_variables(data, name):
+    """a second service of the same kind (same parts) gets its own variables instead of silently sharing the first one's
+    tokens: PATCHMON_TOKEN_KEY → PATCHMON_SKYNET_TOKEN_KEY. Different kinds keep sharing (e.g. GH_TOKEN for api and git)."""
+    kinds = {k for k in PARTS if k in data}
+    taken = {}
+    for p in glob.glob(os.path.join(SERVICES_DIR, "*.json")):
+        if os.path.basename(p).startswith("_"):
+            continue
+        try:
+            other = json.load(open(p))
+        except (OSError, ValueError):
+            continue
+        same = {k for k in PARTS if k in other} == kinds
+        for v in variables({k: x for k, x in other.items() if k in PARTS}):
+            taken[v] = taken.get(v, False) or same
+    up = name.upper().replace("-", "_")
+    text = json.dumps(data, ensure_ascii=False)
+    for v in sorted(variables({k: x for k, x in data.items() if k in PARTS})):
+        if not taken.get(v) or v.startswith(up + "_"):
+            continue
+        new = f"{up}_{v.split('_', 1)[1] if '_' in v else v}"
+        while new in taken:
+            new += "_2"
+        text = text.replace("${" + v + "}", "${" + new + "}")
+    return json.loads(text)
+
+
 def create(name, template=""):
     p = path_of(name)
     if os.path.exists(p):
@@ -156,7 +199,7 @@ def create(name, template=""):
     domain = PLACEHOLDER_DOMAIN
     text = json.dumps(tpl, ensure_ascii=False).replace("svc NAME ", f"svc {name} ").replace(" NAME ", f" {name} ").replace("svc docker NAME", f"svc docker {name}").replace("{{DOMAIN}}", domain)
     text = text.replace("EXAMPLE_", f"{up}_").replace('"example"', f'"{name}"')
-    data = json.loads(text)
+    data = _own_variables(json.loads(text), name)
     data = {"name": name, **{k: v for k, v in data.items() if k != "name"}}
     save_raw(name, json.dumps(data, ensure_ascii=False))
 

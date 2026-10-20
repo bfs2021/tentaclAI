@@ -48,6 +48,7 @@
         {% for v in svc.vars %}
         <div class="field">
           <label class="between">{{ v.name }} <span class="pill {{ 'ok' if v.set else 'warn' }}">{{ 'set' if v.set else 'empty' }}</span></label>
+          {% if v.shared_with %}<div class="help">Also used by {% for n in v.shared_with %}<a href="/services/{{ n }}">{{ n }}</a>{{ ', ' if not loop.last }}{% endfor %} – a value entered here applies there too. For separate tokens give this service its own variable name in the JSON.</div>{% endif %}
           {% if v.secret %}
           <div class="secret-row">
             <input type="password" name="var_{{ v.name }}" placeholder="{{ 'leave unchanged' if v.set else 'enter value' }}" autocomplete="new-password">

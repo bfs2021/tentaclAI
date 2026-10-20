@@ -43,6 +43,10 @@ def _stack():
         json.dump({"_meta": {"title": "n8n", "category": "Automation", "setup": "token"}, "api": {"base_url": "https://n8n.{{DOMAIN}}"}}, f)
     with open(os.path.join(STACK, "services", "_templates", "demoapi.json"), "w") as f:
         json.dump({"_meta": {"title": "Demo"}, "api": {"base_url": "https://x"}, "test_path": "/items?limit=1"}, f)
+    with open(os.path.join(STACK, "services", "_templates", "tokapi.json"), "w") as f:
+        json.dump({"api": {"base_url": "https://tok.{{DOMAIN}}", "auth": {"type": "basic", "user": "${TOKAPI_KEY}", "password": "${TOKAPI_SECRET}"}}}, f)
+    with open(os.path.join(STACK, "services", "_templates", "tokgit.json"), "w") as f:
+        json.dump({"git": {"url": "https://git.{{DOMAIN}}/r.git", "auth": {"type": "token", "token": "${TOKAPI_KEY}"}}}, f)
     with open(os.path.join(STACK, "systems", "box.json"), "w") as f:
         json.dump({"description": "Demo server", "ssh_host": "box", "rules": "ask before restarts"}, f)
     with open(os.path.join(STACK, "ssh", "config.d", "box.conf"), "w") as f:

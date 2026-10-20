@@ -107,3 +107,15 @@ def test_template_placeholder_domain(client, app_module):
         assert "placeholder address" not in client.get("/services/demoapi").text
     finally:
         services_store.delete("fromtpl")
+
+
+def test_shared_variable_is_shown(client, app_module):
+    from app import services_store as s
+    try:
+        s.create("tokone", "tokapi")
+        s.create("tokrepo2", "tokgit")
+        html = client.get("/services/tokone").text
+        assert "Also used by" in html and 'href="/services/tokrepo2"' in html
+    finally:
+        for n in ("tokone", "tokrepo2"):
+            s.delete(n)

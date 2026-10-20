@@ -10,6 +10,11 @@ All notable changes, newest first. Every release lists **upgrade steps** from th
   the catalog and MCP entries. Tokens, system and rules stay.
 
 ### Fixes
+- A second service created from the same template shared the first one's token variables (most templates use fixed
+  names like `HA_TOKEN`) – entering a token for one silently changed the other. It now gets its own variables
+  (`PATCHMON_TOKEN_KEY` → `PATCHMON_SKYNET_TOKEN_KEY`); services of a different kind keep sharing on purpose (e.g.
+  `GH_TOKEN` for the GitHub API and a git repo). The service page shows which other services use a variable.
+  Existing pairs are not changed automatically – check the *Tokens & variables* card.
 - Egress gateway: a service that was just enabled (or whose last token was just set) asked for a network approval
   on its first use – the gateway only re-reads its policy every 15 s. Before it asks, it now re-reads the policy once
   and decides again.

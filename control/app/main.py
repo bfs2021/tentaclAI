@@ -801,6 +801,9 @@ async def service_edit(request: Request, name: str):
     except ValueError as e:
         data, err = {}, str(e)
     svc = services_store.describe(name, data, error=err)
+    users = services_store.variable_users()
+    for v in svc["vars"]:
+        v["shared_with"] = [n for n in users.get(v["name"], []) if n != name]
     return page(request, "service_edit.html", svc=svc, raw=raw, systems=systems_store.load_all(),
                 suggested_test_path=services_store.template_test_path(name))
 

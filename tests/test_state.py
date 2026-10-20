@@ -147,3 +147,25 @@ def test_service_rename(app_module):
                 s.delete(n)
             except (FileNotFoundError, ValueError):
                 pass
+
+
+def test_second_service_from_a_template_gets_own_variables(app_module):
+    from app import services_store as s
+    names = ("tok1", "tok2", "tok-three", "tokrepo")
+    try:
+        s.create("tok1", "tokapi")
+        s.create("tok2", "tokapi")
+        s.create("tok-three", "tokapi")
+        s.create("tokrepo", "tokgit")
+        auth = lambda n: json.loads(s.read_raw(n))["api"]["auth"]
+        assert auth("tok1") == {"type": "basic", "user": "${TOKAPI_KEY}", "password": "${TOKAPI_SECRET}"}  # first keeps the names
+        assert auth("tok2") == {"type": "basic", "user": "${TOK2_KEY}", "password": "${TOK2_SECRET}"}
+        assert auth("tok-three")["user"] == "${TOK_THREE_KEY}"
+        assert json.loads(s.read_raw("tokrepo"))["git"]["auth"]["token"] == "${TOKAPI_KEY}"  # other kind: shared on purpose
+        assert s.variable_users()["TOKAPI_KEY"] == ["tok1", "tokrepo"]
+    finally:
+        for n in names:
+            try:
+                s.delete(n)
+            except FileNotFoundError:
+                pass
