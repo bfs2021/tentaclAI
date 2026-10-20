@@ -88,6 +88,16 @@ for k in ("DISABLE_TELEMETRY", "DISABLE_ERROR_REPORTING", "DISABLE_BUG_COMMAND")
         env.pop(k, None)
 if not env:
     s.pop("env")
+# skills of the account and of Claude Code that make no sense in a headless sandbox – each one costs context in every
+# request. Only defaults: an entry the user set in skillOverrides (e.g. "on") is kept.
+over = s.setdefault("skillOverrides", {})
+for k in ("dataviz", "artifact-design", "artifact-diagramming", "artifact-capabilities", "keybindings-help",
+          "fewer-permission-prompts", "claude-in-chrome", "run", "plugin-authoring",
+          "anthropic-skills:built-in-browser", "anthropic-skills:chrome-browser", "anthropic-skills:computer-use",
+          "anthropic-skills:docs", "anthropic-skills:docx", "anthropic-skills:pptx", "anthropic-skills:xlsx",
+          "anthropic-skills:google-workspace", "anthropic-skills:import-memory", "anthropic-skills:morning",
+          "anthropic-skills:setup-writing-style"):
+    over.setdefault(k, "off")
 open(p + ".tmp", "w").write(json.dumps(s, indent=2) + "\n")
 os.replace(p + ".tmp", p)
 PY
@@ -100,6 +110,7 @@ try:
 except (OSError, ValueError):
     known = {}
 os.makedirs("/etc/claude-code", exist_ok=True)
+os.chmod("/etc/claude-code", 0o755)  # umask 077 above – Claude must be able to read its policy, or it is silently ignored
 with open("/etc/claude-code/managed-settings.json", "w") as f:
     json.dump({"deniedMcpServers": [{"serverName": n} for n, c in sorted(known.items()) if not c.get("enabled")]}, f, indent=1)
 os.chmod("/etc/claude-code/managed-settings.json", 0o644)

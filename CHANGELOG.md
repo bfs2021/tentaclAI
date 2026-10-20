@@ -2,6 +2,26 @@
 
 All notable changes, newest first. Every release lists **upgrade steps** from the previous one.
 
+## v0.7.1 – 2026-10-20
+
+### Fixes
+- **claude.ai connectors were not denied**: `/etc/claude-code` was created with mode 700 (umask of the entrypoint), so
+  Claude Code could not read the managed settings and ignored them ("policies … are NOT in effect"). The directory is
+  now 755; the file stays root-owned and read-only for Claude.
+
+### Changes – less context per request
+- Skills that make no sense in a headless sandbox (Office files, Artifacts, browser/computer use, morning brief …) are
+  switched off by default via `skillOverrides` in Claude's `settings.json` – entries set by the user are kept.
+- The sandbox instructions (`CLAUDE.base.md`, SSH host section) are about a third shorter: the command table points to
+  `svc help` instead of repeating it; all rules stay. New section *Keep context small* (bundle read-only calls, filter
+  outputs at the source, narrow MCP calls).
+- `/inventory` and `/onboard`: fewer turns – bundled read and test calls, the scan is read once from a file, the
+  summary comes with the first question round, no duplicate `cat`/backups, OpenAPI specs only as a path list.
+
+### Upgrade (from v0.7.0)
+`git pull`, `docker compose build`, `docker compose up -d` – recreating `tentaclai` ends running sessions and
+Remote Control. Afterwards switched-off connectors are really off in the sandbox.
+
 ## v0.7.0 – 2026-10-20
 
 ### Highlights
