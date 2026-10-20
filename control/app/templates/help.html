@@ -349,15 +349,11 @@ gh …                      GitHub CLI without credentials (public data)</pre>
     <section class="card" id="roadmap">
       <h2>Roadmap</h2>
       <ul>
-        <li><strong>Scheduled jobs</strong>: run Claude tasks on a schedule (e.g. patch report, certificate expiry); per-service monitoring builds on this.</li>
-        <li><strong>Monitoring per service</strong>: Claude checks connected services regularly and reports status and recommendations.</li>
-        <li><strong>Topology</strong>: next – connections between systems and containers (reverse proxy → container, tunnels), status from monitoring.</li>
-        <li><strong>Export/import</strong>: configuration and templates, e.g. for a second installation or to share templates.</li>
+        <li><strong>Two-factor sign-in (TOTP)</strong> for tentacontrol.</li>
+        <li><strong>Scheduled jobs</strong>: run Claude tasks on a schedule (e.g. patch report, certificate expiry), results as notifications.</li>
         <li><strong>Usage</strong> of each Claude instance (tokens, quota, sessions) shown in tentacontrol.</li>
-        <li><strong>Notifications, phase 2</strong>: approve or deny right from the notification (ntfy actions, Home Assistant), daily digest.</li>
-        <li><strong>AI assistant</strong> in tentacontrol for the whole configuration (can be switched off).</li>
-        <li><strong>OAuth with browser login</strong> (authorization code, e.g. Google) as auth type, with templates. Client credentials already exist.</li>
-        <li><strong>More sandbox</strong>: egress allowlist (only service hosts reachable), read-only root filesystem, Docker socket only through a filtering proxy, preconfigured Claude Code permissions, prompt-injection safeguards for content from services.</li>
+        <li><strong>Export/import</strong>: configuration and templates, e.g. for a second installation or to share templates.</li>
+        <li><strong>More sandbox</strong>: DNS filter in the egress gateway, read-only root filesystem, Docker socket only through a filtering proxy, prompt-injection safeguards for content from services.</li>
       </ul>
     </section>
   </div>

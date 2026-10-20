@@ -356,11 +356,11 @@ What it does **not** (yet) do – keep it in mind:
 
 ## Roadmap
 
-- **Security:** DNS filter in the egress gateway, read-only root filesystem, Docker socket proxy, prompt-injection safeguards
-- **Automation:** scheduled Claude jobs · monitoring per service with status and recommendations
+- **Security:** two-factor sign-in (TOTP) for tentacontrol · DNS filter in the egress gateway · read-only root filesystem,
+  Docker socket proxy, prompt-injection safeguards
+- **Automation:** scheduled Claude jobs (e.g. patch report, certificate expiry) with results as notifications
 - **Usage** of each Claude instance (tokens, quota, sessions) in tentacontrol
-- **tentacontrol:** AI assistant for the configuration · OAuth with browser login · export/import of configuration and templates
-- **Topology:** connections between systems and containers (reverse proxy → container, tunnels) · monitoring status
+- **Export/import** of configuration and templates
 
 ## License
 
