@@ -16,7 +16,7 @@ from . import activity, auth, dockerops, jobs, services_store, sshhosts, sshops,
 from .config import CLAUDE_SERVICE, COMPOSE, DATA_DIR, SERVICES_DIR, STACK_DIR, RC_VARS, RESTART_VARS, SETTINGS_GROUPS, is_secret, site
 from .envfile import read_env, update_env
 from .terminal import PROFILES, bridge, onboard_cmd
-from . import connectors, egress, generated, notify, usage
+from . import connectors, egress, generated, notify, skills, usage
 import tclib  # noqa: E402  shared with the sandbox tools
 
 BASE = os.path.dirname(__file__)
@@ -125,6 +125,8 @@ async def start_notifications():
                 await asyncio.to_thread(usage.refresh_local)
                 if n % 2 == 0 and dockerops.status().get("running"):
                     await asyncio.to_thread(connectors.discover)  # new claude.ai connectors start disabled
+                if n % 6 == 0 and dockerops.status().get("running"):
+                    await asyncio.to_thread(skills.discover)  # skills of new Claude Code versions / the account
                 if n % 2 == 0 and dockerops.status().get("running") and await asyncio.to_thread(dockerops.logged_in_claude):
                     p = await asyncio.to_thread(usage.refresh_plan)
                     for lim in p.get("limits", []):
@@ -1045,6 +1047,30 @@ async def notifications_routes(request: Request):
     quiet = {"enabled": bool(form.get("quiet")), "from": form.get("q_from") or "23:00", "to": form.get("q_to") or "07:00"}
     notify.set_routes(routes, quiet, form.get("dedupe") or 10)
     return respond(request, "Notification settings saved")
+
+
+@app.get("/skills", response_class=HTMLResponse)
+async def skills_page(request: Request):
+    rows = skills.listing()
+    saved = sum(r.get("tokens") or 0 for r in rows if r["mode"] != "on")
+    return page(request, "skills.html", rows=rows, saved=saved, modes=tclib.SKILL_MODES,
+                fmt=lambda ts: time.strftime("%Y-%m-%d", time.localtime(ts)) if ts else "–")
+
+
+@app.post("/skills/mode", response_class=HTMLResponse)
+async def skills_mode(request: Request, name: str = Form(...), mode: str = Form(...)):
+    try:
+        ok = await asyncio.to_thread(skills.set_mode, name, mode)
+    except ValueError as e:
+        return respond(request, f"Not saved: {e}", "err")
+    return respond(request, f"{name}: {mode} – applies to new Claude sessions" if ok else "Saved, but the sandbox is not running – applied on its next start",
+                   "ok" if ok else "warn", refresh=True)
+
+
+@app.post("/skills/discover", response_class=HTMLResponse)
+async def skills_discover(request: Request):
+    ok = await asyncio.to_thread(skills.discover)
+    return respond(request, "Skills checked" if ok else "Could not ask Claude Code (signed in?)", "ok" if ok else "warn", refresh=True)
 
 
 @app.get("/settings", response_class=HTMLResponse)

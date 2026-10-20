@@ -381,3 +381,41 @@ def ssh_known_name(fields):
         return fields["hostkeyalias"]
     port = str(fields.get("port") or "22")
     return fields["hostname"] if port == "22" else f"[{fields['hostname']}]:{port}"
+
+
+# ---------------------------------------------------------------- skills (Claude Code skillOverrides)
+# Every skill Claude Code lists costs context in every request. tentacontrol keeps a mode per skill in
+# data/control/skills.json; the entrypoint and tentacontrol write them into Claude's settings.json.
+SKILL_MODES = ("on", "user-invocable-only", "off")  # user-invocable-only: only as /command, not offered to the model
+SKILLS_OFF_DEFAULT = (  # make no sense in a headless sandbox
+    "dataviz", "artifact-design", "artifact-diagramming", "artifact-capabilities", "keybindings-help",
+    "fewer-permission-prompts", "claude-in-chrome", "run", "plugin-authoring",
+    "anthropic-skills:built-in-browser", "anthropic-skills:chrome-browser", "anthropic-skills:computer-use",
+    "anthropic-skills:docs", "anthropic-skills:docx", "anthropic-skills:pptx", "anthropic-skills:xlsx",
+    "anthropic-skills:google-workspace", "anthropic-skills:import-memory", "anthropic-skills:morning",
+    "anthropic-skills:setup-writing-style",
+)
+
+
+def skill_mode(state, name):
+    m = (state.get("modes") or {}).get(name)
+    return m if m in SKILL_MODES else ("off" if name in SKILLS_OFF_DEFAULT else "on")
+
+
+def skill_overrides(state):
+    """{skill: mode} for every skill tentaclai manages (known or default-off); "on" means: no override"""
+    names = set(state.get("known") or {}) | set(SKILLS_OFF_DEFAULT) | set(state.get("modes") or {})
+    return {n: skill_mode(state, n) for n in sorted(names)}
+
+
+def apply_skill_overrides(settings, managed):
+    """merge into a settings.json dict – managed skills only, other entries of the user stay"""
+    over = settings.setdefault("skillOverrides", {})
+    for name, mode in managed.items():
+        if mode == "on":
+            over.pop(name, None)
+        else:
+            over[name] = mode
+    if not over:
+        settings.pop("skillOverrides")
+    return settings

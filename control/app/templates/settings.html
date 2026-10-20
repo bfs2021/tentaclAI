@@ -8,6 +8,7 @@
 <nav class="conn-tabs" aria-label="Settings">
   <a href="/settings" class="active">{{ icon('settings') }}Settings</a>
   <a href="/notifications">{{ icon('activity') }}Notifications</a>
+  <a href="/skills">{{ icon('sparkle') }}Skills</a>
 </nav>
 <form hx-post="/settings" autocomplete="off" class="stack">
   {% for group, items in groups %}

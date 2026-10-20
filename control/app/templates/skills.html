@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% from "_icons.html" import icon %}
+{% block title %}Skills{% endblock %}
+{% block content %}
+<div class="header">
+  <div><h1>Skills</h1><div class="sub">Skills of Claude Code and your claude.ai account. Every skill Claude is offered costs context in <em>every</em> request – switch off what Claude never needs in this sandbox. Written as <code>skillOverrides</code> into Claude's <code>settings.json</code>; changes apply to new Claude sessions.</div></div>
+  <button class="btn ghost" hx-post="/skills/discover">{{ icon('refresh') }}Check</button>
+</div>
+<nav class="conn-tabs" aria-label="Settings">
+  <a href="/settings">{{ icon('settings') }}Settings</a>
+  <a href="/notifications">{{ icon('activity') }}Notifications</a>
+  <a href="/skills" class="active">{{ icon('sparkle') }}Skills</a>
+</nav>
+
+<p class="help" style="margin:-8px 0 14px"><strong>On</strong> = Claude may use it on its own · <strong>/command only</strong> = only when you call it as <code>/name</code> · <strong>Off</strong> = gone.
+  {% if saved %}Switched off or limited now: about <strong>{{ '%.1f' % (saved / 1000) }}k tokens</strong> less per request (sizes as last measured).{% endif %}</p>
+
+{% if rows %}
+<div class="card"><div class="table-wrap"><table>
+  <thead><tr><th>Skill</th><th>Source</th><th style="text-align:right">Tokens</th><th>Mode</th></tr></thead>
+  <tbody>
+  {% for r in rows %}
+  <tr>
+    <td><strong class="mono small">{{ r.name }}</strong>
+      {% if r.custom and r.mode != r.default %}<span class="pill info" title="default: {{ r.default }}">changed</span>{% endif %}
+      {% if r.description %}<div class="small muted">{{ r.description }}</div>
+      {% elif not r.seen %}<div class="small faint">not seen yet – only listed with some accounts or Claude Code versions</div>{% endif %}</td>
+    <td class="small muted">{{ r.source or '–' }}</td>
+    <td class="small" style="text-align:right;font-variant-numeric:tabular-nums">{{ ('~%d' % r.tokens) if r.tokens else '–' }}</td>
+    <td><form class="inline" hx-post="/skills/mode"><input type="hidden" name="name" value="{{ r.name }}">
+      <select name="mode" aria-label="Mode of {{ r.name }}" onchange="this.form.requestSubmit()">
+        {% for m in modes %}<option value="{{ m }}" {{ 'selected' if m == r.mode }}>{{ {'on': 'On', 'user-invocable-only': '/command only', 'off': 'Off'}[m] }}</option>{% endfor %}
+      </select></form></td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table></div></div>
+{% else %}<div class="empty small">No skills known yet – they are checked every 30 minutes while Claude is signed in, or now with <em>Check</em>.</div>{% endif %}
+{% endblock %}

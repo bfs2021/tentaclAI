@@ -2,6 +2,19 @@
 
 All notable changes, newest first. Every release lists **upgrade steps** from the previous one.
 
+## Unreleased
+
+### Highlights
+- **Settings → Skills**: every skill of Claude Code and the claude.ai account with its size in tokens, set to *On*,
+  */command only* (`user-invocable-only`: only when called as `/name`) or *Off*. Written as `skillOverrides` into
+  Claude's `settings.json` – right away and on every container start. Skills are found with `claude -p /context`
+  (no model call) every 30 minutes or with *Check*; switched-off ones are remembered in `data/control/skills.json`.
+  The defaults of v0.7.1 (sandbox-useless skills off) stay; entries of your own for other skills are kept.
+
+### Upgrade (from v0.7.1)
+`git pull`, `docker compose build`, `docker compose up -d` – recreating `tentaclai` ends running sessions and Remote
+Control. Nothing to migrate.
+
 ## v0.7.1 – 2026-10-20
 
 ### Fixes

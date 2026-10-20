@@ -148,8 +148,18 @@ check "ntfy got 'Approval needed'" "$(echo "$NT" | grep -c 'Approval needed: exa
 check "webhook got 'Approval needed'" "$(echo "$HK" | grep -c 'Approval needed: example.edu' || true)" "1"
 check "webhook got the blocked destination" "$(echo "$HK" | grep -c 'example.com:443 blocked' || true)" "1"
 
+echo "== skills"
+SK() { $C python3 -c 'import json,os,sys;print(json.load(open(os.path.expanduser("~/.claude/settings.json"))).get("skillOverrides",{}).get(sys.argv[1],"on"))' "$1" 2>/dev/null; }
+curl -s -b "$J" -H "$H" -o /dev/null -X POST "http://$IP:8080/skills/mode" -d name=dataviz -d mode=on
+check "default-off skill switched on" "$(SK dataviz)" "on"
+curl -s -b "$J" -H "$H" -o /dev/null -X POST "http://$IP:8080/skills/mode" -d name=dataviz -d mode=user-invocable-only
+check "skill as /command only" "$(SK dataviz)" "user-invocable-only"
+curl -s -b "$J" -H "$H" -o /dev/null -X POST "http://$IP:8080/skills/mode" -d name=dataviz -d mode=bogus
+check "unknown mode refused" "$(SK dataviz)" "user-invocable-only"
+check "other defaults stay off" "$(SK anthropic-skills:pptx)" "off"
+
 echo "== tentacontrol pages render"
-for p in / /network "/network?tab=allow" "/network?tab=block" /services /ssh /activity /terminal /topology /help /settings /notifications /usage /logs; do
+for p in / /network "/network?tab=allow" "/network?tab=block" /services /ssh /activity /terminal /topology /help /settings /notifications /skills /usage /logs; do
     check "GET $p" "$(curl -s -b "$J" -o /dev/null -w '%{http_code}' "http://$IP:8080$p")" "200"
 done
 

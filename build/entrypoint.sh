@@ -68,8 +68,17 @@ as_claude sh -c 'cp -f /etc/tentaclai/commands/*.md /home/claude/.claude/command
 # status line (caged octopus + pending approvals) – only if the user has none of their own;
 # telemetry, error reports and /bug off unless CLAUDE_TELEMETRY=true in .env
 TRAFFIC_OFF="$( [ "$(envval CLAUDE_TELEMETRY | tr A-Z a-z)" = "true" ] || echo 1 )"
-as_claude env TRAFFIC_OFF="$TRAFFIC_OFF" python3 - <<'PY' || echo "could not set Claude's settings"
-import json, os
+# skill modes from tentacontrol → Settings → Skills (root-only data dir; Claude gets just the result)
+SKILLS="$(python3 -c 'import json, sys; sys.path.insert(0, "/usr/local/lib/tentaclai"); import tclib
+try:
+    s = json.load(open(sys.argv[1]))
+except (OSError, ValueError):
+    s = {}
+print(json.dumps(tclib.skill_overrides(s)))' "$TC_DIR/data/control/skills.json" 2>/dev/null || echo '{}')"
+as_claude env TRAFFIC_OFF="$TRAFFIC_OFF" SKILLS="$SKILLS" python3 - <<'PY' || echo "could not set Claude's settings"
+import json, os, sys
+sys.path.insert(0, "/usr/local/lib/tentaclai")
+import tclib
 p = "/home/claude/.claude/settings.json"
 try:
     s = json.load(open(p))
@@ -88,16 +97,7 @@ for k in ("DISABLE_TELEMETRY", "DISABLE_ERROR_REPORTING", "DISABLE_BUG_COMMAND")
         env.pop(k, None)
 if not env:
     s.pop("env")
-# skills of the account and of Claude Code that make no sense in a headless sandbox – each one costs context in every
-# request. Only defaults: an entry the user set in skillOverrides (e.g. "on") is kept.
-over = s.setdefault("skillOverrides", {})
-for k in ("dataviz", "artifact-design", "artifact-diagramming", "artifact-capabilities", "keybindings-help",
-          "fewer-permission-prompts", "claude-in-chrome", "run", "plugin-authoring",
-          "anthropic-skills:built-in-browser", "anthropic-skills:chrome-browser", "anthropic-skills:computer-use",
-          "anthropic-skills:docs", "anthropic-skills:docx", "anthropic-skills:pptx", "anthropic-skills:xlsx",
-          "anthropic-skills:google-workspace", "anthropic-skills:import-memory", "anthropic-skills:morning",
-          "anthropic-skills:setup-writing-style"):
-    over.setdefault(k, "off")
+tclib.apply_skill_overrides(s, json.loads(os.environ.get("SKILLS") or "{}"))
 open(p + ".tmp", "w").write(json.dumps(s, indent=2) + "\n")
 os.replace(p + ".tmp", p)
 PY
