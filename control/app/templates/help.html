@@ -115,7 +115,7 @@
   "name": "paperless",
   "description": "Paperless-ngx – documents",
   "api": {
-    "base_url": "https://paperless.{{ site.domain }}/api",
+    "base_url": "https://paperless.example.com/api",
     "auth": { "type": "header", "header": "Authorization", "value": "Token ${PAPERLESS_TOKEN}" },
     "insecure_tls": false,
     "docs": "https://docs.paperless-ngx.com/api/"
@@ -212,7 +212,7 @@
 
     <section class="card" id="templates">
       <h2>Templates</h2>
-      <p>Pick a template when creating a service – then adjust URL and token variables. Setup hints end up in the service's notes. <code>{{ '{{DOMAIN}}' }}</code> in templates is replaced by <code>TC_DOMAIN</code>.</p>
+      <p>Pick a template when creating a service – then adjust URL and token variables. Setup hints end up in the service's notes. Addresses in templates use the placeholder <code>example.com</code> – replace it with the real address (the service page reminds you as long as it is there).</p>
       <table>
         <tr><th>Category</th><th>Templates</th></tr>
         {% for cat, items in templates_list | groupby("category") %}

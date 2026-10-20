@@ -259,7 +259,7 @@ SSH hosts: tentacontrol → Tentacles → SSH hosts, or `./ssh-host.sh list|add|
 | `DOCKER_SOCKET` | Docker socket of this host – for tentacontrol only |
 | `HOST_DOCS` | optional Markdown file about the host, imported into Claude's instructions |
 | `CA_CERT` | optional own root CA (PEM), trusted by curl, git, python and node in the sandbox |
-| `TC_HOSTNAME`, `TC_DOMAIN` | name of this host for Claude; domain that prefills templates |
+| `TC_HOSTNAME`, `TC_DOMAIN` | name of this host for Claude; domain for the suggested tentacontrol address (templates use `example.com`) |
 | `CONTROL_URL`, `CONTROL_BIND`, `CONTROL_PORT` | where tentacontrol is reachable |
 | `CLAUDE_CPUS`, `CLAUDE_MEMORY`, `CLAUDE_CODE_VERSION` | sandbox resources, pinned Claude Code version |
 | `GIT_USER_NAME`, `GIT_USER_EMAIL` | git identity of Claude's commits |

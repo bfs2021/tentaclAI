@@ -167,6 +167,16 @@ check "API call with injected token" "$($C svc testapi GET / 2>/dev/null)" '{"au
 check "database query" "$($C svc db testdb 'select 41+1' 2>/dev/null | sed -n 3p | tr -d ' ')" "42"
 check "ssh (tentacle, rw)" "$($C svc ssh testssh echo ssh-ok 2>&1 | tail -1)" "ssh-ok"
 check "plain ssh has no key" "$($C ssh -o BatchMode=yes testssh true >/dev/null 2>&1 && echo yes || echo no)" "no"
+# rename a git service in tentacontrol: file, root's mirror and Claude's working copy move together
+rm -f services/gitdemo.json services/gitdemo2.json
+echo '{"name":"gitdemo","git":{"url":"https://github.com/mwaldegg/tentaclai.git","access":"ro"},"examples":["svc git fetch gitdemo"]}' > services/gitdemo.json
+$C svc git sync gitdemo >/dev/null 2>&1 || true
+curl -s -b "$J" -H "$H" -o /dev/null -X POST "http://$IP:8080/services/gitdemo/rename" -d new=gitdemo2
+check "rename: service file" "$([ -f services/gitdemo2.json ] && [ ! -f services/gitdemo.json ] && echo moved)" "moved"
+check "rename: working copy" "$($C sh -c '[ -d /workspace/repos/gitdemo2/.git ] && [ ! -e /workspace/repos/gitdemo ] && echo moved')" "moved"
+check "rename: mirror" "$(docker exec tctest-claude sh -c '[ -d /root/.cache/tentaclai/git/gitdemo2.git ] && [ ! -e /root/.cache/tentaclai/git/gitdemo.git ] && echo moved')" "moved"
+check "rename: example follows" "$(grep -c 'svc git fetch gitdemo2' services/gitdemo2.json)" "1"
+check "rename: repo still works" "$($C svc git fetch gitdemo2 >/dev/null 2>&1 && echo ok)" "ok"
 fi
 
 if want egress; then

@@ -69,3 +69,41 @@ def test_save_test_path(client, app_module):
         assert "Not saved" in r.headers.get("HX-Trigger", "")
     finally:
         services_store.save_raw("demoapi", before)
+
+
+def test_rename_route(client, app_module):
+    import json
+    from app import services_store
+    before = services_store.read_raw("demodb")
+    try:
+        r = client.post("/services/demodb/rename", data={"new": "demodb2"}, headers={"HX-Request": "true"})
+        assert r.headers.get("HX-Redirect") == "/services/demodb2"
+        assert json.loads(services_store.read_raw("demodb2"))["name"] == "demodb2"
+        assert client.get("/services/demodb2").status_code == 200
+    finally:
+        try:
+            services_store.delete("demodb2")
+        except FileNotFoundError:
+            pass
+        services_store.save_raw("demodb", before)
+
+
+def test_rename_git_service_needs_running_sandbox(client, app_module):
+    from app import dockerops, services_store
+    if dockerops.status().get("running"):
+        return  # the "running" variant would move files in a sandbox – only the refusal is tested here
+    r = client.post("/services/demogit/rename", data={"new": "demogit2"}, headers={"HX-Request": "true"})
+    assert "start tentaclAI first" in r.headers.get("HX-Trigger", "")
+    services_store.read_raw("demogit")  # still there
+
+
+def test_template_placeholder_domain(client, app_module):
+    import json
+    from app import services_store
+    try:
+        services_store.create("fromtpl", "n8n")
+        assert json.loads(services_store.read_raw("fromtpl"))["api"]["base_url"] == "https://n8n.example.com"  # not the site's domain
+        assert "placeholder address" in client.get("/services/fromtpl").text
+        assert "placeholder address" not in client.get("/services/demoapi").text
+    finally:
+        services_store.delete("fromtpl")

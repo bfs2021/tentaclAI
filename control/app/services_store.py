@@ -95,9 +95,12 @@ def docker_info(d, env):
             "target": _sub(d.get("socket", "/var/run/docker.sock"), env) if mode == "socket" else d.get("ssh_host", "")}
 
 
+PLACEHOLDER_DOMAIN = "example.com"  # {{DOMAIN}} in templates – the user enters the real address, nothing is guessed
+
+
 def list_templates():
     out = []
-    domain = read_env().get("TC_DOMAIN") or "example.lan"
+    domain = PLACEHOLDER_DOMAIN
     for p in sorted(glob.glob(os.path.join(TEMPLATES_DIR, "*.json"))):
         try:
             with open(p) as f:
@@ -150,7 +153,7 @@ def create(name, template=""):
     if setup:
         tpl["notes"] = [f"Setup: {setup}"] + tpl.get("notes", [])
     up = name.upper().replace("-", "_")
-    domain = read_env().get("TC_DOMAIN") or "example.lan"
+    domain = PLACEHOLDER_DOMAIN
     text = json.dumps(tpl, ensure_ascii=False).replace("svc NAME ", f"svc {name} ").replace(" NAME ", f" {name} ").replace("svc docker NAME", f"svc docker {name}").replace("{{DOMAIN}}", domain)
     text = text.replace("EXAMPLE_", f"{up}_").replace('"example"', f'"{name}"')
     data = json.loads(text)
@@ -205,3 +208,22 @@ def set_test_path(name, path):
     data = json.loads(read_raw(name))
     data["test_path"] = path
     save_raw(name, json.dumps(data))
+
+
+def rename(old, new):
+    """services/<old>.json → <new>.json; `svc <old> …` calls in examples and notes follow. Returns the service data.
+    Tokens (${VAR} in .env) and the system membership stay; git working copies are moved by the caller (sandbox)."""
+    if not NAME.match(new or ""):
+        raise ValueError("name: lower-case letters, digits, - and _ (max 41)")
+    if new == old:
+        raise ValueError("that is the current name")
+    if os.path.exists(path_of(new)):
+        raise ValueError(f"{new} exists already")
+    data = json.loads(read_raw(old))
+    call = re.compile(r"(\bsvc\s+(?:(?:docker|compose|db|web|files|info|test|git\s+[a-z]+)\s+)?)" + re.escape(old) + r"\b")
+    for key in ("examples", "notes"):
+        if isinstance(data.get(key), list):
+            data[key] = [call.sub(lambda m: m.group(1) + new, x) if isinstance(x, str) else x for x in data[key]]
+    save_raw(new, json.dumps(data, ensure_ascii=False))  # new file first – a failure leaves the old one intact
+    os.remove(path_of(old))
+    return data

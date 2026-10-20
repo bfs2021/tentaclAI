@@ -27,7 +27,7 @@ def _stack():
     for d in ("services/_templates", "systems", "ssh/config.d", "data/control", "data/claude/.claude/projects/-workspace", "vendor", "local"):
         os.makedirs(os.path.join(STACK, d), exist_ok=True)
     with open(os.path.join(STACK, ".env"), "w") as f:
-        f.write("TC_DIR=%s\nTC_HOSTNAME=testhost\nAPI_TOKEN=secret-123\nRC_ENABLED=true\nNOTIFY_URL_PHONE=ntfy://x/y\n" % STACK)
+        f.write("TC_DIR=%s\nTC_HOSTNAME=testhost\nTC_DOMAIN=site.test\nAPI_TOKEN=secret-123\nRC_ENABLED=true\nNOTIFY_URL_PHONE=ntfy://x/y\n" % STACK)
     services = {
         "demoapi": {"description": "Demo API", "system": "box", "api": {"base_url": "https://api.example.test", "auth": {"type": "bearer", "token": "${API_TOKEN}"}},
                     "mcp": {"url": "https://api.example.test/mcp"}, "notes": "read only", "examples": ["svc demoapi GET /items"]},

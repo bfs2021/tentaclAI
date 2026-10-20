@@ -886,6 +886,31 @@ async def service_delete(request: Request, name: str):
     return respond(request, f"{name} deleted", redirect="/services")
 
 
+@app.post("/services/{name}/rename")
+async def service_rename(request: Request, name: str, new: str = Form("")):
+    new = new.strip().lower()
+    try:
+        data = json.loads(services_store.read_raw(name))
+    except (FileNotFoundError, ValueError) as e:
+        return respond(request, f"Not renamed: {e}", "err")
+    git = data.get("git") if isinstance(data.get("git"), dict) else None
+    if git and not dockerops.status().get("running"):
+        return respond(request, "Not renamed: start tentaclAI first – the git working copy and mirror move inside the sandbox", "err")
+    try:
+        services_store.rename(name, new)
+    except (ValueError, OSError) as e:
+        return respond(request, f"Not renamed: {e}", "err")
+    moved = ""
+    if git:  # svc's mirror belongs to root, the working copy to Claude – each moved by its owner
+        mv = ["sh", "-c", '[ ! -e "$1" ] || [ -e "$2" ] || mv "$1" "$2"', "mv"]
+        await asyncio.to_thread(dockerops.run, mv + [f"/root/.cache/tentaclai/git/{name}.git", f"/root/.cache/tentaclai/git/{new}.git"])
+        if not git.get("path"):
+            await asyncio.to_thread(dockerops.run, mv + [f"/workspace/repos/{name}", f"/workspace/repos/{new}"], user=dockerops.CLAUDE_USER)
+            moved = f", repo now in /workspace/repos/{new}"
+    await sync_services()
+    return respond(request, f"Renamed {name} → {new}{moved} – Claude calls it svc {new} now", redirect=f"/services/{new}")
+
+
 @app.post("/services/{name}/test", response_class=HTMLResponse)
 async def service_test(request: Request, name: str, path: str = Form("/")):
     if not services_store.valid_test_path(path):

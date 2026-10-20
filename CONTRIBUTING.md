@@ -29,7 +29,7 @@ Thanks for your interest in tentaclAI! Issues, ideas and pull requests are welco
 ## Service templates
 
 New templates go to `services/_templates/<name>.json` with a `_meta` block (`title`, `category`, `setup`), `${VAR}`
-placeholders for secrets (prefer `EXAMPLE_…` names – they are renamed per service) and `{{DOMAIN}}` for the site domain.
+placeholders for secrets (prefer `EXAMPLE_…` names – they are renamed per service) and `{{DOMAIN}}` where the site's domain belongs (filled with the placeholder `example.com` – the user enters the real address).
 
 ## Pull requests
 

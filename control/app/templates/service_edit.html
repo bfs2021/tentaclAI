@@ -22,10 +22,19 @@
     <button class="btn" hx-post="/services/{{ svc.name }}/svc-test" hx-target="#svc-test" hx-indicator="#svc-test-spin">{{ icon('check') }}Test connection</button>
     <a class="btn primary" href="/terminal?p=onboard&alias={{ svc.name | urlencode }}" title="Claude tests and explores the service and agrees on purpose, scope and rules with you">{{ icon('sparkle') }}Onboard with Claude</a>
     <button class="btn" hx-post="/services/{{ svc.name }}/toggle">{{ 'Disable' if svc.enabled else 'Enable' }}</button>
+    <button class="btn" type="button" aria-expanded="false" onclick="var f=document.getElementById('rename-form');f.hidden=!f.hidden;this.setAttribute('aria-expanded',String(!f.hidden));if(!f.hidden)f.querySelector('input').select()">Rename</button>
     <button class="btn danger" hx-post="/services/{{ svc.name }}/delete" hx-confirm="Delete service {{ svc.name }}? (tokens in .env are kept)">{{ icon('trash') }}Delete</button>
   </div>
+  <form id="rename-form" class="row" hx-post="/services/{{ svc.name }}/rename" autocomplete="off" style="margin-top:10px" hidden>
+    <input type="text" name="new" value="{{ svc.name }}" aria-label="New name" class="mono" style="max-width:260px" pattern="[a-z0-9][a-z0-9_-]{0,40}" required>
+    <button class="btn primary">{{ icon('check') }}Rename</button>
+    <span class="help">Claude then calls it <code>svc &lt;new name&gt;</code>; tokens, system and rules stay{% if 'git' in svc.kinds %}, the repo moves to <code>/workspace/repos/&lt;new name&gt;</code>{% endif %}.</span>
+  </form>
 </div>
 
+{% if 'example.com' in raw %}
+<div class="card flat" style="margin-bottom:16px"><span class="pill warn">placeholder address</span> The service still contains <code>example.com</code> from its template – replace it with the real address in the JSON below.</div>
+{% endif %}
 <div id="svc-test-wrap" class="card flat" style="margin-bottom:16px">
   <div class="between"><strong>Connection test</strong><span id="svc-test-spin" class="spinner htmx-indicator"></span></div>
   <div id="svc-test" class="small muted" style="margin-top:6px">Checks every part of the service (API, MCP, git, Docker, database, web source, files). “Onboard with Claude” also tests, explores the service and records its purpose, scope and rules with you.</div>

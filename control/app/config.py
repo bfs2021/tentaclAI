@@ -24,7 +24,7 @@ def is_secret(key: str) -> bool:
 SETTINGS_GROUPS = [
     ("General", [
         ("TC_HOSTNAME", "Host name", "how Claude refers to the host tentaclAI runs on", "text"),
-        ("TC_DOMAIN", "Internal domain", "prefills templates, e.g. n8n.<domain>", "text"),
+        ("TC_DOMAIN", "Internal domain", "suggests the tentacontrol address in ./tentaclai.sh init – service templates use example.com", "text"),
         ("CONTROL_URL", "tentacontrol address", "for the setup link and help, e.g. https://tentacontrol.example.lan", "text"),
         ("TZ", "Time zone", "e.g. Europe/Vienna", "text"),
         ("CLAUDE_CODE_VERSION", "Claude Code version", "latest or a fixed version – applied with the next update", "text"),

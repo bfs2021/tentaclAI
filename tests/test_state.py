@@ -125,3 +125,25 @@ def test_test_path_helpers(app_module):
     for bad in ("", "items", "/a b", "/x'", '/x"'):
         assert not services_store.valid_test_path(bad)
     assert services_store.valid_test_path("/environments")
+
+
+def test_service_rename(app_module):
+    from app import services_store as s
+    s.save_raw("renme", json.dumps({"api": {"base_url": "https://x"}, "examples": ["svc renme GET /a", "svc db renme tables", "svc renmex GET /"],
+                                    "notes": ["use svc renme carefully"]}))
+    try:
+        data = s.rename("renme", "renamed")
+        assert data["examples"] == ["svc renamed GET /a", "svc db renamed tables", "svc renmex GET /"]  # other names untouched
+        assert data["notes"] == ["use svc renamed carefully"]
+        assert json.loads(s.read_raw("renamed"))["name"] == "renamed"
+        with pytest.raises(FileNotFoundError):
+            s.read_raw("renme")
+        for bad in ("Renamed", "a b", "../x", "", "renamed", "demoapi"):
+            with pytest.raises(ValueError):
+                s.rename("renamed", bad)
+    finally:
+        for n in ("renme", "renamed"):
+            try:
+                s.delete(n)
+            except (FileNotFoundError, ValueError):
+                pass
