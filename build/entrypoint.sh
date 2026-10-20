@@ -68,14 +68,18 @@ as_claude sh -c 'cp -f /etc/tentaclai/commands/*.md /home/claude/.claude/command
 # status line (caged octopus + pending approvals) – only if the user has none of their own;
 # telemetry, error reports and /bug off unless CLAUDE_TELEMETRY=true in .env
 TRAFFIC_OFF="$( [ "$(envval CLAUDE_TELEMETRY | tr A-Z a-z)" = "true" ] || echo 1 )"
-# skill modes from tentacontrol → Settings → Skills (root-only data dir; Claude gets just the result)
-SKILLS="$(python3 -c 'import json, sys; sys.path.insert(0, "/usr/local/lib/tentaclai"); import tclib
+# skill modes and models from tentacontrol → Settings → Skills / Models (root-only data dir; Claude gets just the result)
+ctrl_state() {  # <file> <tclib function>
+    python3 -c 'import json, sys; sys.path.insert(0, "/usr/local/lib/tentaclai"); import tclib
 try:
     s = json.load(open(sys.argv[1]))
 except (OSError, ValueError):
     s = {}
-print(json.dumps(tclib.skill_overrides(s)))' "$TC_DIR/data/control/skills.json" 2>/dev/null || echo '{}')"
-as_claude env TRAFFIC_OFF="$TRAFFIC_OFF" SKILLS="$SKILLS" python3 - <<'PY' || echo "could not set Claude's settings"
+print(json.dumps(getattr(tclib, sys.argv[2])(s)))' "$TC_DIR/data/control/$1" "$2" 2>/dev/null || echo '{}'
+}
+SKILLS="$(ctrl_state skills.json skill_overrides)"
+MODELS="$(ctrl_state models.json models)"
+as_claude env TRAFFIC_OFF="$TRAFFIC_OFF" SKILLS="$SKILLS" MODELS="$MODELS" python3 - <<'PY' || echo "could not set Claude's settings"
 import json, os, sys
 sys.path.insert(0, "/usr/local/lib/tentaclai")
 import tclib
@@ -98,8 +102,11 @@ for k in ("DISABLE_TELEMETRY", "DISABLE_ERROR_REPORTING", "DISABLE_BUG_COMMAND")
 if not env:
     s.pop("env")
 tclib.apply_skill_overrides(s, json.loads(os.environ.get("SKILLS") or "{}"))
+m = tclib.models(json.loads(os.environ.get("MODELS") or "{}"))
+tclib.apply_models(s, m)
 open(p + ".tmp", "w").write(json.dumps(s, indent=2) + "\n")
 os.replace(p + ".tmp", p)
+tclib.write_model_commands(m)  # after the plain copy above: /inventory and /onboard with their model
 PY
 
 # claude.ai connectors that are switched off in tentacontrol (default: all) – root-owned managed settings

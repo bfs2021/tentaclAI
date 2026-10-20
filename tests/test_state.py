@@ -67,3 +67,20 @@ def test_skills_discover_without_claude(app_module, monkeypatch):
     from app import dockerops, skills
     monkeypatch.setattr(dockerops, "run", lambda *a, **k: (1, "container is not running"))
     assert skills.discover() is False
+
+
+def test_models_set_and_apply(app_module, monkeypatch):
+    from app import dockerops, models
+    calls = []
+    monkeypatch.setattr(dockerops, "run", lambda cmd, workdir=None, user="root": (calls.append((json.loads(cmd[3]), user)), (0, ""))[1])
+    assert models.current() == tclib.MODELS_DEFAULT  # fresh installation: sparing defaults
+    assert models.set_values({"main": "custom", "main_custom": "Claude-Opus-5-5", "effort": "high", "subagents": "",
+                              "commands": "haiku", "commands_effort": ""})
+    applied, user = calls[-1]
+    assert user == "claude"
+    assert applied == {"main": "claude-opus-5-5", "effort": "high", "subagents": "", "commands": "haiku", "commands_effort": ""}
+    assert models.current() == applied
+    for bad in ({"main": "custom", "main_custom": "opus; rm -rf /"}, {"effort": "max"}, {"commands_effort": "ultra"}):
+        with pytest.raises(ValueError):
+            models.set_values(bad)
+    assert models.current() == applied  # refused input changes nothing

@@ -4,7 +4,7 @@ import pytest
 PAGES = ["/", "/partials/overview", "/services", "/services/demoapi", "/services/demodb", "/services/demohost", "/services/demogit",
          "/systems", "/systems/box", "/ssh", "/ssh/new", "/ssh/box/edit", "/ssh/box/remove", "/network", "/network?tab=allow",
          "/network?tab=block", "/topology", "/topology.json", "/activity", "/partials/approvals", "/partials/approval-count",
-         "/terminal", "/help", "/settings", "/notifications", "/skills", "/usage", "/logs", "/updates", "/partials/versions"]
+         "/terminal", "/help", "/settings", "/notifications", "/skills", "/models", "/usage", "/logs", "/updates", "/partials/versions"]
 
 
 @pytest.mark.parametrize("path", PAGES)
@@ -23,4 +23,9 @@ def test_login_required(app_module):
 
 def test_skills_mode_post(client):
     r = client.post("/skills/mode", data={"name": "dataviz", "mode": "bogus"}, headers={"HX-Request": "true"})
+    assert "Not saved" in r.headers.get("HX-Trigger", "")
+
+
+def test_models_post_refuses_bad_values(client):
+    r = client.post("/models", data={"main": "custom", "main_custom": "x y"}, headers={"HX-Request": "true"})
     assert "Not saved" in r.headers.get("HX-Trigger", "")

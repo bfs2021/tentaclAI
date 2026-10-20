@@ -120,7 +120,8 @@ done
 echo "   rebuilt:${built:- nothing}"
 if docker ps -q -f name=tctest-control | grep -q .; then
     # reused stack: fresh tentaclAI state (password, rules, grants, channels, policy cache), helper containers stay up
-    docker compose rm -sf claude egress control >/dev/null 2>&1
+    docker compose stop -t 1 claude egress control >/dev/null 2>&1  # the sandbox ignores SIGTERM – no 10 s wait
+    docker compose rm -f claude egress control >/dev/null 2>&1
     docker volume rm -f tctest_egress-data >/dev/null
     docker run --rm -v "$T/data:/d" alpine:3.20 rm -rf /d/control >/dev/null
 fi
@@ -213,7 +214,7 @@ check "webhook got the blocked destination" "$(echo "$HK" | grep -c 'example.com
 fi
 
 if want skills; then
-section "skills"
+section "skills and models"
 SK() { $C python3 -c 'import json,os,sys;print(json.load(open(os.path.expanduser("~/.claude/settings.json"))).get("skillOverrides",{}).get(sys.argv[1],"on"))' "$1" 2>/dev/null; }
 curl -s -b "$J" -H "$H" -o /dev/null -X POST "http://$IP:8080/skills/mode" -d name=dataviz -d mode=on
 check "default-off skill switched on" "$(SK dataviz)" "on"
@@ -222,11 +223,18 @@ check "skill as /command only" "$(SK dataviz)" "user-invocable-only"
 curl -s -b "$J" -H "$H" -o /dev/null -X POST "http://$IP:8080/skills/mode" -d name=dataviz -d mode=bogus
 check "unknown mode refused" "$(SK dataviz)" "user-invocable-only"
 check "other defaults stay off" "$(SK anthropic-skills:pptx)" "off"
+ST() { $C python3 -c 'import json,os,sys;s=json.load(open(os.path.expanduser("~/.claude/settings.json")));print(eval(sys.argv[1]))' "$1" 2>/dev/null; }
+check "default: subagents on sonnet" "$(ST 's.get("env",{}).get("CLAUDE_CODE_SUBAGENT_MODEL")')" "sonnet"
+check "default: /inventory on sonnet" "$($C grep -c '^model: sonnet$' /home/claude/.claude/commands/inventory.md)" "1"
+curl -s -b "$J" -H "$H" -o /dev/null -X POST "http://$IP:8080/models" -d main=haiku -d effort=low -d subagents= -d commands=opus -d commands_effort=high
+check "default model applied" "$(ST 's.get("model"), s.get("effortLevel")')" "('haiku', 'low')"
+check "subagent model removed" "$(ST '"CLAUDE_CODE_SUBAGENT_MODEL" in s.get("env",{})')" "False"
+check "command model and effort" "$($C sed -n '/^model:/p;/^effort:/p' /home/claude/.claude/commands/onboard.md | tr '\n' ' ')" "model: opus effort: high "
 fi
 
 if want pages; then
 section "tentacontrol pages render"
-for p in / /network "/network?tab=allow" "/network?tab=block" /services /ssh /activity /terminal /topology /help /settings /notifications /skills /usage /logs; do
+for p in / /network "/network?tab=allow" "/network?tab=block" /services /ssh /activity /terminal /topology /help /settings /notifications /skills /models /usage /logs; do
     check "GET $p" "$(curl -s -b "$J" -o /dev/null -w '%{http_code}' "http://$IP:8080$p")" "200"
 done
 fi

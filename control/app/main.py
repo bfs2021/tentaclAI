@@ -16,7 +16,7 @@ from . import activity, auth, dockerops, jobs, services_store, sshhosts, sshops,
 from .config import CLAUDE_SERVICE, COMPOSE, DATA_DIR, SERVICES_DIR, STACK_DIR, RC_VARS, RESTART_VARS, SETTINGS_GROUPS, is_secret, site
 from .envfile import read_env, update_env
 from .terminal import PROFILES, bridge, onboard_cmd
-from . import connectors, egress, generated, notify, skills, usage
+from . import connectors, egress, generated, models, notify, skills, usage
 import tclib  # noqa: E402  shared with the sandbox tools
 
 BASE = os.path.dirname(__file__)
@@ -1071,6 +1071,22 @@ async def skills_mode(request: Request, name: str = Form(...), mode: str = Form(
 async def skills_discover(request: Request):
     ok = await asyncio.to_thread(skills.discover)
     return respond(request, "Skills checked" if ok else "Could not ask Claude Code (signed in?)", "ok" if ok else "warn", refresh=True)
+
+
+@app.get("/models", response_class=HTMLResponse)
+async def models_page(request: Request):
+    return page(request, "models.html", m=models.current(), tasks=models.TASKS, defaults=tclib.MODELS_DEFAULT,
+                aliases=tclib.MODEL_ALIASES, efforts=tclib.EFFORTS, usage_models=usage.summary()["models"])
+
+
+@app.post("/models", response_class=HTMLResponse)
+async def models_save(request: Request):
+    try:
+        ok = await asyncio.to_thread(models.set_values, dict(await request.form()))
+    except ValueError as e:
+        return respond(request, f"Not saved: {e}", "err")
+    return respond(request, "Models saved – apply to new Claude sessions" if ok else "Saved, but the sandbox is not running – applied on its next start",
+                   "ok" if ok else "warn", refresh=True)
 
 
 @app.get("/settings", response_class=HTMLResponse)

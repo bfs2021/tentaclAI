@@ -114,3 +114,39 @@ def test_apply_skill_overrides_keeps_foreign_entries():
     assert settings == {"skillOverrides": {"mine": "off", "loop": "user-invocable-only"}, "theme": "dark"}
     s2 = {"skillOverrides": {"run": "off"}}
     assert tclib.apply_skill_overrides(s2, {"run": "on"}) == {}
+
+
+def test_models_defaults_and_validation():
+    assert tclib.models({}) == tclib.MODELS_DEFAULT
+    m = tclib.models({"main": "opus", "effort": "xhigh", "subagents": "", "commands": "opus; rm -rf /", "commands_effort": "max",
+                      "unknown": "x"})
+    assert m == {"main": "opus", "effort": "xhigh", "subagents": "", "commands": "sonnet", "commands_effort": ""}
+    assert tclib.valid_model("claude-sonnet-5-5") and tclib.valid_model("opus[1m]") and not tclib.valid_model("Opus X")
+
+
+def test_apply_models():
+    s = {"env": {"DISABLE_TELEMETRY": "1"}, "theme": "dark"}
+    tclib.apply_models(s, {"main": "opus", "effort": "high", "subagents": "haiku"})
+    assert s == {"env": {"DISABLE_TELEMETRY": "1", "CLAUDE_CODE_SUBAGENT_MODEL": "haiku"}, "theme": "dark", "model": "opus",
+                 "effortLevel": "high"}
+    tclib.apply_models(s, {"main": "", "effort": "", "subagents": ""})
+    assert s == {"env": {"DISABLE_TELEMETRY": "1"}, "theme": "dark"}
+    assert tclib.apply_models({"env": {"CLAUDE_CODE_SUBAGENT_MODEL": "x"}}, {}) == {}
+
+
+def test_command_frontmatter():
+    text = "---\ndescription: Do it\nargument-hint: <x>\n---\n\nBody\n---\nnot frontmatter\n"
+    a = tclib.command_frontmatter(text, "sonnet", "low")
+    assert a == "---\ndescription: Do it\nargument-hint: <x>\nmodel: sonnet\neffort: low\n---\n\nBody\n---\nnot frontmatter\n"
+    assert tclib.command_frontmatter(a, "opus", "") == "---\ndescription: Do it\nargument-hint: <x>\nmodel: opus\n---\n\nBody\n---\nnot frontmatter\n"
+    assert tclib.command_frontmatter(a) == text
+    assert tclib.command_frontmatter("Just a body\n", "haiku") == "---\nmodel: haiku\n---\nJust a body\n"
+
+
+def test_write_model_commands(tmp_path):
+    src, dst = tmp_path / "src", tmp_path / "dst"
+    src.mkdir(), dst.mkdir()
+    (src / "inventory.md").write_text("---\ndescription: inv\n---\nBody\n")
+    tclib.write_model_commands({"commands": "sonnet", "commands_effort": "medium"}, str(src), str(dst))
+    assert (dst / "inventory.md").read_text() == "---\ndescription: inv\nmodel: sonnet\neffort: medium\n---\nBody\n"
+    assert not (dst / "onboard.md").exists()  # missing source → skipped

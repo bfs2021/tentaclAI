@@ -2,7 +2,19 @@
 
 All notable changes, newest first. Every release lists **upgrade steps** from the previous one.
 
-## Unreleased
+## v0.9.0 – 2026-10-20
+
+### Highlights
+- **Settings → Models**: model and effort per task – *Default* (every session, terminal and Remote Control),
+  *Subagents* and the set-up commands */inventory and /onboard*; aliases (`fable`, `opus`, `sonnet`, `haiku`) or an own
+  model id, *Standard* = Claude Code decides. Applied right away (new sessions) and on every container start: `model`,
+  `effortLevel` and `env.CLAUDE_CODE_SUBAGENT_MODEL` in Claude's `settings.json`, `model:`/`effort:` in the commands'
+  frontmatter. The page also shows the usage per model of the last 14 days.
+
+### Changes
+- **Behaviour change:** subagents and `/inventory`·`/onboard` run on **Sonnet** by default (less plan quota for
+  searches and set-up). The default model of the sessions stays Claude Code's choice. Back to the old behaviour:
+  Settings → Models → *Standard*.
 
 ### Fixes
 - Settings → Skills: the *Mode* select was squeezed to its arrow; descriptions of skills with a colon in the name
@@ -18,7 +30,7 @@ All notable changes, newest first. Every release lists **upgrade steps** from th
 
 ### Upgrade (from v0.8.0)
 `git pull`, `docker compose build`, `docker compose up -d` – recreating `tentaclai` ends running sessions and Remote
-Control. Nothing to migrate.
+Control. Nothing to migrate; subagents and the set-up commands use Sonnet afterwards (see Changes).
 
 ## v0.8.0 – 2026-10-20
 

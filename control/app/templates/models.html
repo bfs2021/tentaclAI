@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% from "_icons.html" import icon %}
+{% block title %}Models{% endblock %}
+{% block content %}
+<div class="header">
+  <div><h1>Models</h1><div class="sub">Which Claude model (and how much thinking effort) the sandbox uses for which task. Written into Claude's <code>settings.json</code> and the two set-up commands; changes apply to new Claude sessions. <em>Standard</em> = Claude Code decides.</div></div>
+</div>
+<nav class="conn-tabs" aria-label="Settings">
+  <a href="/settings">{{ icon('settings') }}Settings</a>
+  <a href="/notifications">{{ icon('activity') }}Notifications</a>
+  <a href="/skills">{{ icon('sparkle') }}Skills</a>
+  <a href="/models" class="active">{{ icon('cloud') }}Models</a>
+</nav>
+
+<form hx-post="/models" autocomplete="off" class="stack">
+  {% for key, effort_key, title, help in tasks %}
+  {% set v = m[key] %}{% set custom = v and v not in aliases %}
+  <div class="card">
+    <h2>{{ title }}</h2>
+    <p class="help" style="margin-top:-4px">{{ help }} Default of a fresh installation: <strong>{{ defaults[key] or 'Standard' }}</strong>.</p>
+    <div class="row" style="gap:12px;flex-wrap:wrap;align-items:flex-end">
+      <div class="field"><label for="m-{{ key }}">Model</label>
+        <select id="m-{{ key }}" name="{{ key }}" class="sys-select" style="min-width:190px"
+                onchange="var c=document.getElementById('c-{{ key }}');c.hidden=this.value!=='custom';if(!c.hidden)c.focus()">
+          <option value="" {{ 'selected' if not v }}>Standard (Claude Code)</option>
+          {% for a in aliases %}<option value="{{ a }}" {{ 'selected' if v == a }}>{{ a }}</option>{% endfor %}
+          <option value="custom" {{ 'selected' if custom }}>Own model id …</option>
+        </select></div>
+      <div class="field"><label for="c-{{ key }}" class="faint small">model id</label>
+        <input id="c-{{ key }}" type="text" name="{{ key }}_custom" value="{{ v if custom else '' }}" placeholder="e.g. claude-sonnet-5-5" class="mono" style="min-width:230px" {{ '' if custom else 'hidden' }}></div>
+      {% if effort_key %}
+      <div class="field"><label for="e-{{ key }}">Effort</label>
+        <select id="e-{{ key }}" name="{{ effort_key }}" class="sys-select" style="min-width:150px">
+          <option value="" {{ 'selected' if not m[effort_key] }}>Standard</option>
+          {% for e in efforts %}<option value="{{ e }}" {{ 'selected' if m[effort_key] == e }}>{{ e }}</option>{% endfor %}
+        </select></div>
+      {% endif %}
+    </div>
+  </div>
+  {% endfor %}
+  <div class="row">
+    <button class="btn primary">{{ icon('check') }}Save</button>
+    <span class="help">A <code>/model</code> switch inside a session only lasts for that session.</span>
+  </div>
+</form>
+
+<div class="card" style="margin-top:16px"><div class="card-head"><h2>Usage by model</h2><span class="small muted">this sandbox, 14 days · <a href="/usage">Usage</a></span></div>
+  {% if usage_models %}<div class="stack small">{% for name, u in usage_models %}
+    <div class="between"><span class="mono">{{ name }}</span><span>{{ '%.1f M' % (u.tokens / 1e6) if u.tokens >= 1e6 else '%d k' % (u.tokens // 1000) }} tokens <span class="muted">· {{ u.replies }} replies</span></span></div>
+  {% endfor %}</div>{% else %}<div class="empty small">No data yet.</div>{% endif %}
+</div>
+{% endblock %}

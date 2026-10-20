@@ -419,3 +419,71 @@ def apply_skill_overrides(settings, managed):
     if not over:
         settings.pop("skillOverrides")
     return settings
+
+
+# ---------------------------------------------------------------- models (Settings → Models)
+# Model and effort per task, from data/control/models.json; "" = Claude Code decides. The default model reaches every
+# session (terminal and Remote Control) only through settings.json – `claude remote-control` has no --model.
+MODEL_ALIASES = ("fable", "opus", "sonnet", "haiku")
+EFFORTS = ("low", "medium", "high", "xhigh")
+MODEL_RE = re.compile(r"^[a-z0-9][a-z0-9.\-\[\]]{1,60}$")  # alias or full model id – nothing else reaches settings/frontmatter
+MODELS_DEFAULT = {"main": "", "effort": "", "subagents": "sonnet", "commands": "sonnet", "commands_effort": ""}
+MODEL_COMMANDS = ("inventory", "onboard")  # slash commands shipped with the image that get the "commands" model
+
+
+def valid_model(v):
+    return v == "" or bool(MODEL_RE.match(v))
+
+
+def models(state):
+    """the effective settings: defaults, overridden by valid values from the state file"""
+    out = dict(MODELS_DEFAULT)
+    for k, v in (state or {}).items():
+        if k not in out or not isinstance(v, str):
+            continue
+        if (k.endswith("effort") and v in ("",) + EFFORTS) or (not k.endswith("effort") and valid_model(v)):
+            out[k] = v
+    return out
+
+
+def apply_models(settings, m):
+    """merge into a settings.json dict: model, effortLevel, env.CLAUDE_CODE_SUBAGENT_MODEL ("" removes the entry)"""
+    for key, val in (("model", m.get("main", "")), ("effortLevel", m.get("effort", ""))):
+        if val:
+            settings[key] = val
+        else:
+            settings.pop(key, None)
+    env = settings.setdefault("env", {})
+    if m.get("subagents"):
+        env["CLAUDE_CODE_SUBAGENT_MODEL"] = m["subagents"]
+    else:
+        env.pop("CLAUDE_CODE_SUBAGENT_MODEL", None)
+    if not env:
+        settings.pop("env")
+    return settings
+
+
+def command_frontmatter(text, model="", effort=""):
+    """set or remove `model:` and `effort:` in the YAML frontmatter of a slash command file"""
+    lines = text.split("\n")
+    if not lines or lines[0].strip() != "---" or "---" not in [l.strip() for l in lines[1:]]:
+        lines = ["---", "---"] + lines
+    end = 1 + [l.strip() for l in lines[1:]].index("---")
+    head = [l for l in lines[1:end] if not re.match(r"^(model|effort)\s*:", l)]
+    head += [f"model: {model}"] if model else []
+    head += [f"effort: {effort}"] if effort else []
+    return "\n".join(["---"] + head + lines[end:])
+
+
+def write_model_commands(m, src="/etc/tentaclai/commands", dst=None):
+    """the shipped /inventory and /onboard with the "commands" model and effort in their frontmatter (run as claude)"""
+    dst = dst or os.path.expanduser("~/.claude/commands")
+    for name in MODEL_COMMANDS:
+        try:
+            text = open(os.path.join(src, f"{name}.md")).read()
+        except OSError:
+            continue
+        out = os.path.join(dst, f"{name}.md")
+        with open(out + ".tmp", "w") as f:
+            f.write(command_frontmatter(text, m.get("commands", ""), m.get("commands_effort", "")))
+        os.replace(out + ".tmp", out)
