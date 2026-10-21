@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_icons.html" import icon %}
+{% from "_icons.html" import icon, help_link %}
 {% block title %}Network{% endblock %}
 {% macro rule_btn(kind, entry, label, cls="") -%}
 <form class="inline" hx-post="/network/rule"><input type="hidden" name="kind" value="{{ kind }}"><input type="hidden" name="entry" value="{{ entry }}"><button class="btn sm {{ cls }}">{{ label }}</button></form>
@@ -22,6 +22,7 @@
     {% for v, t in (('ask', 'ask'), ('block', 'block')) %}{% if direct_ip == v %}<span class="seg-on {{ 'ok' if v == 'block' else 'warn' }}" role="radio" aria-checked="true">{{ t }}</span>{% else %}<button role="radio" aria-checked="false" hx-post="/network/direct-ip">{{ t }}</button>{% endif %}{% endfor %}
   </div>
   </div>
+  <div class="row">{{ help_link('network') }}</div>
 </div>
 <nav class="conn-tabs" aria-label="Network">
   <a href="/network?tab=seen" class="{{ 'active' if tab == 'seen' }}">{{ icon('activity') }}Seen</a>

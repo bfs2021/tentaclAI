@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_icons.html" import icon, help_link %}
 {% from "_conn_tabs.html" import conn_tabs %}
 {% from "_service_card.html" import service_card %}
 {% block title %}Services{% endblock %}
@@ -9,7 +10,7 @@
   <div class="row">
     <button class="btn primary toggle" data-toggle="new-svc" aria-expanded="false" aria-controls="new-svc">{{ icon('plus') }}Add service</button>
     <button class="btn" hx-post="/services/sync">{{ icon('refresh') }}Sync</button>
-    <a class="btn ghost" href="/help#services">Help</a>
+    {{ help_link('services') }}
   </div>
 </div>
 <div class="card flat" id="new-svc" style="margin-bottom:18px" hidden>

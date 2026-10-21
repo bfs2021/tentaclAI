@@ -85,6 +85,10 @@ h1 svg { margin-right: 8px; vertical-align: -3px; color: var(--accent); }
 .btn svg { width: 15px; height: 15px; }
 .btn.primary { background: var(--accent-2); border-color: var(--accent-2); color: #fff; }
 .btn.toggle svg { transition: transform .15s; }
+.help-link { display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; border-radius: 50%;
+  color: var(--muted); }
+.help-link:hover { color: var(--accent); background: var(--accent-soft); text-decoration: none; }
+.help-link svg { width: 20px; height: 20px; }
 .btn.toggle.open svg { transform: rotate(45deg); }
 .btn.primary:hover { background: var(--accent); border-color: var(--accent); }
 .btn.danger { color: var(--err); } .btn.danger:hover { background: var(--err-soft); border-color: var(--err); }

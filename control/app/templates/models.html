@@ -1,9 +1,10 @@
 {% extends "base.html" %}
-{% from "_icons.html" import icon %}
+{% from "_icons.html" import icon, help_link %}
 {% block title %}Models{% endblock %}
 {% block content %}
 <div class="header">
   <div><h1>Models</h1><div class="sub">Which Claude model (and how much thinking effort) the sandbox uses for which task. Written into Claude's <code>settings.json</code> and the two set-up commands; changes apply to new Claude sessions. <em>Standard</em> = Claude Code decides.</div></div>
+  <div class="row">{{ help_link('models') }}</div>
 </div>
 <nav class="conn-tabs" aria-label="Settings">
   <a href="/settings">{{ icon('settings') }}Settings</a>

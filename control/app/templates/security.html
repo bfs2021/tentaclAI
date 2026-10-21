@@ -1,9 +1,10 @@
 {% extends "base.html" %}
-{% from "_icons.html" import icon %}
+{% from "_icons.html" import icon, help_link %}
 {% block title %}Security{% endblock %}
 {% block content %}
 <div class="header">
   <div><h1>Security</h1><div class="sub">Two-factor sign-in: after the password, tentacontrol asks for a code from an authenticator app (Google Authenticator, Aegis, 1Password, Bitwarden …). Whoever signs in here controls the Docker host – a second factor keeps a leaked password from being enough.</div></div>
+  <div class="row">{{ help_link('two-factor') }}</div>
 </div>
 <nav class="conn-tabs" aria-label="Settings">
   <a href="/settings">{{ icon('settings') }}Settings</a>

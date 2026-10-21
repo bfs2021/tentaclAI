@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_icons.html" import icon, help_link %}
 {% from "_conn_tabs.html" import conn_tabs %}
 {% block title %}SSH{% endblock %}
 {% block content %}
@@ -6,8 +7,9 @@
 <div class="header">
   <div><h1>SSH targets</h1><div class="sub">One file per host in <code>ssh/config.d/</code>, own key <code>tentaclai_ed25519</code></div></div>
   <div class="row">
-    <button class="btn" onclick="document.getElementById('dlg-pubkey').showModal()">{{ icon('key') }}Public key</button>
     <button class="btn primary" hx-get="/ssh/new" hx-target="#ssh-dlg-body" onclick="document.getElementById('dlg-ssh').showModal()">{{ icon('plus') }}Add host</button>
+    <button class="btn" onclick="document.getElementById('dlg-pubkey').showModal()">{{ icon('key') }}Public key</button>
+    {{ help_link('ssh') }}
   </div>
 </div>
 <div class="card" style="margin-bottom:16px">

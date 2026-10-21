@@ -1,10 +1,11 @@
 {% extends "base.html" %}
-{% from "_icons.html" import icon %}
+{% from "_icons.html" import icon, help_link %}
 {% block title %}Skills{% endblock %}
 {% block content %}
 <div class="header">
   <div><h1>Skills</h1><div class="sub">Skills of Claude Code and your claude.ai account. Every skill Claude is offered costs context in <em>every</em> request – switch off what Claude never needs in this sandbox. Written as <code>skillOverrides</code> into Claude's <code>settings.json</code>; changes apply to new Claude sessions.</div></div>
   <button class="btn ghost" hx-post="/skills/discover">{{ icon('refresh') }}Check</button>
+  <div class="row">{{ help_link('skills') }}</div>
 </div>
 <nav class="conn-tabs" aria-label="Settings">
   <a href="/settings">{{ icon('settings') }}Settings</a>

@@ -1,10 +1,10 @@
 {% extends "base.html" %}
-{% from "_icons.html" import icon %}
+{% from "_icons.html" import icon, help_link %}
 {% block title %}Usage{% endblock %}
 {% block content %}
 <div class="header">
   <div><h1>Usage</h1><div class="sub">Plan limits as Claude Code reports them (account-wide – the same numbers as in your claude.ai profile) and token totals of the sessions in this sandbox.</div></div>
-  <button class="btn sm" hx-post="/usage/refresh">{{ icon('refresh') }}Refresh</button>
+  <div class="row"><button class="btn sm" hx-post="/usage/refresh">{{ icon('refresh') }}Refresh</button>{{ help_link('usage') }}</div>
 </div>
 
 <div class="card" style="margin-bottom:16px">

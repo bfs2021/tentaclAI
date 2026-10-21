@@ -1,9 +1,10 @@
 {% extends "base.html" %}
-{% from "_icons.html" import icon %}
+{% from "_icons.html" import icon, help_link %}
 {% block title %}Settings{% endblock %}
 {% block content %}
 <div class="header">
   <div><h1>Settings</h1><div class="sub">Values from <code>{{ site.tc_dir }}/.env</code>. Secrets are never shown. Reverse proxy and extra mounts: <code>compose.override.yaml</code> (see <a href="/help#site">help</a>).</div></div>
+  <div class="row">{{ help_link('settings') }}</div>
 </div>
 <nav class="conn-tabs" aria-label="Settings">
   <a href="/settings" class="active">{{ icon('settings') }}Settings</a>

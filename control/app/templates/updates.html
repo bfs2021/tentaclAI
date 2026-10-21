@@ -1,8 +1,10 @@
 {% extends "base.html" %}
+{% from "_icons.html" import icon, help_link %}
 {% block title %}Updates{% endblock %}
 {% block content %}
 <div class="header">
   <div><h1>Updates</h1><div class="sub">Claude Code is installed when the image is built – an update rebuilds the image and recreates the container.</div></div>
+  <div class="row">{{ help_link('updates') }}</div>
 </div>
 <div class="grid two">
   <div hx-get="/partials/versions" hx-trigger="load" hx-swap="outerHTML"><div class="skeleton"></div></div>

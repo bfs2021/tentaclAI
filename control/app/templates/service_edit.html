@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_icons.html" import icon, help_link %}
 {% from "_conn_tabs.html" import conn_tabs %}
 {% block title %}{{ svc.name }}{% endblock %}
 {% block content %}
@@ -24,6 +25,7 @@
     <button class="btn" hx-post="/services/{{ svc.name }}/toggle">{{ 'Disable' if svc.enabled else 'Enable' }}</button>
     <button class="btn" type="button" aria-expanded="false" onclick="var f=document.getElementById('rename-form');f.hidden=!f.hidden;this.setAttribute('aria-expanded',String(!f.hidden));if(!f.hidden)f.querySelector('input').select()">Rename</button>
     <button class="btn danger" hx-post="/services/{{ svc.name }}/delete" hx-confirm="Delete service {{ svc.name }}? (tokens in .env are kept)">{{ icon('trash') }}Delete</button>
+    {{ help_link('services') }}
   </div>
   <form id="rename-form" class="row" hx-post="/services/{{ svc.name }}/rename" autocomplete="off" style="margin-top:10px" hidden>
     <input type="text" name="new" value="{{ svc.name }}" aria-label="New name" class="mono" style="max-width:260px" pattern="[a-z0-9][a-z0-9_-]{0,40}" required>

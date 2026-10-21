@@ -1,8 +1,10 @@
 {% extends "base.html" %}
+{% from "_icons.html" import icon, help_link %}
 {% block title %}Activity{% endblock %}
 {% block content %}
 <div class="header">
   <div><h1>Activity</h1><div class="sub">Write actions through <code>svc</code>: approvals for services with access <code>confirm</code>, and the audit log of everything that changed something.</div></div>
+  <div class="row">{{ help_link('activity') }}</div>
 </div>
 <div class="card" style="margin-bottom:18px">
   <h2>Pending approvals</h2>

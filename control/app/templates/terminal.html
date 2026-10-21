@@ -1,11 +1,12 @@
 {% extends "base.html" %}
+{% from "_icons.html" import icon, help_link %}
 {% block title %}Terminal{% endblock %}
 {% block head %}<link rel="stylesheet" href="/vendor/xterm.css">{% endblock %}
 {% block content %}
 <div class="header">
   <div><h1>Terminal</h1><div class="sub">{{ title }} – sessions keep running in tmux when you leave the page.</div></div>
   <div class="row"><span id="term-state" class="pill info">connecting …</span>
-    <button class="btn sm" id="reconnect" hidden>{{ icon('refresh') }}Reconnect</button></div>
+    <button class="btn sm" id="reconnect" hidden>{{ icon('refresh') }}Reconnect</button>{{ help_link('terminal') }}</div>
 </div>
 <div class="tabs">
   {% for key, prof in profiles.items() if not (key == 'login' and logged and current != 'login') %}

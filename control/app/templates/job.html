@@ -1,9 +1,11 @@
 {% extends "base.html" %}
+{% from "_icons.html" import icon, help_link %}
 {% block title %}{{ job.title }}{% endblock %}
 {% block content %}
 <div class="header">
   <div><h1>{{ job.title }}</h1><div class="sub">Live output – you can close the page, the job keeps running.</div></div>
   <span id="job-state" class="pill info"><span class="spinner"></span>running</span>
+  <div class="row">{{ help_link('updates') }}</div>
 </div>
 <pre class="console" id="out"></pre>
 <div class="row" style="margin-top:14px"><a class="btn" href="/">Back to overview</a></div>

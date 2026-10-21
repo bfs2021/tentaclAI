@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_icons.html" import icon, help_link %}
 {% from "_conn_tabs.html" import conn_tabs %}
 {% block title %}{{ sysd.name }}{% endblock %}
 {% block content %}
@@ -8,6 +9,7 @@
   <div class="row">
     <a class="btn ghost" href="/systems">Back</a>
     <button class="btn danger" hx-post="/systems/{{ sysd.name }}/delete" hx-confirm="Delete system {{ sysd.name }}? Its services stay and become standalone.">{{ icon('trash') }}Delete</button>
+    {{ help_link('systems') }}
   </div>
 </div>
 <form hx-post="/systems/{{ sysd.name }}">

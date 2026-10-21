@@ -1,10 +1,12 @@
 {% extends "base.html" %}
+{% from "_icons.html" import icon, help_link %}
 {% from "_conn_tabs.html" import conn_tabs %}
 {% block title %}Topology{% endblock %}
 {% block content %}
 {{ conn_tabs("topology") }}
 <div class="header">
   <div><h1>Topology</h1><div class="sub">What Claude can reach and how – systems, services, SSH hosts and (optionally) containers. Disabled services are hidden.</div></div>
+  <div class="row">{{ help_link('topology') }}</div>
 </div>
 <div class="topo-toolbar card flat">
   <input type="search" id="topo-q" placeholder="Search nodes …" autocomplete="off" spellcheck="false">

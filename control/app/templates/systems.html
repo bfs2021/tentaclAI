@@ -1,11 +1,12 @@
 {% extends "base.html" %}
+{% from "_icons.html" import icon, help_link %}
 {% from "_conn_tabs.html" import conn_tabs %}
 {% block title %}Systems{% endblock %}
 {% block content %}
 {{ conn_tabs("systems") }}
 <div class="header">
   <div><h1>Systems</h1><div class="sub">A system groups the services of one host or appliance – SSH host, docker host, APIs – with rules that apply to all of them. Services can also stand alone.</div></div>
-  <div class="row"><button class="btn primary toggle" data-toggle="new-system" aria-expanded="false" aria-controls="new-system">{{ icon('plus') }}Add system</button></div>
+  <div class="row"><button class="btn primary toggle" data-toggle="new-system" aria-expanded="false" aria-controls="new-system">{{ icon('plus') }}Add system</button>{{ help_link('systems') }}</div>
 </div>
 <div class="card flat" id="new-system" style="margin-bottom:18px" hidden>
   <form class="row" hx-post="/systems/new" style="align-items:flex-end">
