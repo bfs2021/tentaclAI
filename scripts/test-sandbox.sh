@@ -176,9 +176,9 @@ check "plain ssh has no key" "$($C ssh -o BatchMode=yes testssh true >/dev/null 
 SID=0123abcd-0123-4abc-8def-0123456789ab
 docker exec -u claude -e CLAUDE_CODE_SESSION_ID=$SID -e CLAUDE_CODE_ENTRYPOINT=cli -e CLAUDE_CODE_SESSION_ACCESS_TOKEN=leak-test \
     tctest-claude svc ssh testssh touch /tmp/origin-test >/dev/null 2>&1 || true
-LAST="$(tail -1 data/control/audit.jsonl 2>/dev/null || true)"
-check "audit entry names the session" "$(echo "$LAST" | grep -c "$SID" || true)" "1"
-check "the session token stays behind" "$(grep -c leak-test data/control/audit.jsonl 2>/dev/null || true)" "0"
+AUDIT="$(docker exec tctest-claude cat "$T/data/control/audit.jsonl" 2>/dev/null || true)"  # root-only (also in CI)
+check "audit entry names the session" "$(echo "$AUDIT" | tail -1 | grep -c "$SID" || true)" "1"
+check "the session token stays behind" "$(echo "$AUDIT" | grep -c leak-test || true)" "0"
 # rename a git service in tentacontrol: file, root's mirror and Claude's working copy move together
 rm -f services/gitdemo.json services/gitdemo2.json
 echo '{"name":"gitdemo","git":{"url":"https://github.com/mwaldegg/tentaclai.git","access":"ro"},"examples":["svc git fetch gitdemo"]}' > services/gitdemo.json
