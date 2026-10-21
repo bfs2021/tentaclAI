@@ -191,7 +191,7 @@ def test_state_token_changes(sj, monkeypatch, tmp_path):
 def test_manual_only(sj, monkeypatch, tmp_path):
     monkeypatch.setattr(sj, "JOBS", str(tmp_path / "jobs.json"))
     assert sj.clean_schedule({"kind": "manual", "time": "07:00"}) == {"kind": "manual"}
-    assert sj.next_run({"kind": "manual"}, time.time()) is None and sj.describe({"kind": "manual"}) == "manual only"
+    assert sj.next_run({"kind": "manual"}, time.time()) is None and sj.describe({"kind": "manual"}) == "manual"
     jid = sj.save({"name": "On demand", "prompt": "p", "kind": "manual"})
     assert sj.get(jid)["next"] is None
     jobs = sj.load(); jobs[jid]["last"] = 0

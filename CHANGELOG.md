@@ -21,7 +21,7 @@ All notable changes, newest first. Every release lists **upgrade steps** from th
   every other service and SSH host, MCP servers are off. A running run shows a spinner and its time, the page
   reloads when it ends.
   The latest run is always shown, earlier ones fold away under *History*.
-  Schedule *manual only* for jobs that run just with *Run now*.
+  Schedule *manual* for jobs that run just with *Run now*.
 
 ### Changes
 - Service cards and pages show every part's access the same way – `api: rw`, `docker: confirm`, `imap: ro` – including mail parts.

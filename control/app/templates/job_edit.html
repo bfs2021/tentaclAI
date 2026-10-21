@@ -24,7 +24,7 @@
   <div class="grid2">
     <div><label>Schedule</label>
       <select name="kind" id="sched-kind">
-        {% for k, t in (('hourly', 'every hour'), ('daily', 'daily'), ('weekly', 'weekly'), ('every', 'every N hours'), ('cron', 'cron expression'), ('manual', 'manual only – Run now')) %}
+        {% for k, t in (('hourly', 'every hour'), ('daily', 'daily'), ('weekly', 'weekly'), ('every', 'every N hours'), ('cron', 'cron expression'), ('manual', 'manual')) %}
         <option value="{{ k }}" {{ 'selected' if s.kind == k }}>{{ t }}</option>{% endfor %}
       </select>
       <div class="row sched" data-kinds="daily weekly" style="margin-top:8px;justify-content:flex-start">

@@ -222,7 +222,7 @@ def next_run(sched, after, last=None):
 def describe(sched):
     k = sched.get("kind")
     if k == "manual":
-        return "manual only"
+        return "manual"
     if k == "hourly":
         return f"every hour at :{int(sched.get('minute', 0)):02d}"
     if k == "daily":

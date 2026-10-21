@@ -316,5 +316,5 @@ def test_manual_job_renders_without_next_and_pause(client, app_module, monkeypat
     jid = scheduled.save({"name": "On demand", "prompt": "p", "kind": "manual"})
     html = client.get("/jobs").text
     card = html[html.index("On demand"):]
-    assert "manual only" in card and "· next" not in card[:400] and ">Pause<" not in card[:1500]
+    assert "manual" in card and "· next" not in card[:400] and ">Pause<" not in card[:1500]
     assert client.get(f"/jobs/{jid}").status_code == 200
