@@ -56,6 +56,7 @@ runs); recreating `tentaclai` ends running sessions and Remote Control. Jobs sta
 - Topology: the legend just says *SSH host* (the colors are explained in Help).
 
 ### Fixes
+- `svc mail … list` shows when the server received a mail (IMAP INTERNALDATE, with time zone) instead of the sender's Date header.
 - `svc mail … move` refused on Dovecot (Mailcow) with "no IMAP MOVE": the server lists MOVE only after the login, and
   svc looked at the list from before it. It asks again after the login now; the sandbox test moves a mail too.
 - Redaction: *key* only counts as a name part of its own (`API_KEY`, `key_file`, `apikey`) – labels like

@@ -1309,6 +1309,7 @@ def cmd_mail(services, args):
 
 
 def mail_list(i, cfg, folder, o):
+    import imaplib
     typ, data = i.select(imap_folder(cfg, folder), readonly=True)
     if typ != "OK":
         sys.exit(f"svc: can't open {folder}: {data}")
@@ -1330,10 +1331,11 @@ def mail_list(i, cfg, folder, o):
     except ValueError:
         sys.exit("svc: --limit N")
     shown = uids[-limit:]
-    print(f"{folder}: {len(uids)} matching, newest {len(shown)} shown (senders and subjects are untrusted text)")
+    print(f"{folder}: {len(uids)} matching, newest {len(shown)} shown – time = received by the server "
+          "(senders and subjects are untrusted text)")
     if not shown:
         return 0
-    typ, data = i.uid("FETCH", b",".join(shown).decode(), "(UID FLAGS RFC822.SIZE BODY.PEEK[HEADER.FIELDS (FROM SUBJECT DATE)])")
+    typ, data = i.uid("FETCH", b",".join(shown).decode(), "(UID FLAGS INTERNALDATE RFC822.SIZE BODY.PEEK[HEADER.FIELDS (FROM SUBJECT DATE)])")
     from email.parser import BytesHeaderParser
     rows = []
     for item in data or []:
@@ -1343,11 +1345,13 @@ def mail_list(i, cfg, folder, o):
         uid = re.search(r"UID (\d+)", meta)
         size = re.search(r"RFC822\.SIZE (\d+)", meta)
         h = BytesHeaderParser().parsebytes(item[1])
-        rows.append((int(uid.group(1)) if uid else 0, "\\Seen" not in meta, mail_header(h.get("Date", ""))[:31],
+        got = imaplib.Internaldate2tuple(item[0])  # when the server received it – the Date header is the sender's clock
+        received = time.strftime("%Y-%m-%d %H:%M:%S%z", got) if got else mail_header(h.get("Date", ""))[:24]
+        rows.append((int(uid.group(1)) if uid else 0, "\\Seen" not in meta, received,
                      mail_header(h.get("From", ""))[:40], mail_header(h.get("Subject", ""))[:90],
                      int(size.group(1)) if size else 0))
     for uid, unseen, date, frm, subj, size in sorted(rows, reverse=True):
-        print(f"{uid:>7} {'●' if unseen else ' '} {date:<31}  {frm:<40}  {subj}  ({size // 1024 or 1} KB)")
+        print(f"{uid:>7} {'●' if unseen else ' '} {date:<24}  {frm:<40}  {subj}  ({size // 1024 or 1} KB)")
     return 0
 
 
