@@ -202,3 +202,33 @@ def test_approval_shows_where_it_came_from(client, app_module):
         assert "from Onboarding demohost" in html
     finally:
         activity.decide(rid, False)
+
+
+def test_favicon_without_login(app_module):
+    from fastapi.testclient import TestClient
+    r = TestClient(app_module.app).get("/favicon.ico", follow_redirects=False)
+    assert r.status_code == 200 and r.headers["content-type"].startswith("image/svg+xml")
+
+
+def test_badge_disappears_after_the_last_decision(client, app_module):
+    """an empty answer would be kept by app.js – the badge must answer with a hidden element"""
+    from app import activity
+    rid = activity.create("demohost", "docker", "docker restart x")
+    assert ">1<" in client.get("/partials/approval-count").text.replace(" ", "")
+    activity.decide(rid, False)
+    r = client.get("/partials/approval-count").text
+    assert r.strip() and "hidden" in r
+
+
+def test_approval_banner(client, app_module):
+    from app import activity
+    assert 'id="approval-banner"' in client.get("/settings").text      # placeholder on normal pages
+    assert 'id="approval-banner"' not in client.get("/activity").text  # Activity has the full list
+    empty = client.get("/partials/approval-banner").text
+    assert 'id="approval-banner"' in empty and "Approval needed" not in empty  # never an empty answer
+    rid = activity.create("demohost", "docker", "docker restart x", {"tmux": "claude-rc"})
+    html = client.get("/partials/approval-banner").text
+    assert "Approval needed: demohost" in html and "from Remote Control" in html and f"/approvals/{rid}/approve?view=banner" in html
+    r = client.post(f"/approvals/{rid}/deny?view=banner")
+    assert 'id="approval-banner"' in r.text and "Approval needed" not in r.text and "Active grants" not in r.text
+    assert activity.APPROVALS[rid]["status"] == "denied"

@@ -38,6 +38,7 @@
     <a class="version-tag" href="https://github.com/mwaldegg/tentaclai/releases" target="_blank" rel="noopener" title="Releases on GitHub">tentaclAI v{{ tc_version }}</a>
   </aside>
   <main class="main">
+    {% if nav != 'activity' %}<div id="approval-banner" hx-get="/partials/approval-banner" hx-trigger="load" hx-swap="outerHTML"></div>{% endif %}
     {% if restart_needed %}
     <div class="banner">
       <div><strong>{{ 'A newer tentaclAI image is ready.' if newer_image else 'Configuration changed.' }}</strong> <span class="muted">tentaclAI has to be recreated for the changes to take effect – running Claude sessions will end.</span></div>

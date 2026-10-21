@@ -80,6 +80,12 @@ async def approvals_partial(request: Request):
                                        "grants": activity.grants(), "no_grant": activity.NO_GRANT_PARTS})
 
 
+@router.get("/partials/approval-banner", response_class=HTMLResponse)
+async def approval_banner(request: Request):
+    return templates.TemplateResponse(request, "partials/approval_banner.html",
+                                      {"pending": activity.pending(), "no_grant": activity.NO_GRANT_PARTS})
+
+
 @router.post("/grants/revoke", response_class=HTMLResponse)
 async def grant_revoke(request: Request, service: str = Form(...), part: str = Form(...)):
     activity.revoke(service, part)
@@ -91,7 +97,8 @@ async def grant_revoke(request: Request, service: str = Form(...), part: str = F
 @router.get("/partials/approval-count", response_class=HTMLResponse)
 async def approval_count():
     n = len(activity.pending())
-    return HTMLResponse(f'<span class="nav-badge">{n}</span>' if n else "")
+    # never an empty answer: app.js keeps the old content then, and the badge would stay after the last decision
+    return HTMLResponse(f'<span class="nav-badge">{n}</span>' if n else '<span class="nav-badge" hidden></span>')
 
 
 @router.post("/approvals/{rid}/{verdict}", response_class=HTMLResponse)
@@ -104,7 +111,7 @@ async def approval_decide(request: Request, rid: str, verdict: str):
         egress.add("allow" if verdict == "always" else "block", a["service"])  # host:port
     ok = activity.decide(rid, verdict not in ("deny", "block"), who=who, grant=verdict in ("approve15", "net10", "net60"),
                          seconds={"net10": 600, "net60": 3600}.get(verdict))
-    resp = await approvals_partial(request)
+    resp = await (approval_banner(request) if request.query_params.get("view") == "banner" else approvals_partial(request))
     if not ok:
         resp.headers.update(toast("Request no longer pending", "warn"))
     return resp

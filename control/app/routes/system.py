@@ -1,17 +1,18 @@
 """Sign-in, overview, sandbox lifecycle, terminal, help, updates, jobs and logs."""
 import asyncio
 import json
+import os
 import time
 
 import segno
 from fastapi import APIRouter, Form, Request, WebSocket
-from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse, RedirectResponse, StreamingResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, PlainTextResponse, RedirectResponse, StreamingResponse
 
 from .. import activity, auth, dockerops, egress, jobs, netguard, notify, services_store, sshhosts, updatecheck, usage
 from ..config import CLAUDE_SERVICE, COMPOSE
 from ..envfile import read_env, update_env
 from ..terminal import PROFILES, bridge, onboard_cmd
-from ..web import TC_VERSION, client_ip, page, respond, templates, toast
+from ..web import BASE, TC_VERSION, client_ip, page, respond, templates, toast
 import tclib  # noqa: E402  shared with the sandbox tools
 
 router = APIRouter()
@@ -20,6 +21,13 @@ router = APIRouter()
 @router.get("/healthz")
 async def healthz():
     return {"ok": True}
+
+
+@router.get("/favicon.ico")
+async def favicon():
+    """browsers ask for /favicon.ico on their own (e.g. for JSON pages or bookmarks) – the logo, not the login redirect"""
+    return FileResponse(os.path.join(BASE, "static", "logo.svg"), media_type="image/svg+xml",
+                        headers={"Cache-Control": "public, max-age=86400"})
 
 
 @router.get("/setup", response_class=HTMLResponse)

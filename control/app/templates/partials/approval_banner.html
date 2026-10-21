@@ -1,0 +1,26 @@
+{% from "_icons.html" import icon %}
+{# on every page but Activity: pending approvals with their buttons – refreshes itself, never empty (htmx keeps empty answers) #}
+<div id="approval-banner" hx-get="/partials/approval-banner" hx-trigger="every 3s" hx-swap="outerHTML">
+  {% for a in pending %}
+  <div class="banner approval-banner">
+    <div style="min-width:0">
+      <strong>{{ icon('activity') }}Approval needed: {{ a.service }}</strong> <span class="tag">{{ a.part }}</span>
+      {% if a.get('from') %}<span class="small muted">from {{ a['from'] }}</span>{% endif %}
+      <div class="mono small approval-action-line" title="{{ a.action }}">{{ a.action }}</div>
+    </div>
+    <div class="row" style="gap:6px;flex-wrap:wrap;justify-content:flex-end">
+      {% set go = '?view=banner' %}
+      {% if a.part == 'network' %}
+      <button class="btn primary sm" hx-post="/approvals/{{ a.id }}/net10{{ go }}" hx-target="#approval-banner" hx-swap="outerHTML">{{ icon('check') }}Allow 10 min</button>
+      <button class="btn sm danger" hx-post="/approvals/{{ a.id }}/deny{{ go }}" hx-target="#approval-banner" hx-swap="outerHTML">Deny</button>
+      {% else %}
+      <button class="btn primary sm" hx-post="/approvals/{{ a.id }}/approve{{ go }}" hx-target="#approval-banner" hx-swap="outerHTML">{{ icon('check') }}Approve</button>
+      {% if a.part not in no_grant %}<button class="btn sm" hx-post="/approvals/{{ a.id }}/approve15{{ go }}" hx-target="#approval-banner" hx-swap="outerHTML"
+        title="Approve this and every further write of {{ a.service }} ({{ a.part }}) for the next 15 minutes">+ 15 min</button>{% endif %}
+      <button class="btn sm danger" hx-post="/approvals/{{ a.id }}/deny{{ go }}" hx-target="#approval-banner" hx-swap="outerHTML">Deny</button>
+      {% endif %}
+      <a class="btn sm ghost" href="/activity" title="all options and the audit log">More</a>
+    </div>
+  </div>
+  {% endfor %}
+</div>

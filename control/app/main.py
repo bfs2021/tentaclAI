@@ -27,7 +27,7 @@ app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None, lifespan=lifespan
 app.mount("/static", StaticFiles(directory=os.path.join(BASE, "static")), name="static")
 app.mount("/vendor", StaticFiles(directory=os.environ.get("VENDOR_DIR", "/app/vendor")), name="vendor")  # VENDOR_DIR: tests
 
-PUBLIC = ("/login", "/setup", "/static/", "/vendor/", "/healthz", "/internal/")  # /internal/: svc token, checked per route
+PUBLIC = ("/login", "/setup", "/static/", "/vendor/", "/healthz", "/internal/", "/favicon.ico")  # /internal/: svc token, checked per route
 
 
 @app.middleware("http")

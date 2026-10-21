@@ -353,3 +353,9 @@ input[type=checkbox]:not(.switch-cb) { accent-color: var(--accent-2); }
 .uchart-x { display: flex; gap: 4px; font-size: 11px; color: var(--muted); } .uchart-x span { flex: 1; text-align: center; min-width: 0; overflow: hidden; }
 .legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 12px; color: var(--muted); margin-top: 8px; }
 .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
+
+/* approval banner on every page but Activity */
+.approval-banner { margin-bottom: 12px; }
+.approval-banner svg { width: 15px; height: 15px; vertical-align: -2px; margin-right: 4px; }
+.approval-action-line { margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 70ch; }
+@media (max-width: 700px) { .approval-banner { flex-direction: column; align-items: stretch; } }
