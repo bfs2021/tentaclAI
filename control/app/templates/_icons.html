@@ -27,6 +27,6 @@
 </svg>
 {%- endmacro %}
 
-{% macro help_link(anchor) -%}
-<a class="help-link" href="/help#{{ anchor }}" title="Help" aria-label="Help">{{ icon('help') }}</a>
+{% macro help_link(anchor, small=false) -%}
+<a class="help-link{{ ' sm' if small }}" href="/help#{{ anchor }}" title="Help" aria-label="Help">{{ icon('help') }}</a>
 {%- endmacro %}

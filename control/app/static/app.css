@@ -47,6 +47,8 @@ p { margin: 0 0 10px; }
 .main { padding: 28px 36px 60px; max-width: 1240px; width: 100%; }
 .header { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 22px; flex-wrap: wrap; }
 .header .sub { color: var(--muted); margin-top: 4px; }
+.header > div:first-child { flex: 1 1 360px; min-width: 0; }  /* a long subtitle wraps, the buttons stay on the right */
+.header > .row { margin-left: auto; }
 
 /* cards & grid */
 .grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); }
@@ -89,6 +91,8 @@ h1 svg { margin-right: 8px; vertical-align: -3px; color: var(--accent); }
   color: var(--muted); }
 .help-link:hover { color: var(--accent); background: var(--accent-soft); text-decoration: none; }
 .help-link svg { width: 20px; height: 20px; }
+.help-link.sm { width: 20px; height: 20px; vertical-align: middle; }
+.help-link.sm svg { width: 15px; height: 15px; }
 .btn.toggle.open svg { transform: rotate(45deg); }
 .btn.primary:hover { background: var(--accent); border-color: var(--accent); }
 .btn.danger { color: var(--err); } .btn.danger:hover { background: var(--err-soft); border-color: var(--err); }
@@ -322,7 +326,7 @@ form.inline { display: inline; margin: 0; }
 .btn.soft-err { background: var(--err-soft); color: var(--err); border-color: transparent; }
 .btn.soft-ok:hover { box-shadow: inset 0 0 0 1px var(--ok); } .btn.soft-err:hover { box-shadow: inset 0 0 0 1px var(--err); }
 .seg .seg-on.sel { background: var(--panel); color: var(--text); font-weight: 600; box-shadow: inset 0 0 0 1px var(--border); }
-.mode-grid { display: grid; grid-template-columns: auto auto; gap: 8px 12px; align-items: center; justify-items: start; }
+.mode-grid { display: grid; grid-template-columns: auto auto; gap: 8px 12px; align-items: center; justify-items: start; justify-content: start; }
 .mode-label { font-size: 13px; color: var(--muted); text-align: right; justify-self: end; }
 .flash { box-shadow: 0 0 0 3px var(--accent-soft), 0 0 0 1px var(--accent) !important; transition: box-shadow .3s; }
 details.forgot summary { cursor: pointer; color: var(--muted); list-style: none; }

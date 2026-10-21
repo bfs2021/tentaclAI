@@ -26,7 +26,7 @@
     <a href="#terminal">Terminal &amp; tmux</a><a href="#rc">Remote control</a><a href="#services">Services</a>
     <a href="#systems">Systems</a><a href="#topology">Topology</a><a href="#docker">Docker hosts</a><a href="#onboard">Onboarding a service</a><a href="#auth">Auth types</a>
     <a href="#git">Git repositories</a><a href="#db">Databases</a><a href="#web">Web sources</a><a href="#files">Files</a><a href="#templates">Templates</a><a href="#inventory">System inventory</a>
-    <a href="#activity">Activity</a><a href="#ssh">SSH targets</a><a href="#settings">Settings</a><a href="#updates">Updates</a><a href="#cli">Commands</a>
+    <a href="#activity">Activity</a><a href="#network">Network</a><a href="#ssh">SSH targets</a><a href="#settings">Settings</a><a href="#updates">Updates</a><a href="#cli">Commands</a>
     <a href="#security">Security</a><a href="#troubleshooting">Troubleshooting</a><a href="#roadmap">Roadmap</a>
   </nav>
   <div class="doc">
@@ -279,6 +279,16 @@
       <p class="help">Claude runs as the unprivileged user <code>claude</code> and can't read <code>.env</code>, the SSH key or the audit log, nor change service files – <code>svc</code> (root, via sudo) is its only way out. MCP tool calls are not gated (Claude Code asks for them itself); MCP servers with tokens run through <code>svc mcp-proxy</code>.</p>
     </section>
 
+    <section class="card" id="network">
+      <h2>Network</h2>
+      <p>All traffic of the sandbox leaves through the egress gateway; <a href="/network">Network</a> shows and controls it.</p>
+      <h3 id="network-mode">Mode</h3>
+      <p>How the gateway treats a destination that no rule covers. <strong>permissive</strong> (default): allowed and recorded – use it to learn what the sandbox needs. <strong>enforce</strong>: held for up to 60 s while you decide in Activity (<em>Allow 10 min</em>, <em>Allow 1 h</em>, <em>Always</em>, <em>Deny</em>, <em>Block</em>); refused if nobody answers. <code>EGRESS_MODE</code> in <code>.env</code>.</p>
+      <h3 id="network-ip">IP targets</h3>
+      <p>Connections to a bare IP address instead of a name (<code>curl https://93.184.215.14</code>). Normal programs almost always use names, so in enforce mode such a connection without a rule is blocked (<strong>block</strong>, default) or asked about like any other unknown destination (<strong>ask</strong>). In permissive mode it is allowed like everything else. <code>EGRESS_DIRECT_IP</code> in <code>.env</code>.</p>
+      <h3 id="network-rules">Rules</h3>
+      <p>Checked in this order: <strong>Built-in</strong> (Anthropic, GitHub, PyPI, npm – always allowed, can't be blocked) → <strong>Blocklist</strong> (always refused, even for tentacles) → <strong>your allowlist</strong> (added here, with <em>Allow</em> on a seen destination, or <em>Always</em> in Activity) → <strong>tentacles</strong> (hosts of your active services and SSH hosts, derived live) → <strong>temporary approvals</strong>. Entries: <code>host</code>, <code>*.domain</code> (subdomains only), an IP or a range like <code>10.0.0.0/8</code>, each optionally with <code>:port</code>. The gateway resolves names itself and checks IP rules against the resolved address, so a blocked range can't be reached through an allowed name. <em>Seen</em> lists every destination with its rule and last result.</p>
+    </section>
     <section class="card" id="ssh">
       <h2>SSH targets</h2>
       <p>tentaclAI has its own key (<code>ssh/keys/tentaclai_ed25519</code>). Each host is a <code>Host</code> block in <code>ssh/config.d/</code>. Everything works in the UI:</p>
@@ -336,7 +346,7 @@ gh …                      GitHub CLI without credentials (public data)</pre>
       <ul>
         <li>tentacontrol has the Docker socket of this host (to run tentaclAI) – that is <strong>root on {{ site.hostname }}</strong>. Choose the tentacontrol password accordingly.</li>
         <li>In tentaclAI, Claude runs as the unprivileged user <code>claude</code>. <code>.env</code>, the SSH key, the service files and the audit log belong to root; <code>svc</code> (via sudo) is the only way to services and enforces <code>ro</code>/<code>rw</code>/<code>confirm</code>. Client tools run as a third user (<code>tcrun</code>) with only their own secret.</li>
-        <li id="network"><strong>Mode</strong>: <em>permissive</em> allows and records every destination; <em>enforce</em> holds a destination without a rule for up to 60 s and asks in Activity (Allow 10 min / 1 h / Always / Deny / Block). <strong>IP targets</strong>: in enforce mode, connections to a bare IP address without a rule are blocked (default) or asked about. Rule order: built-in (never blockable) → blocklist → your allowlist → tentacles → temporary approvals; entries can be <code>host</code>, <code>*.domain</code>, an IP or a range like <code>10.0.0.0/8</code>, optionally with <code>:port</code>.</li>
+        <li>Network: <em>permissive</em> records every destination, <em>enforce</em> asks for unknown ones – see <a href="#network">Network</a>.</li>
         <li><strong>tentacontrol is out of Claude's reach</strong>: from the sandbox only <code>svc</code>'s approval endpoints answer (with its token) – the admin UI, the login and the gateway's endpoints refuse it, and only the gateway may use the latter.</li>
         <li><strong>Other services' secrets are blanked</strong> in free read-only output: <code>docker … inspect</code>, <code>compose … config</code> and <code>systemctl show|cat</code> show <code>[redacted by svc]</code> for values with secret-looking names and for passwords in URLs. Logs and commands you approve are not filtered. <code>svc</code> also keeps the <code>.env</code> values out of the environment of the programs it starts.</li>
         <li>The sandbox sits in an internal network without a route to the outside; everything leaves through the <strong>egress gateway</strong> (<code>tentaclai-egress</code>), which records every destination. <code>EGRESS_MODE=permissive</code> (default) allows all – allow/block lists and approvals follow.</li>
