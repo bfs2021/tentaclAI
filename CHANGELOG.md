@@ -13,6 +13,8 @@ All notable changes, newest first. Every release lists **upgrade steps** from th
   *Clone* copies a job – the copy starts paused.
 
 ### Changes
+- Notifications: channel type **E-mail** – server, port, STARTTLS / SSL / none (internal relay), sender, recipients
+  and an optional login in a form instead of a raw Apprise URL; the password stays in `.env`.
 - The live output of image builds and updates moved from `/jobs/<id>` to `/builds/<id>` – `/jobs` is the new Jobs page.
 - Template *zigbee2mqtt* removed (45 templates).
 - Templates *Pangolin* and *Backrest*: a note on testing – Pangolin's `GET /` answers without the key (use

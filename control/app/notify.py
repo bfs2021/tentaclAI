@@ -96,10 +96,60 @@ def build_url(kind, f):
             from urllib.parse import quote
             q = ("&" if "?" in m.group(2) else "?") + f"+{quote(name.strip())}={quote(value.strip())}"
         return f"{scheme}://{m.group(2)}{q}"
+    if kind == "email":
+        return email_url(f)
     url = (f.get("apprise") or "").strip()
     if not re.match(r"^[a-z0-9]+://", url):
         raise ValueError("an Apprise URL, e.g. tgram://bottoken/chatid")
     return url
+
+
+EMAIL_RE = re.compile(r"^[^@\s,;]+@[^@\s,;]+\.[^@\s,;]+$")
+SECURITY = {"starttls": 587, "ssl": 465, "none": 25}
+
+
+def email_url(f):
+    """Apprise mailto(s) URL: server, port, security (starttls / ssl / none), sender, recipients, optional login"""
+    from urllib.parse import quote
+    host = (f.get("host") or "").strip()
+    if not re.match(r"^[A-Za-z0-9.-]+$", host):
+        raise ValueError("server: a host name, e.g. smtp.example.com")
+    sec = f.get("security") or "starttls"
+    if sec not in SECURITY:
+        raise ValueError("security: starttls, ssl or none")
+    try:
+        port = int(f.get("port") or SECURITY[sec])
+    except ValueError:
+        raise ValueError("port: a number")
+    if not 1 <= port <= 65535:
+        raise ValueError("port: 1–65535")
+    sender = (f.get("sender") or "").strip()
+    to = [x.strip() for x in re.split(r"[,;\s]+", f.get("to") or "") if x.strip()]
+    if not EMAIL_RE.match(sender):
+        raise ValueError("from: an e-mail address")
+    if not to or not all(EMAIL_RE.match(x) for x in to):
+        raise ValueError("to: one or more e-mail addresses")
+    user, pw = (f.get("user") or "").strip(), f.get("password") or ""
+    auth = f"{quote(user, safe='')}:{quote(pw, safe='')}@" if user else ""
+    q = f"from={quote(sender, safe='@')}&to={quote(','.join(to), safe='@,')}"
+    if sec == "none":
+        return f"mailto://{auth}{host}:{port}?{q}"
+    return f"mailtos://{auth}{host}:{port}?{q}&mode={sec}"
+
+
+def email_parts(url, secret=False):
+    """fields of an e-mail channel URL for the edit form – the password only with secret=True (never to the browser)"""
+    from urllib.parse import parse_qs, unquote, urlsplit
+    if not re.match(r"^mailtos?://", url or ""):
+        return {}
+    u = urlsplit(url)
+    q = parse_qs(u.query)
+    sec = q.get("mode", ["starttls" if u.scheme == "mailtos" else "none"])[0]
+    out = {"host": u.hostname or "", "port": str(u.port or SECURITY.get(sec, 587)), "security": sec,
+           "sender": q.get("from", [""])[0], "to": ", ".join(q.get("to", [""])[0].split(",")), "user": unquote(u.username or "")}
+    if secret:
+        out["password"] = unquote(u.password or "")
+    return out
 
 
 def add_channel(kind, name, form):
@@ -122,8 +172,10 @@ def add_channel(kind, name, form):
 
 
 def public_parts(cid):
-    """non-secret parts of a channel URL for the edit form (ntfy server/topic) – never the token"""
+    """non-secret parts of a channel URL for the edit form (ntfy server/topic, e-mail fields) – never a token or password"""
     import re as _re
+    if channel_url(cid).startswith("mailto"):
+        return email_parts(channel_url(cid))
     m = _re.match(r"^(ntfys?)://(?:[^@/]*@)?([^/]+)/([^/?]+)", channel_url(cid))
     if m:
         return {"server": ("https://" if m.group(1) == "ntfys" else "http://") + m.group(2), "topic": m.group(3)}
@@ -142,6 +194,13 @@ def update_channel(cid, name, enabled, form):
     old = public_parts(cid) if ch["kind"] == "ntfy" else {}
     changed_ntfy = ch["kind"] == "ntfy" and any((form.get(k) or "").strip() and (form.get(k) or "").strip() != old.get(k, "")
                                                for k in ("server", "topic"))
+    if ch["kind"] == "email":
+        old = email_parts(channel_url(cid), secret=True)
+        new = dict(old, **{k: v for k, v in form.items() if k in old and (v or "").strip()})
+        if new != old:
+            update_env({env_key(cid): email_url(new)})
+        save(c)
+        return
     if any((form.get(k) or "").strip() for k in fields) or changed_ntfy:
         merged = dict(old, **{k: v for k, v in form.items() if (v or "").strip()})
         update_env({env_key(cid): build_url(ch["kind"], merged)})

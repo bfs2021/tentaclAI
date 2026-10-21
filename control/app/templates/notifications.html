@@ -35,6 +35,14 @@
           {% elif ch.kind == 'webhook' %}
           <div class="field"><label for="u-{{ ch.id }}">Webhook URL</label><input id="u-{{ ch.id }}" name="url" class="mono" placeholder="unchanged"></div>
           <div class="field"><label for="h-{{ ch.id }}">Header</label><input id="h-{{ ch.id }}" name="header" class="mono" placeholder="unchanged"></div>
+          {% elif ch.kind == 'email' %}{% set e = parts[ch.id] %}
+          <div class="field"><label for="eh-{{ ch.id }}">SMTP server</label><input id="eh-{{ ch.id }}" name="host" class="mono" value="{{ e.get('host', '') }}"></div>
+          <div class="field"><label for="ep-{{ ch.id }}">Port</label><input id="ep-{{ ch.id }}" name="port" class="mono" value="{{ e.get('port', '') }}"></div>
+          <div class="field"><label for="es-{{ ch.id }}">Security</label><select id="es-{{ ch.id }}" name="security">{% for k in ('starttls', 'ssl', 'none') %}<option {{ 'selected' if e.get('security') == k }}>{{ k }}</option>{% endfor %}</select></div>
+          <div class="field"><label for="ef-{{ ch.id }}">From</label><input id="ef-{{ ch.id }}" name="sender" class="mono" value="{{ e.get('sender', '') }}"></div>
+          <div class="field"><label for="et-{{ ch.id }}">To</label><input id="et-{{ ch.id }}" name="to" class="mono" value="{{ e.get('to', '') }}"></div>
+          <div class="field"><label for="eu-{{ ch.id }}">Login (optional)</label><input id="eu-{{ ch.id }}" name="user" class="mono" value="{{ e.get('user', '') }}"></div>
+          <div class="field"><label for="ew-{{ ch.id }}">Password</label><input id="ew-{{ ch.id }}" name="password" type="password" class="mono" placeholder="unchanged" autocomplete="new-password"></div>
           {% else %}
           <div class="field"><label for="a-{{ ch.id }}">Apprise URL</label><input id="a-{{ ch.id }}" name="apprise" type="password" class="mono" placeholder="unchanged" autocomplete="new-password"></div>
           {% endif %}
@@ -53,6 +61,7 @@
       <div class="seg" role="radiogroup" aria-label="Channel type" id="ch-kind">
         <button type="button" class="seg-on sel" data-kind="ntfy">ntfy</button>
         <button type="button" data-kind="webhook">Webhook</button>
+        <button type="button" data-kind="email">E-mail</button>
         <button type="button" data-kind="apprise">Other (Apprise URL)</button>
       </div>
       <input type="hidden" name="kind" value="ntfy" id="ch-kind-val">
@@ -63,6 +72,13 @@
         <div class="field kind-ntfy"><label for="ch-token">Access token (optional)</label><input id="ch-token" name="token" type="password" class="mono" autocomplete="new-password"></div>
         <div class="field kind-webhook" hidden><label for="ch-url">Webhook URL</label><input id="ch-url" name="url" class="mono" placeholder="https://n8n.example/webhook/…"><div class="help">Receives a JSON POST with title, message and type.</div></div>
         <div class="field kind-webhook" hidden><label for="ch-header">Header (optional)</label><input id="ch-header" name="header" class="mono" placeholder="X-Token: secret"></div>
+        <div class="field kind-email" hidden><label for="ch-host">SMTP server</label><input id="ch-host" name="host" class="mono" placeholder="smtp.example.com"></div>
+        <div class="field kind-email" hidden><label for="ch-sec">Security</label><select id="ch-sec" name="security" onchange="var p=document.getElementById('ch-port');p.placeholder={starttls:'587',ssl:'465',none:'25'}[this.value]"><option value="starttls">STARTTLS (587)</option><option value="ssl">SSL/TLS (465)</option><option value="none">none – internal relay (25)</option></select></div>
+        <div class="field kind-email" hidden><label for="ch-port">Port</label><input id="ch-port" name="port" class="mono" placeholder="587"></div>
+        <div class="field kind-email" hidden><label for="ch-from">From</label><input id="ch-from" name="sender" class="mono" placeholder="tentaclai@example.com"></div>
+        <div class="field kind-email" hidden><label for="ch-to">To</label><input id="ch-to" name="to" class="mono" placeholder="you@example.com, …"></div>
+        <div class="field kind-email" hidden><label for="ch-user">Login (optional)</label><input id="ch-user" name="user" class="mono" autocomplete="off"></div>
+        <div class="field kind-email" hidden><label for="ch-pw">Password</label><input id="ch-pw" name="password" type="password" class="mono" autocomplete="new-password"><div class="help">Stored in <code>.env</code> with the rest of the channel, never shown again.</div></div>
         <div class="field kind-apprise" hidden><label for="ch-apprise">Apprise URL</label><input id="ch-apprise" name="apprise" class="mono" placeholder="tgram://bottoken/chatid"><div class="help">Telegram, Discord, Slack, Teams, e-mail, Home Assistant … – see the <a href="https://github.com/caronc/apprise/wiki" target="_blank" rel="noopener">Apprise wiki</a>.</div></div>
       </div>
       <div><button class="btn primary sm">Add channel</button></div>
@@ -120,7 +136,7 @@
     b.addEventListener("click", function () {
       seg.querySelectorAll("button").forEach(function (x) { x.classList.toggle("seg-on", x === b); x.classList.toggle("sel", x === b); });
       document.getElementById("ch-kind-val").value = b.dataset.kind;
-      ["ntfy", "webhook", "apprise"].forEach(function (k) {
+      ["ntfy", "webhook", "email", "apprise"].forEach(function (k) {
         document.querySelectorAll(".kind-" + k).forEach(function (el) { el.hidden = k !== b.dataset.kind; });
       });
     });
