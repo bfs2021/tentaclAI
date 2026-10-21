@@ -52,6 +52,10 @@ architecture and `CONTRIBUTING.md` for the ground rules.
   `test-sandbox.sh` works in a scratch copy with its own compose project `tctest`, guarded with `set -e` + a cwd check.
   Never write `.env`/compose files or run `docker compose` before checking that the current directory is the scratch
   copy – a failed copy step once ran test commands in the live stack. Waits poll for a condition, never fixed `sleep`s.
+  The script runs as root locally but **not in CI**: read root-only files (`data/control/*`, `.env`) through a container
+  (`docker exec tctest-claude cat …`), never directly from the host. A check that expects a refusal must test the
+  refusal itself (e.g. the gateway's `403` via `%{http_connect}`), not just `000` – a timeout also gives `000`.
+  Checks slower than 2 s print their time – look there first when a run gets slow.
   Recreating the real `tentaclai` container ends running sessions and Remote Control – only after asking.
 - **Templates:** every page must render in `tests/test_pages.py` (a stray `'` in a Jinja string is a 500) – add new pages there. Keep user-facing
   wording plain (e.g. *Rule*, *No rule*, *Built-in*, *IP targets*) and explain modes in README → Network control and Help.

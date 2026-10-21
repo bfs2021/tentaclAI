@@ -34,9 +34,13 @@ services:
       TZ: ${TZ:-UTC}
       TC_DIR: ${TC_DIR:?TC_DIR not set – run ./tentaclai.sh init}
       # the sandbox network has no way out – everything goes through the egress gateway
+      # both spellings: curl reads only the lower-case http_proxy for http:// URLs (httpoxy), other tools the upper case
       HTTP_PROXY: http://egress:3128
       HTTPS_PROXY: http://egress:3128
       NO_PROXY: localhost,127.0.0.1,tentacontrol
+      http_proxy: http://egress:3128
+      https_proxy: http://egress:3128
+      no_proxy: localhost,127.0.0.1,tentacontrol
       # system bundle incl. the optional site CA (added by the entrypoint)
       NODE_EXTRA_CA_CERTS: /etc/ssl/certs/ca-certificates.crt
     volumes:

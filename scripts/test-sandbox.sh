@@ -16,9 +16,14 @@ ONLY="${ONLY:-$SECTIONS}"
 PASS=0 FAIL=0 T0=$SECONDS
 ok() { PASS=$((PASS + 1)); printf '  \033[32m✓\033[0m %s\n' "$1"; }
 bad() { FAIL=$((FAIL + 1)); printf '  \033[31m✗\033[0m %s\n' "$1"; }
-check() { if [ "$2" = "$3" ]; then ok "$1"; else bad "$1 (expected '$3', got '$2')"; fi; }
+# slow checks show their time (since the previous check) – to see what makes a run slow, e.g. in CI
+check() {
+    local d=$((SECONDS - ${LASTCHECK:-$SECONDS})) t=""; LASTCHECK=$SECONDS
+    [ "$d" -ge 2 ] && t=$(printf ' \033[2m(%s s)\033[0m' "$d")
+    if [ "$2" = "$3" ]; then ok "$1$t"; else bad "$1 (expected '$3', got '$2')$t"; fi
+}
 want() { case ",${ONLY// /,}," in *",$1,"*) return 0 ;; *) return 1 ;; esac; }
-section() { [ -n "${TS:-}" ] && echo "   ($((SECONDS - TS)) s)"; TS=$SECONDS; echo "== $1"; }
+section() { [ -n "${TS:-}" ] && echo "   ($((SECONDS - TS)) s)"; TS=$SECONDS; LASTCHECK=$SECONDS; echo "== $1"; }
 # wait_for <seconds> <command…>: poll every 0.5 s instead of fixed sleeps
 wait_for() { local end=$((SECONDS + $1)); shift; until "$@" >/dev/null 2>&1; do [ $SECONDS -ge "$end" ] && return 1; sleep 0.5; done; }
 for s in ${ONLY//,/ }; do case " $SECTIONS " in *" $s "*) ;; *) echo "unknown section '$s' – one of: $SECTIONS"; exit 2 ;; esac; done
@@ -83,11 +88,13 @@ class H(BaseHTTPRequestHandler):
 HTTPServer(("0.0.0.0", 8000), H).serve_forever()
 PY
 # EGRESS_REFRESH: the gateway fetches its policy every second instead of every 15 s
-cat > compose.test.yaml <<'EOF'
+# TC_BUILD_CACHE=gha (CI): image layers from GitHub's Actions cache – a fresh runner otherwise builds everything
+cache() { [ "${TC_BUILD_CACHE:-}" = gha ] && printf ', build: {cache_from: ["type=gha,scope=%s"], cache_to: ["type=gha,mode=max,scope=%s"]}' "$1" "$1"; true; }
+cat > compose.test.yaml <<EOF
 services:
-  claude: {image: "local/tentaclai:test", container_name: tctest-claude}
-  egress: {image: "local/tentaclai-egress:test", container_name: tctest-egress, environment: {EGRESS_REFRESH: "1"}}
-  control: {image: "local/tentacontrol:test", container_name: tctest-control, environment: {CLAUDE_CONTAINER: tctest-claude}, ports: !reset []}
+  claude: {image: "local/tentaclai:test", container_name: tctest-claude$(cache claude)}
+  egress: {image: "local/tentaclai-egress:test", container_name: tctest-egress, environment: {EGRESS_REFRESH: "1"}$(cache egress)}
+  control: {image: "local/tentacontrol:test", container_name: tctest-control, environment: {CLAUDE_CONTAINER: tctest-claude}, ports: !reset []$(cache control)}
   api: {image: "python:3.12-alpine", container_name: tctest-api, command: ["python", "/srv/api.py"], volumes: ["./fixtures/api.py:/srv/api.py:ro"], networks: {outside: {aliases: [tctest-api2]}}}
   pg: {image: "postgres:16-alpine", container_name: tctest-pg, environment: {POSTGRES_PASSWORD: pg-secret-789}, networks: [outside]}
   ntfy: {image: "binwiederhier/ntfy:v2.11.0", container_name: tctest-ntfy, command: ["serve"], networks: [outside]}
@@ -193,7 +200,10 @@ fi
 
 if want egress; then
 section "egress gateway"
-check "no direct route out" "$($C curl -s -m 5 --noproxy '*' -o /dev/null -w '%{http_code}' https://example.com || true)" "000"
+# plain http:// must use the gateway too (curl reads only the lower-case http_proxy) – without it the name doesn't
+# even resolve (000); through the gateway the test API answers 401 (no token)
+check "plain http goes through the gateway too" "$($C curl -s -m 10 -o /dev/null -w '%{http_code}' http://tctest-api:8000/ || true)" "401"
+check "no direct route out" "$($C curl -s -m 3 --noproxy '*' -o /dev/null -w '%{http_code}' https://example.com || true)" "000"
 check "built-in list (github.com)" "$($C curl -s -m 15 -o /dev/null -w '%{http_code}' https://github.com || true)" "200"
 ( $C curl -s -m 70 -o /dev/null -w '%{http_code}' https://example.com > "$T/o.txt" 2>&1 || true ) &
 wait_for 30 pending example.com:443 || true
@@ -206,13 +216,15 @@ wait_for 30 pending example.org:443 || true
 decide deny; wait
 check "Deny refuses" "$(cat "$T/o.txt")" "000"
 EX=$(docker exec tctest-egress python -c "import socket;print(socket.gethostbyname('example.net'))")
-check "IP target without a rule is blocked" "$($C curl -s -m 10 -k -o /dev/null -w '%{http_code}' "https://$EX" || true)" "000"
+# the gateway's answer to CONNECT (403) – a timeout would also give http_code 000 and prove nothing
+check "IP target without a rule is blocked" "$($C curl -s -m 10 -k -o /dev/null -w '%{http_connect}' "https://$EX" || true)" "403"
 curl -s -b "$J" -H "$H" -X POST -o /dev/null "http://$IP:8080/network/rule" -d kind=block -d "entry=${EX%.*}.0/24"
 curl -s -b "$J" -H "$H" -X POST -o /dev/null "http://$IP:8080/network/rule" -d kind=allow -d "entry=example.net"
 wait_for 30 sh -c "docker exec tctest-egress grep -q -- '${EX%.*}.0/24' /data/policy.json && docker exec tctest-egress grep -q example.net /data/policy.json" || true
-check "allowed name in a blocked IP range is refused" "$($C curl -s -m 10 -o /dev/null -w '%{http_code}' https://example.net || true)" "000"
+check "allowed name in a blocked IP range is refused" "$($C curl -s -m 10 -o /dev/null -w '%{http_connect}' https://example.net || true)" "403"
 # a service enabled a moment ago must work at once – the gateway re-reads its policy before it asks for approval
-rm -f services/newapi.json
+rm -f services/newapi.json  # left over from a REUSE run – wait until the gateway forgot the tentacle
+wait_for 10 sh -c "! docker exec tctest-egress grep -q tctest-api2 /data/policy.json" || true
 $C curl -s -o /dev/null http://tctest-api2:8000/ >/dev/null 2>&1 &  # unknown yet: asks for approval
 wait_for 30 pending tctest-api2:8000 || true
 decide deny; wait

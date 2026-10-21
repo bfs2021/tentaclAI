@@ -2,6 +2,24 @@
 
 All notable changes, newest first. Every release lists **upgrade steps** from the previous one.
 
+## Unreleased
+
+### Fixes
+- **Plain `http://` from the sandbox now goes through the egress gateway:** only `HTTP_PROXY`/`HTTPS_PROXY` were set,
+  but curl reads the lower-case `http_proxy` for `http://` URLs – such requests failed at name resolution instead of
+  reaching the gateway (and asking for approval). Both spellings are set now. `svc` was not affected.
+
+### Development
+- CI: image layers come from the GitHub Actions cache (`TC_BUILD_CACHE=gha` in `test-sandbox.sh`) instead of a full
+  build on every run.
+- `test-sandbox.sh`: checks slower than 2 s print their time; refusal checks test the gateway's `403` instead of
+  `000` (a timeout gives `000` too); the plain-http case is tested; a REUSE run waits until the gateway forgot a leftover
+  test service (that wait was 30 s per run).
+
+### Upgrade (from v0.12.0)
+`./tentaclai.sh update`, `docker compose up -d` – recreating `tentaclai` ends running sessions and Remote Control (new
+environment variables, no rebuild needed).
+
 ## v0.12.0 – 2026-10-21
 
 ### Highlights
