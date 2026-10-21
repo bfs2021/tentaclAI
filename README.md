@@ -374,8 +374,13 @@ What it does **not** (yet) do – keep it in mind:
 
 ## Roadmap
 
-- **Security:** read-only root filesystem, prompt-injection safeguards
-- **Automation:** scheduled Claude jobs (e.g. patch report, certificate expiry) with results as notifications
+- **Claude via API (n8n & co.):** start Claude jobs from outside – HTTP API with its own tokens and profiles
+  (*read-only* / *standard*, the svc and gateway guard rails stay), wait for the result or poll a job id, structured
+  answers via a JSON schema, an MCP endpoint (`ask_claude`) for n8n's MCP client; off by default. Later: webhook
+  callback, an API key just for API jobs.
+- **Automation:** scheduled Claude jobs (e.g. patch report, certificate expiry) with results as notifications – on the
+  same job runner
+- **Security:** prompt-injection safeguards
 - **Export/import** of configuration and templates
 
 ## License
