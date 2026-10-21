@@ -185,8 +185,10 @@ def _cron_day_ok(c, t):
 
 
 def next_run(sched, after, last=None):
-    """next start time (epoch, local time) strictly after `after`"""
+    """next start time (epoch, local time) strictly after `after` – None for a job that only runs on request"""
     k = sched.get("kind")
+    if k == "manual":
+        return None
     base = int(after // 60 * 60) + 60
     if k == "every":
         step = int(sched["hours"]) * 3600
@@ -219,6 +221,8 @@ def next_run(sched, after, last=None):
 
 def describe(sched):
     k = sched.get("kind")
+    if k == "manual":
+        return "manual only"
     if k == "hourly":
         return f"every hour at :{int(sched.get('minute', 0)):02d}"
     if k == "daily":
@@ -235,6 +239,8 @@ def describe(sched):
 def clean_schedule(f):
     """form values → a validated schedule"""
     k = f.get("kind", "daily")
+    if k == "manual":
+        return {"kind": k}
     if k == "hourly":
         m = int(f.get("minute") or 0)
         if not 0 <= m <= 59:

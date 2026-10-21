@@ -307,3 +307,14 @@ def test_jobs_show_latest_run_and_fold_the_rest(client, app_module, monkeypatch,
                                         "result": {"status": "ok", "title": f"title {i}"}} for i in range(3)])
     html = client.get("/jobs").text
     assert "History (2 earlier runs)" in html and html.index("title 2") < html.index("job-history") < html.index("title 1")
+
+
+def test_manual_job_renders_without_next_and_pause(client, app_module, monkeypatch, tmp_path):
+    from app import scheduled
+    for k, f in (("JOBS", "j.json"), ("HISTORY", "h.json"), ("SEEN", "s.json")):
+        monkeypatch.setattr(scheduled, k, str(tmp_path / f))
+    jid = scheduled.save({"name": "On demand", "prompt": "p", "kind": "manual"})
+    html = client.get("/jobs").text
+    card = html[html.index("On demand"):]
+    assert "manual only" in card and "· next" not in card[:400] and ">Pause<" not in card[:1500]
+    assert client.get(f"/jobs/{jid}").status_code == 200

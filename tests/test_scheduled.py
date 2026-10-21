@@ -186,3 +186,17 @@ def test_state_token_changes(sj, monkeypatch, tmp_path):
     t1 = sj.state_token()
     jsonstore.save(sj.HISTORY, [{"id": "a", "status": "done"}])
     assert sj.state_token() != t1
+
+
+def test_manual_only(sj, monkeypatch, tmp_path):
+    monkeypatch.setattr(sj, "JOBS", str(tmp_path / "jobs.json"))
+    assert sj.clean_schedule({"kind": "manual", "time": "07:00"}) == {"kind": "manual"}
+    assert sj.next_run({"kind": "manual"}, time.time()) is None and sj.describe({"kind": "manual"}) == "manual only"
+    jid = sj.save({"name": "On demand", "prompt": "p", "kind": "manual"})
+    assert sj.get(jid)["next"] is None
+    jobs = sj.load(); jobs[jid]["last"] = 0
+    from app import jsonstore
+    jsonstore.save(sj.JOBS, jobs)
+    assert sj.due(time.time() + 10 * 86400) == []  # never due
+    sj.set_enabled(jid, True)
+    assert sj.get(jid)["next"] is None and sj.get(sj.clone(jid))["next"] is None

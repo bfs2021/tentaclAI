@@ -33,11 +33,11 @@
   <div class="between" style="align-items:flex-start;gap:12px">
     <div style="min-width:0">
       <h2 style="margin:0">{{ icon('clock') }}{{ j.name }}{% if not j.enabled %} <span class="pill off">paused</span>{% endif %}</h2>
-      <div class="small muted" style="margin-top:4px">{{ j.when }} · next {{ fmt(j.next) if j.enabled else '–' }} · <span class="pill {{ 'warn' if j.profile == 'standard' else 'off' }}">{{ j.profile }}</span> · notify {{ j.notify }}</div>
+      <div class="small muted" style="margin-top:4px">{{ j.when }}{% if j.schedule.kind != 'manual' %} · next {{ fmt(j.next) if j.enabled else '–' }}{% endif %} · <span class="pill {{ 'warn' if j.profile == 'standard' else 'off' }}">{{ j.profile }}</span> · notify {{ j.notify }}</div>
     </div>
     <div class="row" style="flex-wrap:nowrap">
       <button class="btn sm primary" hx-post="/jobs/{{ j.id }}/run" {{ 'disabled' if j.busy }}>{{ icon('play') }}Run now</button>
-      <button class="btn sm" hx-post="/jobs/{{ j.id }}/toggle">{{ 'Resume' if not j.enabled else 'Pause' }}</button>
+      {% if j.schedule.kind != 'manual' %}<button class="btn sm" hx-post="/jobs/{{ j.id }}/toggle">{{ 'Resume' if not j.enabled else 'Pause' }}</button>{% endif %}
       <a class="btn sm" href="/jobs/{{ j.id }}">Edit</a>
       <button class="btn sm" hx-post="/jobs/{{ j.id }}/clone" title="Copy this job (the copy starts paused)">{{ icon('copy') }}Clone</button>
     </div>

@@ -24,7 +24,7 @@
   <div class="grid2">
     <div><label>Schedule</label>
       <select name="kind" id="sched-kind">
-        {% for k, t in (('hourly', 'every hour'), ('daily', 'daily'), ('weekly', 'weekly'), ('every', 'every N hours'), ('cron', 'cron expression')) %}
+        {% for k, t in (('hourly', 'every hour'), ('daily', 'daily'), ('weekly', 'weekly'), ('every', 'every N hours'), ('cron', 'cron expression'), ('manual', 'manual only – Run now')) %}
         <option value="{{ k }}" {{ 'selected' if s.kind == k }}>{{ t }}</option>{% endfor %}
       </select>
       <div class="row sched" data-kinds="daily weekly" style="margin-top:8px;justify-content:flex-start">
@@ -32,6 +32,7 @@
         <span class="muted">at</span><input type="time" name="time" value="{{ s.time or '07:00' }}" style="width:auto"></div>
       <div class="row sched" data-kinds="hourly" style="margin-top:8px;justify-content:flex-start"><span class="muted">at minute</span><input type="number" name="minute" min="0" max="59" value="{{ s.minute or 0 }}" style="width:90px"></div>
       <div class="row sched" data-kinds="every" style="margin-top:8px;justify-content:flex-start"><span class="muted">every</span><input type="number" name="hours" min="1" max="168" value="{{ s.hours or 6 }}" style="width:90px"><span class="muted">hours</span></div>
+      <div class="help sched" data-kinds="manual" style="margin-top:8px">Never starts on its own – only with <em>Run now</em>.</div>
       <div class="sched" data-kinds="cron" style="margin-top:8px"><input type="text" name="expr" value="{{ s.expr or '0 7 * * 1-5' }}" class="mono" spellcheck="false">
         <div class="help">minute hour day month weekday (0 = Sunday) – e.g. <code>0 7 * * 1-5</code> = weekdays at 07:00</div></div>
     </div>
