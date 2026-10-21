@@ -2,6 +2,15 @@
 
 All notable changes, newest first. Every release lists **upgrade steps** from the previous one.
 
+## Unreleased
+
+### Fixes
+- `svc jobs`: long job names no longer run into the schedule column.
+
+### Upgrade (from v0.14.0)
+`./tentaclai.sh update`, `docker compose build claude`, `docker compose up -d claude` – recreating `tentaclai` ends running
+sessions and Remote Control.
+
 ## v0.14.0 – 2026-10-22
 
 ### Highlights

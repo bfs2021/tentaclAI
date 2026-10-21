@@ -1951,10 +1951,11 @@ def cmd_jobs(args):
         if not jobs:
             print("No jobs. They are set up in tentacontrol → Jobs, or proposed with svc config put job <name> <file>.")
             return 0
-        print(f"{'Name':<24}{'Schedule':<24}{'Profile':<11}{'On':<5}Last run")
+        w = max(len(x) for x in jobs) + 2
+        print(f"{'Name':<{w}}{'Schedule':<24}{'Profile':<11}{'On':<5}Last run")
         for jid, j in sorted(jobs.items()):
             runs = [r for r in hist if r.get("job") == jid]
-            print(f"{jid:<24}{tclib.schedule_text(j.get('schedule')):<24}{j.get('profile', 'read-only'):<11}"
+            print(f"{jid:<{w}}{tclib.schedule_text(j.get('schedule')):<24}{j.get('profile', 'read-only'):<11}"
                   f"{'on' if j.get('enabled', True) else 'off':<5}{_run_line(runs[-1]) if runs else '–'}")
         return 0
     jid, rest = args[0], args[1:]
