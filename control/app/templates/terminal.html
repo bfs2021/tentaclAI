@@ -14,7 +14,7 @@
   {% if current == 'onboard' %}<a class="active">{{ title }}</a>{% endif %}
 </div>
 <div class="term-wrap"><div id="term" style="height:100%"></div></div>
-<p class="help">tmux: scroll with the mouse wheel · leave a session without ending it: <code>Ctrl+B</code>, then <code>D</code> · paste: <code>Ctrl+Shift+V</code> or right click</p>
+<p class="help">tmux: scroll with the mouse wheel · leave a session without ending it: <code>Ctrl+B</code>, then <code>D</code> · select: <code>Shift</code> + drag (Mac: <code>Option</code> + drag), copy: <code>Cmd+C</code> / <code>Ctrl+Shift+C</code> · paste: <code>Ctrl+Shift+V</code> or right click</p>
 {% endblock %}
 {% block scripts %}
 <script src="/vendor/xterm.js"></script>
@@ -26,6 +26,7 @@
   var css = getComputedStyle(document.documentElement);
   var term = new Terminal({
     cursorBlink: true, fontSize: 13.5, scrollback: 5000, allowProposedApi: true,
+    macOptionClickForcesSelection: true,  // tmux takes the mouse – Option (Mac) / Shift (others) + drag selects text
     fontFamily: 'ui-monospace, "SF Mono", "JetBrains Mono", "Cascadia Code", Menlo, Consolas, monospace',
     theme: {background: "#0b0e14", foreground: "#d6dbe5", cursor: "#a78bfa", selectionBackground: "rgba(167,139,250,.35)",
             black: "#1b2130", brightBlack: "#5c6679", magenta: "#c4a7ff", brightMagenta: "#d8c4ff", cyan: "#22d3ee", blue: "#60a5fa"}
@@ -70,6 +71,13 @@
     };
   }
   function sendSize() { if (ws && ws.readyState === 1) ws.send(JSON.stringify({type: "resize", cols: term.cols, rows: term.rows})); }
+  term.attachCustomKeyEventHandler(function (e) {  // Ctrl+Shift+C copies the selection (Cmd+C works natively)
+    if (e.type === "keydown" && e.ctrlKey && e.shiftKey && e.code === "KeyC" && term.hasSelection()) {
+      if (navigator.clipboard) navigator.clipboard.writeText(term.getSelection());
+      e.preventDefault(); return false;
+    }
+    return true;
+  });
   term.onData(function (d) { if (ws && ws.readyState === 1) ws.send(JSON.stringify({type: "input", data: d})); });
   window.addEventListener("resize", function () { fit.fit(); sendSize(); });
   term.onResize(sendSize);
