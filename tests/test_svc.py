@@ -1,6 +1,7 @@
 """svc (the sandbox's service gateway) – pure functions, loaded from build/svc without running it."""
 import importlib.machinery
 import importlib.util
+import json
 import os
 
 import pytest
@@ -29,7 +30,24 @@ def test_redact(text, hidden, kept):
 
 def test_redact_leaves_json_structure_alone():
     text = '{"Config": {"Env": ["TZ=UTC"], "AuthConfig": {}, "Image": "x"}}'
-    assert svc.redact(text) == text
+    assert json.loads(svc.redact(text)) == json.loads(text)
+
+
+def test_redact_keeps_inspect_output_valid_json():
+    # escaped quotes inside a secret-looking label once left a stray quote and broke tc-scan
+    doc = [{"Config": {"Labels": {"ofelia.job-exec.keycloak_sync.command": '/bin/bash -c "php sync.php"',
+                                  "com.docker.compose.service": "php"},
+                       "Env": ['X_TOKEN=ab"cd', "DB_URL=mysql://u:pw1@db/x", "TZ=UTC"]}}]
+    out = json.loads(svc.redact(json.dumps(doc)))
+    cfg = out[0]["Config"]
+    assert cfg["Labels"]["ofelia.job-exec.keycloak_sync.command"] == "[redacted by svc]"
+    assert cfg["Labels"]["com.docker.compose.service"] == "php"
+    assert cfg["Env"] == ["X_TOKEN=[redacted by svc]", "DB_URL=mysql://u:[redacted by svc]@db/x", "TZ=UTC"]
+
+
+def test_redact_text_with_escaped_quotes():
+    out = svc.redact('{"a_token": "x\\"y", broken')
+    assert "x" not in out.split(":", 1)[1].split("[")[0] and out.count('"') % 2 == 0
 
 
 @pytest.mark.parametrize("words,compose,expected", [

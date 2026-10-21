@@ -14,6 +14,9 @@ All notable changes, newest first. Every release lists **upgrade steps** from th
 - **Plain `http://` from the sandbox now goes through the egress gateway:** only `HTTP_PROXY`/`HTTPS_PROXY` were set,
   but curl reads the lower-case `http_proxy` for `http://` URLs – such requests failed at name resolution instead of
   reaching the gateway (and asking for approval). Both spellings are set now. `svc` was not affected.
+- `tc-scan` stopped on hosts with container labels like `…keycloak….command` holding escaped quotes: `svc`'s
+  redaction cut the value at the first `\"` and left invalid JSON. `inspect` output is now redacted value by
+  value as JSON (always valid), and `tc-scan` skips unreadable inspect output instead of aborting.
 
 ### Development
 - CI: image layers come from the GitHub Actions cache (`TC_BUILD_CACHE=gha` in `test-sandbox.sh`) instead of a full

@@ -79,10 +79,11 @@ def inspect(ctx, ids):
     code, out = sh(["svc", "docker", ctx, "inspect", *ids], timeout=90)
     if code != 0:
         return {}
-    data = {}
-    for c in json.loads(out):
-        data[c["Id"][:12]] = c
-    return data
+    try:
+        return {c["Id"][:12]: c for c in json.loads(out)}
+    except (ValueError, KeyError, TypeError) as e:
+        print(f"docker inspect output unreadable ({e}) – stack details missing for `{ctx}`")
+        return {}
 
 
 def env_names_only(env):

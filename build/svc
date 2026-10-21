@@ -678,8 +678,31 @@ _REDACTED = "[redacted by svc]"
 
 
 def redact(text):
-    text = re.sub(r'(?i)("' + _SECRET_NAME + r'"\s*:\s*")([^"]+)(")', lambda m: m.group(1) + _REDACTED + m.group(3), text)
-    text = re.sub(r"(?i)(^|[\s\"'\[,=-])(" + _SECRET_NAME + r")(=|:[ \t]+)([^\s\"',\]]+)",
+    """JSON (docker inspect) is redacted value by value, so the output stays valid JSON; anything else as text"""
+    try:
+        doc = json.loads(text)
+    except ValueError:
+        return _redact_text(text)
+    return json.dumps(_redact_json(doc), indent=4) + "\n"
+
+
+def _redact_json(v, key=""):
+    if isinstance(v, dict):
+        return {k: _redact_json(x, k) for k, x in v.items()}
+    if isinstance(v, list):
+        return [_redact_json(x) for x in v]
+    if isinstance(v, str):
+        if v and re.fullmatch(r"(?i)" + _SECRET_NAME, key):
+            return _REDACTED
+        m = re.fullmatch(r"(?is)(" + _SECRET_NAME + r"=).+", v)  # an Env entry: the whole rest is the value
+        return m.group(1) + _REDACTED if m else _redact_text(v)
+    return v
+
+
+def _redact_text(text):
+    text = re.sub(r'(?i)("' + _SECRET_NAME + r'"\s*:\s*")((?:[^"\\]|\\.)+)(")',
+                  lambda m: m.group(1) + _REDACTED + m.group(3), text)
+    text = re.sub(r"(?i)(^|[\s\"'\[,=-])(" + _SECRET_NAME + r")(=|:[ \t]+)([^\s\"',\]\\]+)",
                   lambda m: m.group(1) + m.group(2) + m.group(3) + _REDACTED, text, flags=re.M)
     return re.sub(r"(://[^/\s:@\"']+:)[^@\s\"']+@", r"\1" + _REDACTED + "@", text)
 
