@@ -276,6 +276,23 @@ def set_enabled(jid, on):
     jsonstore.save(JOBS, jobs)
 
 
+def clone(jid):
+    """a paused copy (so it doesn't run twice by accident) – returns the new id"""
+    jobs = load()
+    if jid not in jobs:
+        raise ValueError("unknown job")
+    src = jobs[jid]
+    name = f"{src['name'][:53]} (copy)"
+    new = slug(name)
+    base, n = new, 2
+    while new in jobs:
+        new, n = f"{base}-{n}", n + 1
+    jobs[new] = dict({k: v for k, v in src.items() if k not in ("last", "next")}, name=name, enabled=False,
+                     created=time.time(), next=next_run(src["schedule"], time.time()))
+    jsonstore.save(JOBS, jobs)
+    return new
+
+
 def delete(jid):
     jobs = load()
     if jobs.pop(jid, None) is None:

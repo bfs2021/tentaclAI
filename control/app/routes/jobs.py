@@ -85,6 +85,15 @@ async def job_toggle(request: Request, jid: str):
     return respond(request, f"{job['name']} {'paused' if job.get('enabled', True) else 'on'}", refresh=True)
 
 
+@router.post("/jobs/{jid}/clone", response_class=HTMLResponse)
+async def job_clone(request: Request, jid: str):
+    try:
+        new = scheduled.clone(jid)
+    except ValueError as e:
+        return respond(request, str(e), "err")
+    return respond(request, "Copy created (paused) – adjust it and resume", redirect=f"/jobs/{new}")
+
+
 @router.post("/jobs/{jid}/delete", response_class=HTMLResponse)
 async def job_delete(request: Request, jid: str):
     try:

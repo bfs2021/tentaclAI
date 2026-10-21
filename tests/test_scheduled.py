@@ -124,3 +124,13 @@ def test_new_events_follow_approval_routing(app_module, tmp_path, monkeypatch):
     monkeypatch.setattr(notify, "CONFIG", str(cfg))
     r = notify.load()["routes"]
     assert r["job_result"] == ["phone"] and r["job_failed"] == ["phone"] and r["update"] == []  # a set choice stays
+
+
+def test_clone_starts_paused(sj, monkeypatch, tmp_path):
+    monkeypatch.setattr(sj, "JOBS", str(tmp_path / "jobs.json"))
+    jid = sj.save({"name": "Disk space", "prompt": "df", "kind": "daily", "time": "07:00", "profile": "standard"})
+    c = sj.clone(jid)
+    assert c == "disk-space-copy" and sj.clone(jid) == "disk-space-copy-2"
+    j = sj.get(c)
+    assert j["name"] == "Disk space (copy)" and j["enabled"] is False and j["profile"] == "standard" and j["prompt"] == "df"
+    assert sj.get(jid)["enabled"] is True

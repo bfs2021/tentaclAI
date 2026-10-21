@@ -10,6 +10,7 @@ All notable changes, newest first. Every release lists **upgrade steps** from th
   backup check and container health. Profile *read-only* (default) is enforced twice – by Claude Code's tool rules
   and by `svc`, which recognises the run and treats every tentacle as `ro`; *standard* works like a terminal session
   (approvals for `confirm`, shown as “Job · name”).
+  *Clone* copies a job – the copy starts paused.
 
 ### Changes
 - The live output of image builds and updates moved from `/jobs/<id>` to `/builds/<id>` – `/jobs` is the new Jobs page.

@@ -26,6 +26,7 @@
       <button class="btn sm primary" hx-post="/jobs/{{ j.id }}/run" {{ 'disabled' if j.busy }}>{{ icon('play') }}Run now</button>
       <button class="btn sm" hx-post="/jobs/{{ j.id }}/toggle">{{ 'Resume' if not j.enabled else 'Pause' }}</button>
       <a class="btn sm" href="/jobs/{{ j.id }}">Edit</a>
+      <button class="btn sm" hx-post="/jobs/{{ j.id }}/clone" title="Copy this job (the copy starts paused)">{{ icon('copy') }}Clone</button>
     </div>
   </div>
   {% if j.runs %}
