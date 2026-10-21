@@ -9,7 +9,7 @@ All notable changes, newest first. Every release lists **upgrade steps** from th
   Deny (network: Allow 10 min / Deny) – no need to switch to Activity.
 
 ### Changes
-- Services: the *Create service* form is folded away behind a round **+** button next to *Sync*.
+- Services: the *Create service* form is folded away behind an *Add service* button next to *Sync*.
 - Topology: the legend just says *SSH host* (the colors are explained in Help).
 
 ### Fixes
