@@ -1410,6 +1410,8 @@ def cmd_config(services, args):
         os.makedirs(os.path.dirname(target), exist_ok=True)
         with open(target + ".tmp", "w") as f:
             f.write(text)
+        if args[1] == "local":
+            os.chmod(target + ".tmp", 0o644)  # Claude imports it (@…) – with svc's inherited umask 077 the import fails silently
         os.replace(target + ".tmp", target)
         print(f"✓ {os.path.relpath(target, TC_DIR)} written" + (" (previous version kept as .bak-…)" if old is not None else ""))
         if args[1] == "service":

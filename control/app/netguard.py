@@ -25,7 +25,8 @@ def _resolve(name):
         ips = {i[4][0] for i in socket.getaddrinfo(name, None)}
     except OSError:
         ips = set()
-    _cache[name] = (time.time(), ips)
+    if ips:  # a miss is not cached: while the sandbox starts, its first requests would count as "anyone else"
+        _cache[name] = (time.time(), ips)
     return ips
 
 

@@ -1,18 +1,13 @@
 {% extends "base.html" %}
+{% from "_tabs.html" import claude_tabs %}
 {% from "_icons.html" import icon, help_link %}
 {% block title %}Models{% endblock %}
 {% block content %}
+{{ claude_tabs('models') }}
 <div class="header">
   <div><h1>Models</h1><div class="sub">Which Claude model (and how much thinking effort) the sandbox uses for which task. Written into Claude's <code>settings.json</code> and the two set-up commands; changes apply to new Claude sessions. <em>Standard</em> = Claude Code decides.</div></div>
   <div class="row">{{ help_link('models') }}</div>
 </div>
-<nav class="conn-tabs" aria-label="Settings">
-  <a href="/settings">{{ icon('settings') }}Settings</a>
-  <a href="/notifications">{{ icon('activity') }}Notifications</a>
-  <a href="/skills">{{ icon('sparkle') }}Skills</a>
-  <a href="/models" class="active">{{ icon('cloud') }}Models</a>
-  <a href="/security">{{ icon('key') }}Security</a>
-</nav>
 
 <form hx-post="/models" autocomplete="off" class="stack">
   {% for key, effort_key, title, help in tasks %}

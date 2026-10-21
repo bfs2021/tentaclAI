@@ -1,18 +1,13 @@
 {% extends "base.html" %}
+{% from "_tabs.html" import settings_tabs %}
 {% from "_icons.html" import icon, help_link %}
 {% block title %}Notifications{% endblock %}
 {% block content %}
+{{ settings_tabs('notifications') }}
 <div class="header">
   <div><h1>Notifications</h1><div class="sub">Where tentaclAI tells you about approvals, blocked actions and problems. Channel URLs (with tokens) are stored in <code>.env</code> as <code>NOTIFY_URL_…</code> and never shown.</div></div>
   <div class="row">{{ help_link('notifications') }}</div>
 </div>
-<nav class="conn-tabs" aria-label="Settings">
-  <a href="/settings">{{ icon('settings') }}Settings</a>
-  <a href="/notifications" class="active">{{ icon('activity') }}Notifications</a>
-  <a href="/skills">{{ icon('sparkle') }}Skills</a>
-  <a href="/models">{{ icon('cloud') }}Models</a>
-  <a href="/security">{{ icon('key') }}Security</a>
-</nav>
 
 <div class="card" style="margin-bottom:16px">
   <div class="card-head"><h2>Channels</h2></div>

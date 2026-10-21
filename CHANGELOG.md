@@ -5,6 +5,12 @@ All notable changes, newest first. Every release lists **upgrade steps** from th
 ## Unreleased
 
 ### Highlights
+- **New area *Claude*** – everything that steers Claude in one place, in tabs: **Instructions** (a diagram of what
+  Claude reads every session and what it looks up when needed, an editor for the site rules `local/CLAUDE.md` with
+  backup, the generated `CLAUDE.md` to view), **Memory** (what Claude noted for itself – view, delete entries),
+  **Models**, **Skills**, **Usage** (moved from Settings) and **settings.json** (Claude Code's own settings without
+  the parts the other tabs manage; secret-looking env values masked, JSON checked, last 5 versions kept).
+  *Settings* keeps tentaclAI itself: General, Notifications, Security.
 - **Approvals on every page:** a banner above each page (but Activity) shows pending approvals with Approve / + 15 min /
   Deny (network: Allow 10 min / Deny) – no need to switch to Activity.
 
@@ -16,6 +22,13 @@ All notable changes, newest first. Every release lists **upgrade steps** from th
 - Topology: the legend just says *SSH host* (the colors are explained in Help).
 
 ### Fixes
+- **Site rules were not loaded:** `svc config put local` wrote `local/CLAUDE.md` with mode 0600 (svc inherits the
+  entrypoint's umask 077), so Claude's `@` import skipped it without a word. svc writes it 0644 now and the
+  entrypoint repairs the mode on start.
+- tentacontrol cached a failed lookup of the sandbox's address for 5 s – right after the sandbox started, its
+  first requests counted as "anyone else" and reached the login page. Misses are not cached any more.
+- Safari showed the SVG favicon without its background (a bare red octopus): only the PNG icons are offered now.
+- Pages with a wide tab bar no longer get wider than a phone screen – the tabs scroll.
 - Browser terminals left their `docker exec` process running when the connection dropped – one stale tmux client per
   reload, and tmux sized Claude's window to the smallest of them. Closing a terminal now hangs its process up
   (a tmux client detaches, Claude keeps running).
@@ -42,8 +55,9 @@ All notable changes, newest first. Every release lists **upgrade steps** from th
   test service (that wait was 30 s per run).
 
 ### Upgrade (from v0.12.0)
-`./tentaclai.sh update`, `docker compose up -d` – recreating `tentaclai` ends running sessions and Remote Control (new
-environment variables, no rebuild needed).
+`./tentaclai.sh update`, `docker compose build`, `docker compose up -d` – both images changed (svc, entrypoint, tmux
+settings, tentacontrol); recreating `tentaclai` ends running sessions and Remote Control. Nothing to migrate: the
+entrypoint makes an existing `local/CLAUDE.md` readable for Claude again.
 
 ## v0.12.0 – 2026-10-21
 

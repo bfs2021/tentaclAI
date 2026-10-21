@@ -63,6 +63,8 @@ fi
 
 # Claude's user-level instructions and the slash commands shipped with the image (own commands stay untouched)
 as_claude mkdir -p /home/claude/.claude/commands
+# the site rules are imported by Claude (@…) – an unreadable file is skipped without a word
+if [ -f "$TC_DIR/local/CLAUDE.md" ]; then chmod 644 "$TC_DIR/local/CLAUDE.md"; fi
 claude-instructions | as_claude sh -c 'cat > /home/claude/.claude/CLAUDE.md' || echo "could not generate CLAUDE.md"
 as_claude sh -c 'cp -f /etc/tentaclai/commands/*.md /home/claude/.claude/commands/' 2>/dev/null || true
 # status line (caged octopus + pending approvals) – only if the user has none of their own;

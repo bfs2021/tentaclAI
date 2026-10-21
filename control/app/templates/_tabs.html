@@ -1,0 +1,19 @@
+{# tab bars of the Settings area (tentaclAI itself) and the Claude area (what steers Claude in the sandbox) #}
+{% from "_icons.html" import icon %}
+{% macro settings_tabs(active) -%}
+<nav class="conn-tabs" aria-label="Settings">
+  <a href="/settings" class="{{ 'active' if active == 'settings' }}">{{ icon('settings') }}General</a>
+  <a href="/notifications" class="{{ 'active' if active == 'notifications' }}">{{ icon('activity') }}Notifications</a>
+  <a href="/security" class="{{ 'active' if active == 'security' }}">{{ icon('key') }}Security</a>
+</nav>
+{%- endmacro %}
+{% macro claude_tabs(active) -%}
+<nav class="conn-tabs" aria-label="Claude">
+  <a href="/claude/instructions" class="{{ 'active' if active == 'instructions' }}">{{ icon('file') }}Instructions</a>
+  <a href="/claude/memory" class="{{ 'active' if active == 'memory' }}">{{ icon('bookmark') }}Memory</a>
+  <a href="/models" class="{{ 'active' if active == 'models' }}">{{ icon('cloud') }}Models</a>
+  <a href="/skills" class="{{ 'active' if active == 'skills' }}">{{ icon('sparkle') }}Skills</a>
+  <a href="/usage" class="{{ 'active' if active == 'usage' }}">{{ icon('chart') }}Usage</a>
+  <a href="/claude/settings" class="{{ 'active' if active == 'settings' }}">{{ icon('settings') }}settings.json</a>
+</nav>
+{%- endmacro %}

@@ -1,18 +1,13 @@
 {% extends "base.html" %}
+{% from "_tabs.html" import settings_tabs %}
 {% from "_icons.html" import icon, help_link %}
 {% block title %}Security{% endblock %}
 {% block content %}
+{{ settings_tabs('security') }}
 <div class="header">
   <div><h1>Security</h1><div class="sub">Two-factor sign-in: after the password, tentacontrol asks for a code from an authenticator app (Google Authenticator, Aegis, 1Password, Bitwarden …). Whoever signs in here controls the Docker host – a second factor keeps a leaked password from being enough.</div></div>
   <div class="row">{{ help_link('two-factor') }}</div>
 </div>
-<nav class="conn-tabs" aria-label="Settings">
-  <a href="/settings">{{ icon('settings') }}Settings</a>
-  <a href="/notifications">{{ icon('activity') }}Notifications</a>
-  <a href="/skills">{{ icon('sparkle') }}Skills</a>
-  <a href="/models">{{ icon('cloud') }}Models</a>
-  <a href="/security" class="active">{{ icon('key') }}Security</a>
-</nav>
 
 {% if error %}<div class="card flat" style="margin-bottom:16px"><span class="pill err">not done</span> {{ error }}</div>{% endif %}
 

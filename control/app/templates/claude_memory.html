@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% from "_tabs.html" import claude_tabs %}
+{% from "_icons.html" import icon, help_link %}
+{% block title %}Memory{% endblock %}
+{% block content %}
+{{ claude_tabs('memory') }}
+<div class="header">
+  <div><h1>Memory</h1><div class="sub">What Claude noted for itself – open tasks, facts about your setup, your preferences. <code>MEMORY.md</code> is the index Claude reads in every session; the entries it opens when they matter. Delete what is wrong or done.</div></div>
+  <div class="row">{{ help_link('memory') }}</div>
+</div>
+{% if st is none %}
+<div class="empty">tentaclAI is not running – the memory can't be read.</div>
+{% elif not memory %}
+<div class="empty">Claude hasn't noted anything yet.</div>
+{% else %}
+{% for project, items in memory | groupby('project') %}
+<div class="card" style="margin-bottom:16px">
+  <div class="card-head"><h2>{{ icon('bookmark') }}{{ project | replace('-', '/') }}</h2><span class="faint small">{{ items | length }} file{{ '' if items | length == 1 else 's' }}</span></div>
+  {% for m in (items | selectattr('name', 'equalto', 'MEMORY.md') | list) + (items | rejectattr('name', 'equalto', 'MEMORY.md') | list) %}
+  <details class="mem-entry">
+    <summary><span class="mono">{{ m.name }}</span>{% if m.name == 'MEMORY.md' %} <span class="pill accent">index</span>{% endif %}<span class="faint small">{{ fmt(m.mtime) }}</span></summary>
+    <pre class="rc" style="max-height:340px;margin-top:8px">{{ m.text }}</pre>
+    {% if m.name != 'MEMORY.md' %}
+    <form hx-post="/claude/memory/forget" hx-confirm="Delete {{ m.name }}? Its line in MEMORY.md goes too." style="margin-top:8px">
+      <input type="hidden" name="project" value="{{ m.project }}"><input type="hidden" name="name" value="{{ m.name }}">
+      <button class="btn sm danger">{{ icon('trash') }}Delete</button>
+    </form>
+    {% endif %}
+  </details>
+  {% endfor %}
+</div>
+{% endfor %}
+{% endif %}
+{% endblock %}

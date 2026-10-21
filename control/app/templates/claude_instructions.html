@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% from "_tabs.html" import claude_tabs %}
+{% from "_icons.html" import icon, help_link %}
+{% block title %}Instructions{% endblock %}
+{% block content %}
+{{ claude_tabs('instructions') }}
+<div class="header">
+  <div><h1>Instructions</h1><div class="sub">What Claude reads in every session and what it looks up when it needs it. Your site rules are the part to edit – the rest is generated or comes with the image.</div></div>
+  <div class="row">{{ help_link('instructions') }}</div>
+</div>
+{% if st is none %}<div class="card flat" style="margin-bottom:16px"><span class="pill warn">not running</span> tentaclAI is not running – sizes and “what Claude sees” are missing.</div>{% endif %}
+
+{% macro size(n, unit='lines') %}<span class="flow-size">{{ '–' if n is none else n ~ ' ' ~ unit }}</span>{% endmacro %}
+<div class="card" style="margin-bottom:16px">
+  <div class="flow">
+    <div class="flow-col">
+      <div class="flow-title">Every session</div>
+      <a class="flow-box img" href="/help#instructions"><b>Base rules</b><small>sandbox, <code>svc</code>, keep context small – comes with the image</small>{{ size(sizes.base) }}</a>
+      <a class="flow-box gen" href="/services"><b>Host tables</b><small>docker and SSH hosts with their access – generated from Tentacles</small></a>
+      <a class="flow-box edit" href="#site-rules"><b>✎ Site rules</b><small><code>local/CLAUDE.md</code> – yours, edit below</small>{{ size(sizes.local) }}</a>
+    </div>
+    <div class="flow-arrow" aria-hidden="true">→</div>
+    <div class="flow-col flow-mid">
+      <a class="flow-box result" href="#claude-md"><b>CLAUDE.md</b><small>what Claude sees – assembled at every start and every sync</small>{{ size(sizes.claude_md) }}</a>
+    </div>
+    <div class="flow-arrow" aria-hidden="true" title="looked up when needed">⇠</div>
+    <div class="flow-col">
+      <div class="flow-title">When needed</div>
+      <a class="flow-box gen" href="/services"><b>Service &amp; system rules</b><small><code>notes</code> of each service and system – <code>svc info</code>, <code>svc systems</code></small></a>
+      <a class="flow-box gen" href="/services"><b>Service catalog</b><small><code>/workspace/SERVICES.md</code> – generated</small>{{ size(sizes.catalog) }}</a>
+      {% if sizes.host_docs %}<a class="flow-box img" href="/help#site"><b>Host documentation</b><small><code>HOST_DOCS</code> – only referenced, read for work on the host</small>{{ size(sizes.host_docs) }}</a>{% endif %}
+    </div>
+  </div>
+  <div class="flow-foot">
+    <a class="flow-box gen" href="/claude/memory"><b>Memory</b><small>what Claude noted itself – the index every session, entries when needed</small>{{ size(sizes.memory, 'entry' if sizes.memory == 1 else 'entries') }}</a>
+    <a class="flow-box gen" href="/claude/settings"><b>settings.json</b><small>model, skills and other Claude Code settings – not text Claude reads</small></a>
+  </div>
+  <div class="flow-legend small muted"><span class="lg-edit"></span>you edit · <span class="lg-gen"></span>generated or written by Claude · <span class="lg-img"></span>fixed (image, host)</div>
+</div>
+
+<div class="card" id="site-rules" style="margin-bottom:16px">
+  <div class="card-head"><h2>{{ icon('file') }}Site rules</h2><span class="faint small mono">{{ local_path }}</span></div>
+  <form hx-post="/claude/instructions">
+    <textarea name="text" spellcheck="false" placeholder="# Site rules&#10;&#10;e.g. which host is production, what must never be restarted, naming conventions …">{{ local }}</textarea>
+    <div class="row" style="margin-top:12px;justify-content:space-between">
+      <button class="btn primary">{{ icon('check') }}Save</button>
+      <span class="small muted">Applies to new Claude sessions · the previous version is kept as <code>.bak-…</code> · <a href="/terminal?p=inventory">/inventory</a> drafts it for you</span>
+    </div>
+  </form>
+</div>
+
+<div class="card" id="claude-md">
+  <details>
+    <summary class="card-head" style="cursor:pointer;margin:0"><h2>{{ icon('logs') }}What Claude sees</h2><span class="faint small mono">~/.claude/CLAUDE.md · {{ sizes.claude_md }} lines</span></summary>
+    <p class="small muted">Generated – changes here would be overwritten. Lines starting with <code>@</code> import a file (your site rules).</p>
+    <pre class="rc" style="max-height:520px">{{ (st or {}).get('claude_md') or 'not available' }}</pre>
+  </details>
+</div>
+{% endblock %}

@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% from "_tabs.html" import claude_tabs %}
+{% from "_icons.html" import icon, help_link %}
+{% block title %}settings.json{% endblock %}
+{% block content %}
+{{ claude_tabs('settings') }}
+<div class="header">
+  <div><h1>settings.json</h1><div class="sub">Claude Code's own settings in the sandbox (<code>~/.claude/settings.json</code>) – for everything without a page of its own: permissions, language, attribution, how long sessions are kept … Applies to new Claude sessions.</div></div>
+  <div class="row"><a class="btn ghost" href="https://code.claude.com/docs/en/settings" target="_blank" rel="noopener">All settings ↗</a>{{ help_link('claude-settings') }}</div>
+</div>
+{% if st is none %}
+<div class="empty">tentaclAI is not running – settings.json can't be read.</div>
+{% elif broken %}
+<div class="card flat"><span class="pill err">invalid</span> The current settings.json is not valid JSON – fix it in a <a href="/terminal?p=shell">shell</a> (<code>~/.claude/settings.json</code>) first.</div>
+{% else %}
+<div class="card">
+  <form hx-post="/claude/settings">
+    <textarea name="text" spellcheck="false" id="settings-json">{{ text }}</textarea>
+    <div class="row" style="margin-top:12px;justify-content:space-between">
+      <div class="row">
+        <button class="btn primary">{{ icon('check') }}Save</button>
+        <button type="button" class="btn ghost" onclick="try{var t=document.getElementById('settings-json');t.value=JSON.stringify(JSON.parse(t.value),null,2);tcToast('Valid JSON','info')}catch(e){tcToast(e.message,'err')}">Validate &amp; format</button>
+      </div>
+      <span class="small muted">The previous version is kept as <code>settings.json.bak-…</code> (last 5)</span>
+    </div>
+  </form>
+  <details style="margin-top:14px" class="small">
+    <summary class="muted">Not shown here</summary>
+    <div class="muted" style="margin-top:8px">
+      {% for k, where in managed_top.items() %}<code>{{ k }}</code> → {{ where }}{{ ', ' if not loop.last }}{% endfor %};
+      env {% for k, where in managed_env.items() %}<code>{{ k }}</code> → {{ where }}{{ ', ' if not loop.last }}{% endfor %}.
+      They stay as they are when you save. Env values with secret-looking names show as <code>{{ mask }}</code> – leave that to keep the value.
+      Policies Claude can't change (blocked connectors) are in the managed settings and not editable here.
+    </div>
+  </details>
+</div>
+{% endif %}
+{% endblock %}

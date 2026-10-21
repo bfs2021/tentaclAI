@@ -1,19 +1,13 @@
 {% extends "base.html" %}
+{% from "_tabs.html" import claude_tabs %}
 {% from "_icons.html" import icon, help_link %}
 {% block title %}Skills{% endblock %}
 {% block content %}
+{{ claude_tabs('skills') }}
 <div class="header">
   <div><h1>Skills</h1><div class="sub">Skills of Claude Code and your claude.ai account. Every skill Claude is offered costs context in <em>every</em> request – switch off what Claude never needs in this sandbox. Written as <code>skillOverrides</code> into Claude's <code>settings.json</code>; changes apply to new Claude sessions.</div></div>
-  <button class="btn ghost" hx-post="/skills/discover">{{ icon('refresh') }}Check</button>
-  <div class="row">{{ help_link('skills') }}</div>
+  <div class="row"><button class="btn ghost" hx-post="/skills/discover">{{ icon('refresh') }}Check</button>{{ help_link('skills') }}</div>
 </div>
-<nav class="conn-tabs" aria-label="Settings">
-  <a href="/settings">{{ icon('settings') }}Settings</a>
-  <a href="/notifications">{{ icon('activity') }}Notifications</a>
-  <a href="/skills" class="active">{{ icon('sparkle') }}Skills</a>
-  <a href="/models">{{ icon('cloud') }}Models</a>
-  <a href="/security">{{ icon('key') }}Security</a>
-</nav>
 
 <p class="help" style="margin:-8px 0 14px"><strong>On</strong> = Claude may use it on its own · <strong>/command only</strong> = only when you call it as <code>/name</code> · <strong>Off</strong> = gone.
   {% if saved %}Switched off or limited now: about <strong>{{ '%.1f' % (saved / 1000) }}k tokens</strong> less per request (sizes as last measured).{% endif %}</p>

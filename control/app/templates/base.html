@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}Overview{% endblock %} · tentaclAI</title>
-  <link rel="icon" type="image/svg+xml" href="/static/logo.svg?v={{ asset_v }}">
+  <!-- PNG only: Safari draws the SVG logo without its gradient background (a bare red octopus) -->
   <link rel="icon" type="image/png" sizes="32x32" href="/static/favicon-32.png?v={{ asset_v }}">
   <link rel="apple-touch-icon" href="/static/apple-touch-icon.png?v={{ asset_v }}">
   <link rel="stylesheet" href="/static/app.css?v={{ asset_v }}">
@@ -23,7 +23,8 @@
       <a href="/network" class="{{ 'active' if nav == 'network' }}">{{ icon('globe') }}Network</a>
       <a href="/activity" class="{{ 'active' if nav == 'activity' }}">{{ icon('activity') }}Activity
         <span class="nav-count" hx-get="/partials/approval-count" hx-trigger="load, every 5s" hx-swap="innerHTML"></span></a>
-      <a href="/settings" class="{{ 'active' if nav in ('settings', 'notifications', 'skills', 'models', 'security') }}">{{ icon('settings') }}Settings</a>
+      <a href="/claude/instructions" class="{{ 'active' if nav in ('claude_instructions', 'claude_memory', 'claude_settings', 'skills', 'models', 'usage') }}">{{ icon('claude') }}Claude</a>
+      <a href="/settings" class="{{ 'active' if nav in ('settings', 'notifications', 'security') }}">{{ icon('settings') }}Settings</a>
       <a href="/updates" class="{{ 'active' if nav in ('updates', 'job') }}">{{ icon('refresh') }}Updates</a>
       <a href="/logs" class="{{ 'active' if nav == 'logs' }}">{{ icon('logs') }}Logs</a>
       <a href="/help" class="{{ 'active' if nav == 'help' }}">{{ icon('help') }}Help</a>

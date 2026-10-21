@@ -33,7 +33,8 @@ def test_page_renders(client, path):
 
 def test_page_discovery_finds_the_known_pages():
     found = set(pages())
-    assert {"/", "/services", "/settings", "/skills", "/models", "/usage", "/partials/overview", "/topology.json"} <= found
+    assert {"/", "/services", "/settings", "/skills", "/models", "/usage", "/partials/overview", "/topology.json",
+            "/claude/instructions", "/claude/memory", "/claude/settings"} <= found
 
 
 def test_login_required(app_module):
@@ -234,3 +235,21 @@ def test_approval_banner(client, app_module):
     r = client.post(f"/approvals/{rid}/deny?view=banner")
     assert 'id="approval-banner"' in r.text and "Approval needed" not in r.text and "Active grants" not in r.text
     assert activity.APPROVALS[rid]["status"] == "denied"
+
+
+def test_netguard_does_not_cache_a_failed_lookup(app_module, monkeypatch):
+    """a sandbox not yet in Docker's DNS must be recognised by its next request, not after the cache expires"""
+    from app import netguard
+    from app.config import CLAUDE_CONTAINER
+    calls = []
+    def fake(name, port):
+        if name != CLAUDE_CONTAINER:
+            raise OSError("no such host")
+        calls.append(name)
+        if len(calls) == 1:
+            raise OSError("not yet in Docker's DNS")
+        return [(0, 0, 0, "", ("172.30.0.5", 0))]
+    monkeypatch.setattr(netguard.socket, "getaddrinfo", fake)
+    monkeypatch.setattr(netguard, "_cache", {})
+    assert netguard.source("172.30.0.5") == "other"  # lookup failed
+    assert netguard.source("172.30.0.5") == "sandbox"  # asked again right away

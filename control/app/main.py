@@ -11,7 +11,7 @@ from starlette.middleware.sessions import SessionMiddleware
 
 from . import activity, auth, connectors, dockerops, netguard, notify, skills, updatecheck, usage
 from .envfile import drop_generated_compose, read_env
-from .routes import network, settings, ssh, system, tentacles
+from .routes import claude, network, settings, ssh, system, tentacles
 from .web import BASE, TC_VERSION
 
 
@@ -167,5 +167,5 @@ async def announce_setup():
         print("=" * 72, flush=True)
 
 
-for _r in (system, tentacles, ssh, network, settings):  # one router per area of the UI
+for _r in (system, tentacles, ssh, network, settings, claude):  # one router per area of the UI
     app.include_router(_r.router)
