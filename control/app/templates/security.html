@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% from "_icons.html" import icon %}
+{% block title %}Security{% endblock %}
+{% block content %}
+<div class="header">
+  <div><h1>Security</h1><div class="sub">Two-factor sign-in: after the password, tentacontrol asks for a code from an authenticator app (Google Authenticator, Aegis, 1Password, Bitwarden …). Whoever signs in here controls the Docker host – a second factor keeps a leaked password from being enough.</div></div>
+</div>
+<nav class="conn-tabs" aria-label="Settings">
+  <a href="/settings">{{ icon('settings') }}Settings</a>
+  <a href="/notifications">{{ icon('activity') }}Notifications</a>
+  <a href="/skills">{{ icon('sparkle') }}Skills</a>
+  <a href="/models">{{ icon('cloud') }}Models</a>
+  <a href="/security" class="active">{{ icon('key') }}Security</a>
+</nav>
+
+{% if error %}<div class="card flat" style="margin-bottom:16px"><span class="pill err">not done</span> {{ error }}</div>{% endif %}
+
+{% if codes %}
+<div class="card" style="margin-bottom:16px">
+  <h2>Recovery codes</h2>
+  <p class="help" style="margin-top:-4px">Each one replaces a code from the app <strong>once</strong> – for a lost or broken phone. Save them now (password manager, printout); they are not shown again.</p>
+  <pre class="mono" style="columns:2;max-width:360px">{% for c in codes %}{{ c }}
+{% endfor %}</pre>
+</div>
+{% endif %}
+
+{% if not st.enabled %}
+<div class="card">
+  <h2>Two-factor sign-in <span class="pill off">off</span></h2>
+  {% if not secret %}
+  <p>Set it up in two steps: scan a QR code with the app, then enter the code it shows.</p>
+  <form method="post" action="/security/setup"><button class="btn primary">{{ icon('key') }}Set up</button></form>
+  {% else %}
+  <div class="row" style="gap:20px;align-items:flex-start;flex-wrap:wrap">
+    <div class="rc-qr" title="Scan with the authenticator app">{{ qr | safe }}</div>
+    <div class="stack" style="flex:1;min-width:240px">
+      <p class="small">1. Scan the QR code with the authenticator app – or enter this key by hand:</p>
+      <code class="mono small" style="word-break:break-all">{{ secret }}</code>
+      <form method="post" action="/security/confirm" autocomplete="off" class="stack" style="margin-top:8px">
+        <label for="code" class="small">2. The 6-digit code the app shows now</label>
+        <div class="row"><input id="code" name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="7" class="mono" style="max-width:140px" required>
+          <button class="btn primary">{{ icon('check') }}Switch on</button></div>
+      </form>
+    </div>
+  </div>
+  {% endif %}
+</div>
+{% else %}
+<div class="card" style="margin-bottom:16px">
+  <h2>Two-factor sign-in <span class="pill ok">on</span></h2>
+  <p class="small">Recovery codes left: <strong>{{ st.recovery_left }}</strong>{% if st.recovery_left < 3 %} <span class="pill warn">make new ones</span>{% endif %}</p>
+  <form method="post" action="/security/recovery" autocomplete="off" class="row" style="gap:8px;flex-wrap:wrap">
+    <input name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="7" placeholder="current code" aria-label="Current code" class="mono" style="max-width:140px" required>
+    <button class="btn">New recovery codes</button>
+    <span class="help">the old ones stop working</span>
+  </form>
+</div>
+
+<div class="card" style="margin-bottom:16px">
+  <div class="card-head"><h2>Trusted browsers</h2>
+    {% if st.trusted %}<form method="post" action="/security/revoke"><button class="btn sm ghost">Revoke all</button></form>{% endif %}</div>
+  <p class="help" style="margin-top:-4px">Browsers where you ticked “Trust this browser” skip the code for {{ days }} days (the password is still needed).</p>
+  {% if st.trusted %}
+  <div class="table-wrap"><table>
+    <thead><tr><th>Browser</th><th>Trusted since</th><th>Last sign-in</th><th></th></tr></thead><tbody>
+    {% for t in st.trusted %}
+    <tr><td>{{ t.label }}</td><td class="small muted">{{ fmt(t.created) }}</td><td class="small muted">{{ fmt(t.last_used) }}</td>
+      <td style="text-align:right"><form method="post" action="/security/revoke"><input type="hidden" name="tid" value="{{ t.id }}"><button class="btn sm ghost">Revoke</button></form></td></tr>
+    {% endfor %}
+  </tbody></table></div>
+  {% else %}<div class="empty small">None.</div>{% endif %}
+</div>
+
+<div class="card">
+  <h2>Switch off</h2>
+  <form method="post" action="/security/disable" autocomplete="off" class="row" style="gap:8px;flex-wrap:wrap">
+    <input type="password" name="password" placeholder="password" aria-label="Password" autocomplete="current-password" required style="max-width:220px">
+    <input name="code" placeholder="code or recovery code" aria-label="Code" class="mono" style="max-width:200px" required>
+    <button class="btn danger">Switch off</button>
+  </form>
+  <p class="help">Without the phone and recovery codes: <code>./tentaclai.sh reset-2fa</code> on the host.</p>
+</div>
+{% endif %}
+{% endblock %}

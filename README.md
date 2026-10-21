@@ -199,13 +199,14 @@ Claude commands: **`/onboard <service>`** and **`/inventory`** (see above).
 | **Tentacles** | Everything Claude can reach, in four tabs: **Services** (grouped by system, live status dot per service; templates, JSON editor, write-only tokens, connection test and test path, onboarding, enable/disable, rename, move between systems; shows which services share a token variable) · **SSH hosts** (live status; add with host key check and one-time password key deployment, edit incl. jump host, sudo and rename, remove with key revocation) · **Systems** (groups with SSH host and rules) · **Topology** (live graph incl. optional stacks/containers, search, saved layout, PNG export). |
 | **Network** | Every destination the sandbox connected to (rule, last connection, filters), your allowlist and blocklist with one-click Allow/Block, the tentacles and the built-in list, and the switches *Mode* (permissive / enforce) and *IP targets* (ask / block) – see [Network control](#network-control). |
 | **Activity** | Pending approvals – writes of `confirm` services (Approve / Approve + 15 min / Deny) and unknown network destinations (Allow 10 min / 1 h / Always / Deny / Block), badge in the sidebar and in Claude's status line – and the audit log of all write actions with filters. |
-| **Settings** | All `.env` settings with descriptions; secrets are write-only. Shows *Apply now* when the sandbox must be recreated. Tab **Notifications**: channels (ntfy, webhook or any Apprise URL), which event goes where, quiet hours. Tab **Skills**: per skill of Claude Code and the account *On* / */command only* / *Off* (each listed skill costs context in every request; sandbox-useless ones start off). Tab **Models**: model and effort for all sessions, subagents and `/inventory`·`/onboard` (subagents and the set-up commands start on Sonnet). |
+| **Settings** | All `.env` settings with descriptions; secrets are write-only. Shows *Apply now* when the sandbox must be recreated. Tab **Notifications**: channels (ntfy, webhook or any Apprise URL), which event goes where, quiet hours. Tab **Skills**: per skill of Claude Code and the account *On* / */command only* / *Off* (each listed skill costs context in every request; sandbox-useless ones start off). Tab **Models**: model and effort for all sessions, subagents and `/inventory`·`/onboard` (subagents and the set-up commands start on Sonnet). Tab **Security**: two-factor sign-in (authenticator app, recovery codes, trusted browsers). |
 | **Usage** | Plan limits (session and week) and what contributes to them, tokens per day, sessions of this sandbox and models – from Claude Code's `/usage` and the local session files (no model call). |
 | **Updates** | Installed tentaclAI version, new releases with their upgrade steps (checked every 6 h, also shown in the sidebar; `UPDATE_CHECK=false` turns it off), Claude Code and image updates. |
 | **Logs / Help** | Container log; full documentation of every feature. |
 
-Single admin password (bcrypt), signed session cookie (12 h, SameSite=Strict), login throttling.
-Reset: `./tentaclai.sh passwd`. tentacontrol itself is updated on the host: `docker compose up -d --build control`.
+Single admin password (bcrypt), optional **two-factor sign-in** (TOTP from an authenticator app, 10 one-time recovery
+codes, “trust this browser” for 30 days – revocable), signed session cookie (12 h, SameSite=Strict), login throttling.
+Reset: `./tentaclai.sh passwd` (also revokes trusted browsers), `./tentaclai.sh reset-2fa`. tentacontrol itself is updated on the host: `docker compose up -d --build control`.
 
 ## Service reference
 
@@ -373,7 +374,7 @@ What it does **not** (yet) do – keep it in mind:
 
 ## Roadmap
 
-- **Security:** two-factor sign-in (TOTP) for tentacontrol · read-only root filesystem, prompt-injection safeguards
+- **Security:** read-only root filesystem, prompt-injection safeguards
 - **Automation:** scheduled Claude jobs (e.g. patch report, certificate expiry) with results as notifications
 - **Export/import** of configuration and templates
 

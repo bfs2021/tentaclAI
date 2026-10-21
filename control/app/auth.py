@@ -1,11 +1,14 @@
-"""Single admin password (bcrypt hash in /data/admin.hash), signed session cookie, login throttling."""
+"""Single admin password (bcrypt hash in /data/admin.hash), optional second factor (TOTP), signed session cookie, login
+throttling."""
 import os
 import secrets
 import time
 
 import bcrypt
 from fastapi import Request
+from itsdangerous import BadSignature, URLSafeTimedSerializer
 
+from . import jsonstore, totp
 from .config import DATA_DIR
 
 HASH_FILE = os.path.join(DATA_DIR, "admin.hash")
@@ -74,3 +77,132 @@ def same_origin(request: Request) -> bool:
         return True  # same-origin form posts from old browsers / curl; cookie is SameSite=Strict anyway
     host = request.headers.get("x-forwarded-host") or request.headers.get("host", "")
     return origin.split("://", 1)[-1] == host
+
+
+# ---------------------------------------------------------------- second factor (TOTP), optional
+# data/control/twofactor.json (0600): secret, last used step, recovery code hashes, trusted browsers.
+TWOFACTOR_FILE = os.path.join(DATA_DIR, "twofactor.json")
+PENDING_SECONDS = 300           # password → code: 5 minutes
+TRUST_DAYS = 30                 # "trust this browser"
+TRUST_COOKIE = "tc_trust"
+FAIL_DELAY = 1.0                # seconds after a wrong password or code (slows guessing down)
+RECOVERY_ROUNDS = 10            # bcrypt cost of the recovery code hashes
+
+
+def _2fa():
+    return jsonstore.load(TWOFACTOR_FILE, {"enabled": False})
+
+
+def _2fa_save(s):
+    jsonstore.save(TWOFACTOR_FILE, s, mode=0o600)
+
+
+def twofactor_enabled() -> bool:
+    return bool(_2fa().get("enabled"))
+
+
+def twofactor_status():
+    s = _2fa()
+    return {"enabled": bool(s.get("enabled")), "recovery_left": len(s.get("recovery", [])),
+            "trusted": sorted(({"id": k, **v} for k, v in s.get("trusted", {}).items()), key=lambda t: -t.get("last_used", 0))}
+
+
+def pending_secret():
+    """the secret of a running setup (shown as QR code until the first code confirms it)"""
+    return _2fa().get("pending_secret", "")
+
+
+def start_setup():
+    """a new secret waiting for its first code (the running setup is replaced)"""
+    s = _2fa()
+    s["pending_secret"] = totp.new_secret()
+    _2fa_save(s)
+    return s["pending_secret"]
+
+
+def _hash(code):
+    return bcrypt.hashpw(code.strip().lower().encode(), bcrypt.gensalt(rounds=RECOVERY_ROUNDS)).decode()
+
+
+def confirm_setup(code):
+    """turns 2FA on when the code matches the pending secret – returns the recovery codes (shown once) or None"""
+    s = _2fa()
+    secret = s.get("pending_secret")
+    counter = totp.verify(secret, code) if secret else None
+    if counter is None:
+        return None
+    codes = totp.new_recovery_codes()
+    s.update(enabled=True, secret=secret, last_counter=counter, recovery=[_hash(c) for c in codes], trusted={})
+    s.pop("pending_secret", None)
+    _2fa_save(s)
+    return codes
+
+
+def check_second_factor(code):
+    """'totp', 'recovery' (that code is used up now) or None"""
+    s = _2fa()
+    if not s.get("enabled"):
+        return None
+    counter = totp.verify(s["secret"], code, s.get("last_counter", -1))
+    if counter is not None:
+        s["last_counter"] = counter
+        _2fa_save(s)
+        return "totp"
+    given = code.strip().lower()
+    for h in s.get("recovery", []):
+        if bcrypt.checkpw(given.encode(), h.encode()):
+            s["recovery"].remove(h)
+            _2fa_save(s)
+            return "recovery"
+    return None
+
+
+def new_recovery_codes():
+    s = _2fa()
+    codes = totp.new_recovery_codes()
+    s["recovery"] = [_hash(c) for c in codes]
+    _2fa_save(s)
+    return codes
+
+
+def disable_twofactor():
+    """off – secret, recovery codes and trusted browsers are gone (also: ./tentaclai.sh reset-2fa)"""
+    _2fa_save({"enabled": False})
+
+
+def _signer():
+    return URLSafeTimedSerializer(session_secret(), salt="tc-trust")
+
+
+def trust_browser(label):
+    """a signed cookie value; its id must also be in twofactor.json, so it can be revoked"""
+    s = _2fa()
+    tid = secrets.token_urlsafe(12)
+    s.setdefault("trusted", {})[tid] = {"created": time.time(), "last_used": time.time(), "label": label[:80]}
+    _2fa_save(s)
+    return _signer().dumps(tid)
+
+
+def is_trusted(token) -> bool:
+    if not token:
+        return False
+    try:
+        tid = _signer().loads(token, max_age=TRUST_DAYS * 86400)
+    except BadSignature:  # includes expired
+        return False
+    s = _2fa()
+    if tid not in s.get("trusted", {}):
+        return False
+    s["trusted"][tid]["last_used"] = time.time()
+    _2fa_save(s)
+    return True
+
+
+def revoke_trust(tid=None):
+    """one trusted browser, or all (tid None)"""
+    s = _2fa()
+    if tid is None:
+        s["trusted"] = {}
+    else:
+        s.get("trusted", {}).pop(tid, None)
+    _2fa_save(s)

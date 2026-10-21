@@ -11,6 +11,7 @@
 #   ./tentaclai.sh inventory   guided system inventory → local/CLAUDE.md (Claude asks, you approve)
 #   ./tentaclai.sh scan       read-only inventory report (tc-scan)
 #   ./tentaclai.sh passwd     set/reset the tentacontrol web admin password
+#   ./tentaclai.sh reset-2fa  switch tentacontrol's two-factor sign-in off (lost phone and recovery codes)
 #   ./tentaclai.sh setup-url  show the one-time tentacontrol setup link (first start)
 #   ./tentaclai.sh update     to the latest release: what's new (changelog) + rebuild + recreate, asks before each step
 #                             (--check: only show, --main: latest main instead of the latest release)
@@ -192,12 +193,13 @@ cmd_update() {  # git pull + changelog of the new versions + rebuild + recreate 
 case "${1:-}" in
     init)      cmd_init "${2:-}"; exit 0 ;;
     passwd)    exec docker exec -it tentacontrol tentacontrol-passwd ;;
+    reset-2fa) exec docker exec -it tentacontrol tentacontrol-passwd --reset-2fa ;;
     setup-url)
         url="$(env_value CONTROL_URL)"
         docker logs tentacontrol 2>&1 | grep -E 'setup\?token=' | tail -1 | sed "s|https://<host>|${url:-http://127.0.0.1:8484}|"
         exit 0 ;;
     update)    cmd_update "${2:-}"; exit 0 ;;
-    -h|--help|help) sed -n '2,19p' "$0"; exit 0 ;;
+    -h|--help|help) awk 'NR > 1 && /^#/ { print; next } NR > 1 { exit }' "$0"; exit 0 ;;  # the comment block above
 esac
 
 if [ "$(docker inspect -f '{{.State.Running}}' "$CONTAINER" 2>/dev/null)" != "true" ]; then

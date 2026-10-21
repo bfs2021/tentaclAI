@@ -296,6 +296,8 @@
       <p>Edits the stack's <code>.env</code>. Secrets are never shown – variables whose name looks like one (TOKEN, KEY, PASS, SECRET, AUTH, PAT …) and every variable a service uses as a credential (in <code>auth</code>, <code>headers</code>, <code>password</code> …) – leaving the field empty keeps the value, the “clear” checkbox removes it. Changes that need a new container show “Apply now” at the top (running sessions end); remote control changes only need “Restart” on the overview.</p>
           <h3>Notifications</h3>
       <p>Settings → <a href="/notifications">Notifications</a>: add channels (ntfy, webhook, or any <a href="https://github.com/caronc/apprise/wiki" target="_blank" rel="noopener">Apprise URL</a> – Telegram, Discord, Slack, Teams, e-mail, Home Assistant), send a test, and tick which event goes to which channel. Urgent events (approval needed, Remote Control down, signed out, container stopped) also come during quiet hours; the same event is sent at most once per dedupe interval. Channel URLs are stored in <code>.env</code> as <code>NOTIFY_URL_…</code>.</p>
+          <h3>Security</h3>
+      <p>Settings → <a href="/security">Security</a> switches on <strong>two-factor sign-in</strong>: scan the QR code with an authenticator app (Google Authenticator, Aegis, 1Password, Bitwarden …), enter its code, keep the 10 recovery codes (each works once, for a lost phone). From then on tentacontrol asks for a code after the password; “Trust this browser” skips it for 30 days in that browser – the trusted browsers are listed there and can be revoked. Switching off needs the password and a code. No phone and no recovery code: <code>./tentaclai.sh reset-2fa</code> on the host. A sign-in with a recovery code sends a notification.</p>
           <h3>Usage</h3>
       <p><a href="/usage">Usage</a> shows the plan limits (session and week, account-wide) and what contributes to them – from Claude Code's <code>/usage</code>, asked every 10 minutes without a model call – plus tokens per day, the sandbox's sessions and the models used, read from the local session files (usage fields only, never the conversation). A quota notification goes out at 80 %.</p>
 </section>
@@ -336,7 +338,7 @@ gh …                      GitHub CLI without credentials (public data)</pre>
         <li><strong>Other services' secrets are blanked</strong> in free read-only output: <code>docker … inspect</code>, <code>compose … config</code> and <code>systemctl show|cat</code> show <code>[redacted by svc]</code> for values with secret-looking names and for passwords in URLs. Logs and commands you approve are not filtered. <code>svc</code> also keeps the <code>.env</code> values out of the environment of the programs it starts.</li>
         <li>The sandbox sits in an internal network without a route to the outside; everything leaves through the <strong>egress gateway</strong> (<code>tentaclai-egress</code>), which records every destination. <code>EGRESS_MODE=permissive</code> (default) allows all – allow/block lists and approvals follow.</li>
         <li>An <code>rw</code> docker service is root on that host. The sandbox itself never gets a Docker socket – docker hosts are reached over SSH only.</li>
-        <li>Login: bcrypt hash, 12 h session, <code>SameSite=Strict</code> cookie (Secure behind https), origin check for forms and the terminal, throttling after failed attempts.</li>
+        <li>Login: bcrypt hash, optional two-factor sign-in (TOTP, see <a href="#settings">Settings → Security</a>), 12 h session, <code>SameSite=Strict</code> cookie (Secure behind https), origin check for forms and the terminal, throttling after failed attempts (password and code).</li>
         <li>Secrets never reach the browser; <code>svc</code> passes them to curl through temporary 0600 files on tmpfs, not on the command line.</li>
         <li>Claude keeps asking before actions – the rules are in its instructions (generic rules + <code>local/CLAUDE.md</code>).</li>
         <li>Forgot the password: <code>./tentaclai.sh passwd</code> on the host.</li>
@@ -362,7 +364,6 @@ gh …                      GitHub CLI without credentials (public data)</pre>
     <section class="card" id="roadmap">
       <h2>Roadmap</h2>
       <ul>
-        <li><strong>Two-factor sign-in (TOTP)</strong> for tentacontrol.</li>
         <li><strong>Scheduled jobs</strong>: run Claude tasks on a schedule (e.g. patch report, certificate expiry), results as notifications.</li>
         <li><strong>Export/import</strong>: configuration and templates, e.g. for a second installation or to share templates.</li>
         <li><strong>More sandbox</strong>: read-only root filesystem, prompt-injection safeguards for content from services.</li>

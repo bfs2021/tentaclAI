@@ -4,6 +4,14 @@ All notable changes, newest first. Every release lists **upgrade steps** from th
 
 ## Unreleased
 
+### Highlights
+- **Two-factor sign-in for tentacontrol** (Settings → **Security**): a code from an authenticator app after the password
+  (TOTP, RFC 6238 – no new dependency). Set up with a QR code; 10 one-time **recovery codes** for a lost phone (stored as
+  hashes, a sign-in with one sends a notification); **“Trust this browser”** skips the code for 30 days – signed cookie
+  plus a server-side list, so single browsers or all can be revoked. Switching off needs the password and a code; on
+  the host `./tentaclai.sh reset-2fa`. A password reset also revokes the trusted browsers. Optional – off until you
+  switch it on.
+
 ### Changes
 - **Docker hosts run over SSH only** – the `socket` mode for docker services is gone. It mounted the host's Docker
   socket into the sandbox, which made Claude root on the host and undid the privilege separation (`.env`, SSH key).
@@ -16,7 +24,7 @@ All notable changes, newest first. Every release lists **upgrade steps** from th
 
 ### Upgrade (from v0.10.0)
 `./tentaclai.sh update`, `docker compose build`, `docker compose up -d` – recreating `tentaclai` ends running sessions and
-Remote Control. On its first start tentacontrol removes `compose.generated.yaml` from `COMPOSE_FILE` in `.env` (the
+Remote Control. Two-factor sign-in stays off until you set it up under Settings → Security. On its first start tentacontrol removes `compose.generated.yaml` from `COMPOSE_FILE` in `.env` (the
 stale file can be deleted). **If you used a docker service in `socket` mode:** add the host under Tentacles → SSH hosts
 (this host: hostname `host.docker.internal`, a user allowed to run docker or a sudo prefix), then set `"mode": "ssh"`
 and `"ssh_host": "<alias>"` in the service and remove `"socket"`.

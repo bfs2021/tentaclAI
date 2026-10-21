@@ -1,13 +1,15 @@
-"""Settings and its tabs: notifications, skills, models – plus usage."""
+"""Settings and its tabs: notifications, skills, models, security (two-factor sign-in) – plus usage."""
 import asyncio
 import time
 
+import segno
 from fastapi import APIRouter, Form, Request
-from fastapi.responses import HTMLResponse, PlainTextResponse
+from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse
 
-from .. import models, notify, services_store, skills, usage
+from .. import auth, models, notify, services_store, skills, totp, usage
 from ..config import RC_VARS, RESTART_VARS, SETTINGS_GROUPS
 from ..envfile import read_env, update_env
+from ..config import site
 from ..web import mark_restart, not_applied, page, respond, toast
 import tclib  # noqa: E402  shared with the sandbox tools
 
@@ -171,3 +173,62 @@ async def settings_save(request: Request):
     elif RC_VARS & set(changes):
         msg += " – restart remote control on the overview to apply"
     return respond(request, msg, refresh=True)
+
+
+# ---------------------------------------------------------------- security: two-factor sign-in (TOTP)
+
+def _security(request, codes=None, error=None, status=200):
+    st = auth.twofactor_status()
+    secret = auth.pending_secret() if not st["enabled"] else ""
+    qr = ""
+    if secret:
+        link = totp.uri(secret, site().get("hostname") or "tentacontrol")
+        qr = segno.make(link, error="m").svg_inline(scale=4, border=2, dark="#111", light="#fff", omitsize=True)
+    resp = page(request, "security.html", st=st, secret=secret, qr=qr, codes=codes, error=error, days=auth.TRUST_DAYS,
+                fmt=lambda ts: time.strftime("%Y-%m-%d %H:%M", time.localtime(ts)) if ts else "–")
+    resp.status_code = status
+    return resp
+
+
+@router.get("/security", response_class=HTMLResponse)
+async def security_page(request: Request):
+    return _security(request)
+
+
+@router.post("/security/setup", response_class=HTMLResponse)
+async def security_setup(request: Request):
+    if auth.twofactor_enabled():
+        return RedirectResponse("/security", status_code=303)
+    auth.start_setup()
+    return RedirectResponse("/security", status_code=303)
+
+
+@router.post("/security/confirm", response_class=HTMLResponse)
+async def security_confirm(request: Request, code: str = Form("")):
+    codes = await asyncio.to_thread(auth.confirm_setup, code)
+    if codes is None:
+        return _security(request, error="That code doesn't match – check the time on the phone and try the next one.", status=400)
+    return _security(request, codes=codes)  # shown once – only the hashes are stored
+
+
+@router.post("/security/recovery", response_class=HTMLResponse)
+async def security_recovery(request: Request, code: str = Form("")):
+    if await asyncio.to_thread(auth.check_second_factor, code) != "totp":
+        return _security(request, error="Enter a current code from the app to make new recovery codes.", status=400)
+    return _security(request, codes=await asyncio.to_thread(auth.new_recovery_codes))
+
+
+@router.post("/security/revoke", response_class=HTMLResponse)
+async def security_revoke(request: Request, tid: str = Form("")):
+    auth.revoke_trust(tid or None)
+    return RedirectResponse("/security", status_code=303)
+
+
+@router.post("/security/disable", response_class=HTMLResponse)
+async def security_disable(request: Request, password: str = Form(""), code: str = Form("")):
+    ok = await asyncio.to_thread(auth.check_password, password) and await asyncio.to_thread(auth.check_second_factor, code)
+    if not ok:
+        await asyncio.sleep(auth.FAIL_DELAY)
+        return _security(request, error="Password and a current code (or a recovery code) are needed to switch it off.", status=400)
+    auth.disable_twofactor()
+    return RedirectResponse("/security", status_code=303)

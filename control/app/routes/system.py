@@ -7,7 +7,7 @@ import segno
 from fastapi import APIRouter, Form, Request, WebSocket
 from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse, RedirectResponse, StreamingResponse
 
-from .. import activity, auth, dockerops, egress, jobs, netguard, services_store, sshhosts, updatecheck, usage
+from .. import activity, auth, dockerops, egress, jobs, netguard, notify, services_store, sshhosts, updatecheck, usage
 from ..config import CLAUDE_SERVICE, COMPOSE
 from ..envfile import read_env, update_env
 from ..terminal import PROFILES, bridge, onboard_cmd
@@ -62,12 +62,66 @@ async def login(request: Request, password: str = Form(...)):
         return templates.TemplateResponse(request, "login.html", {"error": f"too many attempts – please wait {wait} s"}, status_code=429)
     if not auth.check_password(password):
         auth.register_failure(ip)
-        await asyncio.sleep(1)
+        await asyncio.sleep(auth.FAIL_DELAY)
         return templates.TemplateResponse(request, "login.html", {"error": "wrong password"}, status_code=401)
     auth.clear_failures(ip)
     request.session.clear()
+    if auth.twofactor_enabled() and not auth.is_trusted(request.cookies.get(auth.TRUST_COOKIE)):
+        request.session["pending_2fa"] = time.time()  # password done – the code comes next
+        return RedirectResponse("/login/2fa", status_code=303)
     request.session["auth"] = True
     return RedirectResponse("/", status_code=303)
+
+
+def _pending_2fa(request):
+    ts = request.session.get("pending_2fa", 0)
+    return auth.twofactor_enabled() and 0 < time.time() - ts < auth.PENDING_SECONDS
+
+
+def browser_label(ua):
+    """'Firefox on Linux' – to recognise a trusted browser in Settings → Security"""
+    browser = next((n for k, n in (("Edg/", "Edge"), ("Firefox/", "Firefox"), ("Chrome/", "Chrome"), ("Safari/", "Safari"))
+                    if k in ua), "Browser")
+    system = next((n for k, n in (("iPhone", "iPhone"), ("iPad", "iPad"), ("Android", "Android"), ("Windows", "Windows"),
+                                  ("Mac OS X", "macOS"), ("Linux", "Linux")) if k in ua), "")
+    return f"{browser} on {system}" if system else browser
+
+
+@router.get("/login/2fa", response_class=HTMLResponse)
+async def login_2fa_form(request: Request):
+    if not _pending_2fa(request):
+        return RedirectResponse("/login", status_code=303)
+    return templates.TemplateResponse(request, "login_2fa.html", {"error": None, "days": auth.TRUST_DAYS})
+
+
+@router.post("/login/2fa")
+async def login_2fa(request: Request, code: str = Form(...), trust: str = Form("")):
+    if not _pending_2fa(request):
+        return RedirectResponse("/login", status_code=303)
+    ip = client_ip(request)
+    ctx = {"days": auth.TRUST_DAYS}
+    wait = auth.throttled(ip)
+    if wait:
+        return templates.TemplateResponse(request, "login_2fa.html", {**ctx, "error": f"too many attempts – please wait {wait} s"}, status_code=429)
+    kind = await asyncio.to_thread(auth.check_second_factor, code)
+    if kind is None:
+        auth.register_failure(ip)
+        await asyncio.sleep(auth.FAIL_DELAY)
+        return templates.TemplateResponse(request, "login_2fa.html", {**ctx, "error": "wrong code"}, status_code=401)
+    auth.clear_failures(ip)
+    request.session.clear()
+    request.session["auth"] = True
+    if kind == "recovery":
+        left = auth.twofactor_status()["recovery_left"]
+        notify.emit("signin", "tentacontrol: sign-in with a recovery code", f"{left} recovery codes left.", key=f"signin:{time.time()}")
+        request.session["flash"] = {"msg": f"Signed in with a recovery code – {left} left. Set up new ones under Settings → Security.",
+                                    "kind": "warn"}
+    response = RedirectResponse("/", status_code=303)
+    if trust:
+        token = auth.trust_browser(browser_label(request.headers.get("user-agent", "")))
+        response.set_cookie(auth.TRUST_COOKIE, token, max_age=auth.TRUST_DAYS * 86400, httponly=True, samesite="strict",
+                            secure=request.url.scheme == "https", path="/")
+    return response
 
 
 @router.post("/logout")

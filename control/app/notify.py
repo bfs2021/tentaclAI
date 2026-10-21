@@ -25,6 +25,7 @@ EVENTS = {
     "container":  ("Container stopped", "high", "the sandbox or the egress gateway is not running"),
     "update":     ("Update available", "low", "a new tentaclAI release is out"),
     "quota":      ("Quota running low", "normal", "the Claude session or weekly limit passed 80 %"),
+    "signin":     ("Sign-in with a recovery code", "high", "someone signed in to tentacontrol with a 2FA recovery code"),
 }
 ID_RE = re.compile(r"^[a-z0-9][a-z0-9-]{0,30}$")
 
