@@ -2,7 +2,7 @@
 
 All notable changes, newest first. Every release lists **upgrade steps** from the previous one.
 
-## Unreleased
+## v0.13.0 – 2026-10-21
 
 ### Highlights
 - **New area *Claude*** – everything that steers Claude in one place, in tabs: **Instructions** (a diagram of what
