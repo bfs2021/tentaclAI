@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% from "_tabs.html" import claude_tabs %}
+{% from "_icons.html" import icon, help_link %}
+{% block title %}{{ job.name or 'New job' }}{% endblock %}
+{% block content %}
+{{ claude_tabs('jobs') }}
+{% set s = job.schedule or {} %}
+<div class="header">
+  <div><div class="small"><a href="/claude/jobs">← Jobs</a></div><h1>{{ job.name or 'New job' }}</h1>
+    <div class="sub">What Claude should check or report, and when. The answer is a traffic light (ok / warn / alert) with a short summary.</div></div>
+  <div class="row">{% if jid %}<button class="btn danger" hx-post="/claude/jobs/{{ jid }}/delete" hx-confirm="Delete job {{ job.name }}? Its run history stays.">{{ icon('trash') }}Delete</button>{% endif %}{{ help_link('jobs') }}</div>
+</div>
+{% if not jid %}
+<div class="row small" style="margin:-8px 0 16px;flex-wrap:wrap;justify-content:flex-start"><span class="muted">Templates:</span>
+  {% for t in templates %}<a href="/claude/jobs/new?template={{ loop.index0 }}">{{ t.name }}</a>{% endfor %}</div>
+{% endif %}
+<form class="card stack" hx-post="/claude/jobs/save" style="gap:14px">
+  <input type="hidden" name="jid" value="{{ jid or '' }}">
+  <div><label>Name</label><input type="text" name="name" value="{{ job.name or '' }}" maxlength="60" required></div>
+  <div><label>Task</label>
+    <textarea name="prompt" style="min-height:160px;font-family:inherit" required placeholder="e.g. Check the free disk space on every host and warn above 80 %.">{{ job.prompt or '' }}</textarea>
+    <div class="help">Say when it is ok, warn or alert – that decides whether you hear about it.</div></div>
+
+  <div class="grid2">
+    <div><label>Schedule</label>
+      <select name="kind" id="sched-kind">
+        {% for k, t in (('hourly', 'every hour'), ('daily', 'daily'), ('weekly', 'weekly'), ('every', 'every N hours'), ('cron', 'cron expression')) %}
+        <option value="{{ k }}" {{ 'selected' if s.kind == k }}>{{ t }}</option>{% endfor %}
+      </select>
+      <div class="row sched" data-kinds="daily weekly" style="margin-top:8px;justify-content:flex-start">
+        <select name="day" class="sched" data-kinds="weekly" style="width:auto">{% for d in days %}<option value="{{ loop.index0 }}" {{ 'selected' if s.day == loop.index0 }}>{{ d }}</option>{% endfor %}</select>
+        <span class="muted">at</span><input type="time" name="time" value="{{ s.time or '07:00' }}" style="width:auto"></div>
+      <div class="row sched" data-kinds="hourly" style="margin-top:8px;justify-content:flex-start"><span class="muted">at minute</span><input type="number" name="minute" min="0" max="59" value="{{ s.minute or 0 }}" style="width:90px"></div>
+      <div class="row sched" data-kinds="every" style="margin-top:8px;justify-content:flex-start"><span class="muted">every</span><input type="number" name="hours" min="1" max="168" value="{{ s.hours or 6 }}" style="width:90px"><span class="muted">hours</span></div>
+      <div class="sched" data-kinds="cron" style="margin-top:8px"><input type="text" name="expr" value="{{ s.expr or '0 7 * * 1-5' }}" class="mono" spellcheck="false">
+        <div class="help">minute hour day month weekday (0 = Sunday) – e.g. <code>0 7 * * 1-5</code> = weekdays at 07:00</div></div>
+    </div>
+    <div><label>Profile</label>
+      <select name="profile" id="profile">{% for p in profiles %}<option value="{{ p }}" {{ 'selected' if job.profile == p }}>{{ p }}</option>{% endfor %}</select>
+      <div class="help prof" data-p="read-only">Reads only: every tentacle counts as <code>ro</code>, no file edits, no MCP tools.</div>
+      <div class="help prof" data-p="standard">Like a terminal session: <code>confirm</code> tentacles wait for your approval in Activity (expires after 10 min), <code>rw</code> tentacles are written without asking.</div>
+      {% if rw %}<div class="card flat small prof" data-p="standard" style="margin-top:8px"><span class="pill warn">writes without asking</span> {{ rw | join(', ') }}</div>{% endif %}
+    </div>
+  </div>
+
+  <div class="grid2">
+    <div><label>Notify</label>
+      <select name="notify">{% for k, t in notify_rules.items() %}<option value="{{ k }}" {{ 'selected' if job.notify == k }}>{{ t }}</option>{% endfor %}</select>
+      <div class="help">Through the channels routed to <em>Job finding</em> / <em>Job failed</em> in <a href="/notifications">Notifications</a>.</div></div>
+    <div class="row" style="align-items:flex-end;gap:10px">
+      <div style="flex:1"><label>Model</label><input type="text" name="model" value="{{ job.model or '' }}" placeholder="as on Models" spellcheck="false"></div>
+      <div style="flex:1"><label>Effort</label><select name="effort"><option value="">as on Models</option>{% for e in efforts %}<option value="{{ e }}" {{ 'selected' if job.effort == e }}>{{ e }}</option>{% endfor %}</select></div>
+      <div style="width:110px"><label>Max. minutes</label><input type="number" name="max_minutes" min="1" max="120" value="{{ job.max_minutes or 20 }}"></div>
+    </div>
+  </div>
+  <div class="row"><button class="btn primary">{{ icon('check') }}Save</button><a class="btn ghost" href="/claude/jobs">Cancel</a></div>
+</form>
+<script>
+(function () {
+  function sync() {
+    var k = document.getElementById("sched-kind").value, p = document.getElementById("profile").value;
+    document.querySelectorAll(".sched").forEach(function (el) { el.hidden = el.dataset.kinds.split(" ").indexOf(k) < 0; });
+    document.querySelectorAll(".prof").forEach(function (el) { el.hidden = el.dataset.p !== p; });
+  }
+  document.getElementById("sched-kind").addEventListener("change", sync);
+  document.getElementById("profile").addEventListener("change", sync);
+  sync();
+})();
+</script>
+{% endblock %}

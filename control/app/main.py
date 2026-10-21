@@ -9,7 +9,7 @@ from fastapi.responses import PlainTextResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
 
-from . import activity, auth, connectors, dockerops, netguard, notify, skills, updatecheck, usage
+from . import activity, auth, connectors, dockerops, netguard, notify, scheduled, skills, updatecheck, usage
 from .envfile import drop_generated_compose, read_env
 from .routes import claude, network, settings, ssh, system, tentacles
 from .web import BASE, TC_VERSION
@@ -17,8 +17,8 @@ from .web import BASE, TC_VERSION
 
 @contextlib.asynccontextmanager
 async def lifespan(_app):
-    """startup: activity token, background loops (notifications, usage, update check), setup hint"""
-    for start in (migrate, prepare_activity, start_notifications, start_update_check, announce_setup):
+    """startup: activity token, background loops (notifications, usage, update check, scheduled jobs), setup hint"""
+    for start in (migrate, prepare_activity, start_notifications, start_update_check, start_scheduled_jobs, announce_setup):
         await start()
     yield
 
@@ -148,6 +148,12 @@ async def start_notifications():
             n += 1
             await asyncio.sleep(300)
     loop.create_task(usage_loop())
+
+
+async def start_scheduled_jobs():
+    loop = asyncio.get_running_loop()
+    loop.create_task(scheduled.worker())
+    loop.create_task(scheduled.scheduler())
 
 
 async def start_update_check():

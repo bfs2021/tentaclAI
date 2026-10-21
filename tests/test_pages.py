@@ -264,3 +264,17 @@ def test_netguard_unknown_address_in_the_sandbox_network_counts_as_sandbox(app_m
     assert netguard.source("10.9.0.3") == "egress"
     assert netguard.source("192.168.1.5") == "other"
     assert not netguard.allowed("/login", "10.9.0.7")
+
+
+def test_job_pages_render(client, app_module, monkeypatch, tmp_path):
+    from app import scheduled
+    monkeypatch.setattr(scheduled, "JOBS", str(tmp_path / "jobs.json"))
+    monkeypatch.setattr(scheduled, "HISTORY", str(tmp_path / "hist.json"))
+    jid = scheduled.save({"name": "Disk space", "prompt": "df", "kind": "cron", "expr": "0 7 * * 1-5", "profile": "standard"})
+    from app import jsonstore
+    jsonstore.save(scheduled.HISTORY, [{"id": "abc123", "job": jid, "name": "Disk space", "status": "done", "queued": 1,
+                                        "result": {"status": "warn", "title": "80 % on /", "summary": "s", "details": "d"}}])
+    for path in ("/claude/jobs", f"/claude/jobs/{jid}", "/claude/jobs/new?template=1"):
+        r = client.get(path)
+        assert r.status_code == 200 and "</html>" in r.text, path
+    assert "80 % on /" in client.get("/claude/jobs").text

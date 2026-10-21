@@ -26,6 +26,8 @@ EVENTS = {
     "update":     ("Update available", "low", "a new tentaclAI release is out"),
     "quota":      ("Quota running low", "normal", "the Claude session or weekly limit passed 80 %"),
     "signin":     ("Sign-in with a recovery code", "high", "someone signed in to tentacontrol with a 2FA recovery code"),
+    "job_result": ("Job finding", "normal", "a scheduled Claude job reported something (by its notification rule)"),
+    "job_failed": ("Job failed", "normal", "a scheduled Claude job failed or ran out of time"),
 }
 ID_RE = re.compile(r"^[a-z0-9][a-z0-9-]{0,30}$")
 
@@ -41,6 +43,8 @@ def load():
         c = {}
     c.setdefault("channels", [])
     c.setdefault("routes", {})
+    for ev in EVENTS:  # an event added in a later version goes where approvals go until it is set itself
+        c["routes"].setdefault(ev, list(c["routes"].get("approval", [])))
     c.setdefault("quiet", {"enabled": False, "from": "23:00", "to": "07:00"})
     c.setdefault("dedupe_min", 10)
     return c

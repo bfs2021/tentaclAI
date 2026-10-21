@@ -186,6 +186,18 @@ docker exec -u claude -e CLAUDE_CODE_SESSION_ID=$SID -e CLAUDE_CODE_ENTRYPOINT=c
 AUDIT="$(docker exec tctest-claude cat "$T/data/control/audit.jsonl" 2>/dev/null || true)"  # root-only (also in CI)
 check "audit entry names the session" "$(echo "$AUDIT" | tail -1 | grep -c "$SID" || true)" "1"
 check "the session token stays behind" "$(echo "$AUDIT" | grep -c leak-test || true)" "0"
+# scheduled jobs: tentacontrol runs a job's Claude under `sh -c … tc-job=<run>` and lists the run in root's job-runs.json
+docker exec tctest-claude sh -c "printf '%s' '{\"jobro01\": {\"job\": \"T\", \"profile\": \"read-only\"}, \"jobstd01\": {\"job\": \"T2\", \"profile\": \"standard\"}}' > $T/data/control/job-runs.json"
+J() { docker exec -u claude tctest-claude sh -c "$2; exit" "tc-job=$1" >/dev/null 2>&1 && echo ran || echo refused; }  # "; exit": sh stays the parent
+check "read-only job: API write refused" "$(J jobro01 'svc testapi POST /')" "refused"
+check "read-only job: ssh write refused" "$(J jobro01 'svc ssh testssh touch /tmp/job-ro')" "refused"
+check "read-only job: reading works" "$(docker exec -u claude tctest-claude sh -c 'svc testapi GET /; exit' tc-job=jobro01 2>/dev/null)" '{"auth_ok": true}'
+check "standard job: writes as the tentacle allows" "$(J jobstd01 'svc ssh testssh touch /tmp/job-std')" "ran"
+check "audit entry names the job" "$(docker exec tctest-claude tail -1 "$T/data/control/audit.jsonl" 2>/dev/null | grep -c '"job": "jobstd01"' || true)" "1"
+check "unknown job marker counts as read-only" "$(J fakejob01 'svc ssh testssh touch /tmp/job-fake')" "refused"
+check "a second marker can't lift read-only" "$(J jobro01 "sh -c 'svc ssh testssh touch /tmp/job-lift; exit' tc-job=jobstd01")" "refused"
+check "nested standard markers still write (control)" "$(J jobstd01 "sh -c 'svc ssh testssh touch /tmp/job-nest; exit' tc-job=jobstd01")" "ran"
+docker exec tctest-claude rm -f "$T/data/control/job-runs.json"
 # rename a git service in tentacontrol: file, root's mirror and Claude's working copy move together
 rm -f services/gitdemo.json services/gitdemo2.json
 # a kept REUSE stack still has the last run's copies – the rename (rightly) refuses to overwrite them

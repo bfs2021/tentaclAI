@@ -2,6 +2,25 @@
 
 All notable changes, newest first. Every release lists **upgrade steps** from the previous one.
 
+## Unreleased
+
+### Highlights
+- **Scheduled jobs** (Claude → Jobs): Claude tasks on a schedule – presets or cron, a traffic-light answer
+  (ok / warn / alert) and notifications only on findings; templates for patch report, certificate expiry, disk space,
+  backup check and container health. Profile *read-only* (default) is enforced twice – by Claude Code's tool rules
+  and by `svc`, which recognises the run and treats every tentacle as `ro`; *standard* works like a terminal session
+  (approvals for `confirm`, shown as “Job · name”).
+
+### Changes
+- Template *zigbee2mqtt* removed (45 templates).
+- Templates *Pangolin* and *Backrest*: a note on testing – Pangolin's `GET /` answers without the key (use
+  `/org/<orgId>/sites`), Backrest's API has no GET that checks the login.
+
+### Upgrade (from v0.13.0)
+`./tentaclai.sh update`, `docker compose build`, `docker compose up -d` – both images changed (svc recognises job
+runs); recreating `tentaclai` ends running sessions and Remote Control. Jobs start empty. The new notification events
+*Job finding* and *Job failed* go to the channels that get *Approval needed* until you change them in Notifications.
+
 ## v0.13.0 – 2026-10-21
 
 ### Highlights
@@ -15,9 +34,6 @@ All notable changes, newest first. Every release lists **upgrade steps** from th
   Deny (network: Allow 10 min / Deny) – no need to switch to Activity.
 
 ### Changes
-- Template *zigbee2mqtt* removed (45 templates).
-- Templates *Pangolin* and *Backrest*: a note on testing – Pangolin's `GET /` answers without the key (use
-  `/org/<orgId>/sites`), Backrest's API has no GET that checks the login.
 - Services and Systems: the create forms are folded away behind *Add service* / *Add system* buttons in the header.
 - Every page has a small **?** in its header that opens the matching part of Help (replaces the *Help* button on
   Services); the *Add …* button comes first everywhere and stays on the right when the subtitle is long. Network:

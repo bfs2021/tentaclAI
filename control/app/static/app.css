@@ -401,3 +401,5 @@ input[type=checkbox]:not(.switch-cb) { accent-color: var(--accent-2); }
 .mem-entry:first-of-type { border-top: 0; padding-top: 0; }
 .mem-entry summary { cursor: pointer; display: flex; gap: 10px; align-items: center; }
 .mem-entry summary .faint { margin-left: auto; }
+.job-card h2 { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.job-card h2 svg { width: 18px; height: 18px; color: var(--accent); flex: none; }

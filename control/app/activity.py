@@ -54,7 +54,7 @@ def _expire():
 
 
 _ORIGIN_KEYS = {"session": r"(cse_[A-Za-z0-9]{10,60}|[0-9a-f-]{36})", "entry": r"[a-z][a-z-]{0,19}", "tmux": r"[A-Za-z0-9._-]{1,40}",
-                "by": r"root"}
+                "by": r"root", "job": r"[a-z0-9]{6,40}"}
 
 
 def clean_origin(o):
@@ -71,6 +71,9 @@ def origin_label(o):
         return ""
     if o.get("by") == "root":
         return "tentacontrol / host"
+    if o.get("job"):  # set by svc from the job's process marker, not from Claude's variables
+        from .scheduled import running_job_name
+        return f"Job · {running_job_name(o['job']) or o['job']}"
     parts = []
     if o.get("tmux"):
         parts.append(dockerops.session_label(o["tmux"]))

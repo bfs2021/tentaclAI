@@ -110,6 +110,49 @@ def via_sudo():
 
 SESSION_ID_RE = re.compile(r"^(cse_[A-Za-z0-9]{10,60}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$")
 _origin = None
+JOB_RE = re.compile(r"^[a-z0-9]{6,40}$")
+_job = None
+
+
+def job():
+    """the scheduled job a call belongs to, or None. tentacontrol runs a job's Claude under a wrapper process
+    `sh -c … tc-job=<run id>` and lists the run in root's job-runs.json; svc looks for that marker in the command lines
+    of its ancestors (/proc/<pid>/cmdline – readable without ptrace, unlike another user's environment). Claude can
+    start processes with markers of its own, so the strictest one wins: any marker that isn't a registered standard run
+    makes the call read-only."""
+    global _job
+    if _job is not None:
+        return _job or None
+    found, pid = [], os.getppid()
+    for _ in range(64):
+        if pid <= 1:
+            break
+        try:
+            with open(f"/proc/{pid}/cmdline", "rb") as f:
+                args = f.read().split(b"\0")
+            with open(f"/proc/{pid}/stat") as f:
+                pid = int(f.read().rsplit(")", 1)[1].split()[1])
+        except (OSError, ValueError, IndexError):
+            break
+        found += [a[7:].decode(errors="replace") for a in args if a.startswith(b"tc-job=")]
+    if not found:
+        _job = {}
+        return None
+    try:
+        with open(os.path.join(TC_DIR, "data", "control", "job-runs.json")) as f:
+            runs = json.load(f)
+    except (OSError, ValueError):
+        runs = {}
+    known = [runs.get(r) for r in found if JOB_RE.match(r) and isinstance(runs.get(r), dict)]
+    ro = len(known) < len(found) or any(k.get("profile") != "standard" for k in known)
+    first = found[-1]  # the outermost marker – the one tentacontrol set
+    _job = {"run": first if JOB_RE.match(first) else "", "read_only": ro}
+    return _job
+
+
+def job_read_only():
+    j = job()
+    return bool(j and j["read_only"])
 
 
 def origin():
@@ -123,6 +166,8 @@ def origin():
     if not via_sudo():
         o["by"] = "root"  # tentacontrol, the entrypoint or a root shell
     else:
+        if job() and job()["run"]:
+            o["job"] = job()["run"]
         sid = os.environ.get("CLAUDE_CODE_SESSION_ID", "")
         if SESSION_ID_RE.match(sid):
             o["session"] = sid
@@ -1350,7 +1395,7 @@ def cmd_ssh(name_args):
         cmd = cmd[1:]
     if not tclib.ssh_host(SSH_CONF_D, alias):
         sys.exit(f"svc: unknown SSH host '{alias}' (svc ssh)")
-    mode = tclib.ssh_access(SSH_CONF_D, alias)
+    mode = "ro" if job_read_only() else tclib.ssh_access(SSH_CONF_D, alias)
     remote = " ".join(cmd)
     tty = not cmd or sys.stdin.isatty() and sys.stdout.isatty()
     argv = ["ssh"] + (["-t"] if tty else ["-T"]) + ["--", alias] + ([remote] if remote else [])
@@ -1370,6 +1415,8 @@ def cmd_config(services, args):
     """Claude proposes a service file or the site rules; the user approves every write (the stack dir is root's)"""
     if len(args) < 3 or args[0] != "put" or args[1] not in ("service", "local") or (args[1] == "service" and len(args) < 4):
         sys.exit("usage: svc config put service <name> <file>  |  svc config put local <file>")
+    if job_read_only():
+        sys.exit("svc: a read-only job can't propose configuration changes")
     if args[1] == "service":
         name, src = args[2], args[3]
         if not re.fullmatch(r"[a-z0-9][a-z0-9_-]{0,40}", name):
@@ -1471,6 +1518,8 @@ MODES = ("ro", "rw", "confirm")
 
 
 def access_mode(part, default="ro"):
+    if job_read_only():
+        return "ro"  # a read-only scheduled job: every tentacle is read-only, whatever its own access
     mode = str(part.get("access", default))
     return mode if mode in MODES else "ro"
 
@@ -1733,6 +1782,8 @@ def cmd_mcp_proxy(services, name):
     svc = services.get(name) or sys.exit(f"svc: unknown service '{name}'")
     if "mcp" not in svc or not enabled(svc) or missing_vars(svc["mcp"]):
         sys.exit(f"svc: {name}: MCP not available (svc test {name})")
+    if job_read_only():
+        sys.exit(f"svc: {name}: MCP servers are off in read-only jobs (their tools can write)")
     m = render(svc["mcp"])
     kind = m.get("type", "stdio" if m.get("command") else "http")
     if kind == "stdio":

@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% from "_tabs.html" import claude_tabs %}
+{% from "_icons.html" import icon, help_link %}
+{% block title %}Jobs{% endblock %}
+{% macro light(st) %}{% set r = st.get('result') or {} %}{% set k = r.get('status') if st.status == 'done' else st.status %}<span class="pill {{ {'ok': 'ok', 'warn': 'warn', 'alert': 'err', 'failed': 'err', 'timeout': 'err', 'running': 'info', 'queued': 'info'}.get(k, 'off') }}">{{ k }}</span>{% endmacro %}
+{% block content %}
+{{ claude_tabs('jobs') }}
+<div class="header">
+  <div><h1>Jobs</h1><div class="sub">Claude tasks on a schedule – reports and checks whose result comes as a notification. One run at a time; each run is a fresh Claude session.</div></div>
+  <div class="row"><a class="btn primary" href="/claude/jobs/new">{{ icon('plus') }}Add job</a>{{ help_link('jobs') }}</div>
+</div>
+{% if not rows %}
+<div class="empty">
+  <p>No jobs yet. Start from a template:</p>
+  <div class="row" style="justify-content:center;flex-wrap:wrap;margin-top:10px">
+    {% for t in templates %}<a class="btn sm" href="/claude/jobs/new?template={{ loop.index0 }}">{{ t.name }}</a>{% endfor %}
+  </div>
+</div>
+{% else %}
+{% for j in rows %}
+<div class="card job-card" style="margin-bottom:14px">
+  <div class="between" style="align-items:flex-start;gap:12px">
+    <div style="min-width:0">
+      <h2 style="margin:0">{{ icon('clock') }}{{ j.name }}{% if not j.enabled %} <span class="pill off">paused</span>{% endif %}</h2>
+      <div class="small muted" style="margin-top:4px">{{ j.when }} · next {{ fmt(j.next) if j.enabled else '–' }} · <span class="pill {{ 'warn' if j.profile == 'standard' else 'off' }}">{{ j.profile }}</span> · notify {{ j.notify }}</div>
+    </div>
+    <div class="row" style="flex-wrap:nowrap">
+      <button class="btn sm primary" hx-post="/claude/jobs/{{ j.id }}/run" {{ 'disabled' if j.busy }}>{{ icon('play') }}Run now</button>
+      <button class="btn sm" hx-post="/claude/jobs/{{ j.id }}/toggle">{{ 'Resume' if not j.enabled else 'Pause' }}</button>
+      <a class="btn sm" href="/claude/jobs/{{ j.id }}">Edit</a>
+    </div>
+  </div>
+  {% if j.runs %}
+  <div style="margin-top:12px">
+  {% for r in j.runs %}
+    {% set res = r.get('result') or {} %}
+    <details class="mem-entry" id="run-{{ r.id }}">
+      <summary>{{ light(r) }} <span>{{ res.get('title') or r.get('error') or '' }}</span><span class="faint small">{{ fmt(r.get('started') or r.queued) }}{% if r.seconds %} · {{ r.seconds }} s{% endif %}{% if r.cost %} · ${{ '%.2f' % r.cost }}{% endif %}{% if r.trigger == 'manual' %} · manual{% endif %}</span></summary>
+      <div class="small" style="margin-top:8px">
+        {% if res.get('summary') %}<p style="margin:0 0 6px">{{ res.summary }}</p>{% endif %}
+        {% if res.get('details') %}<pre class="rc" style="max-height:340px">{{ res.details }}</pre>{% endif %}
+        {% if r.get('error') and r.status != 'done' %}<p class="muted" style="margin:0">{{ r.error }}</p>{% endif %}
+        {% if r.get('denials') %}<p class="muted" style="margin:6px 0 0">{{ r.denials }} tool call(s) refused by the {{ r.profile }} profile.</p>{% endif %}
+        {% if r.status == 'running' %}<button class="btn sm danger" hx-post="/claude/runs/{{ r.id }}/cancel" hx-confirm="Stop this run?" style="margin-top:8px">Stop</button>{% endif %}
+      </div>
+    </details>
+  {% endfor %}
+  </div>
+  {% else %}<div class="faint small" style="margin-top:10px">Not run yet.</div>{% endif %}
+</div>
+{% endfor %}
+{% endif %}
+{% endblock %}
