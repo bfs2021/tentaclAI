@@ -2,7 +2,7 @@
 
 All notable changes, newest first. Every release lists **upgrade steps** from the previous one.
 
-## Unreleased
+## v0.10.0 – 2026-10-21
 
 ### Highlights
 - **Rename a service**: *Rename* on the service page – the file, `svc <name>` calls in its examples and notes, and for
