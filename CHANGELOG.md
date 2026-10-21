@@ -5,6 +5,10 @@ All notable changes, newest first. Every release lists **upgrade steps** from th
 ## Unreleased
 
 ### Highlights
+- **Jobs from the terminal**: `svc jobs` lists the jobs, `svc jobs <name> [--runs N] [--steps]` shows a definition with
+  its recent runs (and Claude's steps) – Claude can analyse results and tune a prompt; `svc config put job <name> <file>`
+  creates or changes a job after tentacontrol checked it and you approved it in Activity – new jobs start paused, and a
+  running job can't create jobs.
 - **Mail tentacles** `smtp` and `imap` (`svc mail`): send through a relay or a mailbox – `confirm` by default, `rw` only
   with a recipient list; read a mailbox – list, read (as untrusted content between markers, without marking it
   seen), mark and move with `rw`/`confirm`, folders can be limited. Through the egress gateway like databases; new

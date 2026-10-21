@@ -138,6 +138,29 @@ TLS_PARTS = ("api", "mcp", "git", "db", "web", "smtp", "imap")
 MAIL_PORTS = {"smtp": {"starttls": 587, "ssl": 465, "none": 25}, "imap": {"ssl": 993, "starttls": 143, "none": 143}}
 
 
+# ---------------------------------------------------------------- scheduled jobs (tentacontrol runs them, svc shows them)
+
+DAYS = ("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
+
+
+def schedule_text(sched):
+    """a job's schedule in words"""
+    k = (sched or {}).get("kind")
+    if k == "manual":
+        return "manual"
+    if k == "hourly":
+        return f"every hour at :{int(sched.get('minute', 0)):02d}"
+    if k == "daily":
+        return f"daily at {sched['time']}"
+    if k == "weekly":
+        return f"every {DAYS[int(sched['day'])]} at {sched['time']}"
+    if k == "every":
+        return f"every {sched['hours']} h"
+    if k == "cron":
+        return f"cron {sched['expr']}"
+    return "?"
+
+
 def mail_port(part, cfg):
     """port of an smtp/imap part – given, or the default of its security (smtp: starttls, imap: ssl)"""
     sec = cfg.get("security") or ("starttls" if part == "smtp" else "ssl")

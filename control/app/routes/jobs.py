@@ -4,7 +4,7 @@ import asyncio
 import time
 
 from fastapi import APIRouter, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 
 import tclib
 
@@ -28,6 +28,37 @@ def _job_page(request, jid=None, job=None, error=None, status=200):
                                for n, t in sorted(known.items())])
     resp.status_code = status
     return resp
+
+
+# ---------------------------------------------------------------- svc config put job (svc token; svc asks for the approval)
+
+async def _put_args(request):
+    from .. import activity
+    if not activity.token_ok(request.headers.get("x-tc-token", "")):
+        return None, JSONResponse({"error": "forbidden"}, status_code=403)
+    d = await request.json()
+    return (str(d.get("name", "")), d.get("definition")), None
+
+
+@router.post("/internal/jobs/check")
+async def internal_jobs_check(request: Request):
+    args, err = await _put_args(request)
+    if err:
+        return err
+    errors, warnings, summary = scheduled.put_preview(*args)
+    return JSONResponse({"errors": errors, "warnings": warnings, "summary": summary})
+
+
+@router.post("/internal/jobs/put")
+async def internal_jobs_put(request: Request):
+    args, err = await _put_args(request)
+    if err:
+        return err
+    try:
+        jid = await asyncio.to_thread(scheduled.put, *args)
+    except ValueError as e:
+        return JSONResponse({"error": str(e)}, status_code=400)
+    return JSONResponse({"id": jid, "enabled": scheduled.get(jid).get("enabled", False)})
 
 
 @router.get("/claude/jobs")

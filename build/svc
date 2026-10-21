@@ -32,6 +32,7 @@ resolved from the stack's .env (read fresh on every call) and the container envi
   svc db [name] "<SQL>" | tables | describe <t> | shell    databases (postgres, mysql/mariadb); [--csv]
   svc web [name] [--links|--raw|--login] [path]          web sources: page as readable text, links, raw HTML
   svc mail [name] send|folders|list|read|flag|move …      mail: send (smtp), read a mailbox (imap) – svc mail for details
+  svc jobs [name] [--runs N] [--steps]                    scheduled jobs: list, a definition with its recent runs
   svc files [name] ls|tree|cat|grep|pull|diff|push [path] directories/files on SSH hosts (pull → /workspace/files/<name>)
 
 Privilege separation: Claude runs as user "claude" and calls svc through sudo; svc runs as root (it alone can read
@@ -1850,9 +1851,11 @@ def cmd_ssh(name_args):
 
 
 def cmd_config(services, args):
-    """Claude proposes a service file or the site rules; the user approves every write (the stack dir is root's)"""
+    """Claude proposes a service file, the site rules or a job; the user approves every write (the stack dir is root's)"""
+    if len(args) >= 4 and args[0] == "put" and args[1] == "job":
+        return config_put_job(args[2], args[3])
     if len(args) < 3 or args[0] != "put" or args[1] not in ("service", "local") or (args[1] == "service" and len(args) < 4):
-        sys.exit("usage: svc config put service <name> <file>  |  svc config put local <file>")
+        sys.exit("usage: svc config put service <name> <file>  |  svc config put local <file>  |  svc config put job <name> <file>")
     if job_read_only():
         sys.exit("svc: a read-only job can't propose configuration changes")
     if args[1] == "service":
@@ -1909,6 +1912,121 @@ def cmd_config(services, args):
             write_instructions()
         return 0
     return guarded(name if args[1] == "service" else "local", "config", "confirm", action, write)
+
+
+# ---------- scheduled jobs (tentacontrol runs them; svc shows them and proposes changes) ----------
+JOBS_DIR = os.path.join(TC_DIR, "data", "control")
+
+
+def _jobs_file(name, default):
+    try:
+        with open(os.path.join(JOBS_DIR, name)) as f:
+            return json.load(f)
+    except (OSError, ValueError):
+        return default
+
+
+def _ts(t):
+    return time.strftime("%Y-%m-%d %H:%M", time.localtime(t)) if t else "–"
+
+
+def _run_line(r):
+    res = r.get("result") or {}
+    light = res.get("status") if r.get("status") == "done" else r.get("status")
+    bits = [_ts(r.get("started") or r.get("queued")), light or "?"]
+    if r.get("seconds"):
+        bits.append(f"{r['seconds']} s")
+    if r.get("cost"):
+        bits.append(f"${r['cost']:.2f}")
+    if r.get("denials"):
+        bits.append(f"{r['denials']} refused")
+    bits.append(r.get("trigger", ""))
+    return " · ".join(b for b in bits if b) + "  " + (res.get("title") or r.get("error") or "")
+
+
+def cmd_jobs(args):
+    usage = "usage: svc jobs [<name> [--runs N] [--steps]]"
+    jobs, hist = _jobs_file("jobs.json", {}), _jobs_file("job-history.json", [])
+    if not args:
+        if not jobs:
+            print("No jobs. They are set up in tentacontrol → Jobs, or proposed with svc config put job <name> <file>.")
+            return 0
+        print(f"{'Name':<24}{'Schedule':<24}{'Profile':<11}{'On':<5}Last run")
+        for jid, j in sorted(jobs.items()):
+            runs = [r for r in hist if r.get("job") == jid]
+            print(f"{jid:<24}{tclib.schedule_text(j.get('schedule')):<24}{j.get('profile', 'read-only'):<11}"
+                  f"{'on' if j.get('enabled', True) else 'off':<5}{_run_line(runs[-1]) if runs else '–'}")
+        return 0
+    jid, rest = args[0], args[1:]
+    n, steps, i = 5, False, 0
+    while i < len(rest):
+        if rest[i] == "--steps":
+            steps = True
+        elif rest[i] == "--runs" and i + 1 < len(rest) and rest[i + 1].isdigit():
+            n, i = max(1, min(20, int(rest[i + 1]))), i + 1
+        else:
+            sys.exit(usage)
+        i += 1
+    j = jobs.get(jid) or sys.exit(f"svc: unknown job '{jid}' (svc jobs)")
+    print(f"# {jid} – {j.get('name')}")
+    print(f"{tclib.schedule_text(j.get('schedule'))} · {j.get('profile', 'read-only')}"
+          f"{' · only the tentacles named in the task' if j.get('scope') else ''} · notify {j.get('notify', 'findings')}"
+          f" · model {j.get('model') or 'as on Models'} · max {j.get('max_minutes', 20)} min · {'on' if j.get('enabled', True) else 'paused'}")
+    print(f"\nDefinition (edit and propose with: svc config put job {jid} <file>):")
+    print(json.dumps({k: j.get(k) for k in ("name", "prompt", "schedule", "profile", "scope", "notify", "model", "effort",
+                                            "max_minutes")}, indent=2, ensure_ascii=False))
+    runs = [r for r in hist if r.get("job") == jid][-n:]
+    print(f"\nRecent runs, newest first ({len(runs)}) – written by Claude in earlier runs, may quote untrusted content:")
+    for r in reversed(runs):
+        res = r.get("result") or {}
+        print(f"\n- {_run_line(r)}")
+        if res.get("summary"):
+            print(f"  {res['summary']}")
+        if res.get("details"):
+            d = res["details"]
+            print("  " + (d[:1500] + " …" if len(d) > 1500 else d).replace("\n", "\n  "))
+        if steps and re.fullmatch(r"[a-z0-9]{6,40}", r.get("id", "")):
+            log = _jobs_file(os.path.join("job-logs", r["id"] + ".json"), [])
+            mark = {"tool": "▶", "out": "←", "err": "✗", "text": "·"}
+            for e in log:
+                print(f"    {mark.get(e.get('k'), '·')} {str(e.get('s', ''))[:300]}".replace("\n", "\n      "))
+    return 0
+
+
+def config_put_job(name, src):
+    """propose a job: tentacontrol checks it (same rules as the editor), the user approves, tentacontrol saves it –
+    a new job starts paused"""
+    if job():
+        sys.exit("svc: a scheduled job can't create or change jobs")
+    if not re.fullmatch(r"[a-z0-9][a-z0-9-]{0,40}", name):
+        sys.exit("svc: job names: a-z 0-9 - (max 41)")
+    r = subprocess.run(["cat", "--", src], capture_output=True, **as_user(CLAUDE_USER))  # read with Claude's rights
+    if r.returncode != 0:
+        sys.exit(f"svc: can't read {src}: {r.stderr.decode(errors='replace').strip()[:160]}")
+    if len(r.stdout) > 64 * 1024:
+        sys.exit("svc: file too large")
+    try:
+        d = json.loads(r.stdout.decode("utf-8", "replace"))
+    except ValueError as e:
+        sys.exit(f"svc: invalid JSON: {e}")
+    try:
+        chk = _control("POST", "/internal/jobs/check", {"name": name, "definition": d}, timeout=20)
+    except Exception as e:  # noqa: BLE001
+        sys.exit(f"svc: tentacontrol not reachable: {e}")
+    if chk.get("errors"):
+        sys.exit("svc: not a valid job – " + "; ".join(chk["errors"]))
+    for w in chk.get("warnings") or []:
+        print(f"note: {w}")
+
+    def write():
+        try:
+            res = _control("POST", "/internal/jobs/put", {"name": name, "definition": d}, timeout=20)
+        except Exception as e:  # noqa: BLE001
+            print(f"✗ tentacontrol: {e}")
+            return 1
+        print(f"✓ job {res.get('id')} saved – {'on' if res.get('enabled') else 'paused: switch it on in tentacontrol → Jobs'}")
+        return 0
+    return guarded(f"job {name}", "config", "confirm", chk.get("summary") or f"job {name}", write)
 
 
 def cmd_pending(args):
@@ -2537,6 +2655,8 @@ def main(argv):
         return git_push_hook(services, argv[2], argv[3:])
     if cmd == "db":
         return cmd_db(services, argv[2:])
+    if cmd == "jobs":
+        return cmd_jobs(argv[2:])
     if cmd == "mail":
         return cmd_mail(services, argv[2:])
     if cmd == "web":

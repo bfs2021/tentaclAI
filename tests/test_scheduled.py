@@ -242,3 +242,30 @@ def test_helpers(sj, monkeypatch):
     tools = argv[argv.index("--allowedTools") + 1]
     assert "Bash(svc:*)" in tools and "Bash(head:*)" in tools and "python3" not in tools
     assert "these text tools (also in pipes and chains): head" in argv[argv.index("--append-system-prompt") + 1]
+
+
+def test_definition_roundtrip_and_put(sj, monkeypatch, tmp_path):
+    monkeypatch.setattr(sj, "JOBS", str(tmp_path / "jobs.json"))
+    monkeypatch.setattr(sj, "tentacles", lambda: KNOWN)
+    d = {"name": "Mail test", "prompt": "send via @mailrelay", "schedule": {"kind": "weekly", "day": 1, "time": "07:30"},
+         "profile": "standard", "scope": True, "notify": "findings", "max_minutes": 5}
+    errors, warnings, summary = sj.put_preview("mail-test", d)
+    assert errors == [] and summary.startswith("create (paused) job mail-test: 'Mail test', every Tue at 07:30, standard, only the named tentacles")
+    assert sj.put("mail-test", d) == "mail-test" and sj.get("mail-test")["enabled"] is False  # new: paused
+    sj.set_enabled("mail-test", True)
+    sj.put("mail-test", dict(d, prompt="send via @mailrelay twice"))
+    j = sj.get("mail-test")
+    assert j["enabled"] is True and j["prompt"] == "send via @mailrelay twice"  # a change keeps the state
+    assert sj.definition(j)["schedule"] == {"kind": "weekly", "day": 1, "time": "07:30"}
+    assert sj.put_preview("mail-test", d)[2].startswith("change job mail-test")
+
+
+@pytest.mark.parametrize("jid,d,msg", [
+    ("New", {"name": "x", "prompt": "p"}, "job name"), ("new", {"name": "x", "prompt": "p"}, "job name"),
+    ("ok", {"name": "x", "prompt": "p", "bogus": 1}, "unknown fields"), ("ok", {"name": "x", "prompt": "p", "schedule": "daily"}, "schedule"),
+    ("ok", {"name": "x", "prompt": "p", "profile": "root"}, "profile"), ("ok", ["x"], "JSON object"),
+])
+def test_put_preview_rejects(sj, monkeypatch, tmp_path, jid, d, msg):
+    monkeypatch.setattr(sj, "JOBS", str(tmp_path / "jobs.json"))
+    errors, _, _ = sj.put_preview(jid, d)
+    assert errors and msg in errors[0]

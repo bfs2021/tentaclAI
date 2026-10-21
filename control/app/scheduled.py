@@ -33,7 +33,7 @@ CATCH_UP = 6 * 3600          # a run missed while tentaclAI was down is made up 
 QUOTA_SKIP = 90              # skip a scheduled run when a plan limit is at least this full
 PROFILES = ("read-only", "standard")
 NOTIFY = {"findings": "only on findings (warn, alert) and failures", "always": "every run", "failure": "only on failures"}
-DAYS = ("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
+DAYS = tclib.DAYS
 ID_RE = re.compile(r"^[a-z0-9][a-z0-9-]{0,40}$")
 TIME_RE = re.compile(r"^([01]\d|2[0-3]):([0-5]\d)$")
 
@@ -245,20 +245,7 @@ def next_run(sched, after, last=None):
 
 
 def describe(sched):
-    k = sched.get("kind")
-    if k == "manual":
-        return "manual"
-    if k == "hourly":
-        return f"every hour at :{int(sched.get('minute', 0)):02d}"
-    if k == "daily":
-        return f"daily at {sched['time']}"
-    if k == "weekly":
-        return f"every {DAYS[int(sched['day'])]} at {sched['time']}"
-    if k == "every":
-        return f"every {sched['hours']} h"
-    if k == "cron":
-        return f"cron {sched['expr']}"
-    return "?"
+    return tclib.schedule_text(sched)
 
 
 def clean_schedule(f):
@@ -323,9 +310,8 @@ def slug(name):
     return f"{s}-job" if s in RESERVED else s
 
 
-def save(form, jid=None):
-    """create or update a job from form values; returns its id"""
-    jobs = load()
+def validate(form):
+    """form values → the job's fields (raises ValueError) – the editor and `svc config put job` share these rules"""
     name = (form.get("name") or "").strip()
     prompt = (form.get("prompt") or "").replace("\r\n", "\n").strip()
     if not name or len(name) > 60:
@@ -346,7 +332,7 @@ def save(form, jid=None):
         raise ValueError("unknown effort")
     try:
         minutes = int(form.get("max_minutes") or 20)
-    except ValueError:
+    except (TypeError, ValueError):
         raise ValueError("max. runtime: minutes")
     if not 1 <= minutes <= 120:
         raise ValueError("max. runtime: 1–120 minutes")
@@ -355,21 +341,83 @@ def save(form, jid=None):
     errors, _ = check_mentions({"prompt": prompt, "profile": profile, "scope": scope})
     if errors:
         raise ValueError("; ".join(errors))
+    return {"name": name, "prompt": prompt, "profile": profile, "notify": rule, "model": model, "effort": effort,
+            "scope": scope, "max_minutes": minutes, "schedule": sched}
+
+
+def save(form, jid=None, new_id=None, enabled=True):
+    """create or update a job from form values; returns its id. new_id: create under this id (svc config put job);
+    enabled: the state of a new job (an existing one keeps its own)"""
+    jobs = load()
+    fields = validate(form)
     if jid is None:
-        jid = slug(name)
-        base, n = jid, 2
-        while jid in jobs:
-            jid, n = f"{base}-{n}", n + 1
+        if new_id is not None:
+            if not ID_RE.match(new_id) or new_id in RESERVED:
+                raise ValueError("job name: a-z 0-9 - (max 41), not new/save/runs")
+            if new_id in jobs:
+                raise ValueError(f"job {new_id} exists")
+            jid = new_id
+        else:
+            jid = slug(fields["name"])
+            base, n = jid, 2
+            while jid in jobs:
+                jid, n = f"{base}-{n}", n + 1
     elif jid not in jobs:
         raise ValueError("unknown job")
     old = jobs.get(jid, {})
-    job = dict(old, name=name, prompt=prompt, profile=profile, notify=rule, model=model, effort=effort, scope=scope,
-               max_minutes=minutes, schedule=sched, enabled=old.get("enabled", True), created=old.get("created", time.time()))
-    if old.get("schedule") != sched or "next" not in old:
-        job["next"] = next_run(sched, time.time(), old.get("last"))
+    job = dict(old, **fields, enabled=old.get("enabled", enabled), created=old.get("created", time.time()))
+    if old.get("schedule") != fields["schedule"] or "next" not in old:
+        job["next"] = next_run(fields["schedule"], time.time(), old.get("last"))
     jobs[jid] = job
     jsonstore.save(JOBS, jobs)
     return jid
+
+
+def form_from_definition(d):
+    """a job definition as JSON (svc config put job) → form values: the schedule object is flattened"""
+    if not isinstance(d, dict):
+        raise ValueError("a job is a JSON object")
+    unknown = set(d) - {"name", "prompt", "schedule", "profile", "scope", "notify", "model", "effort", "max_minutes"}
+    if unknown:
+        raise ValueError(f"unknown fields: {', '.join(sorted(unknown))}")
+    sched = d.get("schedule") or {"kind": "manual"}
+    if not isinstance(sched, dict):
+        raise ValueError('schedule: an object, e.g. {"kind": "daily", "time": "07:00"}')
+    form = {k: v for k, v in d.items() if k != "schedule"}
+    form.update({k: str(v) for k, v in sched.items()})
+    if form.get("scope") in (False, "false", "0", 0):
+        form["scope"] = ""
+    return form
+
+
+def definition(job):
+    """the editable fields of a job as JSON – what `svc jobs <name>` shows and `svc config put job` takes"""
+    return {k: job.get(k) for k in ("name", "prompt", "schedule", "profile", "scope", "notify", "model", "effort", "max_minutes")}
+
+
+def put_preview(jid, d):
+    """dry run of `svc config put job`: (errors, warnings, summary) – nothing is saved"""
+    try:
+        if not ID_RE.match(jid or "") or jid in RESERVED:
+            raise ValueError("job name: a-z 0-9 - (max 41), not new/save/runs")
+        fields = validate(form_from_definition(d))
+    except ValueError as e:
+        return [str(e)], [], ""
+    _, warnings = check_mentions(fields)
+    old = get(jid)
+    what = "change" if old else "create (paused)"
+    summary = (f"{what} job {jid}: {fields['name']!r}, {describe(fields['schedule'])}, {fields['profile']}"
+               f"{', only the named tentacles' if fields['scope'] else ''}, notify {fields['notify']} – "
+               + " ".join(fields["prompt"].split())[:200])
+    return [], warnings, summary
+
+
+def put(jid, d):
+    """`svc config put job` after the approval: create (paused) or change"""
+    form = form_from_definition(d)
+    if get(jid):
+        return save(form, jid)
+    return save(form, new_id=jid, enabled=False)
 
 
 def set_enabled(jid, on):

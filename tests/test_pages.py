@@ -334,3 +334,10 @@ def test_run_log_partial(client, app_module, monkeypatch, tmp_path):
 def test_settings_refuse_dangerous_job_helpers(client):
     r = client.post("/settings", data={"k_JOB_READONLY_HELPERS": "head, bash, curl"}, headers={"HX-Request": "true"})
     assert "Helpers refused" in r.headers.get("HX-Trigger", "") and "bash, curl" in r.headers.get("HX-Trigger", "")
+
+
+def test_internal_job_endpoints_need_the_svc_token(client, app_module):
+    from fastapi.testclient import TestClient
+    c = TestClient(app_module.app)
+    for path in ("/internal/jobs/check", "/internal/jobs/put"):
+        assert c.post(path, json={"name": "x", "definition": {}}).status_code == 403

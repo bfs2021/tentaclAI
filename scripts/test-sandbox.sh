@@ -219,6 +219,16 @@ docker exec tctest-api python -c "import imaplib; i = imaplib.IMAP4('tctest-mail
 check "mail: move to another folder (rw)" "$($C svc mail testmail move "$MUID" Done 2>&1 | tail -1)" "✓ INBOX/$MUID → Done"
 check "mail: … and it is there" "$($C svc mail testmail list Done 2>/dev/null | grep -c "$MSUBJ" || true)" "1"
 check "mail: read-only job can't send" "$(J jobro01 'echo x | svc mail testmail send --to alice@example.com --subject ro')" "refused"
+# jobs from the terminal: svc proposes, the user approves, tentacontrol saves (paused)
+$C sh -c 'printf "%s" "{\"name\": \"T job\", \"prompt\": \"check @testapi\", \"schedule\": {\"kind\": \"manual\"}}" > /tmp/job.json; printf "%s" "{\"name\": \"bad\", \"prompt\": \"p\", \"profile\": \"root\"}" > /tmp/badjob.json'
+$C svc config put job tjob /tmp/job.json > "$T/put-job.out" 2>&1 &
+wait_for 30 sh -c "curl -s -b '$J' http://$IP:8080/partials/approvals | grep -q 'job tjob'" || true
+decide approve; wait
+check "config put job: saved paused after approval" "$(tail -1 "$T/put-job.out")" "✓ job tjob saved – paused: switch it on in tentacontrol → Jobs"
+check "svc jobs lists it" "$($C svc jobs 2>/dev/null | grep -c '^tjob ' || true)" "1"
+check "svc jobs <name> shows the definition" "$($C svc jobs tjob 2>/dev/null | grep -c '"prompt": "check @testapi"' || true)" "1"
+check "an invalid job is refused before any approval" "$($C svc config put job badjob /tmp/badjob.json 2>&1 | tail -1)" "svc: not a valid job – unknown profile"
+check "a running job can't create jobs" "$(J jobstd01 'svc config put job x /tmp/job.json')" "refused"
 docker exec tctest-claude rm -f "$T/data/control/job-runs.json"
 # rename a git service in tentacontrol: file, root's mirror and Claude's working copy move together
 rm -f services/gitdemo.json services/gitdemo2.json
