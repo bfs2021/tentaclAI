@@ -141,7 +141,7 @@ tentacontrol also shows “Update available” in the sidebar.
   <img src="docs/screenshots/services.png" alt="Services grouped by system" width="900">
 </p>
 
-1. **Create from a template.** Tentacles → Services → search the template list (47 templates: Docker hosts, Home Assistant, Proxmox,
+1. **Create from a template.** Tentacles → Services → **+** (top right) → search the template list (47 templates: Docker hosts, Home Assistant, Proxmox,
    Grafana, n8n, GitHub, PostgreSQL, wikis with login, folders on a NAS, …) → name → *Create service*.
 2. **Fill in the details.** Adjust URL/host/path in the JSON editor; enter tokens under *Tokens & variables*. Tokens are
    write-only: they go into `.env` and are never shown again.

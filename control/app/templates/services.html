@@ -7,11 +7,12 @@
 <div class="header">
   <div><h1>Services</h1><div class="sub">One file per service in <code>services/</code> – Docker host, API, MCP, git repo, database, web source or files; tokens in <code>.env</code></div></div>
   <div class="row">
+    <button class="btn primary round" id="new-svc-toggle" title="New service" aria-label="New service" aria-expanded="false" aria-controls="new-svc">{{ icon('plus') }}</button>
     <button class="btn" hx-post="/services/sync">{{ icon('refresh') }}Sync</button>
     <a class="btn ghost" href="/help#services">Help</a>
   </div>
 </div>
-<div class="card flat" style="margin-bottom:18px">
+<div class="card flat" id="new-svc" style="margin-bottom:18px" hidden>
   <form class="row" hx-post="/services/new" style="align-items:flex-end">
     <div style="flex:2;min-width:260px">
       <label for="tpl-search">Template</label>
@@ -36,6 +37,11 @@
   </form>
   <div class="help" id="tpl-hint">{{ templates_list | length }} templates: docker hosts, smart home, automation, infrastructure, monitoring, network, security, apps, development, git repos, databases, web sources, files.</div>
   <script>
+    document.getElementById("new-svc-toggle").addEventListener("click", function () {
+      var box = document.getElementById("new-svc"), open = box.hidden;
+      box.hidden = !open; this.setAttribute("aria-expanded", open); this.classList.toggle("open", open);
+      if (open) document.getElementById("tpl-search").focus();
+    });
     document.getElementById("tpl").addEventListener("combo-change", function (e) {
       document.getElementById("tpl-hint").textContent = e.detail.desc;
       var n = document.getElementById("svc-name");

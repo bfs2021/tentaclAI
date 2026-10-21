@@ -8,6 +8,10 @@ All notable changes, newest first. Every release lists **upgrade steps** from th
 - **Approvals on every page:** a banner above each page (but Activity) shows pending approvals with Approve / + 15 min /
   Deny (network: Allow 10 min / Deny) – no need to switch to Activity.
 
+### Changes
+- Services: the *Create service* form is folded away behind a round **+** button next to *Sync*.
+- Topology: the legend just says *SSH host* (the colors are explained in Help).
+
 ### Fixes
 - Text in the browser terminal could not be selected on a Mac: tmux takes the mouse, and xterm.js only lets Shift + drag
   through on other systems. Option + drag selects on a Mac now; Cmd+C (Safari never fired xterm.js's own copy event) and `Ctrl+Shift+C` copy.
