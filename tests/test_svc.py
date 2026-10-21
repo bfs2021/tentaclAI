@@ -70,3 +70,33 @@ def test_docker_runs_over_ssh_only(monkeypatch):
     d = svc.get_docker(services, "box")
     assert svc.docker_argv("box", d, ["ps"]) == ["ssh", "box", "docker ps"]
     assert svc.docker_target(d) == "ssh box"
+
+
+def test_origin_from_the_kept_variables(monkeypatch):
+    """only the checked values of the four kept variables – never the session access token"""
+    import subprocess
+    monkeypatch.setattr(svc, "_origin", None)
+    monkeypatch.setattr(svc, "via_sudo", lambda: True)
+    monkeypatch.setattr(svc, "as_user", lambda *a, **k: {})
+    monkeypatch.setenv("CLAUDE_CODE_SESSION_ID", "369797fa-acf1-46dc-9752-e0a7fdab4d35")
+    monkeypatch.setenv("CLAUDE_CODE_ENTRYPOINT", "cli")
+    monkeypatch.setenv("CLAUDE_CODE_SESSION_ACCESS_TOKEN", "must-not-travel")
+    monkeypatch.setenv("TMUX", "/tmp/tmux-10000/default,123,0")
+    monkeypatch.setenv("TMUX_PANE", "%3")
+    monkeypatch.setattr(subprocess, "run", lambda *a, **k: subprocess.CompletedProcess(a, 0, "claude-workspace\n", ""))
+    o = svc.origin()
+    assert o == {"session": "369797fa-acf1-46dc-9752-e0a7fdab4d35", "entry": "cli", "tmux": "claude-workspace"}
+    assert "must-not-travel" not in str(o)
+
+
+def test_origin_drops_bad_values(monkeypatch):
+    monkeypatch.setattr(svc, "_origin", None)
+    monkeypatch.setattr(svc, "via_sudo", lambda: True)
+    monkeypatch.setenv("CLAUDE_CODE_SESSION_ID", "<script>")
+    monkeypatch.setenv("CLAUDE_CODE_ENTRYPOINT", "cli; rm -rf /")
+    monkeypatch.setenv("TMUX_PANE", "%3; id")
+    monkeypatch.delenv("TMUX", raising=False)
+    assert svc.origin() == {}
+    monkeypatch.setattr(svc, "_origin", None)
+    monkeypatch.setattr(svc, "via_sudo", lambda: False)
+    assert svc.origin() == {"by": "root"}

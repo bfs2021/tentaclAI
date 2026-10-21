@@ -172,6 +172,13 @@ check "API call with injected token" "$($C svc testapi GET / 2>/dev/null)" '{"au
 check "database query" "$($C svc db testdb 'select 41+1' 2>/dev/null | sed -n 3p | tr -d ' ')" "42"
 check "ssh (tentacle, rw)" "$($C svc ssh testssh echo ssh-ok 2>&1 | tail -1)" "ssh-ok"
 check "plain ssh has no key" "$($C ssh -o BatchMode=yes testssh true >/dev/null 2>&1 && echo yes || echo no)" "no"
+# where a request comes from: sudo keeps exactly the session variables – never the session's access token
+SID=0123abcd-0123-4abc-8def-0123456789ab
+docker exec -u claude -e CLAUDE_CODE_SESSION_ID=$SID -e CLAUDE_CODE_ENTRYPOINT=cli -e CLAUDE_CODE_SESSION_ACCESS_TOKEN=leak-test \
+    tctest-claude svc ssh testssh touch /tmp/origin-test >/dev/null 2>&1 || true
+LAST="$(tail -1 data/control/audit.jsonl 2>/dev/null || true)"
+check "audit entry names the session" "$(echo "$LAST" | grep -c "$SID" || true)" "1"
+check "the session token stays behind" "$(grep -c leak-test data/control/audit.jsonl 2>/dev/null || true)" "0"
 # rename a git service in tentacontrol: file, root's mirror and Claude's working copy move together
 rm -f services/gitdemo.json services/gitdemo2.json
 echo '{"name":"gitdemo","git":{"url":"https://github.com/mwaldegg/tentaclai.git","access":"ro"},"examples":["svc git fetch gitdemo"]}' > services/gitdemo.json

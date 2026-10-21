@@ -6,8 +6,13 @@ Current week (all models): 2% used · resets Oct 22, 8am (Europe/Vienna)
 Current week (Opus): 81% used · resets Oct 22, 8am (Europe/Vienna)
 
 What's contributing to your limits usage?
-Approximate, based on local sessions on this machine.
+Approximate · sessions on this machine only · shares overlap
 
-Last 7d · 116 requests · 11 sessions
-  50% of your usage went to always-on context over 40k tokens
-  Top skills: /inventory 9%, /onboard 5%
+Last 24h · 62 requests · 3 sessions
+  Top skills: /onboard 5%
+
+Last 7d · 178 requests · 14 sessions
+  37%  See what fills your context · run /context
+  11%  Turn off n8n when you don't need it
+  Top skills: /inventory 7%, /onboard 5%
+  Top MCP servers: n8n 11%

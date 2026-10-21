@@ -192,3 +192,13 @@ def test_credential_values_never_reach_the_browser(client):
 def test_old_socket_service_is_flagged(client):
     assert "not usable" in client.get("/services/oldsock").text
     assert "not usable" not in client.get("/services/demohost").text
+
+
+def test_approval_shows_where_it_came_from(client, app_module):
+    from app import activity
+    rid = activity.create("demohost", "docker", "docker restart x", {"tmux": "claude-onboard-demohost"})
+    try:
+        html = client.get("/partials/approvals").text
+        assert "from Onboarding demohost" in html
+    finally:
+        activity.decide(rid, False)

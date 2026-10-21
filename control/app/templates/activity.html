@@ -23,7 +23,7 @@
   </div>
   {% if entries %}
   <div class="table-wrap"><table class="audit">
-    <thead><tr><th>Time</th><th>Service</th><th>Part</th><th>Action</th><th>Mode</th><th>Decision</th><th>Result</th></tr></thead>
+    <thead><tr><th>Time</th><th>Service</th><th>Part</th><th>Action</th><th>From</th><th>Mode</th><th>Decision</th><th>Result</th></tr></thead>
     <tbody>
     {% for e in entries %}
       <tr>
@@ -31,6 +31,7 @@
         <td>{{ e.service }}</td>
         <td><span class="tag">{{ e.part }}</span></td>
         <td class="mono small audit-action" title="{{ e.detail or '' }}">{{ e.action }}</td>
+        <td class="small muted">{{ e.from_label or '–' }}</td>
         <td class="small">{{ e.mode }}</td>
         <td><span class="pill {{ {'auto':'info','approved':'ok','denied':'err','blocked':'warn','expired':'off','error':'err'}.get(e.decision, 'off') }}">{{ e.decision }}</span></td>
         <td class="small nowrap">{% if e.exit is defined %}{{ '✓' if e.exit == 0 else '✗ exit ' ~ e.exit }}{% if e.seconds is defined %} <span class="faint">{{ e.seconds }} s</span>{% endif %}{% else %}<span class="faint">not run</span>{% endif %}</td>

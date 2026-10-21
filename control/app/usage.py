@@ -22,20 +22,37 @@ LIMIT_RE = re.compile(r"^Current (session|week)(?: \(([^)]*)\))?:\s*(\d+)% used(
 SUMMARY_RE = re.compile(r"Last (\w+) · (\d+) requests · (\d+) sessions")
 
 
+TIP_RE = re.compile(r"^(\d+)%\s+(.+)$")
+TOP_RE = re.compile(r"^Top ([^:]+):\s*(.+)$")
+
+
 def parse_plan(text):
+    """plan limits, and "what contributes" as one block per period (Claude Code prints e.g. last 24h and last 7d):
+    {label, requests, sessions, tips: [{pct, text}], tops: [{what, items}]}"""
     limits = [{"window": m.group(1), "scope": m.group(2) or "", "percent": int(m.group(3)), "resets": re.sub(r"\s*\([^)]*\)\s*$", "", (m.group(4) or "").strip())}
               for m in LIMIT_RE.finditer(text)]
-    s = SUMMARY_RE.search(text)
     lines = text.splitlines()
-    contrib = []
-    if s:
-        i = next((n for n, l in enumerate(lines) if SUMMARY_RE.search(l)), None)
-        contrib = [l.strip() for l in lines[i + 1:] if l.strip()] if i is not None else []
-    # first line that is neither a limit nor a warning (e.g. "Warning: claude.ai MCP server blocked by enterprise policy")
+    periods, cur = [], None
+    for line in lines:
+        s = SUMMARY_RE.search(line)
+        if s:
+            cur = {"label": s.group(1), "requests": int(s.group(2)), "sessions": int(s.group(3)), "tips": [], "tops": []}
+            periods.append(cur)
+            continue
+        item = line.strip()
+        if cur is None or not item:
+            continue
+        t, tip = TOP_RE.match(item), TIP_RE.match(item)
+        if t:
+            cur["tops"].append({"what": t.group(1), "items": t.group(2)})
+        elif tip:
+            cur["tips"].append({"pct": int(tip.group(1)), "text": re.sub(r"^of your usage\s+", "", tip.group(2)).replace(" · run ", " – run ")})
+        else:
+            cur["tips"].append({"pct": None, "text": item})
     billing = next((l.strip() for l in lines if l.strip() and not l.startswith("Warning:")), "")
     billing = "" if LIMIT_RE.match(billing) else billing
-    return {"limits": limits, "billing": billing, "period": s.group(1) if s else "",
-            "requests": int(s.group(2)) if s else None, "sessions": int(s.group(3)) if s else None, "contrib": contrib}
+    note = next((l.strip() for l in lines if l.strip().startswith("Approximate")), "")
+    return {"limits": limits, "billing": billing, "periods": periods, "note": note}
 
 
 def refresh_plan():

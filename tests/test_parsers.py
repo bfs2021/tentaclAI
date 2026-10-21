@@ -24,9 +24,23 @@ def test_parse_plan(app_module):
     assert [(l["window"], l["scope"], l["percent"]) for l in p["limits"]] == [("session", "", 12), ("week", "all models", 2), ("week", "Opus", 81)]
     assert p["limits"][0]["resets"] == "Oct 21, 2:40am"
     assert p["billing"] == "You are currently using your subscription to power your Claude Code usage"  # not the warning line
-    assert (p["period"], p["requests"], p["sessions"]) == ("7d", 116, 11)
-    assert p["contrib"][0].startswith("50% of your usage")
-    assert usage.parse_plan("")["limits"] == []
+    assert p["note"].startswith("Approximate")
+    day, week = p["periods"]
+    assert (day["label"], day["requests"], day["sessions"], day["tips"]) == ("24h", 62, 3, [])
+    assert day["tops"] == [{"what": "skills", "items": "/onboard 5%"}]
+    assert week["tips"][0] == {"pct": 37, "text": "See what fills your context – run /context"}
+    assert [t["what"] for t in week["tops"]] == ["skills", "MCP servers"]
+    assert usage.parse_plan("")["limits"] == [] and usage.parse_plan("")["periods"] == []
+
+
+def test_parse_plan_older_format(app_module):
+    """Claude Code before October 2026: one period, plain sentences"""
+    from app import usage
+    p = usage.parse_plan("Current session: 5% used\n\nLast 7d · 116 requests · 11 sessions\n"
+                         "  50% of your usage went to always-on context over 40k tokens\n  Top skills: /inventory 9%\n")
+    (week,) = p["periods"]
+    assert week["tips"] == [{"pct": 50, "text": "went to always-on context over 40k tokens"}]
+    assert week["tops"] == [{"what": "skills", "items": "/inventory 9%"}]
 
 
 def test_connector_lines(app_module):

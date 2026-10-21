@@ -43,7 +43,10 @@ ARG CLAUDE_UID=10000
 RUN groupadd -g ${CLAUDE_UID} claude && useradd -m -d /home/claude -u ${CLAUDE_UID} -g claude -s /bin/bash claude \
     && groupadd -g 10001 tcrun && useradd -m -d /var/lib/tcrun -u 10001 -g tcrun -s /usr/sbin/nologin tcrun \
     && chmod 700 /var/lib/tcrun \
+    # env_keep: only these four names – where a request comes from (session, tmux pane), never
+    # CLAUDE_CODE_SESSION_ACCESS_TOKEN or anything else of Claude's environment
     && printf '%s\n' 'Defaults:claude !lecture, env_reset, always_set_home' \
+        'Defaults:claude env_keep += "CLAUDE_CODE_SESSION_ID CLAUDE_CODE_ENTRYPOINT TMUX TMUX_PANE"' \
         'claude ALL=(root) NOPASSWD: /usr/local/bin/svc, /usr/local/bin/tc-scan' > /etc/sudoers.d/tentaclai \
     && chmod 0440 /etc/sudoers.d/tentaclai && visudo -cq
 RUN chmod 0755 /usr/local/bin/entrypoint.sh /usr/local/bin/start.sh /usr/local/bin/rc-loop /usr/local/bin/cc /usr/local/bin/svc /usr/local/bin/claude-instructions /usr/local/bin/tc-scan /usr/local/bin/tc-statusline /usr/local/bin/tc-connect \

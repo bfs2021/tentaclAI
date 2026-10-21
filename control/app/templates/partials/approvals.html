@@ -8,6 +8,7 @@
         <div style="min-width:0">
           <div class="row" style="gap:8px"><strong>{{ a.service }}</strong><span class="tag">{{ a.part }}</span>
             <span class="small faint">#{{ a.id }} · {{ ((now - a.created) // 60) | int }} min ago · expires in {{ ((600 - (now - a.created)) // 60) | int }} min</span></div>
+          {% if a.get('from') %}<div class="small muted" title="reported by the requesting session – a hint, not proof">from {{ a['from'] }}</div>{% endif %}
           <pre class="rc approval-action">{{ a.action }}</pre>
         </div>
       </div>

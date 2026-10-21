@@ -178,3 +178,14 @@ def test_drop_generated_compose(app_module, tmp_path):
     assert drop_generated_compose(str(f)) is True
     assert read_env(str(f))["COMPOSE_FILE"] == "compose.yaml:compose.override.yaml" and "# compose files" in f.read_text()
     assert drop_generated_compose(str(f)) is False  # only once
+
+
+def test_origin_label(app_module, monkeypatch):
+    from app import activity, usage
+    sid = "369797fa-acf1-46dc-9752-e0a7fdab4d35"
+    monkeypatch.setattr(usage, "_local", lambda: {"sessions": {sid: {"title": "Mailcow prüfen"}}})
+    assert activity.origin_label({"tmux": "claude-rc", "session": sid}) == "Remote Control · “Mailcow prüfen”"
+    assert activity.origin_label({"entry": "cli", "session": "cse_0123456789abcdef"}) == "Claude terminal · cse_0123"
+    assert activity.origin_label({}) == "" and activity.origin_label(None) == ""
+    assert activity.origin_label({"by": "root"}) == "tentacontrol / host"
+    assert activity.clean_origin({"tmux": "<b>x</b>", "token": "secret", "entry": "cli"}) == {"entry": "cli"}

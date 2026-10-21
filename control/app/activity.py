@@ -7,10 +7,11 @@ import asyncio
 import itertools
 import json
 import os
+import re
 import secrets
 import time
 
-from . import notify
+from . import dockerops, notify, usage
 from .config import DATA_DIR
 
 TOKEN_FILE = os.path.join(DATA_DIR, "svc-token")
@@ -52,7 +53,38 @@ def _expire():
         APPROVALS.pop(k, None)
 
 
-def create(service, part, action):
+_ORIGIN_KEYS = {"session": r"(cse_[A-Za-z0-9]{10,60}|[0-9a-f-]{36})", "entry": r"[a-z][a-z-]{0,19}", "tmux": r"[A-Za-z0-9._-]{1,40}",
+                "by": r"root"}
+
+
+def clean_origin(o):
+    """only the known keys with well-formed values – svc reports them, but Claude could have set them"""
+    if not isinstance(o, dict):
+        return {}
+    return {k: str(v) for k, v in o.items() if k in _ORIGIN_KEYS and re.fullmatch(_ORIGIN_KEYS[k], str(v))}
+
+
+def origin_label(o):
+    """'Remote Control · Mailcow prüfen' – where a request came from (a hint: Claude controls these values)"""
+    o = clean_origin(o)
+    if not o:
+        return ""
+    if o.get("by") == "root":
+        return "tentacontrol / host"
+    parts = []
+    if o.get("tmux"):
+        parts.append(dockerops.session_label(o["tmux"]))
+    elif o.get("entry"):
+        parts.append({"cli": "Claude terminal", "sdk-cli": "Claude (headless / Remote Control)"}.get(o["entry"], f"Claude ({o['entry']})"))
+    else:
+        parts.append("shell (no Claude session)")
+    if o.get("session"):
+        title = (usage._local()["sessions"].get(o["session"]) or {}).get("title", "")
+        parts.append(f"“{title}”" if title else o["session"][:8])
+    return " · ".join(parts)
+
+
+def create(service, part, action, origin=None):
     """new request; approved at once while a grant for this service + part is active; one pending request per network target"""
     _expire()
     if part == "network":
@@ -61,14 +93,16 @@ def create(service, part, action):
             return same["id"]
     rid = str(next(_ids))
     a = {"id": rid, "service": str(service)[:60], "part": str(part)[:20], "action": str(action)[:500],
-         "created": time.time(), "status": "pending", "by": "", "event": asyncio.Event()}
+         "created": time.time(), "status": "pending", "by": "", "event": asyncio.Event(), "origin": clean_origin(origin)}
+    a["from"] = origin_label(a["origin"])
     g = active_grant(a["service"], a["part"])
     if g:
         a.update(status="approved", decided=time.time(), by=f"grant until {time.strftime('%H:%M', time.localtime(g['until']))} ({g['by']})")
         a["event"].set()
     APPROVALS[rid] = a
     if a["status"] == "pending":
-        notify.emit("approval", f"Approval needed: {a['service']} ({a['part']})", a["action"], key=f"approval:{rid}",
+        notify.emit("approval", f"Approval needed: {a['service']} ({a['part']})",
+                    a["action"] + (f"\nFrom: {a['from']}" if a["from"] else ""), key=f"approval:{rid}",
                     link=notify.control_link("/activity"))
     return rid
 
@@ -141,6 +175,7 @@ def audit_entries(limit=300, service="", decision=""):
             continue
         if (service and e.get("service") != service) or (decision and e.get("decision") != decision):
             continue
+        e["from_label"] = origin_label(e.get("from"))
         out.append(e)
         if len(out) >= limit:
             break

@@ -22,7 +22,7 @@ async def internal_approval_create(request: Request):
     if not _svc_auth(request):
         return JSONResponse({"error": "forbidden"}, status_code=403)
     data = await request.json()
-    rid = activity.create(data.get("service", "?"), data.get("part", "?"), data.get("action", "?"))
+    rid = activity.create(data.get("service", "?"), data.get("part", "?"), data.get("action", "?"), data.get("origin"))
     a = activity.APPROVALS[rid]
     return JSONResponse({"id": rid, "status": a["status"], "by": a["by"]})
 

@@ -17,9 +17,21 @@
       <div class="ubar-track"><div class="ubar-fill {{ 'err' if l.percent >= 90 else ('warn' if l.percent >= 75 else '') }}" style="width:{{ [l.percent, 100] | min }}%"></div></div></div>
     {% endfor %}
   </div>
-  {% if plan.contrib %}
-  <h3 style="margin:18px 0 6px;font-size:14px">What contributes{% if plan.requests is not none %} <span class="muted small">· last {{ plan.period }}: {{ plan.requests }} requests, {{ plan.sessions }} sessions</span>{% endif %}</h3>
-  <ul class="small" style="margin:0;padding-left:18px">{% for c in plan.contrib %}<li>{{ c }}</li>{% endfor %}</ul>
+  {% if plan.get('periods') %}
+  <h3 style="margin:18px 0 2px;font-size:14px">What contributes</h3>
+  {% if plan.note %}<p class="small faint" style="margin:0 0 8px">{{ plan.note }}</p>{% endif %}
+  <div class="grid2">
+  {% for p in plan.periods %}
+    <div class="stack small" style="gap:6px">
+      <div><strong>Last {{ p.label }}</strong> <span class="muted">· {{ p.requests }} requests · {{ p.sessions }} sessions</span></div>
+      {% for t in p.tips %}
+      <div class="between" style="gap:10px"><span>{{ t.text }}</span>{% if t.pct is not none %}<span class="mono" style="white-space:nowrap">{{ t.pct }} %</span>{% endif %}</div>
+      {% endfor %}
+      {% for t in p.tops %}<div class="muted">Top {{ t.what }}: {{ t['items'] }}</div>{% endfor %}
+      {% if not p.tips and not p.tops %}<div class="faint">nothing notable</div>{% endif %}
+    </div>
+  {% endfor %}
+  </div>
   {% endif %}
   {% elif plan.raw %}
   <p class="muted small">Claude Code answered, but the limits could not be read:</p><pre class="rc">{{ plan.raw }}</pre>

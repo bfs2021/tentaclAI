@@ -108,6 +108,41 @@ def via_sudo():
     return privileged() and "SUDO_UID" in os.environ
 
 
+SESSION_ID_RE = re.compile(r"^(cse_[A-Za-z0-9]{10,60}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$")
+_origin = None
+
+
+def origin():
+    """where a call comes from – the Claude session, its kind and tmux session – for approvals and the audit log.
+    Taken from the four variables sudo keeps (see the sudoers file); Claude controls them, so this is a hint for the user,
+    not a security feature: every value is checked strictly before it is passed on."""
+    global _origin
+    if _origin is not None:
+        return _origin
+    o = {}
+    if not via_sudo():
+        o["by"] = "root"  # tentacontrol, the entrypoint or a root shell
+    else:
+        sid = os.environ.get("CLAUDE_CODE_SESSION_ID", "")
+        if SESSION_ID_RE.match(sid):
+            o["session"] = sid
+        entry = os.environ.get("CLAUDE_CODE_ENTRYPOINT", "")
+        if re.fullmatch(r"[a-z][a-z-]{0,19}", entry):
+            o["entry"] = entry
+        pane, sock = os.environ.get("TMUX_PANE", ""), os.environ.get("TMUX", "").split(",")[0]
+        if re.fullmatch(r"%\d{1,5}", pane) and re.fullmatch(r"/tmp/tmux-\d+/[A-Za-z0-9_.-]+", sock):
+            try:  # asked as Claude – it's Claude's tmux server
+                r = subprocess.run(["tmux", "-S", sock, "display-message", "-p", "-t", pane, "#S"], capture_output=True,
+                                   text=True, timeout=3, **as_user(CLAUDE_USER))
+                name = r.stdout.strip()
+                if r.returncode == 0 and re.fullmatch(r"[A-Za-z0-9._-]{1,40}", name):
+                    o["tmux"] = name
+            except (OSError, subprocess.SubprocessError):
+                pass
+    _origin = o
+    return o
+
+
 def _account(user):
     try:
         return pwd.getpwnam(user)
@@ -1421,6 +1456,8 @@ def audit(service, part, mode, action, decision, rc=None, duration=None, detail=
         entry["seconds"] = round(duration, 1)
     if detail:
         entry["detail"] = detail[:300]
+    if origin():
+        entry["from"] = origin()
     try:
         import fcntl
         os.makedirs(os.path.dirname(AUDIT_FILE), exist_ok=True)
@@ -1449,7 +1486,7 @@ def _control(method, path, payload=None, timeout=40):
 def request_approval(service, part, action):
     """('approved'|'denied'|'expired'|'error', who/why) – waits for the user's decision in tentacontrol"""
     try:
-        res = _control("POST", "/internal/approvals", {"service": service, "part": part, "action": action})
+        res = _control("POST", "/internal/approvals", {"service": service, "part": part, "action": action, "origin": origin()})
         rid = res["id"]
     except Exception as e:  # noqa: BLE001
         return "error", f"tentacontrol not reachable: {e}"

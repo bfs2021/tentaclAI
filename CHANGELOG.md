@@ -2,6 +2,24 @@
 
 All notable changes, newest first. Every release lists **upgrade steps** from the previous one.
 
+## Unreleased
+
+### Highlights
+- **Where a request comes from:** approvals in Activity, their notifications and the audit log show the requesting
+  Claude session – e.g. *Remote Control · “Mailcow prüfen”*, *Claude terminal · /workspace*, *Onboarding patchmon*,
+  *shell (no Claude session)*. sudo keeps exactly four variables for this (`CLAUDE_CODE_SESSION_ID`,
+  `CLAUDE_CODE_ENTRYPOINT`, `TMUX`, `TMUX_PANE`) – never the session's access token; `svc` and tentacontrol check every
+  value. The session title comes from the session files tentacontrol already reads for Usage. It is a hint for you,
+  not a security feature: Claude controls these values.
+
+### Fixes
+- Usage: Claude Code's `/usage` now lists several periods (last 24 h, last 7 days) with tips – they ran together into
+  one list. Each period is its own block now, with the share of each tip and the top skills / MCP servers.
+
+### Upgrade (from v0.11.0)
+`./tentaclai.sh update`, `docker compose build`, `docker compose up -d` – recreating `tentaclai` ends running sessions and
+Remote Control (needed for the new sudo rule).
+
 ## v0.11.0 – 2026-10-21
 
 ### Highlights
