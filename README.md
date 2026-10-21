@@ -67,6 +67,7 @@ flowchart LR
     db[("Databases")]
     web["Web sources"]
     fs["Files on SSH hosts"]
+    mail["Mailboxes · SMTP"]
   end
   net["Anthropic · GitHub · registries<br/>(built-in) and your allowlist"]
   browser --> control
@@ -77,12 +78,12 @@ flowchart LR
   files -- "read by svc" --> sandbox
   sandbox == "all traffic" ==> egress
   egress -- "rules" --- control
-  egress --> docker & api & git & db & web & fs
+  egress --> docker & api & git & db & web & fs & mail
   egress --> net
 ```
 
 **Tentacles** are everything Claude can reach: services (APIs, MCP servers, Docker hosts, databases, web sources,
-files, git repos), SSH hosts and the systems that group them. You set them up in tentacontrol → *Tentacles*; each one
+files, git repos, mail), SSH hosts and the systems that group them. You set them up in tentacontrol → *Tentacles*; each one
 has its own access mode, and `svc` is the only way to use them. Everything else on the network is the job of the
 egress gateway (tentacontrol → *Network*).
 
@@ -147,7 +148,7 @@ tentacontrol also shows “Update available” in the sidebar.
    write-only: they go into `.env` and are never shown again.
 3. **Place it.** Put it into a system with the ⋯ menu (*Move to …*) or leave it standalone.
 4. **Test connection.** `svc test` checks every part – HTTP status of the API, MCP endpoint, git remote, Docker version,
-   database login, web login, folder on the SSH host – and tells you exactly what is missing.
+   database login, web login, folder on the SSH host, SMTP/IMAP login – and tells you exactly what is missing.
 5. **Onboard with Claude.** Opens a terminal with `/onboard <service>`: Claude tests the service, explores it **read-only**
    (API resources, tables, stacks, page structure …), summarizes what it found and asks you what the service is for, what it
    may do on its own, what only after asking and what never. It writes the answers – purpose, rules, examples – into the
@@ -179,10 +180,12 @@ svc compose <host> <stack> logs --tail 50   # compose in <stacks_dir>/<stack> of
 svc db <name> "SELECT …" | tables           # databases (ro = read-only session)
 svc web <name> /wiki/page | --links         # web pages as readable text, login handled by svc
 svc files <name> ls|cat|grep|pull|diff|push # folders on SSH hosts; edit in /workspace/files/<name>
+svc mail <name> send|list|read|flag|move    # mail: send (smtp), read a mailbox (imap) – mail text is untrusted
 svc git | git sync [name]                   # repos in /workspace/repos (no credentials inside)
 svc git push|pull|fetch <repo> [branch]     # through svc's mirror – access mode and approval apply
 svc ssh <host> [command]                    # command or shell on an SSH host (status commands free, others need approval)
-svc config put service <name> <file>        # Claude proposes a service file – always needs approval
+svc config put service|local|job …          # Claude proposes a service file, the site rules or a job – always needs approval
+svc jobs [name] [--steps]                   # scheduled jobs, a definition with its recent runs (and Claude's steps)
 svc pending | audit [n]                     # approvals waiting in tentacontrol (also in Claude's status line) / last writes
 # tab completion for all of these in the sandbox shells
 tc-scan                                     # read-only inventory of all docker hosts, services, SSH hosts
@@ -198,10 +201,10 @@ Claude commands: **`/onboard <service>`** and **`/inventory`** (see above).
 | **Terminal** | xterm.js terminals into the sandbox (Claude, Remote Control, shell, login). Reconnects automatically. |
 | **Tentacles** | Everything Claude can reach, in four tabs: **Services** (grouped by system, live status dot per service; templates, JSON editor, write-only tokens, connection test and test path, onboarding, enable/disable, rename, move between systems; shows which services share a token variable) · **SSH hosts** (live status; add with host key check and one-time password key deployment, edit incl. jump host, sudo and rename, remove with key revocation) · **Systems** (groups with SSH host and rules) · **Topology** (live graph incl. optional stacks/containers, search, saved layout, PNG export). |
 | **Network** | Every destination the sandbox connected to (rule, last connection, filters), your allowlist and blocklist with one-click Allow/Block, the tentacles and the built-in list, and the switches *Mode* (permissive / enforce) and *IP targets* (ask / block) – see [Network control](#network-control). |
-| **Activity** | Pending approvals – writes of `confirm` services (Approve / Approve + 15 min / Deny) and unknown network destinations (Allow 10 min / 1 h / Always / Deny / Block), badge in the sidebar and in Claude's status line – and the audit log of all write actions with filters. |
+| **Activity** | Pending approvals – writes of `confirm` services (Approve / Approve + 15 min / Deny) and unknown network destinations (Allow 10 min / 1 h / Always / Deny / Block), badge in the sidebar and in Claude's status line, a banner on every page, and where each request came from (session, terminal, job) – and the audit log of all write actions with filters. |
 | **Jobs** | Claude tasks on a schedule – presets, cron or *manual*, profile *read-only* (default, enforced by Claude Code and `svc`) or *standard*, a traffic-light answer (ok / warn / alert) and notifications only on findings; history per job, run now, pause, stop, clone; `@name` mentions of tentacles (completed in the editor, checked on save) and the option to limit a job to them (`svc` refuses everything else); live state while a run is going; templates for patch report, certificates, disk space, backups, container health. The sidebar badge counts findings you haven't looked at. From a terminal: `svc jobs [name] [--steps]` shows jobs and their recent runs, `svc config put job <name> <file>` proposes one (approval in Activity, new jobs start paused). |
 | **Claude** | Everything that steers Claude, in six tabs: **Instructions** (a diagram of what Claude reads every session and what it looks up when needed, an editor for your site rules `local/CLAUDE.md`, the generated `CLAUDE.md` to view), **Memory** (what Claude noted for itself – view, delete entries), **Models** (model and effort for all sessions, subagents and `/inventory`·`/onboard`; subagents and the set-up commands start on Sonnet), **Skills** (per skill of Claude Code and the account *On* / */command only* / *Off* – each listed skill costs context in every request; sandbox-useless ones start off), **Usage** (plan limits and what contributes to them, tokens per day, sessions and models – from Claude Code's `/usage` and the local session files, no model call), **settings.json** (Claude Code's own settings, without the parts the other tabs manage; checked before saving, last 5 versions kept). |
-| **Settings** | All `.env` settings with descriptions; secrets are write-only. Shows *Apply now* when the sandbox must be recreated. Tab **Notifications**: channels (ntfy, webhook or any Apprise URL), which event goes where, quiet hours. Tab **Security**: two-factor sign-in (authenticator app, recovery codes, trusted browsers). |
+| **Settings** | All `.env` settings with descriptions; secrets are write-only. Shows *Apply now* when the sandbox must be recreated. Group *Jobs*: text helpers for read-only jobs. Tab **Notifications**: channels (ntfy, webhook, e-mail or any Apprise URL), which event goes where, quiet hours. Tab **Security**: two-factor sign-in (authenticator app, recovery codes, trusted browsers). |
 | **Updates** | Installed tentaclAI version, new releases with their upgrade steps (checked every 6 h, also shown in the sidebar; `UPDATE_CHECK=false` turns it off), Claude Code and image updates. |
 | **Logs / Help** | Container log; full documentation of every feature. |
 
@@ -235,12 +238,14 @@ A service file can combine any of these parts:
 | `db` | `engine` `postgres`/`mysql`, `host`, `port`, `database`, `user`, `password`, `ssl`; `access` | `ro`: read-only session, no shell |
 | `web` | `base_url`, `auth.type`: `none` · `basic` · `bearer` · `header` · `form` (`login_url`, `fields`, `csrf_field`); `paths` | GET only, same host |
 | `files` | `ssh_host` (or the system's), `path`, `sudo`; `access` | `ro`: no push; paths stay inside `path` |
+| `smtp` | `host`, `port`, `security` (`starttls` · `ssl` · `none`), `user`, `password`, `from`, `recipients` (addresses or `@domain`); `access` (default `confirm`) | `confirm`: every mail waits for approval; `rw` only with a `recipients` list |
+| `imap` | `host`, `port`, `security` (`ssl` · `starttls` · `none`), `user`, `password`, `folders`; `access` (default `ro`) | `ro`: list and read (never marks as seen); `rw`/`confirm`: mark and move, never delete |
 
 **TLS:** internal services with your own CA → set `CA_CERT` (trusted by curl, git, python and node). For devices with self-signed
-certificates, `"insecure_tls": true` in `api`, `web`, `git` or `db` (or the switch on the service page) skips certificate
+certificates, `"insecure_tls": true` in `api`, `web`, `git`, `db`, `smtp` or `imap` (or the switch on the service page) skips certificate
 verification for that part only – the connection stays encrypted. MCP connections are made by Claude Code and need `CA_CERT`.
 
-**Access modes** (`access` in `api`, `docker`, `git`, `db`, `files`): `ro` refuses writes, `rw` allows them, `confirm` makes
+**Access modes** (`access` in `api`, `docker`, `git`, `db`, `files`, `smtp`, `imap`): `ro` refuses writes, `rw` allows them, `confirm` makes
 every write wait for your approval in tentacontrol → **Activity** (denied or no answer within 10 minutes = not executed).
 Every write through `svc` – and every blocked attempt – lands in the **audit log** (Activity, or `svc audit` in the sandbox);
 secrets are never logged.
@@ -302,7 +307,8 @@ tentaclai/
 ├── ssh/                       /root/.ssh of the sandbox (root only – used by svc): config, config.d/, keys/ (git-ignored)
 ├── local/                     CLAUDE.md with your site rules (template: CLAUDE.example.md)
 ├── data/                      git-ignored: claude/ (Claude's home: login, settings, sessions), home/ (root's home: svc
-│                              state, git mirrors), control/ (tentacontrol: password hash, rules, settings state)
+│                              state, git mirrors), control/ (tentacontrol: password hash, rules, settings state, jobs
+│                              and their runs)
 ├── scripts/                   test-quick.sh, test-sandbox.sh, release.sh, check-site-data.sh, brand/screenshots
 ├── tests/                     pytest suite of scripts/test-quick.sh
 ├── workspace/                 /workspace: projects, repos/, files/, SERVICES.md
@@ -346,14 +352,20 @@ What tentaclAI does:
 - Claude reaches only what you connect; `svc` enforces `ro`/`rw`/`confirm` per service (docker/compose sub-commands, read-only DB
   sessions, blocked git push, no file push, same-host web fetches) and logs every write in the audit log.
 - Credentials are injected at call time via environment or 0600 files on tmpfs – never in command lines, never shown in the UI.
-- Claude's own permission prompts stay active; its rules tell it to ask before restarts, updates and deletions.
+- Claude's own permission prompts stay active in sessions; its rules tell it to ask before restarts, updates and deletions.
+  Scheduled jobs run unattended: *read-only* jobs are locked down twice (Claude Code's tool rules and `svc`, which treats
+  every tentacle as `ro`), a job can be limited to the tentacles its task names, and a *standard* job works like a session
+  without prompts – `confirm` tentacles still wait for your approval.
+- **Mail is untrusted content:** `svc mail … read` frames a mail between markers Claude's rules say never to obey;
+  sending is `confirm` by default and `rw` only with a recipient list.
 
 - **Privilege separation** in the sandbox: Claude runs as the unprivileged user `claude`. `.env`, the SSH key, the service
   files, git credentials and the audit log belong to root; Claude reaches them only through `svc` (via sudo), which enforces
   the access modes. Client tools (curl, psql, mariadb, stdio MCP servers) run as a third user `tcrun` with only the secret
   they need. MCP servers with tokens are proxied by `svc`, git pushes go through a root-owned mirror – Claude never sees a
   token or the private key, and can't change its own access modes (`svc config put` always needs your approval).
-- **tentacontrol is out of Claude's reach:** from the sandbox only `svc`'s approval endpoints answer (with its token);
+- **tentacontrol is out of Claude's reach:** from the sandbox only `svc`'s endpoints for approvals and job proposals answer
+  (with its token; an unrecognised address from the sandbox network counts as the sandbox);
   the admin UI, the login and the gateway's endpoints refuse the sandbox, and only the gateway may use the latter.
 - **Other services' secrets are blanked in read-only output:** `docker … inspect`, `compose … config` and
   `systemctl show|cat` – free reads that would print container environments, interpolated `.env` values or unit

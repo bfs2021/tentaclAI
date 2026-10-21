@@ -16,11 +16,13 @@ tentaclAI = sandbox + service gateway for Claude Code. Three containers (`compos
 - `control` → container **tentacontrol** (`control/`): web admin, FastAPI + Jinja + HTMX, vendored JS (no CDN at runtime).
   In both networks; network rules in `data/control/egress-rules.json` (`control/app/egress.py`). `main.py` holds the
   app, middleware and background loops; pages and endpoints live in `routes/` (one router per area: `system`,
-  `tentacles`, `ssh`, `network`, `settings`), shared helpers (`page`, `respond`, the *Apply now* hint) in `web.py`,
-  small JSON state files go through `jsonstore.py`.
+  `tentacles`, `ssh`, `network`, `settings`, `claude`, `jobs`), shared helpers (`page`, `respond`, the *Apply now* hint) in `web.py`,
+  small JSON state files go through `jsonstore.py`. Scheduled jobs: `scheduled.py` (runner, scheduler, step logs –
+  not `jobs.py`, which runs tentacontrol's own build jobs); `svc` recognises a job run by the `tc-job=<run>` marker in
+  an ancestor's command line plus root's `data/control/job-runs.json`.
 
 Two layers: `svc` decides *what* happens with a tentacle (credentials, `ro`/`rw`/`confirm`); the gateway decides *where*
-the sandbox may connect. ssh/rsync go through `ProxyCommand tc-connect`, databases through `svc`'s local `tunnel()`.
+the sandbox may connect. ssh/rsync go through `ProxyCommand tc-connect`, databases and mail through `svc`'s local `tunnel()`.
 
 Shared logic lives in **`lib/tclib.py`** (`.env`, `${VAR}`, services, systems, SSH hosts) and is copied into both images –
 `svc`, `tc-scan`, `claude-instructions` and tentacontrol use it. Never re-implement these parsers elsewhere; extend tclib.

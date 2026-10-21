@@ -47,7 +47,7 @@
       <p>tentaclAI is generic – everything site-specific lives in a few places:</p>
       <table>
         <tr><td><code>.env</code></td><td>paths (<code>TC_DIR</code>, <code>DOCKER_SOCKET</code>, <code>HOST_DOCS</code>, <code>CA_CERT</code>), domain, resources, remote control, tokens – editable under <a href="/settings">Settings</a>.</td></tr>
-        <tr><td><code>services/*.json</code></td><td>everything Claude can reach: Docker hosts, APIs, MCP servers, git repositories.</td></tr>
+        <tr><td><code>services/*.json</code></td><td>everything Claude can reach: Docker hosts, APIs, MCP servers, git repositories, databases, web sources, files, mail.</td></tr>
         <tr><td><code>compose.override.yaml</code></td><td>reverse proxy (nginx-proxy, Traefik …), extra mounts, labels for container managers. Template: <code>compose.override.example.yaml</code>.</td></tr>
         <tr><td><code>local/CLAUDE.md</code></td><td>rules and knowledge about your site for Claude; loaded together with the generic rules on every start. The host docs (<code>HOST_DOCS</code>) are only referenced – Claude reads them before it works on the host.</td></tr>
       </table>
@@ -64,9 +64,9 @@
       <h2>How it fits together</h2>
       <p><strong>Tentacles</strong> are everything Claude can reach – services, SSH hosts and the systems that group them – set up under <a href="/services">Tentacles</a>, each with its own access mode. Any other network traffic goes through the egress gateway (<a href="/network">Network</a>).</p>
       <table>
-        <tr><td><strong>tentaclAI</strong></td><td>Container with Claude Code, Docker CLI, git, Python, Node, <code>gh</code>, <code>svc</code>. It reaches <strong>only connected services</strong> – Docker hosts, APIs, MCP servers, git repositories. Without a docker service it has no Docker access.</td></tr>
+        <tr><td><strong>tentaclAI</strong></td><td>Container with Claude Code, git, Python, Node, <code>gh</code>, database clients and <code>svc</code> – no Docker CLI or socket (docker runs on the hosts over SSH). It reaches <strong>only connected services</strong> – Docker hosts, APIs, MCP servers, git repositories, databases, web sources, files, mail.</td></tr>
         <tr><td><strong>tentacontrol</strong></td><td>This web admin. Edits <code>.env</code>, <code>services/</code>, <code>ssh/</code> of the stack and builds/recreates tentaclAI.</td></tr>
-        <tr><td><code>services/*.json</code></td><td>One file per service (docker, api, mcp and/or git). Tokens only as <code>${VAR}</code>.</td></tr>
+        <tr><td><code>services/*.json</code></td><td>One file per service (parts: docker, api, mcp, git, db, web, files, smtp, imap). Tokens only as <code>${VAR}</code>.</td></tr>
         <tr><td><code>.env</code></td><td>All values and secrets (mode 600). <code>svc</code> reads it fresh on every call.</td></tr>
         <tr><td><code>/workspace</code></td><td>Projects, <code>SERVICES.md</code> (generated service catalog), <code>repos/</code> (git services).</td></tr>
         <tr><td><code>data/claude</code></td><td>Claude's home (<code>/home/claude</code>, user <code>claude</code>): login, settings, history.</td></tr>
@@ -87,7 +87,7 @@
         <tr><td><span class="kbd">Ctrl+Shift+V</span> / right click</td><td>paste (e.g. a login code)</td></tr>
         <tr><td><span class="kbd">Ctrl+C</span> twice</td><td>quit Claude</td></tr>
       </table>
-      <p>On the host the same works with <code>./tentaclai.sh</code>, in a container console (e.g. Arcane, Portainer) with <code>cc</code>. Local docker hosts get their own tab “Claude · &lt;host&gt;” starting in their stacks directory.</p>
+      <p>On the host the same works with <code>./tentaclai.sh</code>, in a container console (e.g. Arcane, Portainer) with <code>cc</code>.</p>
     </section>
 
     <section class="card" id="rc">
@@ -104,13 +104,14 @@
 
     <section class="card" id="services">
       <h2>Services</h2>
-      <p>A service is one JSON file in <code>services/</code>. It can have seven parts – alone or combined (<a href="#db">db</a>, <a href="#web">web</a> and <a href="#files">files</a> have their own sections below):</p>
+      <p>A service is one JSON file in <code>services/</code>. It can have nine parts – alone or combined (<a href="#db">db</a>, <a href="#web">web</a>, <a href="#files">files</a> and <a href="#mail">mail</a> have their own sections below):</p>
       <table>
         <tr><td><code>docker</code></td><td>Docker host – reached over SSH (this host too); Claude manages its stacks with <code>svc docker</code> / <code>svc compose</code>.</td></tr>
         <tr><td><code>api</code></td><td>REST API, called with <code>svc &lt;name&gt; GET /path</code>. <code>svc</code> injects the authentication; tokens never appear in commands.</td></tr>
         <tr><td><code>mcp</code></td><td>MCP server – registered in Claude's configuration on “Sync”.</td></tr>
         <tr><td><code>git</code></td><td>Repository – cloned to <code>/workspace/repos/&lt;name&gt;</code>, read only or read/write.</td></tr>
         <tr><td><code>db</code> · <code>web</code> · <code>files</code></td><td>Database (<code>svc db</code>), web pages as text (<code>svc web</code>), directories on an SSH host (<code>svc files</code>).</td></tr>
+<tr><td><code>smtp</code> · <code>imap</code></td><td>Send mail, read a mailbox (<code>svc mail</code>).</td></tr>
       </table>
       <ul>
         <li><strong>Test path</strong> (<code>"test_path"</code>): the endpoint <code>svc test</code> calls for the API – pick one that needs the token, so a wrong token shows up. Without it <code>GET /</code> is used; the service page warns and suggests the template's path (<em>Save as test path</em>).</li>
@@ -135,10 +136,10 @@
 }</pre>
       <ul>
         <li><strong>Status</strong>: <span class="pill ok">active</span> all variables set · <span class="pill warn">token missing</span> at least one <code>${VAR}</code> empty · <span class="pill off">disabled</span> <code>"enabled": false</code>.</li>
-        <li>New tokens work for <code>svc</code> immediately. Only <code>GIT_*</code> and new/changed local Docker hosts need “Apply now” – the banner also appears when a newer tentaclAI image was built.</li>
+        <li>New tokens work for <code>svc</code> immediately. Only settings read at container start (e.g. <code>GIT_*</code>, <code>TZ</code>, resources) need “Apply now” – the banner also appears when a newer tentaclAI image was built.</li>
         <li>Running Claude sessions see new MCP servers after <code>/mcp</code> → reconnect or in a new session.</li>
         <li>Internal https services with your own CA: set <code>CA_CERT</code> in the settings – the CA becomes trusted in the container. Single devices with self-signed certificates: <code>"insecure_tls": true</code>.</li>
-        <li><strong>Self-signed certificates</strong> (routers, NAS, hypervisors): the switch <em>Ignore TLS certificate errors</em> on the service page sets <code>insecure_tls</code> for its <code>api</code>, <code>web</code>, <code>git</code> and <code>db</code> parts – encrypted, but the server is not verified. MCP connections are made by Claude Code and always verify; use <code>CA_CERT</code> for them.</li>
+        <li><strong>Self-signed certificates</strong> (routers, NAS, hypervisors): the switch <em>Ignore TLS certificate errors</em> on the service page sets <code>insecure_tls</code> for its <code>api</code>, <code>web</code>, <code>git</code>, <code>db</code>, <code>smtp</code> and <code>imap</code> parts – encrypted, but the server is not verified. MCP connections are made by Claude Code and always verify; use <code>CA_CERT</code> for them.</li>
       </ul>
     </section>
 
@@ -155,7 +156,7 @@
 
     <section class="card" id="onboard">
       <h2>Onboarding a service</h2>
-      <p>On every service page: <strong>Test connection</strong> checks each part (API test call, MCP reachability, <code>git ls-remote</code>, <code>docker version</code>) – in the container: <code>svc test &lt;name&gt;</code>.</p>
+      <p>On every service page: <strong>Test connection</strong> checks each part (API test call, MCP reachability, <code>git ls-remote</code>, <code>docker version</code>, database and web login, SMTP/IMAP login) – in the container: <code>svc test &lt;name&gt;</code>.</p>
       <p><strong>Onboard with Claude</strong> runs <code>/onboard &lt;name&gt;</code>: Claude tests the service, explores it read-only (docs/OpenAPI, a few queries, repository content, stacks), asks you what it is for, typical tasks and what is allowed or off limits, and writes description, rules and examples into the service file after your approval. That way the catalog says what each service is for.</p>
     </section>
 
@@ -247,7 +248,7 @@
       <h2>System inventory</h2>
       <p>This is how Claude gets to know a new site. Start: <strong>Overview → System inventory</strong>, terminal tab “System inventory” or <code>./tentaclai.sh inventory</code>.</p>
       <ol>
-        <li><code>tc-scan</code> collects read-only for every docker host (local and via SSH): system (OS, Docker, resources), all stacks and containers (images, status, ports, proxy hosts, mounts), networks, connected services with a test call, git repositories and the SSH hosts. Environment variables and <code>.env</code> contents are never read.</li>
+        <li><code>tc-scan</code> collects read-only for every docker host (over SSH): system (OS, Docker, resources), all stacks and containers (images, status, ports, proxy hosts, mounts), networks, connected services with a test call, git repositories and the SSH hosts. Environment variables and <code>.env</code> contents are never read.</li>
         <li>Claude summarizes and asks short rounds of questions: purpose and criticality of the stacks, taboos, container manager, proxy/DNS, backups, access, conventions.</li>
         <li>Claude shows a draft for <code>local/CLAUDE.md</code> and writes it only after your approval (with a backup copy).</li>
       </ol>
@@ -280,14 +281,14 @@
 
     <section class="card" id="activity">
       <h2>Activity: approvals &amp; audit log</h2>
-      <p>Parts with an <code>access</code> field (<code>api</code>, <code>docker</code>, <code>git</code>, <code>db</code>, <code>files</code>) have three modes:</p>
+      <p>Parts with an <code>access</code> field (<code>api</code>, <code>docker</code>, <code>git</code>, <code>db</code>, <code>files</code>, <code>smtp</code>, <code>imap</code>) have three modes:</p>
       <ul>
         <li><code>ro</code> – writes are refused (and logged as <em>blocked</em>).</li>
         <li><code>rw</code> – writes run and are logged (<em>auto</em>). Default for <code>api</code>.</li>
         <li><code>confirm</code> – every write waits for you: <strong>Activity</strong> shows the request with a badge in the sidebar, <em>Approve</em> runs it, <em>Deny</em> or no answer within 10 minutes stops it. <em>Approve + 15 min</em> also lets further writes of the same service part (or SSH host) run for 15 minutes without asking – listed under <em>Active grants</em>, revocable any time, gone when tentacontrol restarts; never for <code>svc config put</code>. Claude is told to report a pending approval and never to work around a denial.</li>
-        <li>Every approval and audit entry shows <strong>where it came from</strong> – the Claude session (Remote Control, a terminal, onboarding …) and its title. Claude's own environment reports it, so take it as a hint, not as proof.</li>
+        <li>Every approval and audit entry shows <strong>where it came from</strong> – the Claude session (Remote Control, a terminal, onboarding …) and its title, or <em>Job · name</em> for a scheduled job (recognised by <code>svc</code>, not reported by Claude). Pending approvals also show as a banner on every page. Claude's own environment reports it, so take it as a hint, not as proof.</li>
       </ul>
-      <p>Writes are: API calls other than GET/HEAD/OPTIONS, docker/compose commands that change something, SQL that is not a plain query (and the SQL shell), <code>svc files … push</code>, and <code>git push</code> (via a pre-push hook in every repo). The audit log (<code>data/control/audit.jsonl</code>) records time, service, action, decision and result – never tokens or request bodies. In the sandbox: <code>svc audit</code>.</p>
+      <p>Writes are: API calls other than GET/HEAD/OPTIONS, docker/compose commands that change something, SQL that is not a plain query (and the SQL shell), <code>svc files … push</code>, sending mail and marking or moving mails, and <code>git push</code> (via a pre-push hook in every repo). The audit log (<code>data/control/audit.jsonl</code>) records time, service, action, decision and result – never tokens or request bodies. In the sandbox: <code>svc audit</code>.</p>
       <p>Also gated: <code>svc ssh &lt;host&gt; …</code> (per SSH host, default <code>confirm</code>; plain status commands run without approval, even on <code>ro</code> hosts: <code>uptime</code>, <code>df</code>, <code>free</code>, <code>ps</code>, <code>ls</code>, <code>docker ps|logs|inspect …</code>, <code>systemctl status|list-units …</code>, <code>journalctl</code>, <code>ip a|route</code>, <code>ss</code> and similar – no shell syntax, no file contents, optionally behind the host's sudo prefix) and <code>svc config put …</code> – Claude's way to write a service file or <code>local/CLAUDE.md</code>, which always needs your approval.</p>
       <p class="help">Claude runs as the unprivileged user <code>claude</code> and can't read <code>.env</code>, the SSH key or the audit log, nor change service files – <code>svc</code> (root, via sudo) is its only way out. MCP tool calls are not gated (Claude Code asks for them itself); MCP servers with tokens run through <code>svc mcp-proxy</code>.</p>
     </section>
@@ -322,7 +323,7 @@
       </ol>
       <p><strong>Edit</strong> changes host, user, port, jump host, sudo and the alias – a rename also updates docker/files services, systems and other hosts that jump through it. If a host key changed, <em>Check host key</em> fetches and confirms the new one. <strong>Remove</strong> can also take tentaclAI's key off the host. On the command line: <code>./ssh-host.sh list|add|sudo|hostkey|remove|test</code> – same logic as this page.</p>
       <h4>Hosts without root login: sudo</h4>
-      <p>If the SSH user is not root, enable <strong>use sudo</strong> (when adding the host, or later in the <em>sudo</em> column). The prefix (default <code>sudo -n</code>, also e.g. <code>doas</code>) is stored as <code># tentaclai: sudo=…</code> in the host's block. <code>svc docker</code>/<code>svc compose</code> and <code>tc-scan</code> use it automatically (such docker hosts run through ssh instead of a docker context), and Claude's instructions list it per host for admin commands.</p>
+      <p>If the SSH user is not root, enable <strong>use sudo</strong> (when adding the host, or later in the <em>sudo</em> column). The prefix (default <code>sudo -n</code>, also e.g. <code>doas</code>) is stored as <code># tentaclai: sudo=…</code> in the host's block. <code>svc docker</code>/<code>svc compose</code> and <code>tc-scan</code> use it automatically, and Claude's instructions list it per host for admin commands.</p>
       <p>It is non-interactive: the user needs passwordless sudo, ideally limited, e.g. <code>/etc/sudoers.d/tentaclai</code>: <code>deploy ALL=(root) NOPASSWD: /usr/bin/docker</code>. “Test” checks login and sudo.</p>
     </section>
 
@@ -364,17 +365,20 @@ svc list | info &lt;name&gt;     services and status / details
 svc test &lt;name&gt;           connection test of every part of a service
 svc &lt;name&gt; GET /path       API call, e.g. svc arcane GET /environments
 svc docker [&lt;host&gt; …]     docker hosts / docker CLI against one host (svc docker vps1 ps)
-svc compose &lt;host&gt; &lt;stack&gt; …   compose in the stack directory of that host (local or via SSH)
+svc compose &lt;host&gt; &lt;stack&gt; …   compose in the stack directory of that host (over SSH)
+svc db|web|files &lt;name&gt; …  databases, web pages as text, folders on SSH hosts
+svc mail &lt;name&gt; send|list|read|flag|move …   mail (smtp / imap)
+svc jobs [&lt;name&gt; [--steps]]   scheduled jobs, a definition with its recent runs
 svc git | svc git sync    repositories: status / clone + fetch
 svc git push|pull|fetch &lt;repo&gt;   push a branch / update – credentials stay with svc
 svc ssh [&lt;host&gt; [cmd]]     SSH hosts / a command or shell on one (access per host, default confirm)
-svc config put service &lt;name&gt; &lt;file&gt; | local &lt;file&gt;   write a service file / site rules (needs approval)
+svc config put service &lt;name&gt; &lt;file&gt; | local &lt;file&gt; | job &lt;name&gt; &lt;file&gt;   service file / site rules / job (needs approval)
 svc pending               approvals waiting in Activity and active grants (also shown in Claude's status line)
 svc sync                  register MCP, clone missing repos, write SERVICES.md
 tc-scan                   read-only inventory report
 /inventory · /onboard &lt;service&gt;   Claude commands (inside a Claude session)
 gh …                      GitHub CLI without credentials (public data)</pre>
-      <p>On the host (<code>{{ site.tc_dir }}</code>): <code>./tentaclai.sh [init|host|rc|shell|login|status|svc|scan|inventory|passwd|setup-url]</code>, <code>./ssh-host.sh add|remove|list|test</code>.</p>
+      <p>On the host (<code>{{ site.tc_dir }}</code>): <code>./tentaclai.sh [init|rc|shell|rootshell|login|status|svc|scan|inventory|passwd|reset-2fa|setup-url|update]</code>, <code>./ssh-host.sh add|remove|list|test</code>.</p>
     </section>
 
     <section class="card" id="security">
@@ -383,13 +387,14 @@ gh …                      GitHub CLI without credentials (public data)</pre>
         <li>tentacontrol has the Docker socket of this host (to run tentaclAI) – that is <strong>root on {{ site.hostname }}</strong>. Choose the tentacontrol password accordingly.</li>
         <li>In tentaclAI, Claude runs as the unprivileged user <code>claude</code>. <code>.env</code>, the SSH key, the service files and the audit log belong to root; <code>svc</code> (via sudo) is the only way to services and enforces <code>ro</code>/<code>rw</code>/<code>confirm</code>. Client tools run as a third user (<code>tcrun</code>) with only their own secret.</li>
         <li>Network: <em>permissive</em> records every destination, <em>enforce</em> asks for unknown ones – see <a href="#network">Network</a>.</li>
-        <li><strong>tentacontrol is out of Claude's reach</strong>: from the sandbox only <code>svc</code>'s approval endpoints answer (with its token) – the admin UI, the login and the gateway's endpoints refuse it, and only the gateway may use the latter.</li>
+        <li><strong>tentacontrol is out of Claude's reach</strong>: from the sandbox only <code>svc</code>'s endpoints for approvals and job proposals answer (with its token; an unrecognised address from the sandbox network counts as the sandbox) – the admin UI, the login and the gateway's endpoints refuse it, and only the gateway may use the latter.</li>
         <li><strong>Other services' secrets are blanked</strong> in free read-only output: <code>docker … inspect</code>, <code>compose … config</code> and <code>systemctl show|cat</code> show <code>[redacted by svc]</code> for values with secret-looking names and for passwords in URLs. Logs and commands you approve are not filtered. <code>svc</code> also keeps the <code>.env</code> values out of the environment of the programs it starts.</li>
         <li>The sandbox sits in an internal network without a route to the outside; everything leaves through the <strong>egress gateway</strong> (<code>tentaclai-egress</code>), which records every destination. <code>EGRESS_MODE=permissive</code> (default) allows all – allow/block lists and approvals follow.</li>
         <li>An <code>rw</code> docker service is root on that host. The sandbox itself never gets a Docker socket – docker hosts are reached over SSH only.</li>
         <li>Login: bcrypt hash, optional two-factor sign-in (TOTP, see <a href="#settings">Settings → Security</a>), 12 h session, <code>SameSite=Strict</code> cookie (Secure behind https), origin check for forms and the terminal, throttling after failed attempts (password and code).</li>
         <li>Secrets never reach the browser; <code>svc</code> passes them to curl through temporary 0600 files on tmpfs, not on the command line.</li>
-        <li>Claude keeps asking before actions – the rules are in its instructions (generic rules + <code>local/CLAUDE.md</code>).</li>
+        <li>Claude keeps asking before actions – the rules are in its instructions (generic rules + <code>local/CLAUDE.md</code>). Scheduled jobs run without prompts: <em>read-only</em> is enforced by Claude Code and <code>svc</code>, a job can be limited to its named tentacles, and <code>confirm</code> still waits for you – see <a href="#jobs">Jobs</a>.</li>
+<li><strong>Mails are untrusted</strong>: <code>svc mail … read</code> frames them between markers Claude never obeys; sending is <code>confirm</code> by default and <code>rw</code> only with a recipient list – see <a href="#mail">Mail</a>.</li>
         <li>Forgot the password: <code>./tentaclai.sh passwd</code> on the host.</li>
       </ul>
     </section>
