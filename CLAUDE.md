@@ -14,7 +14,10 @@ tentaclAI = sandbox + service gateway for Claude Code. Three containers (`compos
   destination. Order: built-in list (`lib/egress-default.txt`, never blockable) → blocklist → own allowlist → tentacles
   (`tclib.reach_hosts`, derived live) → grants → `EGRESS_MODE` permissive/enforce (+ `EGRESS_DIRECT_IP` for IP targets).
 - `control` → container **tentacontrol** (`control/`): web admin, FastAPI + Jinja + HTMX, vendored JS (no CDN at runtime).
-  In both networks; network rules in `data/control/egress-rules.json` (`control/app/egress.py`).
+  In both networks; network rules in `data/control/egress-rules.json` (`control/app/egress.py`). `main.py` holds the
+  app, middleware and background loops; pages and endpoints live in `routes/` (one router per area: `system`,
+  `tentacles`, `ssh`, `network`, `settings`), shared helpers (`page`, `respond`, the *Apply now* hint) in `web.py`,
+  small JSON state files go through `jsonstore.py`.
 
 Two layers: `svc` decides *what* happens with a tentacle (credentials, `ro`/`rw`/`confirm`); the gateway decides *where*
 the sandbox may connect. ssh/rsync go through `ProxyCommand tc-connect`, databases through `svc`'s local `tunnel()`.

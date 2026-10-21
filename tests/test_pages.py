@@ -14,7 +14,11 @@ def pages():
     from starlette.routing import Route
     sys.modules.get("app.main") or __import__("conftest")  # the dummy stack exists before the app is imported
     from app import main
-    plain = [r.path for r in main.app.routes if isinstance(r, Route) and "GET" in (r.methods or ()) and "{" not in r.path
+    def walk(routes):  # included routers are wrappers around the APIRouter's own routes
+        for r in routes:
+            inner = getattr(r, "original_router", None)
+            yield from walk(inner.routes) if inner is not None else [r]
+    plain = [r.path for r in walk(main.app.routes) if isinstance(r, Route) and "GET" in (r.methods or ()) and "{" not in r.path
              and not r.path.startswith(NOT_PAGES)]
     return sorted(set(plain)) + VARIANTS
 
