@@ -79,12 +79,19 @@
     if (!b64 || b64 === "?") return true;
     try { tmuxCopy = new TextDecoder().decode(Uint8Array.from(atob(b64), function (c) { return c.charCodeAt(0); })); }
     catch (e) { return true; }
-    if (navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(tmuxCopy).catch(function () {});
+    var ok = function () { flash("copied", "ok"); }, wait = function () { flash("Cmd+C to copy", "info", 8000); };
+    if (navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(tmuxCopy).then(ok, wait); else wait();
     return true;
   });
+  var flashTimer, beforeFlash;
+  function flash(txt, kind, ms) {  // short note in the status pill, then back – unless the connection state changed meanwhile
+    if (!flashTimer) beforeFlash = [state.textContent, state.className.replace("pill ", "")];
+    clearTimeout(flashTimer); setState(txt, kind);
+    flashTimer = setTimeout(function () { flashTimer = null; if (state.textContent === txt) setState(beforeFlash[0], beforeFlash[1]); }, ms || 1500);
+  }
   function copySelection() {
     var text = term.hasSelection() ? term.getSelection() : tmuxCopy;
-    if (navigator.clipboard && window.isSecureContext) return navigator.clipboard.writeText(text);
+    if (navigator.clipboard && window.isSecureContext) return navigator.clipboard.writeText(text).then(function () { flash("copied", "ok"); });
     var ta = document.createElement("textarea");  // plain http: the Clipboard API is missing
     ta.value = text; ta.style.position = "fixed"; ta.style.opacity = "0";
     document.body.appendChild(ta); ta.select(); document.execCommand("copy"); ta.remove(); term.focus();
