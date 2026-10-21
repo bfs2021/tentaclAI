@@ -163,6 +163,11 @@ async def settings_save(request: Request):
         changes[new_key.upper()] = new_val
     if not changes:
         return PlainTextResponse("", headers=toast("No changes", "info"))
+    if "JOB_READONLY_HELPERS" in changes:
+        from .. import scheduled
+        _, bad = scheduled.check_helpers(changes["JOB_READONLY_HELPERS"])
+        if bad:
+            return PlainTextResponse("", headers=toast(f"Helpers refused (they could get around read-only): {', '.join(bad)}", "err"))
     try:
         update_env(changes)
     except ValueError as e:

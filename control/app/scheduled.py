@@ -49,8 +49,33 @@ SYSTEM = ("This is an unattended scheduled job of tentaclAI named {name!r}; nobo
           "most three sentences, optional details. If an action waits for an approval that doesn't come, say so in "
           "the summary.{ro}")
 SYSTEM_RO = (" This run is read-only: tentacles can only be read, files in the sandbox can't be edited – report what "
-             "should be done instead of trying it.")
+             "should be done instead of trying it. Bash allows only svc and these text tools (also in pipes and chains): {helpers}.")
 READ_ONLY_TOOLS = "Read,Grep,Glob,WebFetch,WebSearch,Bash(svc:*)"
+# text tools a read-only job may chain with svc (`svc … | head`) – Settings → Jobs (JOB_READONLY_HELPERS)
+HELPERS_DEFAULT = ("echo", "head", "tail", "grep", "jq", "sort", "uniq", "wc", "cut", "tr", "date", "sleep")
+# never: they run code, write files or reach the network – a "helper" must not get around read-only
+HELPERS_REFUSED = {"sh", "bash", "dash", "zsh", "python", "python3", "perl", "ruby", "node", "awk", "gawk", "mawk", "sed",
+                   "find", "xargs", "env", "sudo", "su", "tee", "cp", "mv", "rm", "dd", "ln", "chmod", "chown", "install",
+                   "mkdir", "touch", "truncate", "tar", "unzip", "curl", "wget", "ssh", "scp", "sftp", "rsync", "nc", "ncat",
+                   "socat", "git", "docker", "tc-connect", "svc", "claude", "eval", "exec", "source", "nohup", "setsid",
+                   "timeout", "watch", "crontab", "at", "kill", "pkill", "tmux", "screen", "vi", "vim", "nano", "less", "more",
+                   "man", "pip", "pip3", "npm", "npx", "apt", "apt-get", "make", "gcc", "openssl", "base64", "split", "patch"}
+HELPER_RE = re.compile(r"^[a-z0-9][a-z0-9._+-]{0,30}$")
+
+
+def check_helpers(value):
+    """setting value → (helpers, refused) – refused: not a plain command name or a tool that could get around read-only"""
+    names = [x.strip() for x in re.split(r"[,\s]+", value or "") if x.strip()]
+    ok, bad = [], []
+    for n in names:
+        (ok if HELPER_RE.match(n) and n not in HELPERS_REFUSED else bad).append(n)
+    return ok, bad
+
+
+def readonly_helpers():
+    from .envfile import read_env
+    value = read_env().get("JOB_READONLY_HELPERS", "")
+    return check_helpers(value)[0] if value.strip() else list(HELPERS_DEFAULT)
 
 TEMPLATES = [
     {"name": "Patch report", "schedule": {"kind": "weekly", "day": 0, "time": "07:00"},
@@ -389,7 +414,7 @@ def claude_argv(job, run_id, session_id):
     model = job.get("model") or m.get("main") or ""
     effort = job.get("effort") or m.get("effort") or ""
     ro = job.get("profile") != "standard"
-    system = SYSTEM.format(name=job["name"], ro=SYSTEM_RO if ro else "")
+    system = SYSTEM.format(name=job["name"], ro=SYSTEM_RO.format(helpers=", ".join(readonly_helpers()) or "none") if ro else "")
     context = mention_context(job)
     if context:
         system += " Tentacles named in the task (@name): " + "; ".join(context) + "."
@@ -405,7 +430,8 @@ def claude_argv(job, run_id, session_id):
     if effort:
         argv += ["--effort", effort]
     if ro:
-        argv += ["--permission-mode", "dontAsk", "--allowedTools", READ_ONLY_TOOLS, "--disallowedTools", "Edit,Write,NotebookEdit"]
+        tools = ",".join([READ_ONLY_TOOLS] + [f"Bash({h}:*)" for h in readonly_helpers()])
+        argv += ["--permission-mode", "dontAsk", "--allowedTools", tools, "--disallowedTools", "Edit,Write,NotebookEdit"]
     else:
         argv += ["--permission-mode", "bypassPermissions"]
     return argv

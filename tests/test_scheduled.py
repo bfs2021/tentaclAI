@@ -229,3 +229,16 @@ def test_logs_and_pruning(sj, monkeypatch, tmp_path):
     assert sj.read_log("run111111")[0]["s"] == "Bash svc list" and sj.read_log("../etc") == []
     sj._prune_logs({"run111111"})
     assert sorted(os.listdir(tmp_path)) == ["run111111.json"]
+
+
+def test_helpers(sj, monkeypatch):
+    assert sj.check_helpers("head, grep jq,bash,awk,curl,Bad!") == (["head", "grep", "jq"], ["bash", "awk", "curl", "Bad!"])
+    from app import envfile
+    monkeypatch.setattr(envfile, "read_env", lambda *a, **k: {})
+    assert sj.readonly_helpers() == list(sj.HELPERS_DEFAULT)
+    monkeypatch.setattr(envfile, "read_env", lambda *a, **k: {"JOB_READONLY_HELPERS": "head, python3"})
+    assert sj.readonly_helpers() == ["head"]  # a refused one is dropped even if it got into .env by hand
+    argv = sj.claude_argv({"name": "x", "prompt": "p", "profile": "read-only"}, "r", "s")
+    tools = argv[argv.index("--allowedTools") + 1]
+    assert "Bash(svc:*)" in tools and "Bash(head:*)" in tools and "python3" not in tools
+    assert "these text tools (also in pipes and chains): head" in argv[argv.index("--append-system-prompt") + 1]

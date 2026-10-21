@@ -48,6 +48,10 @@ SETTINGS_GROUPS = [
         ("HOST_DOCS", "Host documentation", "optional: Markdown file about the host – Claude's instructions point to it, Claude reads it before working on the host", "text"),
         ("CA_CERT", "Own root CA", "optional: PEM file for internal https services", "text"),
     ]),
+    ("Jobs", [
+        ("JOB_READONLY_HELPERS", "Helpers in read-only jobs",
+         "commands besides svc a read-only job may run, comma-separated – text tools only (e.g. head, grep, jq); svc still guards every tentacle. Empty = the defaults (echo, head, tail, grep, jq, sort, uniq, wc, cut, tr, date, sleep). Shells, interpreters, awk/sed/find/xargs and network or write tools are refused.", "text"),
+    ]),
     ("Updates", [
         ("UPDATE_CHECK", "Check for new releases", "asks the GitHub API every 6 hours (no token, no data sent) – off: no requests", "bool"),
         ("UPDATE_REPO", "Release repository", "owner/repo whose releases are checked – default mwaldegg/tentaclai (change for a fork)", "text"),

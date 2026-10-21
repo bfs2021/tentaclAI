@@ -269,6 +269,7 @@ SSH hosts: tentacontrol → Tentacles → SSH hosts, or `./ssh-host.sh list|add|
 | `GIT_USER_NAME`, `GIT_USER_EMAIL` | git identity of Claude's commits |
 | `GH_TOKEN` | example token variable for the GitHub templates (`${GH_TOKEN}`) – no longer handed to `gh` in the sandbox |
 | `RC_ENABLED`, `RC_NAME`, `RC_WORKDIR`, `RC_EXTRA_ARGS`, `RC_RESTART_DELAY` | Remote Control – re-read on every restart of the session |
+| `JOB_READONLY_HELPERS` | text tools a read-only job may chain with `svc` (empty = the defaults: echo, head, tail, grep, jq, sort, uniq, wc, cut, tr, date, sleep) – shells, interpreters, awk/sed/find/xargs, network and write tools are refused |
 | `EGRESS_MODE`, `EGRESS_DIRECT_IP` | egress gateway: `permissive` (default) or `enforce`; bare IP targets in enforce mode `block` (default) or `ask` – see [Network control](#network-control) |
 | `CLAUDE_TELEMETRY` | `true` allows Claude Code's telemetry, error reports and `/bug` (default: off) |
 | `UPDATE_CHECK`, `UPDATE_REPO` | release check every 6 h (`false` = no requests), repository to check (default `mwaldegg/tentaclai`) |

@@ -24,6 +24,9 @@ All notable changes, newest first. Every release lists **upgrade steps** from th
   Schedule *manual* for jobs that run just with *Run now*.
   A running run shows Claude's steps live (tool calls, their output, Claude's text – from `stream-json`, refreshed
   every 2 s); finished runs keep them under *Claude's steps* (`data/control/job-logs/`, root only, pruned with the history).
+  Read-only jobs may chain `svc` with text tools (`svc … | grep … | head`): Settings → Jobs → *Helpers in read-only jobs*
+  (`JOB_READONLY_HELPERS`, default echo, head, tail, grep, jq, sort, uniq, wc, cut, tr, date, sleep) – shells,
+  interpreters, awk/sed/find/xargs and network or write tools are refused.
 
 ### Changes
 - Service cards and pages show every part's access the same way – `api: rw`, `docker: confirm`, `imap: ro` – including mail parts.
