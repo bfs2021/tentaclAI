@@ -7,6 +7,7 @@
 - settings.json is shown without the parts other pages and the entrypoint manage (MANAGED_*), and with secret-looking
   env values masked; saving merges both back unchanged.
 """
+import glob
 import json
 import os
 import re
@@ -18,6 +19,7 @@ from .config import STACK_DIR, is_secret
 
 LOCAL = os.path.join(STACK_DIR, "local", "CLAUDE.md")
 MAX_SIZE = 512 * 1024
+KEEP_BACKUPS = 5
 MANAGED_TOP = {"skillOverrides": "Skills", "model": "Models", "effortLevel": "Models"}
 MANAGED_ENV = {"CLAUDE_CODE_SUBAGENT_MODEL": "Models", "DISABLE_TELEMETRY": "Settings (CLAUDE_TELEMETRY)",
                "DISABLE_ERROR_REPORTING": "Settings (CLAUDE_TELEMETRY)", "DISABLE_BUG_COMMAND": "Settings (CLAUDE_TELEMETRY)",
@@ -120,6 +122,8 @@ def save_local(text):
         return False
     if old is not None:
         shutil.copy2(LOCAL, f"{LOCAL}.bak-{time.strftime('%Y-%m-%d-%H%M%S')}")
+        for bak in sorted(glob.glob(LOCAL + ".bak-*"))[:-KEEP_BACKUPS]:
+            os.remove(bak)
     os.makedirs(os.path.dirname(LOCAL), exist_ok=True)
     with open(LOCAL + ".tmp", "w") as f:
         f.write(text)

@@ -67,3 +67,14 @@ def test_save_local_too_large(cf, tmp_path, monkeypatch):
 def test_forget_validates_names(cf, project, name):
     with pytest.raises(ValueError, match="invalid"):
         cf.forget(project, name)
+
+
+def test_save_local_keeps_five_backups(cf, tmp_path, monkeypatch):
+    p = tmp_path / "CLAUDE.md"
+    monkeypatch.setattr(cf, "LOCAL", str(p))
+    for i in range(8):
+        (tmp_path / f"CLAUDE.md.bak-2026-01-0{i + 1}").write_text("old")
+    p.write_text("a\n")
+    cf.save_local("b")
+    baks = sorted(x.name for x in tmp_path.glob("CLAUDE.md.bak-*"))
+    assert len(baks) == 5 and "CLAUDE.md.bak-2026-01-01" not in baks

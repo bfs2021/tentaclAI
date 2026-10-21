@@ -40,7 +40,7 @@ def test_redact_keeps_inspect_output_valid_json():
                        "Env": ['X_TOKEN=ab"cd', "DB_URL=mysql://u:pw1@db/x", "TZ=UTC"]}}]
     out = json.loads(svc.redact(json.dumps(doc)))
     cfg = out[0]["Config"]
-    assert cfg["Labels"]["ofelia.job-exec.keycloak_sync.command"] == "[redacted by svc]"
+    assert cfg["Labels"]["ofelia.job-exec.keycloak_sync.command"] == '/bin/bash -c "php sync.php"'  # keycloak is no key
     assert cfg["Labels"]["com.docker.compose.service"] == "php"
     assert cfg["Env"] == ["X_TOKEN=[redacted by svc]", "DB_URL=mysql://u:[redacted by svc]@db/x", "TZ=UTC"]
 
@@ -118,3 +118,11 @@ def test_origin_drops_bad_values(monkeypatch):
     monkeypatch.setattr(svc, "_origin", None)
     monkeypatch.setattr(svc, "via_sudo", lambda: False)
     assert svc.origin() == {"by": "root"}
+
+
+@pytest.mark.parametrize("name,secret", [("N8N_API_KEY", True), ("key_file", True), ("APIKEY", True), ("ssh.keys", True),
+                                         ("traefik.basicauth.users", True), ("ofelia.job-exec.keycloak_sync.command", False),
+                                         ("com.example.monkey", False), ("KEYBOARD_LAYOUT", False)])
+def test_secret_names(name, secret):
+    import re
+    assert bool(re.fullmatch("(?i)" + svc._SECRET_NAME, name)) is secret

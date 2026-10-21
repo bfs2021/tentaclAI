@@ -188,6 +188,9 @@ check "audit entry names the session" "$(echo "$AUDIT" | tail -1 | grep -c "$SID
 check "the session token stays behind" "$(echo "$AUDIT" | grep -c leak-test || true)" "0"
 # rename a git service in tentacontrol: file, root's mirror and Claude's working copy move together
 rm -f services/gitdemo.json services/gitdemo2.json
+# a kept REUSE stack still has the last run's copies – the rename (rightly) refuses to overwrite them
+$C rm -rf /workspace/repos/gitdemo /workspace/repos/gitdemo2
+docker exec tctest-claude rm -rf /root/.cache/tentaclai/git/gitdemo.git /root/.cache/tentaclai/git/gitdemo2.git
 echo '{"name":"gitdemo","git":{"url":"https://github.com/mwaldegg/tentaclai.git","access":"ro"},"examples":["svc git fetch gitdemo"]}' > services/gitdemo.json
 $C svc git sync gitdemo >/dev/null 2>&1 || true
 curl -s -b "$J" -H "$H" -o /dev/null -X POST "http://$IP:8080/services/gitdemo/rename" -d new=gitdemo2

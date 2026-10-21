@@ -673,7 +673,9 @@ def docker_services(services, usable=True):
 # Read-only commands that print other services' secrets (container env, interpolated compose files, unit
 # Environment=): svc runs them with captured output and blanks values whose name looks like a secret, plus passwords
 # in URLs – they would otherwise land in Claude's context. Streams (logs -f …) are not affected.
-_SECRET_NAME = r"[A-Za-z0-9_.-]*(?:pass|secret|token|key|credential|private|auth|salt|dsn|cookie)[A-Za-z0-9_.-]*"
+# "key" only as a name part of its own (API_KEY, key_file, apikey) – not inside a word (keycloak, monkey)
+_SECRET_NAME = (r"[A-Za-z0-9_.-]*(?:pass|secret|token|credential|private|auth|salt|dsn|cookie|apikey|(?<![a-z])keys?(?![a-z]))"
+                r"[A-Za-z0-9_.-]*")
 _REDACTED = "[redacted by svc]"
 
 
@@ -1407,6 +1409,8 @@ def cmd_config(services, args):
     def write():
         if old is not None:
             shutil.copy2(target, f"{target}.bak-{time.strftime('%Y-%m-%d-%H%M%S')}")
+            for bak in sorted(glob.glob(target + ".bak-*"))[:-5]:  # the last 5 versions are enough
+                os.remove(bak)
         os.makedirs(os.path.dirname(target), exist_ok=True)
         with open(target + ".tmp", "w") as f:
             f.write(text)

@@ -5,11 +5,15 @@ UI, the login and the gateway endpoints within Claude's reach. Requests are clas
   sandbox container → only the svc endpoints (/internal/approvals…, /internal/event; they also need the svc token)
   egress gateway    → only /internal/egress/*
   anyone else       → everything except /internal/egress/* (UI and login still need the password)
-The containers are found by name in Docker's DNS, so a recreated container with a new address is recognised.
+The containers are found by name in Docker's DNS, so a recreated container with a new address is recognised. Any
+other address from the sandbox's own network (subnet read from Docker) also counts as the sandbox – if a lookup
+fails, a request from there gets less, not more.
 """
+import ipaddress
 import socket
 import time
 
+from . import dockerops
 from .config import CLAUDE_CONTAINER
 
 EGRESS_NAME = "egress"  # network alias of the gateway in the sandbox network
@@ -30,12 +34,41 @@ def _resolve(name):
     return ips
 
 
+_net = [0.0, []]  # ts, subnets of the sandbox container's networks
+
+
+def _sandbox_nets():
+    if time.time() - _net[0] < (60 if _net[1] else 5):
+        return _net[1]
+    nets = []
+    try:
+        api = dockerops.client().api
+        for name in api.inspect_container(CLAUDE_CONTAINER)["NetworkSettings"]["Networks"]:
+            for cfg in api.inspect_network(name).get("IPAM", {}).get("Config") or []:
+                if cfg.get("Subnet"):
+                    nets.append(ipaddress.ip_network(cfg["Subnet"]))
+    except Exception:  # noqa: BLE001  no Docker, no container yet – the name lookup still works
+        nets = []
+    _net[:] = [time.time(), nets]
+    return nets
+
+
+def _in(ip, nets):
+    try:
+        a = ipaddress.ip_address(ip)
+    except ValueError:
+        return False
+    return any(a in n for n in nets)
+
+
 def source(ip):
     """'sandbox', 'egress' or 'other'"""
     if ip and ip in _resolve(CLAUDE_CONTAINER):
         return "sandbox"
     if ip and ip in _resolve(EGRESS_NAME):
         return "egress"
+    if ip and _in(ip, _sandbox_nets()):
+        return "sandbox"  # from the sandbox network but not recognised: treat it like the sandbox
     return "other"
 
 

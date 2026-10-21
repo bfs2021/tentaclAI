@@ -253,3 +253,14 @@ def test_netguard_does_not_cache_a_failed_lookup(app_module, monkeypatch):
     monkeypatch.setattr(netguard, "_cache", {})
     assert netguard.source("172.30.0.5") == "other"  # lookup failed
     assert netguard.source("172.30.0.5") == "sandbox"  # asked again right away
+
+
+def test_netguard_unknown_address_in_the_sandbox_network_counts_as_sandbox(app_module, monkeypatch):
+    import ipaddress
+    from app import netguard
+    monkeypatch.setattr(netguard, "_resolve", lambda n: {"10.9.0.3"} if n == netguard.EGRESS_NAME else set())
+    monkeypatch.setattr(netguard, "_sandbox_nets", lambda: [ipaddress.ip_network("10.9.0.0/24")])
+    assert netguard.source("10.9.0.7") == "sandbox"  # sandbox name lookup failed – still not "anyone else"
+    assert netguard.source("10.9.0.3") == "egress"
+    assert netguard.source("192.168.1.5") == "other"
+    assert not netguard.allowed("/login", "10.9.0.7")
