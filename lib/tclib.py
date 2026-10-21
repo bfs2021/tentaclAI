@@ -61,6 +61,30 @@ def render(obj, env, keep_unknown=False):
     return obj
 
 
+_CREDENTIAL_KEYS = ("auth", "headers", "env")      # everything below them is a credential …
+_NOT_CREDENTIAL = ("type", "user", "username", "login", "header", "param", "client_id", "url", "base_url", "token_url")
+_CREDENTIAL_WORDS = ("password", "token", "secret")  # … and fields named like this anywhere
+
+
+def secret_variables(obj, inside=False):
+    """${VAR}s a service uses as credentials – the UI never shows their values, whatever the variable is called
+    (e.g. NETBIRD_PAT). User names, header names and URLs stay visible."""
+    found = set()
+    if isinstance(obj, dict):
+        for k, v in obj.items():
+            key = str(k).lower()
+            if key.startswith("_"):
+                continue
+            here = key not in _NOT_CREDENTIAL and (inside or key in _CREDENTIAL_KEYS or any(w in key for w in _CREDENTIAL_WORDS))
+            found |= secret_variables(v, here)
+    elif isinstance(obj, list):
+        for v in obj:
+            found |= secret_variables(v, inside)
+    elif isinstance(obj, str) and inside:
+        found.update(VAR.findall(obj))
+    return found
+
+
 def missing(obj, env):
     return sorted(v for v in variables(obj) if not env.get(v))
 

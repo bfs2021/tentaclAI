@@ -160,3 +160,9 @@ def test_not_applied_message(logged_in, app_module, monkeypatch, version, expect
     r = logged_in.post("/models", data={}, headers={"HX-Request": "true"})
     assert r.headers.get("HX-Refresh") == "true"
     assert expect in logged_in.get("/models").text  # flash message after the refresh
+
+
+def test_credential_values_never_reach_the_browser(client):
+    """ODD_ACCESS has no secret-looking name, but credsvc uses it as a header token"""
+    for path in ("/settings", "/services/credsvc"):
+        assert "visible-if-broken-123" not in client.get(path).text, path

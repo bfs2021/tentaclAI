@@ -19,8 +19,19 @@ All notable changes, newest first. Every release lists **upgrade steps** from th
   (container env, labels), `compose … config` (interpolated `.env` values) and `systemctl show|cat` – values of
   secret-looking names and passwords in URLs become `[redacted by svc]`.
 - tentacontrol no longer follows symlinks in Claude's session directory (usage, skill descriptions).
+- `svc` keeps the `.env` values to itself instead of putting them into its process environment – ssh, docker, compose
+  and git no longer inherit every service token (a local `docker compose` would even have preferred them over a
+  stack's own `.env` values).
+- Credentials are recognised by where a service uses them (`auth`, `headers`, MCP `env`, `password`/`token` fields),
+  not only by their name – e.g. `NETBIRD_PAT` was shown in clear on the service page and in Settings. More name
+  hints too (`PASS`, `PAT`, `AUTH`, `CREDENTIAL`, `PRIVATE`, `COOKIE`).
+- Escaped the error output of the service page's test button.
 
 ### Fixes
+- `./tentaclai.sh update` goes to the **latest release** instead of the newest commit on `main` (`--main` for that);
+  the Updates page announces releases, so both now agree.
+- The egress gateway's list of seen destinations is capped (2000 entries, unused for 90 days are dropped) – it grew
+  without limit.
 - A change on Settings → Skills/Models that couldn't be applied said "the sandbox is not running" even when it ran an
   older version – the message now names the version and says to recreate it.
 - README: DNS is not a way out – the sandbox resolves only the stack's containers.

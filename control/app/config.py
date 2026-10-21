@@ -12,11 +12,14 @@ CLAUDE_SERVICE = os.environ.get("CLAUDE_SERVICE", "claude")
 COMPOSE = ["docker", "compose", "--project-directory", STACK_DIR]
 
 # .env keys that hold secrets: never sent to the browser
-SECRET_HINTS = ("TOKEN", "KEY", "PASSWORD", "SECRET")
+SECRET_HINTS = ("TOKEN", "KEY", "PASS", "SECRET", "AUTH", "CREDENTIAL", "PRIVATE", "COOKIE")
+SECRET_PARTS = ("PAT",)  # only as a whole name part (NETBIRD_PAT) – not in PATH or PATCHMON_URL
 
 
-def is_secret(key: str) -> bool:
-    return any(h in key.upper() for h in SECRET_HINTS)
+def is_secret(key: str, credentials=()) -> bool:
+    """by name, or because a service uses the variable as a credential (credentials: tclib.secret_variables of all)"""
+    k = key.upper()
+    return key in credentials or any(h in k for h in SECRET_HINTS) or any(p in k.split("_") for p in SECRET_PARTS)
 
 
 # Structured settings page (everything else shows up under "Weitere Variablen").

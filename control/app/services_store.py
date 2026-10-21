@@ -33,6 +33,7 @@ def load_all():
 def describe(name, data, env=None, error=None):
     env = env if env is not None else read_env()
     vars_ = sorted(variables({k: v for k, v in data.items() if k in PARTS}))
+    creds = tclib.secret_variables({k: v for k, v in data.items() if k in PARTS})
     missing = [v for v in vars_ if not env.get(v)]
     enabled = data.get("enabled", True) is not False
     if error:
@@ -55,8 +56,8 @@ def describe(name, data, env=None, error=None):
         "files": files_info(data.get("files")) if data.get("files") else None,
         # URLs contain no secrets -> show them with ${VAR}s resolved
         "base_url": tclib.render((data.get("api") or {}).get("base_url", ""), env, keep_unknown=True),
-        "vars": [{"name": v, "set": bool(env.get(v)), "secret": is_secret(v),
-                  "value": "" if is_secret(v) else env.get(v, "")} for v in vars_],
+        "vars": [{"name": v, "set": bool(env.get(v)), "secret": is_secret(v, creds),
+                  "value": "" if is_secret(v, creds) else env.get(v, "")} for v in vars_],
         "missing": missing, "state": state, "label": label,
     }
 
@@ -270,3 +271,22 @@ def rename(old, new):
     save_raw(new, json.dumps(data, ensure_ascii=False))  # new file first – a failure leaves the old one intact
     os.remove(path_of(old))
     return data
+
+
+def credential_variables():
+    """every ${VAR} some service uses as a credential (see tclib.secret_variables) – computed once per request"""
+    found = set()
+    for p in glob.glob(os.path.join(SERVICES_DIR, "*.json")):
+        if os.path.basename(p).startswith("_"):
+            continue
+        try:
+            found |= tclib.secret_variables(json.load(open(p)))
+        except (OSError, ValueError):
+            continue
+    return found
+
+
+def secret_check():
+    """is_secret for a whole request (settings page, token forms): name hints + credential positions"""
+    creds = credential_variables()
+    return lambda key: is_secret(key, creds)

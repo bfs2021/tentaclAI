@@ -46,3 +46,16 @@ def test_redact_leaves_json_structure_alone():
 ])
 def test_sensitive_read(words, compose, expected):
     assert svc.sensitive_read(words, compose=compose) is expected
+
+
+def test_env_values_stay_out_of_the_process_environment(tmp_path, monkeypatch):
+    """child processes (ssh, docker, compose, git) must not inherit the service tokens from .env"""
+    f = tmp_path / ".env"
+    f.write_text("SVC_TEST_SECRET=s3cret\nTZ=Europe/Vienna\n")
+    monkeypatch.setattr(svc, "ENV_FILE", str(f))
+    monkeypatch.delenv("SVC_TEST_SECRET", raising=False)
+    svc.load_env_file()
+    import os
+    assert "SVC_TEST_SECRET" not in os.environ
+    assert svc.render({"t": "${SVC_TEST_SECRET}"}) == {"t": "s3cret"}
+    assert svc.missing_vars({"t": "${SVC_TEST_SECRET} ${NOPE_X}"}) == ["NOPE_X"]

@@ -13,7 +13,8 @@
 #   ./tentaclai.sh scan       read-only inventory report (tc-scan)
 #   ./tentaclai.sh passwd     set/reset the tentacontrol web admin password
 #   ./tentaclai.sh setup-url  show the one-time tentacontrol setup link (first start)
-#   ./tentaclai.sh update     git pull + what's new (changelog) + rebuild + recreate, asks before each step (--check: only show)
+#   ./tentaclai.sh update     to the latest release: what's new (changelog) + rebuild + recreate, asks before each step
+#                             (--check: only show, --main: latest main instead of the latest release)
 # Detach from a tmux session without stopping Claude: Ctrl+B, then D
 set -euo pipefail
 
@@ -165,25 +166,34 @@ cmd_update() {  # git pull + changelog of the new versions + rebuild + recreate 
     trap 'rm -f "$TC_UPDATE_COPY"' EXIT
     cd "$STACK_DIR"
     [ -d .git ] && command -v git >/dev/null || { echo "$STACK_DIR is no git checkout (or git is missing) – update by hand"; exit 1; }
-    local old new branch upstream behind
+    local old new branch upstream behind target mode="${1:-}"
     old="$(cat VERSION 2>/dev/null || echo "?")"
     echo "🐙 tentaclAI – installed v$old"
-    git fetch --quiet origin || { echo "✗ git fetch failed"; exit 1; }
+    git fetch --quiet --tags origin || { echo "✗ git fetch failed"; exit 1; }
     branch="$(git rev-parse --abbrev-ref HEAD)"
     upstream="$(git rev-parse --abbrev-ref --symbolic-full-name "@{u}" 2>/dev/null)" || { echo "✗ branch $branch has no upstream"; exit 1; }
-    behind="$(git rev-list --count "HEAD..$upstream")"
-    if [ "$behind" = 0 ]; then echo "✓ up to date ($upstream)"; return 0; fi
-    new="$(git show "$upstream:VERSION" 2>/dev/null || echo "?")"
-    echo "→ $behind new commit(s) on $upstream – version v$new"
+    if [ "$mode" = "--main" ]; then
+        target="$upstream"   # everything on main, released or not
+    else
+        target="$(git tag --list 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname | head -1)"
+        [ -n "$target" ] || { echo "✗ no release tags found – use --main"; exit 1; }
+        if ! git merge-base --is-ancestor HEAD "$target"; then
+            echo "✓ already at or past the latest release $target (use --main for unreleased changes)"; return 0
+        fi
+    fi
+    behind="$(git rev-list --count "HEAD..$target")"
+    if [ "$behind" = 0 ]; then echo "✓ up to date ($target)"; return 0; fi
+    new="$(git show "$target:VERSION" 2>/dev/null || echo "?")"
+    echo "→ $behind new commit(s) up to $target – version v$new"
     echo; echo "What's new (CHANGELOG – read the Upgrade steps):"; echo
     # every changelog section newer than the installed version
-    git show "$upstream:CHANGELOG.md" | awk -v old="v$old" '/^## /{ if (index($0, old " ") || $0 ~ ("## " old "$")) exit; p=1 } p' | sed 's/^/   /'
-    [ "${1:-}" = "--check" ] && return 0
+    git show "$target:CHANGELOG.md" | awk -v old="v$old" '/^## /{ if (index($0, old " ") || $0 ~ ("## " old "$")) exit; p=1 } p' | sed 's/^/   /'
+    [ "$mode" = "--check" ] && return 0
     if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
         echo "✗ tracked files have local changes – commit or stash them first:"; git status --short --untracked-files=no; exit 1
     fi
     ask_yn "Pull and rebuild the images now?" y || return 0
-    git pull --ff-only --quiet
+    git merge --ff-only --quiet "$target" || { echo "✗ can't fast-forward to $target – local commits on $branch?"; exit 1; }
     docker compose build
     echo
     if ask_yn "Recreate tentacontrol now (the web admin restarts briefly)?" y; then

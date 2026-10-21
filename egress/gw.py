@@ -23,7 +23,7 @@ DATA = os.environ.get("DATA_DIR", "/data")
 REFRESH = float(os.environ.get("EGRESS_REFRESH", "15"))  # seconds between policy fetches (the tests use 1)
 SEEN_FILE = os.path.join(DATA, "egress-seen.json")
 POLICY_CACHE = os.path.join(DATA, "policy.json")  # last policy from tentacontrol – decisions work right after a restart
-DEFAULT = tclib.egress_patterns(open("/app/egress-default.txt").read())
+DEFAULT = tclib.egress_patterns(open(os.environ.get("EGRESS_DEFAULT_LIST", "/app/egress-default.txt")).read())
 IDLE = 3600  # seconds a tunnel may stay silent (ssh sessions, long polls)
 HOLD = 60  # seconds an unknown destination waits for the user's decision (enforce)
 
@@ -145,12 +145,25 @@ def record(host, port, decision):
     dirty = True
 
 
+SEEN_MAX, SEEN_DAYS = 2000, 90  # the list of destinations stays small – the gateway has 128 MB
+
+
+def prune(entries, now=None):
+    """drop destinations unused for SEEN_DAYS, then keep the SEEN_MAX most recent"""
+    cutoff = (now or time.time()) - SEEN_DAYS * 86400
+    keep = {k: v for k, v in entries.items() if v.get("last", 0) >= cutoff}
+    if len(keep) > SEEN_MAX:
+        keep = dict(sorted(keep.items(), key=lambda kv: -kv[1].get("last", 0))[:SEEN_MAX])
+    return keep
+
+
 async def flush():
-    global dirty
+    global dirty, seen
     while True:
         await asyncio.sleep(10)
         if dirty:
             dirty = False
+            seen = prune(seen)
             with open(SEEN_FILE + ".tmp", "w") as f:
                 json.dump(seen, f, indent=1, sort_keys=True)
             os.replace(SEEN_FILE + ".tmp", SEEN_FILE)

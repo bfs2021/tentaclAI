@@ -165,9 +165,15 @@ def stage_dir(owner=None):
 
 # ---------- loading ----------
 
+ENV = {}  # values for ${VAR}: the container environment, overridden by the stack's .env
+
+
 def load_env_file():
-    """values from the stack's .env win over the container environment"""
-    os.environ.update(tclib.read_env(ENV_FILE))
+    """.env values (all service tokens) are kept here – never in os.environ, so ssh/docker/compose/git child processes
+    don't inherit them (a local `docker compose` would even prefer them over a stack's own .env)"""
+    ENV.clear()
+    ENV.update(os.environ)
+    ENV.update(tclib.read_env(ENV_FILE))
 
 
 def _report(errors, prefix=""):
@@ -224,15 +230,15 @@ enabled = tclib.enabled
 
 
 def render(obj):
-    return tclib.render(obj, os.environ)
+    return tclib.render(obj, ENV)
 
 
 def missing_vars(part):
-    return tclib.missing(part, os.environ)
+    return tclib.missing(part, ENV)
 
 
 def status(svc):
-    return tclib.status_text(svc, os.environ)
+    return tclib.status_text(svc, ENV)
 
 
 def kinds(svc):
@@ -1409,7 +1415,7 @@ def cmd_pending(args):
             print(json.dumps({"error": str(e)[:120]}))
             return 1
         sys.exit(f"svc: tentacontrol not reachable: {e}")
-    url = (os.environ.get("CONTROL_URL") or "").rstrip("/")
+    url = (ENV.get("CONTROL_URL") or "").rstrip("/")
     pending, grants = data.get("pending", []), data.get("grants", [])
     if "--json" in args:
         print(json.dumps({"count": len(pending), "url": f"{url}/activity" if url else "", "grants": len(grants),
@@ -1493,7 +1499,7 @@ def request_approval(service, part, action):
         return "error", f"tentacontrol not reachable: {e}"
     if res.get("status") == "approved":  # an active "Approve + 15 min" grant
         return "approved", res.get("by", "grant")
-    where = (os.environ.get("CONTROL_URL") or "").rstrip("/")
+    where = (ENV.get("CONTROL_URL") or "").rstrip("/")
     where = f"{where}/activity" if where else "tentacontrol → Activity"
     print(f"svc: ⏳ approval needed – {where} (request #{rid}, up to {APPROVAL_TIMEOUT // 60} min): {action}",
           file=sys.stderr, flush=True)

@@ -157,3 +157,22 @@ def test_required_skills_never_off():
     m = tclib.skill_overrides(s)
     assert m["inventory"] == "on" and m["onboard"] == "user-invocable-only"
     assert tclib.skill_overrides({})["inventory"] == "on"  # listed even before discovery
+
+
+def test_secret_variables():
+    svc = {"api": {"base_url": "https://${HOST}/api", "auth": {"type": "basic", "user": "${API_USER}", "password": "${API_PASS}"},
+                   "headers": {"X-Access": "${ACCESS_THING}"}},
+           "mcp": {"command": "x", "env": {"PLAIN": "${MCP_THING}"}},
+           "db": {"host": "${DB_HOST}", "user": "${DB_USER}", "password": "${DB_SECRET_X}"},
+           "web": {"auth": {"type": "header", "header": "${HEADER_NAME}", "value": "${WEB_VALUE}"}},
+           "_meta": {"x": "${IGNORED}"}}
+    assert tclib.secret_variables(svc) == {"API_PASS", "ACCESS_THING", "MCP_THING", "DB_SECRET_X", "WEB_VALUE"}
+
+
+def test_is_secret_names_and_positions():
+    import sys, os
+    sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "control"))
+    from app.config import is_secret
+    assert is_secret("NETBIRD_PAT") and is_secret("WIKI_PASS") and is_secret("X_TOKEN")
+    assert not is_secret("PATCHMON_URL") and not is_secret("HOST_PATH") and not is_secret("TZ")
+    assert is_secret("ODD_NAME", credentials={"ODD_NAME"})

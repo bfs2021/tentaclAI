@@ -14,7 +14,7 @@ from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
 
 from . import activity, auth, dockerops, jobs, services_store, sshhosts, sshops, systems_store, topology, updatecheck
-from .config import CLAUDE_SERVICE, COMPOSE, DATA_DIR, SERVICES_DIR, STACK_DIR, RC_VARS, RESTART_VARS, SETTINGS_GROUPS, is_secret, site
+from .config import CLAUDE_SERVICE, COMPOSE, DATA_DIR, SERVICES_DIR, STACK_DIR, RC_VARS, RESTART_VARS, SETTINGS_GROUPS, site
 from .envfile import read_env, update_env
 from .terminal import PROFILES, bridge, onboard_cmd
 from . import connectors, egress, generated, models, netguard, notify, skills, usage
@@ -858,6 +858,7 @@ async def service_save_json(request: Request, name: str, raw: str = Form(...)):
 async def service_save_tokens(request: Request, name: str):
     form = await request.form()
     env = read_env()
+    is_secret = services_store.secret_check()
     changes = {}
     for key, value in form.items():
         if key.startswith("var_"):
@@ -935,7 +936,7 @@ async def service_test(request: Request, name: str, path: str = Form("/")):
     if code == 0 and out.isdigit():
         kind = "ok" if out.startswith("2") else "warn" if out.startswith(("3", "4")) else "err"
         return HTMLResponse(f'<span class="pill {kind}">HTTP {out}</span>')
-    return HTMLResponse(f'<span class="pill err">{(out or "error")[-160:]}</span>')
+    return HTMLResponse(f'<span class="pill err">{html.escape((out or "error")[-160:])}</span>')
 
 
 @app.post("/services/{name}/test-path")
@@ -1158,7 +1159,7 @@ async def settings_page(request: Request):
     known = {k for _, items in SETTINGS_GROUPS for k, *_ in items}
     service_vars = {v["name"] for s in services_store.load_all() for v in s["vars"]}
     other = sorted(k for k in env if k not in known and k not in service_vars)
-    return page(request, "settings.html", groups=SETTINGS_GROUPS, env=env, other=other, is_secret=is_secret)
+    return page(request, "settings.html", groups=SETTINGS_GROUPS, env=env, other=other, is_secret=services_store.secret_check())
 
 
 READONLY = {k for _, items in SETTINGS_GROUPS for k, _, _, kind in items if kind == "readonly"}
@@ -1168,6 +1169,7 @@ READONLY = {k for _, items in SETTINGS_GROUPS for k, _, _, kind in items if kind
 async def settings_save(request: Request):
     form = await request.form()
     env = read_env()
+    is_secret = services_store.secret_check()
     changes = {}
     for key, value in form.items():
         if not key.startswith("k_"):
@@ -1445,7 +1447,7 @@ async def ssh_test(alias: str):
         elif sudo_state:
             res += f' <span class="pill err" title="the SSH user needs passwordless sudo (NOPASSWD)">✗ {html.escape(sudo)}: needs NOPASSWD</span>'
         return HTMLResponse(res)
-    return HTMLResponse(f'<span class="pill err" title="{line}">✗ {line[:120]}</span>')
+    return HTMLResponse(f'<span class="pill err" title="{line}">✗ {html.escape((lines[-1] if lines else "")[:120])}</span>')
 
 
 # ---------------------------------------------------------------- updates & jobs
