@@ -41,10 +41,22 @@ All notable changes, newest first. Every release lists **upgrade steps** from th
 - Templates *Pangolin* and *Backrest*: a note on testing – Pangolin's `GET /` answers without the key (use
   `/org/<orgId>/sites`), Backrest's API has no GET that checks the login.
 
+### Fixes
+- `svc mail … list` shows when the server received a mail (IMAP INTERNALDATE, with time zone) instead of the sender's Date header.
+- `svc mail … move` refused on Dovecot (Mailcow) with "no IMAP MOVE": the server lists MOVE only after the login, and
+  svc looked at the list from before it. It asks again after the login now; the sandbox test moves a mail too.
+
+### Development
+- `test-sandbox.sh`: a GreenMail SMTP/IMAP server (send, refused recipient, list, framed read, seen flag, mark, move,
+  read-only job can't send); scheduled-job checks (read-only marker, standard writes, scope limits, forged markers,
+  `svc config put job` with approval, `svc jobs`).
+
 ### Upgrade (from v0.13.0)
 `./tentaclai.sh update`, `docker compose build`, `docker compose up -d` – both images changed (svc recognises job
-runs); recreating `tentaclai` ends running sessions and Remote Control. Jobs start empty. The new notification events
-*Job finding* and *Job failed* go to the channels that get *Approval needed* until you change them in Notifications.
+runs, mail, `svc jobs`); recreating `tentaclai` ends running sessions and Remote Control. Jobs start empty. The new
+notification events *Job finding* and *Job failed* go to the channels that get *Approval needed* until you change them in
+Notifications. New optional `.env` variable `JOB_READONLY_HELPERS` (empty = the defaults). Nothing to migrate; to roll
+back, check out `v0.13.0` and rebuild – `data/control/jobs.json`, `job-history.json` and `job-logs/` are then unused.
 
 ## v0.13.0 – 2026-10-21
 
@@ -66,9 +78,6 @@ runs); recreating `tentaclai` ends running sessions and Remote Control. Jobs sta
 - Topology: the legend just says *SSH host* (the colors are explained in Help).
 
 ### Fixes
-- `svc mail … list` shows when the server received a mail (IMAP INTERNALDATE, with time zone) instead of the sender's Date header.
-- `svc mail … move` refused on Dovecot (Mailcow) with "no IMAP MOVE": the server lists MOVE only after the login, and
-  svc looked at the list from before it. It asks again after the login now; the sandbox test moves a mail too.
 - Redaction: *key* only counts as a name part of its own (`API_KEY`, `key_file`, `apikey`) – labels like
   `…keycloak….command` stay readable.
 - `local/CLAUDE.md` keeps its last 5 backups (svc and tentacontrol), not every one.
