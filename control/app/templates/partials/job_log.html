@@ -1,0 +1,3 @@
+{# Claude's steps of a job run – live while it runs (the outer element polls), on request afterwards #}
+{% if not log %}<div class="faint small">{{ 'Waiting for Claude’s first step …' if running else 'No steps recorded (runs before this version, or the run ended before Claude started).' }}</div>
+{% else %}<div class="job-log">{% for e in log %}<div class="jl-{{ e.k }}"><span class="jl-mark">{{ {'tool': '▶', 'out': '←', 'err': '✗', 'text': '·'}.get(e.k, '·') }}</span><span class="jl-text">{{ e.s }}</span></div>{% endfor %}{% if running %}<div class="jl-text faint">…</div>{% endif %}</div>{% endif %}

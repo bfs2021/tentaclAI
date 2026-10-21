@@ -1,5 +1,6 @@
 """Claude → Jobs: schedules, the claude command line per profile, reading the answer, when to notify."""
 import json
+import os
 import time
 
 import pytest
@@ -200,3 +201,31 @@ def test_manual_only(sj, monkeypatch, tmp_path):
     assert sj.due(time.time() + 10 * 86400) == []  # never due
     sj.set_enabled(jid, True)
     assert sj.get(jid)["next"] is None and sj.get(sj.clone(jid))["next"] is None
+
+
+def test_steps_from_stream_events(sj):
+    tool = {"type": "assistant", "message": {"content": [{"type": "text", "text": "Checking."},
+                                                          {"type": "tool_use", "name": "Bash", "input": {"command": "svc list"}}]}}
+    res = {"type": "user", "message": {"content": [{"type": "tool_result", "content": [{"type": "text", "text": "a\nb"}], "is_error": False},
+                                                     {"type": "tool_result", "content": "denied", "is_error": True}]}}
+    assert sj.steps(tool) == [("text", "Checking."), ("tool", "Bash  svc list")]
+    assert sj.steps(res) == [("out", "a\nb"), ("err", "denied")]
+    assert sj.steps({"type": "system", "subtype": "init"}) == [] and sj.steps({"type": "result"}) == []
+    assert sj.steps({"type": "user", "message": {"content": [{"type": "tool_result", "content": "x" * 2000}]}})[0][1].endswith(" …")
+
+
+def test_parse_output_reads_the_stream_tail(sj):
+    stream = "\n".join([json.dumps({"type": "system", "subtype": "init"}), "Warning: something",
+                        json.dumps({"type": "result", "subtype": "success", "is_error": False,
+                                    "structured_output": {"status": "ok", "title": "t", "summary": "s"}})])
+    assert sj.parse_output(stream)[0] == "done"
+
+
+def test_logs_and_pruning(sj, monkeypatch, tmp_path):
+    from app import jsonstore
+    monkeypatch.setattr(sj, "LOGS", str(tmp_path))
+    jsonstore.save(sj.log_path("run111111"), [{"t": 1, "k": "tool", "s": "Bash svc list"}])
+    jsonstore.save(sj.log_path("run222222"), [])
+    assert sj.read_log("run111111")[0]["s"] == "Bash svc list" and sj.read_log("../etc") == []
+    sj._prune_logs({"run111111"})
+    assert sorted(os.listdir(tmp_path)) == ["run111111.json"]

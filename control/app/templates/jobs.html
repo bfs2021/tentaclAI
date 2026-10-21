@@ -11,7 +11,13 @@
     {% if res.get('details') %}<pre class="rc" style="max-height:340px">{{ res.details }}</pre>{% endif %}
     {% if r.get('error') and r.status != 'done' %}<p class="muted" style="margin:0">{{ r.error }}</p>{% endif %}
     {% if r.get('denials') %}<p class="muted" style="margin:6px 0 0">{{ r.denials }} tool call(s) refused by the {{ r.profile }} profile.</p>{% endif %}
+    {% if r.status in ('running', 'queued') %}
+    <div class="job-live" hx-get="/jobs/runs/{{ r.id }}/log" hx-trigger="load, every 2s" style="margin-top:8px"></div>
     {% if r.status == 'running' %}<button class="btn sm danger" hx-post="/jobs/runs/{{ r.id }}/cancel" hx-confirm="Stop this run?" style="margin-top:8px">Stop</button>{% endif %}
+    {% else %}
+    <details class="job-steps" style="margin-top:8px"><summary class="muted">Claude's steps</summary>
+      <div hx-get="/jobs/runs/{{ r.id }}/log" hx-trigger="intersect once" style="margin-top:6px"></div></details>
+    {% endif %}
   </div>
 </details>
 {% endmacro %}
@@ -59,6 +65,10 @@
 {% set busy = rows | selectattr('busy') | list %}
 <div hx-get="/partials/jobs-state?v={{ token }}" hx-trigger="every {{ '3s' if busy else '15s' }}" hx-swap="none" aria-hidden="true"></div>
 <script>
+document.body.addEventListener("htmx:afterSwap", function (e) {  // live steps: keep the newest one in view
+  if (!e.target.classList || !e.target.classList.contains("job-live")) return;
+  var l = e.target.querySelector(".job-log"); if (l) l.scrollTop = l.scrollHeight;
+});
 (function () {  // running time of a run, ticking
   function tick() {
     document.querySelectorAll(".elapsed").forEach(function (el) {

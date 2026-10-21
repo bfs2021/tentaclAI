@@ -416,3 +416,12 @@ input[type=checkbox]:not(.switch-cb) { accent-color: var(--accent-2); }
 .job-history { margin-top: 6px; }
 .job-history > summary { cursor: pointer; padding: 6px 0; }
 .job-history .mem-entry:first-of-type { border-top: 1px solid var(--border); padding-top: 10px; }
+.job-log { font-family: var(--mono); font-size: 12px; line-height: 1.5; background: var(--bg); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); padding: 8px 10px; max-height: 360px; overflow: auto; }
+.job-log > div { display: flex; gap: 8px; }
+.jl-mark { flex: none; width: 1em; color: var(--faint); }
+.jl-text { white-space: pre-wrap; word-break: break-word; }
+.jl-tool .jl-text { color: var(--accent); }
+.jl-out .jl-text { color: var(--muted); }
+.jl-err .jl-text, .jl-err .jl-mark { color: var(--err); }
+.job-steps > summary { cursor: pointer; }

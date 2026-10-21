@@ -22,6 +22,8 @@ All notable changes, newest first. Every release lists **upgrade steps** from th
   reloads when it ends.
   The latest run is always shown, earlier ones fold away under *History*.
   Schedule *manual* for jobs that run just with *Run now*.
+  A running run shows Claude's steps live (tool calls, their output, Claude's text – from `stream-json`, refreshed
+  every 2 s); finished runs keep them under *Claude's steps* (`data/control/job-logs/`, root only, pruned with the history).
 
 ### Changes
 - Service cards and pages show every part's access the same way – `api: rw`, `docker: confirm`, `imap: ro` – including mail parts.

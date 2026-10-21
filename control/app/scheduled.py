@@ -282,6 +282,8 @@ def history():
 
 def _save_history(h):
     jsonstore.save(HISTORY, h[-KEEP_RUNS:], indent=None)
+    if len(h) > KEEP_RUNS:
+        _prune_logs({r["id"] for r in h[-KEEP_RUNS:]})
 
 
 def get(jid):
@@ -394,7 +396,7 @@ def claude_argv(job, run_id, session_id):
     if job.get("scope"):
         system += (" This run may only use those tentacles – svc refuses every other one, and MCP servers are off. "
                    "If the task needs another tentacle, say so in the summary.")
-    argv = ["claude", "-p", job["prompt"], "--output-format", "json", "--session-id", session_id,
+    argv = ["claude", "-p", job["prompt"], "--output-format", "stream-json", "--verbose", "--session-id", session_id,
             "--json-schema", json.dumps(SCHEMA), "--append-system-prompt", system]
     if ro or job.get("scope"):
         argv += ["--strict-mcp-config"]  # no MCP servers: their tools could reach other services past svc
@@ -466,6 +468,57 @@ def running_job_name(run_id):
     return next((r.get("name", "") for r in reversed(history()) if r.get("id") == run_id), "")
 
 
+LOGS = os.path.join(DATA_DIR, "job-logs")
+LOG_MAX = 400       # steps kept per run
+LOG_TEXT = 600      # characters per step
+
+
+def _short(text, n=LOG_TEXT):
+    text = str(text or "").strip()
+    return text if len(text) <= n else text[:n] + " …"
+
+
+def steps(event):
+    """one stream-json event of claude -p → steps for the live view: (kind, text) – kind tool / out / err / text"""
+    out = []
+    t = event.get("type")
+    if t not in ("assistant", "user"):
+        return out
+    for c in (event.get("message") or {}).get("content") or []:
+        if not isinstance(c, dict):
+            continue
+        if c.get("type") == "text" and c.get("text", "").strip():
+            out.append(("text", _short(c["text"])))
+        elif c.get("type") == "tool_use":
+            inp = c.get("input") or {}
+            what = inp.get("command") or inp.get("file_path") or inp.get("pattern") or inp.get("url") or inp.get("query") or ""
+            out.append(("tool", _short(f"{c.get('name', '?')}  {what}".strip(), 300)))
+        elif c.get("type") == "tool_result":
+            body = c.get("content")
+            if isinstance(body, list):
+                body = "\n".join(x.get("text", "") for x in body if isinstance(x, dict))
+            out.append(("err" if c.get("is_error") else "out", _short(body)))
+    return out
+
+
+def log_path(run_id):
+    return os.path.join(LOGS, f"{run_id}.json") if re.fullmatch(r"[a-z0-9]{6,40}", run_id or "") else None
+
+
+def read_log(run_id):
+    p = log_path(run_id)
+    return (jsonstore.load(p) or []) if p else []
+
+
+def _prune_logs(keep):
+    try:
+        for f in os.listdir(LOGS):
+            if f.endswith(".json") and f[:-5] not in keep:
+                os.remove(os.path.join(LOGS, f))
+    except OSError:
+        pass
+
+
 def _exec(argv, run_id, minutes):
     """run in the sandbox as claude, wait, return (exit code, stdout+stderr)"""
     c = dockerops.container()
@@ -475,10 +528,33 @@ def _exec(argv, run_id, minutes):
     wrapped = ["sh", "-c", 'r="${0#tc-job=}"; timeout -k 20 "$@" & echo $! > "/tmp/.tc-job-$r"; wait $!', f"tc-job={run_id}",
                str(minutes * 60)] + argv
     api = dockerops.client().api
+    os.makedirs(LOGS, mode=0o700, exist_ok=True)
+    log, tail, buf = [], [], b""
+
+    def take(line):
+        tail.append(line)
+        del tail[:-60]  # the result is the last JSON line – parse_output only needs the end
+        try:
+            event = json.loads(line)
+        except ValueError:
+            return False
+        new = [{"t": round(time.time()), "k": k, "s": x} for k, x in steps(event)]
+        log.extend(new)
+        del log[:-LOG_MAX]
+        return bool(new)
+
     try:
         e = api.exec_create(CLAUDE_CONTAINER, wrapped, user=dockerops.CLAUDE_USER, workdir="/workspace",
                             environment={"LANG": "C.UTF-8"})
-        out = api.exec_start(e["Id"]).decode(errors="replace")
+        for chunk in api.exec_start(e["Id"], stream=True):  # stream-json: one event per line, as it happens
+            buf += chunk
+            *lines, buf = buf.split(b"\n")
+            if any([take(l.decode(errors="replace")) for l in lines if l.strip()]):
+                jsonstore.save(log_path(run_id), log, indent=None, mode=0o600)
+        if buf.strip():
+            take(buf.decode(errors="replace"))
+            jsonstore.save(log_path(run_id), log, indent=None, mode=0o600)
+        out = "\n".join(tail)
         code = api.exec_inspect(e["Id"]).get("ExitCode")
     except Exception as ex:  # noqa: BLE001
         return None, str(ex)

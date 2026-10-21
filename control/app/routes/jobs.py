@@ -9,7 +9,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 import tclib
 
 from .. import scheduled
-from ..web import page, respond
+from ..web import page, respond, templates
 
 router = APIRouter()
 
@@ -118,6 +118,13 @@ async def job_delete(request: Request, jid: str):
     except ValueError as e:
         return respond(request, str(e), "err")
     return respond(request, "Job deleted", redirect="/jobs")
+
+
+@router.get("/jobs/runs/{rid}/log", response_class=HTMLResponse)
+async def run_log(request: Request, rid: str):
+    run = next((r for r in scheduled.history() if r.get("id") == rid), None)
+    return templates.TemplateResponse(request, "partials/job_log.html", {
+        "log": scheduled.read_log(rid), "running": bool(run and run.get("status") in ("queued", "running"))})
 
 
 @router.post("/jobs/runs/{rid}/cancel", response_class=HTMLResponse)

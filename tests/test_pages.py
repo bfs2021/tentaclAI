@@ -318,3 +318,14 @@ def test_manual_job_renders_without_next_and_pause(client, app_module, monkeypat
     card = html[html.index("On demand"):]
     assert "manual" in card and "· next" not in card[:400] and ">Pause<" not in card[:1500]
     assert client.get(f"/jobs/{jid}").status_code == 200
+
+
+def test_run_log_partial(client, app_module, monkeypatch, tmp_path):
+    from app import jsonstore, scheduled
+    for k, f in (("HISTORY", "h.json"), ("LOGS", "logs")):
+        monkeypatch.setattr(scheduled, k, str(tmp_path / f))
+    jsonstore.save(scheduled.HISTORY, [{"id": "abc123", "job": "x", "status": "running", "queued": 1}])
+    jsonstore.save(scheduled.log_path("abc123"), [{"t": 1, "k": "tool", "s": "Bash  svc mail mailrelay send"}, {"t": 2, "k": "err", "s": "boom <b>"}])
+    html = client.get("/jobs/runs/abc123/log").text
+    assert "svc mail mailrelay send" in html and "jl-err" in html and "&lt;b&gt;" in html and "…" in html
+    assert "No steps recorded" in client.get("/jobs/runs/zzz999/log").text
