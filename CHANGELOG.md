@@ -2,7 +2,7 @@
 
 All notable changes, newest first. Every release lists **upgrade steps** from the previous one.
 
-## Unreleased
+## v0.11.0 – 2026-10-21
 
 ### Highlights
 - **Two-factor sign-in for tentacontrol** (Settings → **Security**): a code from an authenticator app after the password
