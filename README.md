@@ -141,7 +141,7 @@ tentacontrol also shows “Update available” in the sidebar.
   <img src="docs/screenshots/services.png" alt="Services grouped by system" width="900">
 </p>
 
-1. **Create from a template.** Tentacles → Services → *Add service* → search the template list (47 templates: Docker hosts, Home Assistant, Proxmox,
+1. **Create from a template.** Tentacles → Services → *Add service* → search the template list (45 templates: Docker hosts, Home Assistant, Proxmox,
    Grafana, n8n, GitHub, PostgreSQL, wikis with login, folders on a NAS, …) → name → *Create service*.
 2. **Fill in the details.** Adjust URL/host/path in the JSON editor; enter tokens under *Tokens & variables*. Tokens are
    write-only: they go into `.env` and are never shown again.
@@ -295,7 +295,7 @@ tentaclai/
 ├── control/                   tentacontrol (FastAPI, HTMX, xterm.js, cytoscape.js – vendored, no CDN at runtime)
 │   └── app/                   main.py (app, middleware, background loops), routes/ (one router per area), web.py
 ├── egress/gw.py               egress gateway (forward proxy, rules from tentacontrol)
-├── services/                  your services (git-ignored) + _template.json + _templates/ (47 templates)
+├── services/                  your services (git-ignored) + _template.json + _templates/ (45 templates)
 ├── systems/                   your systems (git-ignored) + _example.json
 ├── ssh/                       /root/.ssh of the sandbox (root only – used by svc): config, config.d/, keys/ (git-ignored)
 ├── local/                     CLAUDE.md with your site rules (template: CLAUDE.example.md)

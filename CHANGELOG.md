@@ -15,6 +15,7 @@ All notable changes, newest first. Every release lists **upgrade steps** from th
   Deny (network: Allow 10 min / Deny) – no need to switch to Activity.
 
 ### Changes
+- Template *zigbee2mqtt* removed (45 templates).
 - Services and Systems: the create forms are folded away behind *Add service* / *Add system* buttons in the header.
 - Every page has a small **?** in its header that opens the matching part of Help (replaces the *Help* button on
   Services); the *Add …* button comes first everywhere and stays on the right when the subtitle is long. Network:
