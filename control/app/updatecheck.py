@@ -8,6 +8,7 @@ import re
 import time
 import urllib.request
 
+from . import jsonstore
 from .config import DATA_DIR
 from .envfile import read_env
 
@@ -60,10 +61,7 @@ def refresh(force=False):
                 "published": rel.get("published_at", ""), "upgrade": upgrade_section(rel.get("body", "")), "error": ""}
     except Exception as e:  # noqa: BLE001 – offline, rate limit, no release yet …
         data = dict(data, repo=repo, checked=time.time(), error=str(e)[:200])
-    os.makedirs(DATA_DIR, exist_ok=True)
-    with open(CACHE + ".tmp", "w") as f:
-        json.dump(data, f)
-    os.replace(CACHE + ".tmp", CACHE)
+    jsonstore.save(CACHE, data, indent=None)
     return data
 
 

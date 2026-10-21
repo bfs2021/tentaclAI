@@ -9,7 +9,7 @@ import os
 import re
 import time
 
-from . import dockerops
+from . import dockerops, jsonstore
 from .config import DATA_DIR
 
 STATE = os.path.join(DATA_DIR, "connectors.json")
@@ -18,17 +18,11 @@ LINE = re.compile(r"^(claude\.ai [^:]+):\s*(\S+)\s*-\s*(.+)$")
 
 
 def load():
-    try:
-        return json.load(open(STATE))
-    except (OSError, ValueError):
-        return {"known": {}}
+    return jsonstore.load(STATE, {"known": {}})
 
 
 def _save(s):
-    os.makedirs(DATA_DIR, exist_ok=True)
-    with open(STATE + ".tmp", "w") as f:
-        json.dump(s, f, indent=1)
-    os.replace(STATE + ".tmp", STATE)
+    jsonstore.save(STATE, s)
 
 
 def managed_json(s=None):

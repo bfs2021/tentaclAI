@@ -9,6 +9,7 @@ import os
 import re
 import time
 
+from . import jsonstore
 from .config import DATA_DIR
 from .envfile import read_env, update_env
 
@@ -45,10 +46,7 @@ def load():
 
 
 def save(c):
-    os.makedirs(DATA_DIR, exist_ok=True)
-    with open(CONFIG + ".tmp", "w") as f:
-        json.dump(c, f, indent=1)
-    os.replace(CONFIG + ".tmp", CONFIG)
+    jsonstore.save(CONFIG, c)
 
 
 def control_link(path):

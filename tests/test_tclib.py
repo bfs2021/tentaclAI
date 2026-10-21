@@ -176,3 +176,14 @@ def test_is_secret_names_and_positions():
     assert is_secret("NETBIRD_PAT") and is_secret("WIKI_PASS") and is_secret("X_TOKEN")
     assert not is_secret("PATCHMON_URL") and not is_secret("HOST_PATH") and not is_secret("TZ")
     assert is_secret("ODD_NAME", credentials={"ODD_NAME"})
+
+
+def test_egress_rule_order():
+    r = lambda host, port=443, **kw: tclib.egress_rule(host, port, **{"default": ["api.anthropic.com"], **kw})
+    assert r("api.anthropic.com", block=["api.anthropic.com"]) == ("default", "built-in")  # never blockable
+    assert r("x.test", block=["x.test"], allow=["x.test"], tentacles={("x.test", 443): "svc"})[0] == "blocked"
+    assert r("x.test", allow=["*.test"], tentacles={("x.test", 443): "svc"}) == ("allow", "own allowlist")
+    assert r("x.test", tentacles={("x.test", None): "box"}) == ("tentacle", "box")
+    assert r("x.test", grants={"x.test:443": 2e9}, now=1e9)[0] == "grant"
+    assert r("x.test", grants={"x.test:443": 1e9}, now=2e9) == ("unknown", "")
+    assert r("y.test", ips=["10.1.2.3"], block=["10.0.0.0/8"])[0] == "blocked"  # resolved address in a blocked range

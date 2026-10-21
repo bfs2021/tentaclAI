@@ -7,9 +7,6 @@ import tclib
 
 from .config import ENV_FILE
 
-LINE = re.compile(r"^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=(.*)$")
-
-
 def read_env(path: str = ENV_FILE) -> dict:
     return tclib.read_env(path)
 
@@ -34,7 +31,7 @@ def update_env(changes: dict, path: str = ENV_FILE) -> None:
     pending = dict(changes)
     out = []
     for line in lines:
-        m = LINE.match(line)
+        m = tclib.ENV_LINE.match(line)
         if m and m.group(1) in pending:
             key = m.group(1)
             out.append(f"{key}={_quote(pending.pop(key))}")
@@ -51,10 +48,3 @@ def update_env(changes: dict, path: str = ENV_FILE) -> None:
         f.write("\n".join(out) + "\n")
     os.chmod(tmp, mode or 0o600)
     os.replace(tmp, path)
-
-
-def env_mtime(path: str = ENV_FILE) -> float:
-    try:
-        return os.stat(path).st_mtime
-    except FileNotFoundError:
-        return 0.0

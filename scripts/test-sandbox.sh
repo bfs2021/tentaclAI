@@ -258,8 +258,9 @@ check "command model and effort" "$($C sed -n '/^model:/p;/^effort:/p' /home/cla
 fi
 
 if want pages; then
-section "tentacontrol pages render"
-for p in / /network "/network?tab=allow" "/network?tab=block" /services /ssh /activity /terminal /topology /help /settings /notifications /skills /models /usage /logs; do
+section "tentacontrol in the real container"
+# every page is rendered in stage 1 (tests/test_pages.py) – here: a few with real Docker data, and the vendored assets
+for p in / /services /settings /usage /vendor/htmx.min.js /vendor/xterm.js /vendor/cytoscape.min.js; do
     check "GET $p" "$(curl -s -b "$J" -o /dev/null -w '%{http_code}' "http://$IP:8080$p")" "200"
 done
 fi

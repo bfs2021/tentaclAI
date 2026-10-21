@@ -77,17 +77,14 @@ async def policy_ready(seconds=30):
 
 
 def decide(host, port, ips):
-    """(allow?, reason) – names are checked as requested, IP/CIDR rules also against the resolved addresses ips"""
-    if any(tclib.egress_match(p, host, port) for p in DEFAULT):  # built-in: Claude Code itself – never blockable
+    """(allow?, reason) – the rule order lives in tclib.egress_rule (shared with tentacontrol's Network page)"""
+    kind, _ = tclib.egress_rule(host, port, ips, DEFAULT, pol["block"], pol["allow"], pol["tentacles"], pol["grants"])
+    if kind in ("default", "allow"):
         return True, "allowlist"
-    if any(tclib.egress_match(p, host, port, ips) for p in pol["block"]):
+    if kind == "blocked":
         return False, "blocked"
-    if any(tclib.egress_match(p, host, port, ips) for p in pol["allow"]):
-        return True, "allowlist"
-    if (host, port) in pol["tentacles"] or (host, None) in pol["tentacles"]:
-        return True, "tentacle"
-    if pol["grants"].get(f"{host}:{port}", 0) > time.time():
-        return True, "grant"
+    if kind in ("tentacle", "grant"):
+        return True, kind
     if pol["mode"] != "enforce":
         return True, "unlisted"
     if tclib.is_ip(host) and pol["direct_ip"] == "block":

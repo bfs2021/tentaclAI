@@ -6,7 +6,7 @@ import re
 
 import tclib
 
-from . import activity, sshhosts
+from . import activity, jsonstore, sshhosts
 from .config import DATA_DIR, SERVICES_DIR, STACK_DIR
 from .envfile import read_env
 
@@ -25,18 +25,12 @@ def default_list():
 
 
 def rules():
-    try:
-        r = json.load(open(RULES))
-    except (OSError, ValueError):
-        r = {}
+    r = jsonstore.load(RULES)
     return {"allow": r.get("allow", []), "block": r.get("block", [])}
 
 
 def _save(r):
-    os.makedirs(DATA_DIR, exist_ok=True)
-    with open(RULES + ".tmp", "w") as f:
-        json.dump(r, f, indent=1)
-    os.replace(RULES + ".tmp", RULES)
+    jsonstore.save(RULES, r)
 
 
 def normalize(entry):
@@ -115,16 +109,7 @@ def origin(host, port, tent=None, r=None):
     """(kind, label): default (built-in, never blocked) / blocked / tentacle / allow / unknown"""
     tent = tentacles() if tent is None else tent
     r = rules() if r is None else r
-    if any(tclib.egress_match(p, host, port) for p in default_list()):
-        return "default", "built-in"
-    if any(tclib.egress_match(p, host, port) for p in r["block"]):
-        return "blocked", "blocklist"
-    name = tent.get((host, port)) or tent.get((host, None))
-    if name:
-        return "tentacle", name
-    if any(tclib.egress_match(p, host, port) for p in r["allow"]):
-        return "allow", "own allowlist"
-    return "unknown", ""
+    return tclib.egress_rule(host, port, (), default_list(), r["block"], r["allow"], tent)
 
 
 def seen_rows():

@@ -1,18 +1,35 @@
 """Every tentacontrol page renders (status 200, no template error) with the dummy stack – sandbox stopped and running."""
 import pytest
 
-PAGES = ["/", "/partials/overview", "/services", "/services/demoapi", "/services/demodb", "/services/demohost", "/services/demogit",
-         "/systems", "/systems/box", "/ssh", "/ssh/new", "/ssh/box/edit", "/ssh/box/remove", "/network", "/network?tab=allow",
-         "/network?tab=block", "/topology", "/topology.json", "/activity", "/partials/approvals", "/partials/approval-count",
-         "/terminal", "/help", "/settings", "/notifications", "/skills", "/models", "/usage", "/logs", "/updates", "/partials/versions"]
+# every GET route without parameters is a page to render – new pages are covered without touching this file
+NOT_PAGES = ("/login", "/setup", "/logout", "/healthz", "/api/", "/internal/", "/logs/stream", "/jobs/", "/static", "/vendor",
+             "/topology/ssh-status")  # (ssh-status runs real SSH checks)
+# pages with parameters or variants, rendered with the dummy stack's objects
+VARIANTS = ["/services/demoapi", "/services/demodb", "/services/demohost", "/services/demogit", "/systems/box", "/ssh/box/edit",
+            "/ssh/box/remove", "/network?tab=allow", "/network?tab=block"]
 
 
-@pytest.mark.parametrize("path", PAGES)
+def pages():
+    import sys
+    from starlette.routing import Route
+    sys.modules.get("app.main") or __import__("conftest")  # the dummy stack exists before the app is imported
+    from app import main
+    plain = [r.path for r in main.app.routes if isinstance(r, Route) and "GET" in (r.methods or ()) and "{" not in r.path
+             and not r.path.startswith(NOT_PAGES)]
+    return sorted(set(plain)) + VARIANTS
+
+
+@pytest.mark.parametrize("path", pages())
 def test_page_renders(client, path):
     r = client.get(path, follow_redirects=False)
     assert r.status_code == 200, f"{path}: {r.status_code} {r.text[:300]}"
     if "<html" in r.text:  # full page (dialogs and partials are fragments)
         assert "</html>" in r.text
+
+
+def test_page_discovery_finds_the_known_pages():
+    found = set(pages())
+    assert {"/", "/services", "/settings", "/skills", "/models", "/usage", "/partials/overview", "/topology.json"} <= found
 
 
 def test_login_required(app_module):

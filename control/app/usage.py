@@ -10,7 +10,7 @@ import os
 import re
 import time
 
-from . import dockerops
+from . import dockerops, jsonstore
 from .config import DATA_DIR, STACK_DIR
 
 PLAN_CACHE = os.path.join(DATA_DIR, "usage-plan.json")
@@ -47,10 +47,7 @@ def refresh_plan():
         if old.get("limits"):
             old.update(checked_failed=time.time(), raw_failed=out.strip()[:1000])
             data = old
-    os.makedirs(DATA_DIR, exist_ok=True)
-    with open(PLAN_CACHE + ".tmp", "w") as f:
-        json.dump(data, f)
-    os.replace(PLAN_CACHE + ".tmp", PLAN_CACHE)
+    jsonstore.save(PLAN_CACHE, data, indent=None)
     return data
 
 
@@ -142,10 +139,7 @@ def refresh_local():
     d["seen"] = {k: v for k, v in d.get("seen", {}).items() if v >= cutoff}
     d["sessions"] = {k: v for k, v in d["sessions"].items() if (v.get("last") or v.get("first") or "9")[:10] >= cutoff}
     d["checked"] = time.time()
-    os.makedirs(DATA_DIR, exist_ok=True)
-    with open(LOCAL_CACHE + ".tmp", "w") as f:
-        json.dump(d, f)
-    os.replace(LOCAL_CACHE + ".tmp", LOCAL_CACHE)
+    jsonstore.save(LOCAL_CACHE, d, indent=None)
     return d
 
 

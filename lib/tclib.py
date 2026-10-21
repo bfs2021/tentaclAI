@@ -7,6 +7,7 @@ import glob
 import json
 import os
 import re
+import time
 
 # ---------------------------------------------------------------- .env and ${VAR}
 
@@ -227,6 +228,24 @@ def egress_match(pattern, host, port, ips=()):
     if p_host.startswith("*."):
         return host.endswith(p_host[1:])
     return host == p_host
+
+
+def egress_rule(host, port, ips=(), default=(), block=(), allow=(), tentacles=None, grants=None, now=None):
+    """(kind, label) of the rule that covers a destination – one order for the gateway and tentacontrol's Network page:
+    built-in list (never blockable) → blocklist → own allowlist → tentacles → grants. kind "unknown" = no rule.
+    Names match as requested; IP/CIDR rules also match the resolved addresses ips."""
+    if any(egress_match(p, host, port) for p in default):
+        return "default", "built-in"
+    if any(egress_match(p, host, port, ips) for p in block):
+        return "blocked", "blocklist"
+    if any(egress_match(p, host, port, ips) for p in allow):
+        return "allow", "own allowlist"
+    name = (tentacles or {}).get((host, port)) or (tentacles or {}).get((host, None))
+    if name:
+        return "tentacle", name
+    if (grants or {}).get(f"{host}:{port}", 0) > (now or time.time()):
+        return "grant", "approved for a while"
+    return "unknown", ""
 
 
 # ---------------------------------------------------------------- SSH hosts (ssh/config.d/*.conf)

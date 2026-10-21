@@ -10,7 +10,7 @@ import os
 
 import tclib
 
-from . import dockerops
+from . import dockerops, jsonstore
 from .config import DATA_DIR
 
 STATE = os.path.join(DATA_DIR, "models.json")
@@ -37,10 +37,7 @@ TASKS = [  # key, effort key, title, help
 
 
 def load():
-    try:
-        return json.load(open(STATE))
-    except (OSError, ValueError):
-        return {}
+    return jsonstore.load(STATE)
 
 
 def current():
@@ -68,8 +65,5 @@ def set_values(form):
             if e not in ("",) + tclib.EFFORTS:
                 raise ValueError(f"{effort_key}: one of {', '.join(tclib.EFFORTS)}")
             new[effort_key] = e
-    os.makedirs(DATA_DIR, exist_ok=True)
-    with open(STATE + ".tmp", "w") as f:
-        json.dump(new, f, indent=1)
-    os.replace(STATE + ".tmp", STATE)
+    jsonstore.save(STATE, new)
     return apply(tclib.models(new))

@@ -13,11 +13,11 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
 
-from . import activity, auth, dockerops, jobs, services_store, sshhosts, sshops, systems_store, topology, updatecheck
-from .config import CLAUDE_SERVICE, COMPOSE, DATA_DIR, SERVICES_DIR, STACK_DIR, RC_VARS, RESTART_VARS, SETTINGS_GROUPS, site
+from . import (activity, auth, connectors, dockerops, egress, generated, jobs, jsonstore, models, netguard, notify,
+               services_store, skills, sshhosts, sshops, systems_store, topology, updatecheck, usage)
+from .config import CLAUDE_SERVICE, COMPOSE, DATA_DIR, STACK_DIR, RC_VARS, RESTART_VARS, SETTINGS_GROUPS, site
 from .envfile import read_env, update_env
 from .terminal import PROFILES, bridge, onboard_cmd
-from . import connectors, egress, generated, models, netguard, notify, skills, usage
 import tclib  # noqa: E402  shared with the sandbox tools
 
 BASE = os.path.dirname(__file__)
@@ -704,10 +704,7 @@ async def topology_layout_save(request: Request):
         return JSONResponse({"error": "invalid layout"}, status_code=400)
     if len(pos) > 5000:
         return JSONResponse({"error": "too many nodes"}, status_code=400)
-    os.makedirs(DATA_DIR, exist_ok=True)
-    with open(LAYOUT_FILE + ".tmp", "w") as f:
-        json.dump(pos, f)
-    os.replace(LAYOUT_FILE + ".tmp", LAYOUT_FILE)
+    jsonstore.save(LAYOUT_FILE, pos, indent=None)
     return JSONResponse({"saved": len(pos)})
 
 

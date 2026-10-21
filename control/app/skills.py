@@ -12,7 +12,7 @@ import time
 
 import tclib
 
-from . import dockerops
+from . import dockerops, jsonstore
 from .config import DATA_DIR
 from .usage import session_files
 
@@ -45,10 +45,7 @@ def load():
 
 
 def _save(s):
-    os.makedirs(DATA_DIR, exist_ok=True)
-    with open(STATE + ".tmp", "w") as f:
-        json.dump(s, f, indent=1)
-    os.replace(STATE + ".tmp", STATE)
+    jsonstore.save(STATE, s)
 
 
 def apply(s=None):
