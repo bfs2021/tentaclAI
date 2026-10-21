@@ -2,7 +2,7 @@
 
 All notable changes, newest first. Every release lists **upgrade steps** from the previous one.
 
-## Unreleased
+## v0.14.0 – 2026-10-22
 
 ### Highlights
 - **Jobs from the terminal**: `svc jobs` lists the jobs, `svc jobs <name> [--runs N] [--steps]` shows a definition with
