@@ -7,7 +7,7 @@ import time
 from fastapi.responses import PlainTextResponse
 from fastapi.templating import Jinja2Templates
 
-from . import dockerops, generated, services_store, updatecheck
+from . import dockerops, services_store, updatecheck
 from .config import DATA_DIR, RESTART_VARS, site
 from .envfile import read_env
 
@@ -47,30 +47,12 @@ def _baseline(st):
         return {}
 
 
-def _norm(path):
-    return path[4:] if path.startswith("/var/run/") else path
-
-
-def _mounts_differ(st):
-    """compose.generated.yaml (docker services, mode socket) vs. the mounts the container actually has"""
-    try:
-        want = {(_norm(s), d) for s, d in (m.rsplit(":", 1) for m in generated.mounts(services_store.STACK_DIR))}
-    except OSError:
-        return False
-    stack_dir = services_store.STACK_DIR
-    have = {(_norm(s), d) for s, d in st.get("mounts", [])
-            if d.startswith("/run/tentaclai/docker-") or (s == d and d != stack_dir)}
-    return want != have
-
-
 def restart_needed(st=None):
     st = st or dockerops.status()
     if not st.get("exists"):
         return False
     env = read_env()
-    if any(env.get(k, "") != v for k, v in _baseline(st).items()):
-        return True
-    return _mounts_differ(st)
+    return any(env.get(k, "") != v for k, v in _baseline(st).items())
 
 
 def mark_restart(old_env, changed):
@@ -111,9 +93,5 @@ def client_ip(request):
 
 
 async def sync_services():
-    """after any change to services/: regenerate compose.generated.yaml (docker mounts) and run svc sync"""
-    try:
-        generated.write(services_store.STACK_DIR)  # restart_needed() compares it with the container's mounts
-    except OSError:
-        pass
+    """after any change to services/: svc sync (MCP entries, git repos, catalog, Claude's instructions)"""
     return await asyncio.to_thread(dockerops.run, ["svc", "sync"])

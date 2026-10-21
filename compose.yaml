@@ -4,9 +4,8 @@
 #   start:       docker compose up -d control   (web admin) – then everything else in tentacontrol
 #   cli:         ./tentaclai.sh [rc|shell|svc|scan|inventory|passwd|setup-url]
 #
-# Files (COMPOSE_FILE in .env): compose.yaml (this, generic) + compose.generated.yaml (mounts derived from
-# docker services, written by tentacontrol) + compose.override.yaml (your site additions).
-# tentaclai itself has NO Docker access – that comes only from services of type "docker" (local socket or ssh).
+# Files (COMPOSE_FILE in .env): compose.yaml (this, generic) + compose.override.yaml (your site additions).
+# tentaclai itself has NO Docker access – docker hosts are services reached over SSH (this host via host.docker.internal).
 # container logs: at most 3 × 10 MB per container
 x-logging: &logging
   driver: json-file

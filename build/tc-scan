@@ -257,8 +257,7 @@ def docker_hosts():
         d = svc.get("docker")
         if not d or not tclib.enabled(svc):
             continue
-        res.append({"name": svc.get("name") or name, "mode": d.get("mode", "socket"),
-                    "ssh_host": d.get("ssh_host") if d.get("mode") == "ssh" else None,
+        res.append({"name": svc.get("name") or name, "ssh_host": d.get("ssh_host"),
                     "stacks_dir": tclib.render(str(d.get("stacks_dir") or ""), env), "access": d.get("access", "ro")})
     return res
 
@@ -275,7 +274,7 @@ def main():
         section("Docker")
         print("No docker services configured (services/*.json with \"docker\").")
     for h in hosts:
-        label = f"{'local' if h['mode'] == 'socket' else 'ssh ' + h['ssh_host']}, access {h['access']}"
+        label = f"ssh {h['ssh_host']}, access {h['access']}"
         if not host(h["name"], label):
             continue
         if h["stacks_dir"]:

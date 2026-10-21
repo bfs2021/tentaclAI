@@ -49,16 +49,15 @@
         <tr><td><code>.env</code></td><td>paths (<code>TC_DIR</code>, <code>DOCKER_SOCKET</code>, <code>HOST_DOCS</code>, <code>CA_CERT</code>), domain, resources, remote control, tokens – editable under <a href="/settings">Settings</a>.</td></tr>
         <tr><td><code>services/*.json</code></td><td>everything Claude can reach: Docker hosts, APIs, MCP servers, git repositories.</td></tr>
         <tr><td><code>compose.override.yaml</code></td><td>reverse proxy (nginx-proxy, Traefik …), extra mounts, labels for container managers. Template: <code>compose.override.example.yaml</code>.</td></tr>
-        <tr><td><code>compose.generated.yaml</code></td><td>written automatically from the local docker services (socket + stacks mounts) – never edit by hand.</td></tr>
         <tr><td><code>local/CLAUDE.md</code></td><td>rules and knowledge about your site for Claude; loaded together with the generic rules on every start. The host docs (<code>HOST_DOCS</code>) are only referenced – Claude reads them before it works on the host.</td></tr>
       </table>
       <h4>Install on a new host</h4>
 <pre>git clone … tentaclai &amp;&amp; cd tentaclai
 ./tentaclai.sh init                 # guided setup: paths, domain, access (port / nginx-proxy / Traefik),
-                                      # git, remote control, limits, local Docker host – then starts tentacontrol
+                                      # git, remote control, limits – then starts tentacontrol
 ./tentaclai.sh init --defaults      # the same without questions</pre>
       <p class="muted small">Without a reverse proxy tentacontrol listens on <code>http://127.0.0.1:8484</code> (<code>CONTROL_BIND</code>/<code>CONTROL_PORT</code>).
-      For a public repository, <code>.gitignore</code> keeps <code>.env</code>, <code>compose.override.yaml</code>, <code>compose.generated.yaml</code>, <code>local/</code>, <code>services/*.json</code>, <code>ssh/keys</code>, <code>ssh/config.d</code>, <code>data/</code> and <code>workspace/</code> out; the <code>*.example</code> files are their templates.</p>
+      For a public repository, <code>.gitignore</code> keeps <code>.env</code>, <code>compose.override.yaml</code>, <code>local/</code>, <code>services/*.json</code>, <code>ssh/keys</code>, <code>ssh/config.d</code>, <code>data/</code> and <code>workspace/</code> out; the <code>*.example</code> files are their templates.</p>
     </section>
 
     <section class="card" id="concept">
@@ -105,7 +104,7 @@
       <h2>Services</h2>
       <p>A service is one JSON file in <code>services/</code>. It can have seven parts – alone or combined (<a href="#db">db</a>, <a href="#web">web</a> and <a href="#files">files</a> have their own sections below):</p>
       <table>
-        <tr><td><code>docker</code></td><td>Docker host – local via socket or remote via SSH; Claude manages its stacks with <code>svc docker</code> / <code>svc compose</code>.</td></tr>
+        <tr><td><code>docker</code></td><td>Docker host – reached over SSH (this host too); Claude manages its stacks with <code>svc docker</code> / <code>svc compose</code>.</td></tr>
         <tr><td><code>api</code></td><td>REST API, called with <code>svc &lt;name&gt; GET /path</code>. <code>svc</code> injects the authentication; tokens never appear in commands.</td></tr>
         <tr><td><code>mcp</code></td><td>MCP server – registered in Claude's configuration on “Sync”.</td></tr>
         <tr><td><code>git</code></td><td>Repository – cloned to <code>/workspace/repos/&lt;name&gt;</code>, read only or read/write.</td></tr>
@@ -143,12 +142,10 @@
 
     <section class="card" id="docker">
       <h2>Docker hosts</h2>
-      <p>Docker management is a service like any other. Templates: “Docker host (local, socket)” and “Docker host (remote, SSH)”.</p>
-<pre>"docker": { "mode": "socket", "socket": "/var/run/docker.sock", "stacks_dir": "/srv/stacks", "access": "rw" }
-"docker": { "mode": "ssh", "ssh_host": "vps1", "stacks_dir": "/opt/stacks", "access": "ro" }</pre>
+      <p>Docker management is a service like any other, always over SSH – the sandbox never gets a Docker socket. Template: “Docker host (SSH)”.</p>
+<pre>"docker": { "mode": "ssh", "ssh_host": "vps1", "stacks_dir": "/opt/stacks", "access": "ro" }</pre>
       <ul>
-        <li><strong>socket</strong>: socket and stacks directory are mounted into the Claude container (<code>compose.generated.yaml</code>, written automatically) – then “Apply now”. The stacks directory keeps the host path so <code>docker compose</code> resolves relative paths correctly.</li>
-        <li><strong>ssh</strong>: through the SSH host (alias from <a href="/ssh">Tentacles → SSH hosts</a>); the user there must be allowed to run <code>docker</code>. Compose runs on the target host in the stack's directory.</li>
+        <li><strong>ssh_host</strong>: alias from <a href="/ssh">Tentacles → SSH hosts</a>; the user there must be allowed to run <code>docker</code> (or sudo it – sudo prefix on the SSH host). Docker and compose run on that host, compose in the stack's directory. <strong>This host</strong>: an SSH host with hostname <code>host.docker.internal</code>.</li>
         <li><strong>access</strong>: <code>ro</code> only allows read-only commands through <code>svc</code> (ps, logs, inspect, config …); <code>rw</code> allows changes – Claude asks before restarts, updates and deletions.</li>
         <li>Commands: <code>svc docker</code> (overview), <code>svc docker &lt;host&gt; ps</code>, <code>svc compose &lt;host&gt; &lt;stack&gt; logs --tail 50</code>.</li>
       </ul>
@@ -338,7 +335,7 @@ gh …                      GitHub CLI without credentials (public data)</pre>
         <li><strong>tentacontrol is out of Claude's reach</strong>: from the sandbox only <code>svc</code>'s approval endpoints answer (with its token) – the admin UI, the login and the gateway's endpoints refuse it, and only the gateway may use the latter.</li>
         <li><strong>Other services' secrets are blanked</strong> in free read-only output: <code>docker … inspect</code>, <code>compose … config</code> and <code>systemctl show|cat</code> show <code>[redacted by svc]</code> for values with secret-looking names and for passwords in URLs. Logs and commands you approve are not filtered. <code>svc</code> also keeps the <code>.env</code> values out of the environment of the programs it starts.</li>
         <li>The sandbox sits in an internal network without a route to the outside; everything leaves through the <strong>egress gateway</strong> (<code>tentaclai-egress</code>), which records every destination. <code>EGRESS_MODE=permissive</code> (default) allows all – allow/block lists and approvals follow.</li>
-        <li>An <code>rw</code> docker service is root on that host. A docker service in <code>socket</code> mode is root on this host – and so can read everything in the stack, secrets included; prefer <code>ssh</code> mode.</li>
+        <li>An <code>rw</code> docker service is root on that host. The sandbox itself never gets a Docker socket – docker hosts are reached over SSH only.</li>
         <li>Login: bcrypt hash, 12 h session, <code>SameSite=Strict</code> cookie (Secure behind https), origin check for forms and the terminal, throttling after failed attempts.</li>
         <li>Secrets never reach the browser; <code>svc</code> passes them to curl through temporary 0600 files on tmpfs, not on the command line.</li>
         <li>Claude keeps asking before actions – the rules are in its instructions (generic rules + <code>local/CLAUDE.md</code>).</li>
@@ -368,7 +365,7 @@ gh …                      GitHub CLI without credentials (public data)</pre>
         <li><strong>Two-factor sign-in (TOTP)</strong> for tentacontrol.</li>
         <li><strong>Scheduled jobs</strong>: run Claude tasks on a schedule (e.g. patch report, certificate expiry), results as notifications.</li>
         <li><strong>Export/import</strong>: configuration and templates, e.g. for a second installation or to share templates.</li>
-        <li><strong>More sandbox</strong>: read-only root filesystem, Docker socket only through a filtering proxy, prompt-injection safeguards for content from services.</li>
+        <li><strong>More sandbox</strong>: read-only root filesystem, prompt-injection safeguards for content from services.</li>
       </ul>
     </section>
   </div>

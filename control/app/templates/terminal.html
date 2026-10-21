@@ -11,9 +11,6 @@
   {% for key, prof in profiles.items() if not (key == 'login' and logged and current != 'login') %}
   <a href="/terminal?p={{ key }}" class="{{ 'active' if current == key }}" title="{{ prof.hint }}">{{ prof.title }}</a>
   {% endfor %}
-  {% for name, dir in hosts.items() %}
-  <a href="/terminal?p=host&alias={{ name | urlencode }}" class="{{ 'active' if current == 'host' and params.alias == name }}" title="{{ dir }}">Claude · {{ name }}</a>
-  {% endfor %}
   {% if current == 'onboard' %}<a class="active">{{ title }}</a>{% endif %}
 </div>
 <div class="term-wrap"><div id="term" style="height:100%"></div></div>

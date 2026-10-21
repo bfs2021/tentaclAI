@@ -94,7 +94,7 @@ The stack consists of **three containers** and one **stack directory**:
 
 | Part | What it is |
 |---|---|
-| **tentaclAI** (container `tentaclai`) | The sandbox: Claude Code, `svc`, git, gh, docker CLI, database clients, tmux. Runs the permanent Remote Control session and holds your workspace (`/workspace`). Has **no** Docker socket, no host access and no route to the outside of its own – services go through `svc`, all traffic through the egress gateway. |
+| **tentaclAI** (container `tentaclai`) | The sandbox: Claude Code, `svc`, git, gh, database clients, tmux (docker runs on the hosts over SSH). Runs the permanent Remote Control session and holds your workspace (`/workspace`). Has **no** Docker socket, no host access and no route to the outside of its own – services go through `svc`, all traffic through the egress gateway. |
 | **egress gateway** (container `tentaclai-egress`) | The sandbox's only way out: a small forward proxy (CONNECT for any port, plain HTTP; TLS is not opened). Allows the built-in list and your tentacles, applies your allow/block lists, records every destination and – in `enforce` mode – holds unknown destinations until you approve them in Activity. |
 | **tentacontrol** (container `tentacontrol`) | The web admin: create and edit services, systems and SSH hosts, enter tokens, test connections, start onboarding, see the topology, open terminals into the sandbox, rebuild and update it. It uses the host's Docker socket only to run the tentaclAI container. |
 | **`svc`** (inside tentaclAI) | The gateway Claude uses for every service: `svc <name> GET /path`, `svc docker`, `svc compose`, `svc db`, `svc web`, `svc files`, `svc git`. It runs as root (via sudo), injects credentials from `.env` at call time and enforces `ro`/`rw`/`confirm`; Claude itself runs as user `claude` and can't read `.env` or the SSH key. |
@@ -174,7 +174,7 @@ Inside the sandbox, Claude (and you) use:
 svc list | info <name> | test <name>        # services, details, connection test
 svc systems [name]                          # systems with SSH host, members and rules
 svc <name> GET /path [curl args]            # API call, auth injected – tokens never in argv
-svc docker <host> ps                        # docker CLI against a docker host (socket or SSH, sudo-aware)
+svc docker <host> ps                        # docker CLI on a docker host (over SSH, sudo-aware)
 svc compose <host> <stack> logs --tail 50   # compose in <stacks_dir>/<stack> of that host
 svc db <name> "SELECT …" | tables           # databases (ro = read-only session)
 svc web <name> /wiki/page | --links         # web pages as readable text, login handled by svc
@@ -229,7 +229,7 @@ A service file can combine any of these parts:
 | `api` | `base_url`, `auth.type`: `none` · `bearer` · `header` · `basic` · `query` · `oauth2_client_credentials`; `insecure_tls`; `access` (default `rw`) | writes = everything but GET/HEAD/OPTIONS |
 | `mcp` | like Claude's `.mcp.json`: `http`/`sse` (`url`, `headers`) or `stdio` (`command`, `args`, `env`) | the MCP server's own permissions |
 | `git` | `url`, `access`, `auth` (token via credential helper) | `ro`: push blocked (pushurl + pre-push hook) |
-| `docker` | `mode`: `socket` (`socket`, `stacks_dir`) or `ssh` (`ssh_host`, `stacks_dir`); `access` | `ro`: only read-only docker/compose commands |
+| `docker` | `mode` `ssh` (the only one): `ssh_host`, `stacks_dir`; `access` | `ro`: only read-only docker/compose commands |
 | `db` | `engine` `postgres`/`mysql`, `host`, `port`, `database`, `user`, `password`, `ssl`; `access` | `ro`: read-only session, no shell |
 | `web` | `base_url`, `auth.type`: `none` · `basic` · `bearer` · `header` · `form` (`login_url`, `fields`, `csrf_field`); `paths` | GET only, same host |
 | `files` | `ssh_host` (or the system's), `path`, `sudo`; `access` | `ro`: no push; paths stay inside `path` |
@@ -257,7 +257,7 @@ SSH hosts: tentacontrol → Tentacles → SSH hosts, or `./ssh-host.sh list|add|
 | Variable (`.env`) | Meaning |
 |---|---|
 | `TC_DIR` | absolute host path of this stack (mounted under the same path) |
-| `COMPOSE_FILE` | `compose.yaml:compose.generated.yaml:compose.override.yaml` |
+| `COMPOSE_FILE` | `compose.yaml:compose.override.yaml` |
 | `DOCKER_SOCKET` | Docker socket of this host – for tentacontrol only |
 | `HOST_DOCS` | optional Markdown file about the host – Claude's instructions point to it, Claude reads it before working on the host |
 | `CA_CERT` | optional own root CA (PEM), trusted by curl, git, python and node in the sandbox |
@@ -279,7 +279,6 @@ SSH hosts: tentacontrol → Tentacles → SSH hosts, or `./ssh-host.sh list|add|
 ```
 tentaclai/
 ├── compose.yaml               services claude (tentaclai), egress (tentaclai-egress), control (tentacontrol)
-├── compose.generated.yaml     socket/stacks mounts for local docker services (written by tentacontrol)
 ├── compose.override.*.yaml    site additions: reverse proxy, labels (example + your own)
 ├── .env.example               settings template (your .env: mode 600, git-ignored)
 ├── tentaclai.sh               host helper: init, Claude/RC/shell, status, inventory, passwd, setup-url
@@ -360,8 +359,8 @@ What tentaclAI does:
 
 What it does **not** (yet) do – keep it in mind:
 
-- An `rw` Docker host – or an SSH user with unrestricted sudo – is effectively **root on that machine**. A Docker service in
-  `socket` mode is root on the tentaclAI host, and with it everything in the stack directory – prefer `ssh` mode.
+- An `rw` Docker host – or an SSH user with unrestricted sudo – is effectively **root on that machine**. The sandbox
+  itself never gets a Docker socket: docker hosts, this one included, are reached over SSH only.
 - `tcrun` holds one secret at a time while a client runs: a shell escape in the interactive SQL shell (`\!`, approved
   separately in `confirm` mode) gets that user, its database password and the web cookie jars – not `.env` or the SSH key.
 - **Egress gateway:** the sandbox has no route to the outside; all traffic goes through `tentaclai-egress`. `permissive`
@@ -374,8 +373,7 @@ What it does **not** (yet) do – keep it in mind:
 
 ## Roadmap
 
-- **Security:** two-factor sign-in (TOTP) for tentacontrol · read-only root filesystem, Docker socket proxy,
-  prompt-injection safeguards
+- **Security:** two-factor sign-in (TOTP) for tentacontrol · read-only root filesystem, prompt-injection safeguards
 - **Automation:** scheduled Claude jobs (e.g. patch report, certificate expiry) with results as notifications
 - **Export/import** of configuration and templates
 

@@ -67,7 +67,6 @@
       <a class="btn sm primary" href="/terminal?p=login">{{ icon('key') }}Sign in now</a>
       {% endif %}
       <a class="btn sm" href="/terminal?p=claude" title="Claude Code in /workspace – persistent tmux session, same as ./tentaclai.sh on the host">{{ icon('terminal') }}Claude terminal</a>
-      {% for s in services if s.docker and s.docker.mode == 'socket' and s.state == 'ok' %}<a class="btn sm" href="/terminal?p=host&alias={{ s.name | urlencode }}">{{ icon('terminal') }}{{ s.name }}</a>{% endfor %}
       {% if logged and st.running %}<button class="btn sm ghost" hx-post="/claude/logout"
         hx-confirm="Sign out of Claude{{ ' (' ~ auth.email ~ ')' if auth.email }}? Remote control restarts and stays offline, running Claude sessions stop working until you sign in again – e.g. with a different account.">Sign out</button>{% endif %}
     </div>
@@ -140,7 +139,7 @@
       {% for s in dockers %}
       <div class="between">
         <span class="row" style="gap:8px;flex-wrap:nowrap"><span class="dot {{ 'ok' if s.state == 'ok' else 'warn' if s.state == 'warn' else '' }}"></span>
-          <strong>{{ s.name }}</strong><span class="muted">{{ 'local' if s.docker.mode == 'socket' else 'ssh ' ~ s.docker.target }}</span></span>
+          <strong>{{ s.name }}</strong><span class="muted">{{ 'ssh ' ~ s.docker.target }}</span></span>
         <span class="pill {{ 'accent' if s.docker.access == 'rw' else 'info' }}">{{ s.docker.access }}</span>
       </div>
       {% endfor %}

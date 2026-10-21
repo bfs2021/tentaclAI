@@ -5,7 +5,7 @@ import pytest
 NOT_PAGES = ("/login", "/setup", "/logout", "/healthz", "/api/", "/internal/", "/logs/stream", "/jobs/", "/static", "/vendor",
              "/topology/ssh-status")  # (ssh-status runs real SSH checks)
 # pages with parameters or variants, rendered with the dummy stack's objects
-VARIANTS = ["/services/demoapi", "/services/demodb", "/services/demohost", "/services/demogit", "/systems/box", "/ssh/box/edit",
+VARIANTS = ["/services/oldsock", "/services/demoapi", "/services/demodb", "/services/demohost", "/services/demogit", "/systems/box", "/ssh/box/edit",
             "/ssh/box/remove", "/network?tab=allow", "/network?tab=block"]
 
 
@@ -55,13 +55,13 @@ def test_models_post_refuses_bad_values(client):
 def test_lifespan_runs_every_startup_hook(app_module, monkeypatch):
     from fastapi.testclient import TestClient
     ran = []
-    for name in ("prepare_activity", "start_notifications", "start_update_check", "announce_setup"):
+    for name in ("migrate", "prepare_activity", "start_notifications", "start_update_check", "announce_setup"):
         async def hook(name=name):
             ran.append(name)
         monkeypatch.setattr(app_module, name, hook)
     with TestClient(app_module.app):
         pass
-    assert ran == ["prepare_activity", "start_notifications", "start_update_check", "announce_setup"]
+    assert ran == ["migrate", "prepare_activity", "start_notifications", "start_update_check", "announce_setup"]
 
 
 def test_skills_page_offers_no_off_for_required(client):
@@ -187,3 +187,8 @@ def test_credential_values_never_reach_the_browser(client):
     """ODD_ACCESS has no secret-looking name, but credsvc uses it as a header token"""
     for path in ("/settings", "/services/credsvc"):
         assert "visible-if-broken-123" not in client.get(path).text, path
+
+
+def test_old_socket_service_is_flagged(client):
+    assert "not usable" in client.get("/services/oldsock").text
+    assert "not usable" not in client.get("/services/demohost").text

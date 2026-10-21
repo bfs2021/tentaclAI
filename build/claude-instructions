@@ -23,7 +23,7 @@ def docker_hosts():
         d = svc.get("docker")
         if not d or not tclib.enabled(svc):
             continue
-        target = "local socket" if d.get("mode", "socket") == "socket" else f"ssh `{d.get('ssh_host')}`"
+        target = f"ssh `{d.get('ssh_host')}`"
         rows.append(f"| `{svc.get('name') or name}` | {target} | **{d.get('access', 'ro')}** | `{tclib.render(str(d.get('stacks_dir', '–')), env)}` | {svc.get('description', '')} |")
     if not rows:
         return "### Docker hosts\n\nNone configured – this sandbox has no Docker access."

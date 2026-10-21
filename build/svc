@@ -21,7 +21,7 @@ resolved from the stack's .env (read fresh on every call) and the container envi
   svc pending                      approvals waiting in tentacontrol → Activity (and active grants)
   svc config put service <name> <file> | put local <file>
                                    write a service file / the site rules (local/CLAUDE.md) – always needs approval
-  svc docker                       Docker hosts (local socket or via ssh): mode, target, stacks dir, access
+  svc docker                       Docker hosts (via ssh, also this host): target, stacks dir, access
   svc docker <name> <args...>      docker CLI against that host, e.g. svc docker gate ps
   svc compose <name> <stack> <args...>
                                    docker compose in <stacks_dir>/<stack> of that host, e.g. svc compose gate pangolin ps
@@ -82,8 +82,6 @@ CATALOG = os.environ.get("SVC_CATALOG", "/workspace/SERVICES.md")
 REPO_ROOT = os.environ.get("SVC_REPO_ROOT", "/workspace/repos")
 STATE = os.path.expanduser("~/.config/tentaclai/mcp-managed.json")
 OAUTH_CACHE = os.path.expanduser("~/.cache/tentaclai/oauth")
-DOCKER_STATE = os.path.expanduser("~/.config/tentaclai/docker-managed.json")
-SOCK_DIR = "/run/tentaclai"  # local sockets are mounted here as docker-<name>.sock (compose.generated.yaml)
 RO_DOCKER = {"ps", "inspect", "logs", "images", "info", "version", "stats", "top", "port", "diff", "history", "events",
              "network", "volume", "image", "container", "system", "context"}
 RO_SUB = {"ls", "list", "inspect", "ps", "logs", "df", "info", "top", "port", "diff", "history", "show"}
@@ -603,7 +601,13 @@ def ssh_sudo(alias):
 
 
 def docker_sudo(d):
-    return ssh_sudo(d["ssh_host"]) if d.get("mode", "socket") == "ssh" else ""
+    return ssh_sudo(d["ssh_host"])
+
+
+def docker_target(d, md=False):
+    """where a docker service runs docker: always over ssh (this host too, via host.docker.internal)"""
+    host = f"`{d.get('ssh_host')}`" if md else d.get("ssh_host")
+    return f"ssh {host}" + (" (sudo)" if ssh_sudo(d.get("ssh_host", "")) else "")
 
 
 def wants_tty(args, compose=False):
@@ -618,17 +622,9 @@ def wants_tty(args, compose=False):
 
 
 def docker_argv(name, d, args):
-    """docker CLI for a docker service: ssh hosts run docker remotely (local files are never touched), sockets via a context"""
-    if d.get("mode", "socket") == "ssh":
-        sudo = docker_sudo(d)
-        return ["ssh"] + (["-t", "-q"] if wants_tty(args) else []) + [d["ssh_host"], f"{sudo + ' ' if sudo else ''}docker {shlex.join(args)}"]
-    return ["docker", "--context", name, *args]
-
-
-def docker_target(name, d):
-    if d.get("mode", "socket") == "ssh":
-        return f"ssh://{d['ssh_host']}"
-    return f"unix://{SOCK_DIR}/docker-{name}.sock"
+    """docker CLI for a docker service: runs on the host through ssh – local files are never touched"""
+    sudo = docker_sudo(d)
+    return ["ssh"] + (["-t", "-q"] if wants_tty(args) else []) + [d["ssh_host"], f"{sudo + ' ' if sudo else ''}docker {shlex.join(args)}"]
 
 
 def docker_services(services, usable=True):
@@ -637,36 +633,6 @@ def docker_services(services, usable=True):
         if "docker" in s and (not usable or (enabled(s) and not missing_vars(s["docker"]))):
             out[n] = s
     return out
-
-
-def sync_docker_contexts(services):
-    try:
-        with open(DOCKER_STATE) as f:
-            managed = set(json.load(f))
-    except (FileNotFoundError, ValueError):
-        managed = set()
-    active = set()
-    for name, svc in docker_services(services).items():
-        d = render(svc["docker"])
-        if d.get("mode", "socket") == "ssh":  # svc docker/compose run docker on the host through ssh – no context needed
-            print(f"  ✓ {name} (docker via ssh {d['ssh_host']}{' + sudo' if docker_sudo(d) else ''}, {d.get('access', 'ro')})")
-            continue
-        host = docker_target(name, d)
-        exists = subprocess.run(["docker", "context", "inspect", name], capture_output=True).returncode == 0
-        verb = "update" if exists else "create"
-        r = subprocess.run(["docker", "context", verb, name, "--description", f"tentaclai service {name}",
-                            "--docker", f"host={host}"], capture_output=True, text=True)
-        if r.returncode == 0:
-            active.add(name)
-            print(f"  ✓ {name} (docker {d.get('mode', 'socket')}: {host}, {d.get('access', 'ro')})")
-        else:
-            print(f"  ✗ {name}: docker context: {(r.stderr or r.stdout).strip()[:160]}")
-    for name in sorted(managed - active):
-        subprocess.run(["docker", "context", "rm", "-f", name], capture_output=True)
-        print(f"  – {name}: docker context removed")
-    os.makedirs(os.path.dirname(DOCKER_STATE), exist_ok=True)
-    with open(DOCKER_STATE, "w") as f:
-        json.dump(sorted(active), f)
 
 
 # Read-only commands that print other services' secrets (container env, interpolated compose files, unit
@@ -725,7 +691,11 @@ def get_docker(services, name):
     miss = missing_vars(svc["docker"])
     if miss:
         sys.exit(f"svc: {name} not enabled – empty in .env: {', '.join(miss)}")
-    return render(svc["docker"])
+    d = render(svc["docker"])
+    if d.get("mode", "ssh") != "ssh" or not d.get("ssh_host"):
+        sys.exit(f"svc: {name}: docker services run over SSH only – set \"mode\": \"ssh\" and \"ssh_host\" "
+                 "(this host: an SSH host for host.docker.internal; \"mode\": \"socket\" was removed in v0.11)")
+    return d
 
 
 def cmd_docker(services, args):
@@ -734,21 +704,12 @@ def cmd_docker(services, args):
         if not ds:
             print("No docker services.")
             return 0
-        print(f"{'Name':<16}{'Mode':<8}{'Access':<9}{'Target':<34}Stacks")
+        print(f"{'Name':<16}{'Access':<9}{'Target':<34}Stacks")
         for n, s in ds.items():
             d = render(s["docker"])
-            target = d.get("socket", "/var/run/docker.sock") if d.get("mode", "socket") == "socket" else f"ssh {d.get('ssh_host')}"
-            if d.get("mode", "socket") == "ssh" and ssh_sudo(d.get("ssh_host", "")):
-                target += " (sudo)"
             st = status(s)
-            print(f"{n:<16}{d.get('mode', 'socket'):<8}{d.get('access', 'ro'):<9}{target:<34}{d.get('stacks_dir', '–')}"
+            print(f"{n:<16}{d.get('access', 'ro'):<9}{docker_target(d):<34}{d.get('stacks_dir', '–')}"
                   + ("" if st == "active" else f"  ({st})"))
-        return 0
-    if args[0] == "dirs":
-        for n, s in docker_services(services).items():
-            d = render(s["docker"])
-            if d.get("mode", "socket") == "socket" and d.get("stacks_dir"):
-                print(f"{n}\t{d['stacks_dir']}")
         return 0
     name, rest = args[0], args[1:]
     d = get_docker(services, name)
@@ -772,16 +733,11 @@ def _compose(name, d, stack, rest):
         sys.exit("svc: invalid stack name")
     base = d.get("stacks_dir") or sys.exit(f"svc: {name} has no stacks_dir")
     path = os.path.join(base, stack)
-    if d.get("mode", "socket") == "ssh":
-        sudo = docker_sudo(d)
-        remote = f"cd {shlex.quote(path)} && {sudo + ' ' if sudo else ''}docker compose {shlex.join(rest)}"
-        if sensitive_read(rest, compose=True):
-            return call_redacted(["ssh", "-q", d["ssh_host"], remote])
-        return subprocess.call(["ssh"] + (["-t", "-q"] if wants_tty(rest, compose=True) else []) + [d["ssh_host"], remote])
-    if not os.path.isdir(path):
-        sys.exit(f"svc: {path} not found")
-    call = call_redacted if sensitive_read(rest, compose=True) else subprocess.call
-    return call(["docker", "--context", name, "compose", *rest], cwd=path)
+    sudo = docker_sudo(d)
+    remote = f"cd {shlex.quote(path)} && {sudo + ' ' if sudo else ''}docker compose {shlex.join(rest)}"
+    if sensitive_read(rest, compose=True):
+        return call_redacted(["ssh", "-q", d["ssh_host"], remote])
+    return subprocess.call(["ssh"] + (["-t", "-q"] if wants_tty(rest, compose=True) else []) + [d["ssh_host"], remote])
 
 
 # ---------- shared: service part lookup ----------
@@ -1632,11 +1588,11 @@ def cmd_test(services, name):
             report("git", r.returncode == 0, f"{g['url']} → {heads} Branches" if r.returncode == 0 else (r.stderr.strip()[-160:] or "error"))
         elif part == "docker":
             d = render(svc["docker"])
+            if d.get("mode", "ssh") != "ssh" or not d.get("ssh_host"):
+                report("docker", False, "runs over SSH only – \"mode\": \"socket\" was removed, use an SSH host")
+                continue
             argv = docker_argv(name, d, ["version", "--format", "{{.Server.Version}}"])
             r = subprocess.run(argv, capture_output=True, text=True, timeout=40)
-            if r.returncode != 0 and "context" in r.stderr and "not found" in r.stderr:
-                sync_docker_contexts(services)
-                r = subprocess.run(argv, capture_output=True, text=True, timeout=40)
             report("docker", r.returncode == 0, f"Docker {r.stdout.strip()}" if r.returncode == 0 else r.stderr.strip()[-160:])
         elif part in ("db", "web", "files"):
             try:
@@ -1674,10 +1630,7 @@ def cmd_info(services, name):
     dk = svc.get("docker")
     if dk:
         d = render(dk)
-        tgt = d.get("socket", "/var/run/docker.sock") if d.get("mode", "socket") == "socket" else f"ssh {d.get('ssh_host')}"
-        if d.get("mode", "socket") == "ssh" and ssh_sudo(d.get("ssh_host", "")):
-            tgt += " (sudo)"
-        print(f"Docker: {d.get('mode', 'socket')} {tgt}  [{d.get('access', 'ro')}]  Stacks: {d.get('stacks_dir', '–')}")
+        print(f"Docker: {docker_target(d)}  [{d.get('access', 'ro')}]  Stacks: {d.get('stacks_dir', '–')}")
         print(f"  $ svc docker {name} ps    ·    svc compose {name} <stack> ps")
     git = svc.get("git")
     if git:
@@ -1844,7 +1797,6 @@ def cmd_sync(services):
     with open(STATE, "w") as f:
         json.dump(sorted(active), f)
     git_sync(services, fetch=False)
-    sync_docker_contexts(services)
     write_catalog(services)
     write_instructions()
 
@@ -1903,16 +1855,13 @@ def write_catalog(services):
     dks = docker_services(services, usable=False)
     if dks:
         lines += ["", "## Docker hosts", "",
-                  "Manage with `svc docker <name> <docker args>` and `svc compose <name> <stack> <compose args>` (works for local and ssh hosts). "
+                  "Manage with `svc docker <name> <docker args>` and `svc compose <name> <stack> <compose args>` (docker runs on the host through ssh). "
                   "`ro` = read only (ps, logs, inspect, config …) – changes are blocked; `rw` = changes allowed, but ask before restarts/updates/deletions; "
                   "`confirm` = every change waits for approval.",
-                  "", "| Host | Mode | Access | Target | Stacks dir | Status | Description |", "|---|---|---|---|---|---|---|"]
+                  "", "| Host | Access | Target | Stacks dir | Status | Description |", "|---|---|---|---|---|---|"]
         for name, svc in dks.items():
             d = render(svc["docker"])
-            tgt = d.get("socket", "/var/run/docker.sock") if d.get("mode", "socket") == "socket" else f"ssh `{d.get('ssh_host')}`"
-            if d.get("mode", "socket") == "ssh" and ssh_sudo(d.get("ssh_host", "")):
-                tgt += " (sudo)"
-            lines.append(f"| **{name}** | {d.get('mode', 'socket')} | {d.get('access', 'ro')} | {tgt} | `{d.get('stacks_dir', '–')}` | {status(svc)} | {svc.get('description', '')} |")
+            lines.append(f"| **{name}** | {d.get('access', 'ro')} | {docker_target(d, md=True)} | `{d.get('stacks_dir', '–')}` | {status(svc)} | {svc.get('description', '')} |")
     repos = {n: s for n, s in services.items() if "git" in s}
     if repos:
         lines += ["", "## Git repositories", "",

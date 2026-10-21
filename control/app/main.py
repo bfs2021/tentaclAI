@@ -10,7 +10,7 @@ from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
 
 from . import activity, auth, connectors, dockerops, netguard, notify, skills, updatecheck, usage
-from .envfile import read_env
+from .envfile import drop_generated_compose, read_env
 from .routes import network, settings, ssh, system, tentacles
 from .web import BASE, TC_VERSION
 
@@ -18,7 +18,7 @@ from .web import BASE, TC_VERSION
 @contextlib.asynccontextmanager
 async def lifespan(_app):
     """startup: activity token, background loops (notifications, usage, update check), setup hint"""
-    for start in (prepare_activity, start_notifications, start_update_check, announce_setup):
+    for start in (migrate, prepare_activity, start_notifications, start_update_check, announce_setup):
         await start()
     yield
 
@@ -62,6 +62,12 @@ async def secure_cookie(request: Request, call_next):
         response.raw_headers[:] = [(k, v + b"; secure" if k == b"set-cookie" and v.startswith(b"tentacontrol=")
                                     and b"secure" not in v.lower() else v) for k, v in raw]
     return response
+
+
+async def migrate():
+    """one-time adjustments of an existing installation"""
+    if drop_generated_compose():
+        print("migration: compose.generated.yaml removed from COMPOSE_FILE (docker services run over SSH only)", flush=True)
 
 
 async def prepare_activity():

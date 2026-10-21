@@ -2,7 +2,6 @@
 # Host helper for tentaclai (sandbox + service gateway for Claude Code) and tentacontrol (web admin).
 #   ./tentaclai.sh init       guided first-time setup (questions; --defaults = no questions)
 #   ./tentaclai.sh            Claude in /workspace (persistent tmux session)
-#   ./tentaclai.sh host [name] Claude in the stacks dir of a local docker service (first one if no name)
 #   ./tentaclai.sh <dir>      Claude in any directory inside the container
 #   ./tentaclai.sh rc         attach to the remote-control session
 #   ./tentaclai.sh shell      bash in the container as user claude (rootshell: as root – sees the secrets)
@@ -52,16 +51,6 @@ ask_choice() {  # var "question" default option...  (options "key|Text")
         local o; for o in "$@"; do echo "    [${o%%|*}] ${o#*|}"; done
     fi
     ask "$__var" "Choice" "$def"
-}
-
-write_generated() {  # compose.generated.yaml from local docker services (same logic as tentacontrol)
-    if command -v python3 >/dev/null && [ -f control/app/generated.py ]; then
-        python3 control/app/generated.py "$STACK_DIR" >/dev/null
-    else
-        docker run --rm -v "$STACK_DIR:$STACK_DIR" local/tentacontrol:latest python3 /app/app/generated.py "$STACK_DIR" >/dev/null 2>&1 \
-            || printf '# generated\nservices: {}\n' > compose.generated.yaml
-    fi
-    echo "  → compose.generated.yaml updated"
 }
 
 cmd_init() {
@@ -131,18 +120,10 @@ cmd_init() {
     [ -f local/CLAUDE.md ] || { cp local/CLAUDE.example.md local/CLAUDE.md 2>/dev/null || printf '# Site rules for Claude\n' > local/CLAUDE.md; echo "  → created local/CLAUDE.md"; }
     [ -f compose.override.yaml ] || printf '# site additions (see compose.override.example.yaml)\nservices: {}\n' > compose.override.yaml
 
-    echo; echo "Docker hosts as services"
-    local hn; hn="$(env_value TC_HOSTNAME | tr 'A-Z' 'a-z' | tr -c 'a-z0-9_-\n' '-')"
-    if [ ! -f "services/$hn.json" ] && ask_yn "Let Claude manage Docker on this host (local socket)?" n; then
-        local sd acc
-        ask sd "Directory containing the docker stacks" "$(dirname "$STACK_DIR")"
-        ask_choice acc "Access" rw "rw|manage (Claude may change things after asking)" "ro|read only"
-        printf '{\n  "name": "%s",\n  "description": "Docker host %s – stacks and containers",\n  "docker": {"mode": "socket", "socket": "%s", "stacks_dir": "%s", "access": "%s"},\n  "notes": ["Ask and back up before restarts, updates and deletions."]\n}\n' \
-            "$hn" "$(env_value TC_HOSTNAME)" "$(env_value DOCKER_SOCKET)" "$sd" "$acc" > "services/$hn.json"
-        echo "  → services/$hn.json created (more docker hosts, also via SSH: tentacontrol → Services)"
-    fi
-    write_generated
-    set_env COMPOSE_FILE "compose.yaml:compose.generated.yaml:compose.override.yaml"
+    echo; echo "Docker hosts: Claude reaches every docker host – this one too – over SSH. In tentacontrol add the host"
+    echo "  under Tentacles → SSH hosts (this host: hostname host.docker.internal), then a service from the template"
+    echo "  “Docker host (SSH)”."
+    set_env COMPOSE_FILE "compose.yaml:compose.override.yaml"
     docker compose config --quiet && echo "  ✓ configuration valid"
 
     echo
@@ -227,10 +208,6 @@ fi
 case "${1:-}" in
     "")       exec docker exec -it -u claude "$CONTAINER" cc ;;
     login)    exec docker exec -it -u claude "$CONTAINER" claude auth login ;;
-    host)
-        d="$(docker exec "$CONTAINER" svc docker dirs | awk -F'\t' -v n="${2:-}" 'n=="" || $1==n {print $2; exit}')"
-        [ -n "$d" ] || { echo "No local docker service${2:+ named $2} (svc docker)"; exit 1; }
-        exec docker exec -it -u claude "$CONTAINER" cc "$d" ;;
     rc)       exec docker exec -it -u claude "$CONTAINER" cc rc ;;
     inventory) exec docker exec -it -u claude "$CONTAINER" tmux new-session -A -s claude-inventory -c /workspace claude /inventory ;;
     scan)     exec docker exec "$CONTAINER" tc-scan ;;

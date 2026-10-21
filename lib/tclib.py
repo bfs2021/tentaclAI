@@ -126,7 +126,7 @@ def load_services(services_dir, systems=None, errors=None):
         if not sysd or not sysd.get("ssh_host"):
             continue
         d, f = svc.get("docker"), svc.get("files")
-        if d and d.get("mode") == "ssh" and not d.get("ssh_host"):
+        if d and d.get("mode", "ssh") == "ssh" and not d.get("ssh_host"):
             d["ssh_host"] = sysd["ssh_host"]
         if f and not f.get("ssh_host"):
             f["ssh_host"] = sysd["ssh_host"]

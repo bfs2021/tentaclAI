@@ -59,3 +59,14 @@ def test_env_values_stay_out_of_the_process_environment(tmp_path, monkeypatch):
     assert "SVC_TEST_SECRET" not in os.environ
     assert svc.render({"t": "${SVC_TEST_SECRET}"}) == {"t": "s3cret"}
     assert svc.missing_vars({"t": "${SVC_TEST_SECRET} ${NOPE_X}"}) == ["NOPE_X"]
+
+
+def test_docker_runs_over_ssh_only(monkeypatch):
+    monkeypatch.setattr(svc, "ssh_sudo", lambda alias: "")
+    services = {"old": {"name": "old", "docker": {"mode": "socket", "socket": "/var/run/docker.sock", "stacks_dir": "/srv"}},
+                "box": {"name": "box", "docker": {"mode": "ssh", "ssh_host": "box", "stacks_dir": "/srv"}}}
+    with pytest.raises(SystemExit, match="over SSH only"):
+        svc.get_docker(services, "old")
+    d = svc.get_docker(services, "box")
+    assert svc.docker_argv("box", d, ["ps"]) == ["ssh", "box", "docker ps"]
+    assert svc.docker_target(d) == "ssh box"

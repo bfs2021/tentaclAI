@@ -169,3 +169,12 @@ def test_second_service_from_a_template_gets_own_variables(app_module):
                 s.delete(n)
             except FileNotFoundError:
                 pass
+
+
+def test_drop_generated_compose(app_module, tmp_path):
+    from app.envfile import drop_generated_compose, read_env
+    f = tmp_path / ".env"
+    f.write_text("# compose files\nCOMPOSE_FILE=compose.yaml:compose.generated.yaml:compose.override.yaml\nTZ=UTC\n")
+    assert drop_generated_compose(str(f)) is True
+    assert read_env(str(f))["COMPOSE_FILE"] == "compose.yaml:compose.override.yaml" and "# compose files" in f.read_text()
+    assert drop_generated_compose(str(f)) is False  # only once

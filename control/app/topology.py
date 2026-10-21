@@ -47,9 +47,9 @@ def graph():
              access=next((p["access"] for p in (d, s["git"], s["db"], s["files"]) if p), ""),
              url=s["base_url"] or (s["git"] or {}).get("url", "") or (s["web"] or {}).get("url", "") or (s["db"] or {}).get("target", "")
              or (s["files"] or {}).get("target", ""), missing=s["missing"],
-             docker=f"{'local socket' if d['mode'] == 'socket' else 'ssh ' + d['target']} · {d['stacks_dir'] or '–'}" if d else "")
+             docker=f"ssh {d['target'] or '–'} · {d['stacks_dir'] or '–'}" if d else "")
         fh = (s["data"].get("files") or {}).get("ssh_host") or (systems.get(s["system"], {}).get("ssh_host") if s["files"] else "")
-        if d and d["mode"] == "ssh" and d["target"] in hosts:
+        if d and d["target"] in hosts:
             # docker over ssh: the path goes through the SSH host
             edge(f"ssh:{d['target']}", sid, "docker", "docker")
         elif s["files"] and fh in hosts:

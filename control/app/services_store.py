@@ -91,9 +91,9 @@ def files_info(f):
 
 
 def docker_info(d, env):
-    mode = d.get("mode", "socket")
-    return {"mode": mode, "access": d.get("access", "ro"), "stacks_dir": _sub(d.get("stacks_dir"), env),
-            "target": _sub(d.get("socket", "/var/run/docker.sock"), env) if mode == "socket" else d.get("ssh_host", "")}
+    """docker hosts run over ssh; legacy = an old "mode": "socket" entry (removed in v0.11) that svc refuses"""
+    return {"access": d.get("access", "ro"), "stacks_dir": _sub(d.get("stacks_dir"), env), "target": d.get("ssh_host", ""),
+            "legacy": d.get("mode", "ssh") != "ssh"}  # a missing ssh_host may come from the system – svc test tells
 
 
 PLACEHOLDER_DOMAIN = "example.com"  # {{DOMAIN}} in templates – the user enters the real address, nothing is guessed

@@ -2,6 +2,25 @@
 
 All notable changes, newest first. Every release lists **upgrade steps** from the previous one.
 
+## Unreleased
+
+### Changes
+- **Docker hosts run over SSH only** – the `socket` mode for docker services is gone. It mounted the host's Docker
+  socket into the sandbox, which made Claude root on the host and undid the privilege separation (`.env`, SSH key).
+  Every docker host, the tentaclAI host too (an SSH host for `host.docker.internal`), is reached through `svc` over SSH.
+  `svc` refuses an old `"mode": "socket"` entry with a hint, the service page marks it *not usable*.
+- With it go `compose.generated.yaml` (and its comparison in the *Apply now* hint), the Docker CLI in the sandbox image
+  (1.47 → 1.26 GB), the template *Docker host (local, socket)*, the per-host Claude terminal tabs and
+  `./tentaclai.sh host`. `./tentaclai.sh init` points to SSH hosts instead of offering a socket service.
+- tentacontrol keeps the Docker socket – it runs the sandbox; *Docker socket proxy* is off the roadmap.
+
+### Upgrade (from v0.10.0)
+`./tentaclai.sh update`, `docker compose build`, `docker compose up -d` – recreating `tentaclai` ends running sessions and
+Remote Control. On its first start tentacontrol removes `compose.generated.yaml` from `COMPOSE_FILE` in `.env` (the
+stale file can be deleted). **If you used a docker service in `socket` mode:** add the host under Tentacles → SSH hosts
+(this host: hostname `host.docker.internal`, a user allowed to run docker or a sudo prefix), then set `"mode": "ssh"`
+and `"ssh_host": "<alias>"` in the service and remove `"socket"`.
+
 ## v0.10.0 – 2026-10-21
 
 ### Highlights

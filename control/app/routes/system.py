@@ -148,27 +148,14 @@ async def rc_restart():
 
 @router.get("/terminal", response_class=HTMLResponse)
 async def terminal_page(request: Request, p: str = "claude", alias: str = ""):
-    hosts = docker_dirs()
     if p == "onboard":
         title = f"Onboard service: {alias}"
-    elif p == "host":
-        title = f"Claude · {hosts.get(alias, alias)}"
     else:
         title = PROFILES.get(p, PROFILES["claude"])["title"]
     logged = await asyncio.to_thread(dockerops.logged_in_claude)
-    return page(request, "terminal.html", profiles=PROFILES, hosts=hosts, current=p, title=title, logged=logged,
+    return page(request, "terminal.html", profiles=PROFILES, current=p, title=title, logged=logged,
                 params={"alias": alias},
-                reattach=p in ("claude", "rc", "inventory", "onboard", "host"))  # tmux-based: safe to reconnect automatically
-
-
-def docker_dirs():
-    """local docker services with a stacks dir -> {name: dir} (terminal tabs)"""
-    out = {}
-    for s in services_store.load_all():
-        d = s["data"].get("docker") or {}
-        if s["state"] == "ok" and d.get("mode", "socket") == "socket" and d.get("stacks_dir"):
-            out[s["name"]] = d["stacks_dir"]
-    return out
+                reattach=p in ("claude", "rc", "inventory", "onboard"))  # tmux-based: safe to reconnect automatically
 
 
 @router.websocket("/ws/terminal")
@@ -185,11 +172,6 @@ async def ws_terminal(ws: WebSocket, p: str = "claude", alias: str = ""):
     try:
         if p == "onboard":
             cmd = onboard_cmd(alias)
-        elif p == "host":
-            d = docker_dirs().get(alias)
-            if not d:
-                raise ValueError("no local docker service with this name")
-            cmd = ["cc", d]
         else:
             cmd = PROFILES.get(p, PROFILES["claude"])["cmd"]
     except ValueError as e:

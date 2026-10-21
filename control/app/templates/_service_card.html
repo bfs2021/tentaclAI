@@ -14,7 +14,7 @@
     {% if s.docker %}
     <div class="small">
       <span class="pill {{ {'rw':'accent','confirm':'warn'}.get(s.docker.access, 'info') }}">{{ {'rw':'read + write (rw)','confirm':'confirm writes'}.get(s.docker.access, 'read only (ro)') }}</span>
-      <span class="pill info">{{ 'local' if s.docker.mode == 'socket' else 'ssh ' ~ s.docker.target }}</span>
+      <span class="pill info">{{ 'ssh ' ~ s.docker.target if not s.docker.legacy else 'socket – no longer supported' }}</span>
       <div class="mono faint" style="margin-top:6px">{{ s.docker.stacks_dir or '–' }}</div>
     </div>
     {% endif %}
