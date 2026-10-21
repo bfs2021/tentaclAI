@@ -14,7 +14,7 @@
   {% if current == 'onboard' %}<a class="active">{{ title }}</a>{% endif %}
 </div>
 <div class="term-wrap"><div id="term" style="height:100%"></div></div>
-<p class="help">tmux: scroll with the mouse wheel · leave a session without ending it: <code>Ctrl+B</code>, then <code>D</code> · select: <code>Shift</code> + drag (Mac: <code>Option</code> + drag), copy: <code>Cmd+C</code> / <code>Ctrl+Shift+C</code> · paste: <code>Ctrl+Shift+V</code> or right click</p>
+<p class="help">tmux: scroll with the mouse wheel · leave a session without ending it: <code>Ctrl+B</code>, then <code>D</code> · select: drag (tmux) or <code>Shift</code>/<code>Option</code> + drag, copy: <code>Cmd+C</code> / <code>Ctrl+Shift+C</code> · paste: <code>Ctrl+Shift+V</code> or right click</p>
 {% endblock %}
 {% block scripts %}
 <script src="/vendor/xterm.js"></script>
@@ -71,8 +71,19 @@
     };
   }
   function sendSize() { if (ws && ws.readyState === 1) ws.send(JSON.stringify({type: "resize", cols: term.cols, rows: term.rows})); }
+  // tmux (and Claude Code) hand their copies over as OSC 52 – a plain drag selects in tmux, not in the browser.
+  // Write it to the clipboard right away; Safari refuses that outside a key press, so Cmd+C copies it then.
+  var tmuxCopy = "";
+  term.parser.registerOscHandler(52, function (data) {
+    var b64 = data.slice(data.indexOf(";") + 1);
+    if (!b64 || b64 === "?") return true;
+    try { tmuxCopy = new TextDecoder().decode(Uint8Array.from(atob(b64), function (c) { return c.charCodeAt(0); })); }
+    catch (e) { return true; }
+    if (navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(tmuxCopy).catch(function () {});
+    return true;
+  });
   function copySelection() {
-    var text = term.getSelection();
+    var text = term.hasSelection() ? term.getSelection() : tmuxCopy;
     if (navigator.clipboard && window.isSecureContext) return navigator.clipboard.writeText(text);
     var ta = document.createElement("textarea");  // plain http: the Clipboard API is missing
     ta.value = text; ta.style.position = "fixed"; ta.style.opacity = "0";
@@ -81,8 +92,9 @@
   // Cmd+C / Ctrl+Shift+C copy the selection ourselves – Safari never fires xterm's own copy event
   term.attachCustomKeyEventHandler(function (e) {
     var copy = e.code === "KeyC" && (e.metaKey || (e.ctrlKey && e.shiftKey));
-    if (copy && e.type === "keydown" && term.hasSelection()) { copySelection(); e.preventDefault(); return false; }
-    return !(copy && term.hasSelection());
+    var have = term.hasSelection() || tmuxCopy;
+    if (copy && e.type === "keydown" && have) { copySelection(); e.preventDefault(); return false; }
+    return !(copy && have);
   });
   term.onData(function (d) { if (ws && ws.readyState === 1) ws.send(JSON.stringify({type: "input", data: d})); });
   window.addEventListener("resize", function () { fit.fit(); sendSize(); });
