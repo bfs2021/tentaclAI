@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% from "_icons.html" import icon, help_link %}
 {% block title %}Jobs{% endblock %}
-{% macro light(st) %}{% set r = st.get('result') or {} %}{% set k = r.get('status') if st.status == 'done' else st.status %}<span class="pill {{ {'ok': 'ok', 'warn': 'warn', 'alert': 'err', 'failed': 'err', 'timeout': 'err', 'running': 'info', 'queued': 'info'}.get(k, 'off') }}">{{ k }}</span>{% endmacro %}
+{% macro light(st) %}{% set r = st.get('result') or {} %}{% set k = r.get('status') if st.status == 'done' else st.status %}<span class="pill {{ {'ok': 'ok', 'warn': 'warn', 'alert': 'err', 'failed': 'err', 'timeout': 'err', 'running': 'accent running', 'queued': 'info queued'}.get(k, 'off') }}">{% if k == 'running' %}<span class="spin" aria-hidden="true"></span>{% endif %}{{ k }}</span>{% endmacro %}
 {% block content %}
 <div class="header">
   <div><h1>Jobs</h1><div class="sub">Claude tasks on a schedule – reports and checks whose result comes as a notification. One run at a time; each run is a fresh Claude session.</div></div>
@@ -34,7 +34,7 @@
   {% for r in j.runs %}
     {% set res = r.get('result') or {} %}
     <details class="mem-entry" id="run-{{ r.id }}">
-      <summary>{{ light(r) }} <span>{{ res.get('title') or r.get('error') or '' }}</span><span class="faint small">{{ fmt(r.get('started') or r.queued) }}{% if r.seconds %} · {{ r.seconds }} s{% endif %}{% if r.cost %} · ${{ '%.2f' % r.cost }}{% endif %}{% if r.trigger == 'manual' %} · manual{% endif %}</span></summary>
+      <summary>{{ light(r) }} <span>{% if r.status == 'running' %}<span class="muted">Claude is working – <span class="elapsed" data-since="{{ r.started or r.queued }}"></span></span>{% elif r.status == 'queued' %}<span class="muted">waiting for the run before it</span>{% else %}{{ res.get('title') or r.get('error') or '' }}{% endif %}</span><span class="faint small">{{ fmt(r.get('started') or r.queued) }}{% if r.seconds %} · {{ r.seconds }} s{% endif %}{% if r.cost %} · ${{ '%.2f' % r.cost }}{% endif %}{% if r.trigger == 'manual' %} · manual{% endif %}</span></summary>
       <div class="small" style="margin-top:8px">
         {% if res.get('summary') %}<p style="margin:0 0 6px">{{ res.summary }}</p>{% endif %}
         {% if res.get('details') %}<pre class="rc" style="max-height:340px">{{ res.details }}</pre>{% endif %}
@@ -49,4 +49,20 @@
 </div>
 {% endfor %}
 {% endif %}
+{% set busy = rows | selectattr('busy') | list %}
+<div hx-get="/partials/jobs-state?v={{ token }}" hx-trigger="every {{ '3s' if busy else '15s' }}" hx-swap="none" aria-hidden="true"></div>
+<script>
+(function () {  // running time of a run, ticking
+  function tick() {
+    document.querySelectorAll(".elapsed").forEach(function (el) {
+      var s = Math.max(0, Math.floor(Date.now() / 1000 - parseFloat(el.dataset.since)));
+      el.textContent = Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0");
+    });
+  }
+  tick(); setInterval(tick, 1000);
+  document.querySelectorAll("details[id^=run-]").forEach(function (d) {  // a running run is open, so its state shows
+    if (d.querySelector(".pill.running")) d.open = true;
+  });
+})();
+</script>
 {% endblock %}

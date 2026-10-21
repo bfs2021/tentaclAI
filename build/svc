@@ -146,14 +146,29 @@ def job():
         runs = {}
     known = [runs.get(r) for r in found if JOB_RE.match(r) and isinstance(runs.get(r), dict)]
     ro = len(known) < len(found) or any(k.get("profile") != "standard" for k in known)
+    # a job limited to the tentacles its task names: only those – the intersection if markers disagree
+    allows = [set(map(str, k["allow"])) for k in known if isinstance(k.get("allow"), list)]
     first = found[-1]  # the outermost marker – the one tentacontrol set
-    _job = {"run": first if JOB_RE.match(first) else "", "read_only": ro}
+    _job = {"run": first if JOB_RE.match(first) else "", "read_only": ro,
+            "allow": set.intersection(*allows) if allows else None}
     return _job
 
 
 def job_read_only():
     j = job()
     return bool(j and j["read_only"])
+
+
+def job_allows(name):
+    """False when a scheduled job is limited to other tentacles"""
+    j = job()
+    return not j or j.get("allow") is None or name in j["allow"]
+
+
+def require_allowed(name):
+    if not job_allows(name):
+        audit(name, "job", "–", f"use {name}", "blocked", detail="not one of the job's tentacles")
+        sys.exit(f"svc: this job may only use the tentacles its task names ({', '.join(sorted(job()['allow'])) or 'none'}) – not {name}")
 
 
 def origin():
@@ -325,7 +340,9 @@ def kinds(svc):
 
 
 def get(services, name):
-    return services.get(name) or sys.exit(f"svc: unknown service '{name}' (svc list)")
+    svc = services.get(name) or sys.exit(f"svc: unknown service '{name}' (svc list)")
+    require_allowed(name)
+    return svc
 
 
 # ---------- api ----------
@@ -1809,6 +1826,7 @@ def cmd_ssh(name_args):
         cmd = cmd[1:]
     if not tclib.ssh_host(SSH_CONF_D, alias):
         sys.exit(f"svc: unknown SSH host '{alias}' (svc ssh)")
+    require_allowed(alias)
     mode = "ro" if job_read_only() else tclib.ssh_access(SSH_CONF_D, alias)
     remote = " ".join(cmd)
     tty = not cmd or sys.stdin.isatty() and sys.stdout.isatty()
@@ -2207,6 +2225,7 @@ def cmd_mcp_proxy(services, name):
         sys.exit(f"svc: {name}: MCP not available (svc test {name})")
     if job_read_only():
         sys.exit(f"svc: {name}: MCP servers are off in read-only jobs (their tools can write)")
+    require_allowed(name)
     m = render(svc["mcp"])
     kind = m.get("type", "stdio" if m.get("command") else "http")
     if kind == "stdio":

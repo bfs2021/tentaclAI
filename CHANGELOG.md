@@ -16,6 +16,10 @@ All notable changes, newest first. Every release lists **upgrade steps** from th
   and by `svc`, which recognises the run and treats every tentacle as `ro`; *standard* works like a terminal session
   (approvals for `confirm`, shown as “Job · name”).
   *Clone* copies a job – the copy starts paused.
+  Tentacles are named in the task with `@name` (completed in the editor, checked on save with hints such as
+  "sends mail from a read-only job"); *Only the tentacles named in the task* limits a run to them – `svc` refuses
+  every other service and SSH host, MCP servers are off. A running run shows a spinner and its time, the page
+  reloads when it ends.
 
 ### Changes
 - Notifications: channel type **E-mail** – server, port, STARTTLS / SSL / none (internal relay), sender, recipients

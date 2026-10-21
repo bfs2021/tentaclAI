@@ -134,3 +134,55 @@ def test_clone_starts_paused(sj, monkeypatch, tmp_path):
     j = sj.get(c)
     assert j["name"] == "Disk space (copy)" and j["enabled"] is False and j["profile"] == "standard" and j["prompt"] == "df"
     assert sj.get(jid)["enabled"] is True
+
+
+KNOWN = {"mailrelay": {"kind": "service", "parts": {"smtp": "rw"}, "enabled": True, "description": "relay"},
+         "imap_x": {"kind": "service", "parts": {"imap": "ro"}, "enabled": True, "description": ""},
+         "slowmail": {"kind": "service", "parts": {"smtp": "confirm"}, "enabled": True, "description": ""},
+         "n8n": {"kind": "service", "parts": {"api": "rw", "mcp": "tools"}, "enabled": False, "description": ""},
+         "nas": {"kind": "ssh", "parts": {"ssh": "rw"}, "enabled": True, "description": "SSH host nas"}}
+
+
+def test_mentions(sj):
+    assert sj.mentions("send via @mailrelay, check @imap_x; mail me@example.com and @mailrelay again") == ["mailrelay", "imap_x"]
+
+
+def test_check_mentions(sj):
+    err, warn = sj.check_mentions({"prompt": "use @nope and @n8n", "profile": "standard", "scope": True}, KNOWN)
+    assert err == ["@nope is no service or SSH host"]
+    assert any("@n8n is disabled" in w for w in warn) and any("@n8n: MCP tools are off" in w for w in warn)
+    _, warn = sj.check_mentions({"prompt": "send with @mailrelay", "profile": "read-only"}, KNOWN)
+    assert warn == ["@mailrelay can't send mail in a read-only job"]
+    _, warn = sj.check_mentions({"prompt": "send with @slowmail", "profile": "standard"}, KNOWN)
+    assert "asks for approval (smtp)" in warn[0]
+    err, _ = sj.check_mentions({"prompt": "no names", "profile": "standard", "scope": True}, KNOWN)
+    assert "needs at least one @name" in err[0]
+
+
+def test_context_scope_and_strict_mcp(sj, monkeypatch):
+    monkeypatch.setattr(sj, "tentacles", lambda: KNOWN)
+    job = {"name": "mail test", "prompt": "send via @mailrelay, check @imap_x", "profile": "standard", "scope": True}
+    argv = sj.claude_argv(job, "run1", "sid")
+    system = argv[argv.index("--append-system-prompt") + 1]
+    assert "@mailrelay = service mailrelay (smtp rw) – relay" in system and "svc refuses every other one" in system
+    assert "--strict-mcp-config" in argv
+    assert "--strict-mcp-config" not in sj.claude_argv(dict(job, scope=False), "run1", "sid")
+    assert "--strict-mcp-config" in sj.claude_argv(dict(job, scope=False, profile="read-only"), "run1", "sid")
+
+
+def test_registry_carries_the_allow_list(sj, monkeypatch, tmp_path):
+    monkeypatch.setattr(sj, "ACTIVE", str(tmp_path / "runs.json"))
+    sj._register("r1", {"name": "a", "profile": "standard", "scope": True, "prompt": "@mailrelay @nas"})
+    sj._register("r2", {"name": "b", "profile": "standard", "prompt": "@mailrelay"})
+    act = json.load(open(tmp_path / "runs.json"))
+    assert act["r1"]["allow"] == ["mailrelay", "nas"] and "allow" not in act["r2"]
+
+
+def test_state_token_changes(sj, monkeypatch, tmp_path):
+    from app import jsonstore
+    monkeypatch.setattr(sj, "HISTORY", str(tmp_path / "h.json"))
+    monkeypatch.setattr(sj, "JOBS", str(tmp_path / "j.json"))
+    jsonstore.save(sj.HISTORY, [{"id": "a", "status": "running"}])
+    t1 = sj.state_token()
+    jsonstore.save(sj.HISTORY, [{"id": "a", "status": "done"}])
+    assert sj.state_token() != t1

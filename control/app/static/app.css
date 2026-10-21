@@ -404,3 +404,12 @@ input[type=checkbox]:not(.switch-cb) { accent-color: var(--accent-2); }
 .job-card h2 { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .job-card h2 svg { width: 18px; height: 18px; color: var(--accent); flex: none; }
 .nav-badge.warn { animation: none; }  /* findings wait, nobody is blocked – no pulse */
+.pill .spin { width: 10px; height: 10px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%;
+  display: inline-block; animation: spin .8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.pill.queued { animation: pulse 1.6s ease-in-out infinite; }
+.mention-pop { position: absolute; z-index: 20; background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius-sm);
+  box-shadow: 0 8px 24px rgba(0,0,0,.25); max-height: 260px; overflow: auto; min-width: 260px; }
+.mention-pop div { padding: 6px 10px; cursor: pointer; display: flex; gap: 8px; align-items: baseline; }
+.mention-pop div.sel, .mention-pop div:hover { background: var(--accent-soft); }
+.mention-pop small { color: var(--muted); }

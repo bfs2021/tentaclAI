@@ -17,9 +17,15 @@ router = APIRouter()
 def _job_page(request, jid=None, job=None, error=None, status=200):
     if job is None and jid:
         job = scheduled.get(jid)
+    known = scheduled.tentacles()
+    warnings = scheduled.check_mentions(job, known)[1] if job and job.get("prompt") else []
     resp = page(request, "job_edit.html", jid=jid, job=job or {}, error=error, profiles=scheduled.PROFILES,
                 notify_rules=scheduled.NOTIFY, days=scheduled.DAYS, templates=scheduled.TEMPLATES,
-                rw=scheduled.rw_tentacles(), efforts=tclib.EFFORTS)
+                rw=[x for x in scheduled.rw_tentacles()
+                    if not (job or {}).get("scope") or x.removeprefix("ssh ") in scheduled.mentions(job.get("prompt"))],
+                efforts=tclib.EFFORTS, warnings=warnings,
+                tentacle_list=[{"name": n, "kind": t["kind"], "parts": ", ".join(t["parts"]), "on": t["enabled"]}
+                               for n, t in sorted(known.items())])
     resp.status_code = status
     return resp
 
@@ -35,10 +41,18 @@ async def job_count():
     return HTMLResponse(f'<span class="nav-badge warn">{n}</span>' if n else '<span class="nav-badge" hidden></span>')
 
 
+@router.get("/partials/jobs-state", response_class=HTMLResponse)
+async def jobs_state(v: str = ""):
+    """the Jobs page polls this: a different state (a run started, finished, failed) reloads the page"""
+    if v and v != scheduled.state_token():
+        return HTMLResponse("", headers={"HX-Refresh": "true"})
+    return HTMLResponse("")
+
+
 @router.get("/jobs", response_class=HTMLResponse)
 async def jobs_page(request: Request):
     scheduled.mark_seen()
-    return page(request, "jobs.html", rows=scheduled.overview(), templates=scheduled.TEMPLATES,
+    return page(request, "jobs.html", rows=scheduled.overview(), templates=scheduled.TEMPLATES, token=scheduled.state_token(),
                 fmt=lambda ts: time.strftime("%Y-%m-%d %H:%M", time.localtime(ts)) if ts else "–")
 
 
@@ -64,6 +78,9 @@ async def job_save(request: Request):
         jid = await asyncio.to_thread(scheduled.save, form, jid)
     except (ValueError, KeyError) as e:
         return respond(request, f"Not saved: {e}", "err")
+    warnings = scheduled.check_mentions(scheduled.get(jid))[1]
+    if warnings:
+        return respond(request, "Job saved – note: " + "; ".join(warnings), "warn", redirect=f"/jobs/{jid}")
     return respond(request, "Job saved", redirect="/jobs")
 
 

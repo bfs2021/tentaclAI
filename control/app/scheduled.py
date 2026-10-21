@@ -72,6 +72,75 @@ TEMPLATES = [
 ]
 
 
+# ---------------------------------------------------------------- @tentacle mentions
+
+MENTION_RE = re.compile(r"(?<![\w@.])@([a-z0-9][a-z0-9_-]{0,40})\b")
+
+
+def tentacles():
+    """name → {kind, parts {part: access}, enabled} for services and SSH hosts (what a task can mention)"""
+    from .config import SERVICES_DIR, SSH_DIR, STACK_DIR
+    out = {}
+    for name, svc in tclib.load_services(SERVICES_DIR, tclib.load_systems(STACK_DIR)).items():
+        parts = {p: str(svc[p].get("access", "confirm" if p == "smtp" else ("rw" if p == "api" else "ro")))
+                 for p in tclib.PARTS if isinstance(svc.get(p), dict) and p != "mcp"}
+        if "mcp" in svc:
+            parts["mcp"] = "tools"
+        out[name] = {"kind": "service", "parts": parts, "enabled": tclib.enabled(svc), "description": svc.get("description", "")}
+    conf = os.path.join(SSH_DIR, "config.d")
+    for h in tclib.ssh_hosts(conf):
+        out.setdefault(h["alias"], {"kind": "ssh", "parts": {"ssh": tclib.ssh_access(conf, h["alias"])}, "enabled": True,
+                                    "description": f"SSH host {h.get('hostname') or ''}".strip()})
+    return out
+
+
+def mentions(prompt):
+    seen = []
+    for m in MENTION_RE.findall(prompt or ""):
+        if m not in seen:
+            seen.append(m)
+    return seen
+
+
+def check_mentions(job, known=None):
+    """(errors, warnings) for the tentacles a task names – errors stop the save"""
+    known = tentacles() if known is None else known
+    errors, warnings = [], []
+    ro = job.get("profile", "read-only") != "standard"
+    names = mentions(job.get("prompt"))
+    for n in names:
+        t = known.get(n)
+        if t is None:
+            errors.append(f"@{n} is no service or SSH host")
+            continue
+        if not t["enabled"]:
+            warnings.append(f"@{n} is disabled – the job can't use it")
+        writes = [p for p, a in t["parts"].items() if a in ("rw", "confirm")]
+        if ro and "smtp" in t["parts"]:
+            warnings.append(f"@{n} can't send mail in a read-only job")
+        elif not ro and any(t["parts"][p] == "confirm" for p in writes):
+            warnings.append(f"@{n} asks for approval ({', '.join(p for p in writes if t['parts'][p] == 'confirm')}) – "
+                            "the run waits up to 10 min, at night nobody answers")
+        if job.get("scope") and "mcp" in t["parts"]:
+            warnings.append(f"@{n}: MCP tools are off in a job limited to its tentacles – it can use the other parts")
+    if job.get("scope") and not names:
+        errors.append("“only the tentacles named in the task” needs at least one @name in the task")
+    return errors, warnings
+
+
+def mention_context(job, known=None):
+    """a line per mentioned tentacle for Claude – so it doesn't search the catalog first"""
+    known = tentacles() if known is None else known
+    lines = []
+    for n in mentions(job.get("prompt")):
+        t = known.get(n)
+        if t:
+            parts = ", ".join(f"{p} {a}" for p, a in t["parts"].items())
+            lines.append(f"@{n} = {'SSH host' if t['kind'] == 'ssh' else 'service'} {n} ({parts})"
+                         + (f" – {t['description']}" if t.get("description") else ""))
+    return lines
+
+
 # ---------------------------------------------------------------- schedules
 
 def _field(spec, lo, hi):
@@ -249,6 +318,10 @@ def save(form, jid=None):
     if not 1 <= minutes <= 120:
         raise ValueError("max. runtime: 1–120 minutes")
     sched = clean_schedule(form)
+    scope = bool(form.get("scope"))
+    errors, _ = check_mentions({"prompt": prompt, "profile": profile, "scope": scope})
+    if errors:
+        raise ValueError("; ".join(errors))
     if jid is None:
         jid = slug(name)
         base, n = jid, 2
@@ -257,7 +330,7 @@ def save(form, jid=None):
     elif jid not in jobs:
         raise ValueError("unknown job")
     old = jobs.get(jid, {})
-    job = dict(old, name=name, prompt=prompt, profile=profile, notify=rule, model=model, effort=effort,
+    job = dict(old, name=name, prompt=prompt, profile=profile, notify=rule, model=model, effort=effort, scope=scope,
                max_minutes=minutes, schedule=sched, enabled=old.get("enabled", True), created=old.get("created", time.time()))
     if old.get("schedule") != sched or "next" not in old:
         job["next"] = next_run(sched, time.time(), old.get("last"))
@@ -308,9 +381,17 @@ def claude_argv(job, run_id, session_id):
     model = job.get("model") or m.get("main") or ""
     effort = job.get("effort") or m.get("effort") or ""
     ro = job.get("profile") != "standard"
+    system = SYSTEM.format(name=job["name"], ro=SYSTEM_RO if ro else "")
+    context = mention_context(job)
+    if context:
+        system += " Tentacles named in the task (@name): " + "; ".join(context) + "."
+    if job.get("scope"):
+        system += (" This run may only use those tentacles – svc refuses every other one, and MCP servers are off. "
+                   "If the task needs another tentacle, say so in the summary.")
     argv = ["claude", "-p", job["prompt"], "--output-format", "json", "--session-id", session_id,
-            "--json-schema", json.dumps(SCHEMA), "--append-system-prompt",
-            SYSTEM.format(name=job["name"], ro=SYSTEM_RO if ro else "")]
+            "--json-schema", json.dumps(SCHEMA), "--append-system-prompt", system]
+    if ro or job.get("scope"):
+        argv += ["--strict-mcp-config"]  # no MCP servers: their tools could reach other services past svc
     if model:
         argv += ["--model", model]
     if effort:
@@ -360,6 +441,8 @@ def should_notify(job, run):
 def _register(run_id, job):
     act = jsonstore.load(ACTIVE) or {}
     act[run_id] = {"job": job["name"], "profile": job.get("profile", "read-only"), "started": time.time()}
+    if job.get("scope"):
+        act[run_id]["allow"] = mentions(job.get("prompt"))  # svc refuses every other tentacle
     jsonstore.save(ACTIVE, act, mode=0o600)
 
 
@@ -554,6 +637,14 @@ def unseen():
     return sum(1 for r in history() if finding(r) and (r.get("ended") or 0) > seen)
 
 
+def state_token():
+    """changes whenever a run is queued, starts, ends – or a job is added, edited, paused"""
+    import hashlib
+    h = history()[-50:]
+    raw = json.dumps([(r.get("id"), r.get("status")) for r in h]) + str(os.path.getmtime(JOBS) if os.path.exists(JOBS) else 0)
+    return hashlib.sha1(raw.encode()).hexdigest()[:12]
+
+
 def mark_seen():
     jsonstore.save(SEEN, {"ts": time.time()})
 
@@ -565,7 +656,7 @@ def overview():
     for jid, job in sorted(load().items(), key=lambda kv: kv[1]["name"].lower()):
         runs = [r for r in h if r.get("job") == jid]
         rows.append(dict(job, id=jid, when=describe(job["schedule"]), last_run=runs[-1] if runs else None,
-                         runs=list(reversed(runs[-10:])), busy=jid in _current.values() or any(r["status"] == "queued" for r in runs)))
+                         runs=list(reversed(runs[-10:])), busy=jid in _current.values() or any(r["status"] in ("queued", "running") for r in runs)))
     return rows
 
 

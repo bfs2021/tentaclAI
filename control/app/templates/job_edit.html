@@ -15,9 +15,11 @@
 <form class="card stack" hx-post="/jobs/save" style="gap:14px">
   <input type="hidden" name="jid" value="{{ jid or '' }}">
   <div><label>Name</label><input type="text" name="name" value="{{ job.name or '' }}" maxlength="60" required></div>
-  <div><label>Task</label>
-    <textarea name="prompt" style="min-height:160px;font-family:inherit" required placeholder="e.g. Check the free disk space on every host and warn above 80 %.">{{ job.prompt or '' }}</textarea>
-    <div class="help">Say when it is ok, warn or alert – that decides whether you hear about it.</div></div>
+  {% if warnings %}<div class="card flat small">{% for w in warnings %}<div><span class="pill warn">note</span> {{ w }}</div>{% endfor %}</div>{% endif %}
+  <div style="position:relative"><label for="prompt">Task</label>
+    <textarea name="prompt" id="prompt" style="min-height:160px;font-family:inherit" required placeholder="e.g. Check the free disk space on @docktopus and warn above 80 %.">{{ job.prompt or '' }}</textarea>
+    <div class="help">Name tentacles with <code>@</code> (e.g. <code>@mailrelay</code>) – Claude gets their details, and the job can be limited to them. Say when it is ok, warn or alert – that decides whether you hear about it.</div></div>
+  <label class="check"><input type="checkbox" name="scope" value="1" {{ 'checked' if job.scope }}> Only the tentacles named in the task (<code>@name</code>) – <code>svc</code> refuses every other one, MCP servers are off</label>
 
   <div class="grid2">
     <div><label>Schedule</label>
@@ -54,6 +56,45 @@
   <div class="row"><button class="btn primary">{{ icon('check') }}Save</button><a class="btn ghost" href="/jobs">Cancel</a></div>
 </form>
 <script>
+(function () {  // @mention completion in the task
+  var list = {{ tentacle_list | tojson }}, ta = document.getElementById("prompt"), pop = null, sel = 0, items = [];
+  function close() { if (pop) { pop.remove(); pop = null; } }
+  function word() {
+    var m = ta.value.slice(0, ta.selectionStart).match(/(^|[^\w@.])@([a-z0-9_-]*)$/);
+    return m ? m[2] : null;
+  }
+  function pick(name) {
+    var pos = ta.selectionStart, before = ta.value.slice(0, pos).replace(/@[a-z0-9_-]*$/, "@" + name + " ");
+    ta.value = before + ta.value.slice(pos); ta.selectionStart = ta.selectionEnd = before.length; close(); ta.focus();
+  }
+  function show() {
+    var w = word(); close();
+    if (w === null) return;
+    items = list.filter(function (t) { return t.name.indexOf(w) === 0; }).slice(0, 8);
+    if (!items.length) return;
+    sel = 0; pop = document.createElement("div"); pop.className = "mention-pop";
+    items.forEach(function (t, i) {
+      var d = document.createElement("div"); if (i === 0) d.className = "sel";
+      d.innerHTML = "<strong></strong><small></small>";
+      d.firstChild.textContent = "@" + t.name;
+      d.lastChild.textContent = (t.kind === "ssh" ? "SSH host" : t.parts) + (t.on ? "" : " · disabled");
+      d.addEventListener("mousedown", function (e) { e.preventDefault(); pick(t.name); });
+      pop.appendChild(d);
+    });
+    pop.style.left = "0"; pop.style.top = (ta.offsetTop + ta.offsetHeight + 4) + "px";
+    ta.parentNode.appendChild(pop);
+  }
+  ta.addEventListener("input", show);
+  ta.addEventListener("blur", function () { setTimeout(close, 150); });
+  ta.addEventListener("keydown", function (e) {
+    if (!pop) return;
+    if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+      e.preventDefault(); sel = (sel + (e.key === "ArrowDown" ? 1 : items.length - 1)) % items.length;
+      pop.querySelectorAll("div").forEach(function (d, i) { d.classList.toggle("sel", i === sel); });
+    } else if (e.key === "Enter" || e.key === "Tab") { e.preventDefault(); pick(items[sel].name); }
+    else if (e.key === "Escape") close();
+  });
+})();
 (function () {
   function sync() {
     var k = document.getElementById("sched-kind").value, p = document.getElementById("profile").value;

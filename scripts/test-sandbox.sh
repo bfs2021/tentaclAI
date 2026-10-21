@@ -190,7 +190,7 @@ AUDIT="$(docker exec tctest-claude cat "$T/data/control/audit.jsonl" 2>/dev/null
 check "audit entry names the session" "$(echo "$AUDIT" | tail -1 | grep -c "$SID" || true)" "1"
 check "the session token stays behind" "$(echo "$AUDIT" | grep -c leak-test || true)" "0"
 # scheduled jobs: tentacontrol runs a job's Claude under `sh -c … tc-job=<run>` and lists the run in root's job-runs.json
-docker exec tctest-claude sh -c "printf '%s' '{\"jobro01\": {\"job\": \"T\", \"profile\": \"read-only\"}, \"jobstd01\": {\"job\": \"T2\", \"profile\": \"standard\"}}' > $T/data/control/job-runs.json"
+docker exec tctest-claude sh -c "printf '%s' '{\"jobro01\": {\"job\": \"T\", \"profile\": \"read-only\"}, \"jobstd01\": {\"job\": \"T2\", \"profile\": \"standard\"}, \"jobscope1\": {\"job\": \"T3\", \"profile\": \"standard\", \"allow\": [\"testapi\"]}}' > $T/data/control/job-runs.json"
 J() { docker exec -u claude tctest-claude sh -c "$2; exit" "tc-job=$1" >/dev/null 2>&1 && echo ran || echo refused; }  # "; exit": sh stays the parent
 check "read-only job: API write refused" "$(J jobro01 'svc testapi POST /')" "refused"
 check "read-only job: ssh write refused" "$(J jobro01 'svc ssh testssh touch /tmp/job-ro')" "refused"
@@ -200,6 +200,10 @@ check "audit entry names the job" "$(docker exec tctest-claude tail -1 "$T/data/
 check "unknown job marker counts as read-only" "$(J fakejob01 'svc ssh testssh touch /tmp/job-fake')" "refused"
 check "a second marker can't lift read-only" "$(J jobro01 "sh -c 'svc ssh testssh touch /tmp/job-lift; exit' tc-job=jobstd01")" "refused"
 check "nested standard markers still write (control)" "$(J jobstd01 "sh -c 'svc ssh testssh touch /tmp/job-nest; exit' tc-job=jobstd01")" "ran"
+check "limited job: its own tentacle works" "$(docker exec -u claude tctest-claude sh -c 'svc testapi GET /; exit' tc-job=jobscope1 2>/dev/null)" '{"auth_ok": true}'
+check "limited job: another service refused" "$(J jobscope1 'svc testmail list')" "refused"
+check "limited job: another SSH host refused" "$(J jobscope1 'svc ssh testssh uptime')" "refused"
+check "unlimited job: other tentacles work (control)" "$(J jobstd01 'svc ssh testssh uptime')" "ran"
 # mail: GreenMail takes any login; testmail sends to @example.com only (rw needs that list)
 wait_for 60 docker exec tctest-api python -c "import socket; socket.create_connection(('tctest-mail', 3143), 2)" || stuck "GreenMail not listening"
 MSUBJ="tc test mail $$-$(date +%s)"  # unique: a kept REUSE stack still has the last run's mail
