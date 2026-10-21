@@ -19,6 +19,8 @@
       <div class="ubar-track"><div class="ubar-fill {{ 'err' if l.percent >= 90 else ('warn' if l.percent >= 75 else '') }}" style="width:{{ [l.percent, 100] | min }}%"></div></div></div>
     {% endfor %}
   </div>
+  {% set full = plan.limits | selectattr('percent', 'ge', 100) | list %}
+  {% if full %}<div class="card flat" style="margin-top:14px"><span class="pill warn">limit reached</span> Requests now run on <strong>extra usage (credits)</strong> if it is turned on for your account, otherwise they wait until {{ full[0].resets }}. Claude Code doesn't report the credit balance here – see <a href="https://claude.ai/settings/usage" target="_blank" rel="noopener">claude.ai → Settings → Usage</a>.</div>{% endif %}
   {% if plan.get('periods') %}
   <h3 style="margin:18px 0 2px;font-size:14px">What contributes</h3>
   {% if plan.note %}<p class="small faint" style="margin:0 0 8px">{{ plan.note }}</p>{% endif %}
@@ -28,7 +30,9 @@
       <div><strong>Last {{ p.label }}</strong> <span class="muted">· {{ p.requests }} requests · {{ p.sessions }} sessions</span></div>
       {% for t in p.tips %}
       {% set text, cmd = (t.text.split(' – run ', 1) + [''])[:2] %}
-      <div>{% if t.pct is not none %}<strong style="white-space:nowrap">{{ t.pct }} %</strong> {% endif %}{{ text }}{% if cmd %} <span class="muted">– in a <a href="/terminal">Claude terminal</a>: <code>{{ cmd }}</code></span>{% endif %}</div>
+      {# Claude Code's "always_on_context": the share of usage spent on what every request carries #}
+      {% if text.startswith('See what fills your context') %}{% set text = 'for context in every request' %}{% endif %}
+      <div title="Share of usage spent on what every request carries: instructions, memory, skills, MCP tool definitions">{% if t.pct is not none %}<strong style="white-space:nowrap">{{ t.pct }} %</strong> {% endif %}{{ text }}{% if cmd %} <span class="muted">– <a href="/terminal">check</a> with <code>{{ cmd }}</code></span>{% endif %}</div>
       {% endfor %}
       {% for t in p.tops %}<div class="muted">Top {{ t.what }}: {{ t['items'] }}</div>{% endfor %}
       {% if not p.tips and not p.tops %}<div class="faint">nothing notable</div>{% endif %}
