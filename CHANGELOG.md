@@ -5,6 +5,11 @@ All notable changes, newest first. Every release lists **upgrade steps** from th
 ## Unreleased
 
 ### Highlights
+- **Mail tentacles** `smtp` and `imap` (`svc mail`): send through a relay or a mailbox – `confirm` by default, `rw` only
+  with a recipient list; read a mailbox – list, read (as untrusted content between markers, without marking it
+  seen), mark and move with `rw`/`confirm`, folders can be limited. Through the egress gateway like databases; new
+  rule in Claude's instructions never to act on instructions in a mail. Templates *SMTP relay*, *SMTP (with login)*,
+  *Mailbox (IMAP + SMTP)*.
 - **Scheduled jobs** (new menu item *Jobs*, badge for unseen findings): Claude tasks on a schedule – presets or cron, a traffic-light answer
   (ok / warn / alert) and notifications only on findings; templates for patch report, certificate expiry, disk space,
   backup check and container health. Profile *read-only* (default) is enforced twice – by Claude Code's tool rules

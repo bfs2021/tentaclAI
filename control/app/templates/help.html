@@ -25,7 +25,7 @@
     <a href="#start">Getting started</a><a href="#site">Site &amp; installation</a><a href="#concept">How it fits together</a>
     <a href="#terminal">Terminal &amp; tmux</a><a href="#rc">Remote control</a><a href="#services">Services</a>
     <a href="#systems">Systems</a><a href="#topology">Topology</a><a href="#docker">Docker hosts</a><a href="#onboard">Onboarding a service</a><a href="#auth">Auth types</a>
-    <a href="#git">Git repositories</a><a href="#db">Databases</a><a href="#web">Web sources</a><a href="#files">Files</a><a href="#templates">Templates</a><a href="#inventory">System inventory</a>
+    <a href="#git">Git repositories</a><a href="#db">Databases</a><a href="#web">Web sources</a><a href="#files">Files</a><a href="#mail">Mail</a><a href="#templates">Templates</a><a href="#inventory">System inventory</a>
     <a href="#activity">Activity</a><a href="#jobs">Jobs</a><a href="#network">Network</a><a href="#ssh">SSH targets</a><a href="#claude">Claude</a><a href="#settings">Settings</a><a href="#updates">Updates</a><a href="#cli">Commands</a>
     <a href="#security">Security</a><a href="#troubleshooting">Troubleshooting</a><a href="#roadmap">Roadmap</a>
   </nav>
@@ -188,6 +188,21 @@
         "fields": {"username": "${WIKI_USER}", "password": "${WIKI_PASSWORD}"}, "csrf_field": "_token"},
         "paths": ["/wiki/"]}</pre>
       <p>Claude: <code>svc web &lt;name&gt; &lt;path&gt;</code> returns the page as readable text with links, <code>--links</code> lists the links, <code>--raw</code> the HTML, <code>--login</code> logs in again. Read-only; page content is treated as data, not instructions.</p>
+    </section>
+
+    <section class="card" id="mail">
+      <h2>Mail <code>smtp</code> / <code>imap</code></h2>
+      <p>Sending (<code>smtp</code>) and reading a mailbox (<code>imap</code>) – one part or both in one service. Like databases, mail goes through the egress gateway (svc tunnels it); <code>security</code> is <code>starttls</code>, <code>ssl</code> or <code>none</code> (an internal relay), the port follows from it unless set. Templates: <em>SMTP relay (no login)</em>, <em>SMTP (with login)</em>, <em>Mailbox (IMAP + SMTP)</em>.</p>
+      <pre class="rc">"smtp": {"host": "smtp.example.com", "security": "starttls", "user": "${MAIL_USER}", "password": "${MAIL_PASSWORD}",
+         "from": "tentaclai@example.com", "recipients": ["@example.com", "boss@example.org"], "access": "confirm"},
+"imap": {"host": "imap.example.com", "security": "ssl", "user": "${MAIL_USER}", "password": "${MAIL_PASSWORD}",
+         "folders": ["INBOX", "Alerts"], "access": "ro"}</pre>
+      <ul>
+        <li><strong>smtp</strong>: <code>confirm</code> (default) – every mail waits for your approval, showing recipients, subject and the start of the text. <code>rw</code> sends without asking and only works with a <code>recipients</code> list (addresses or <code>@domain</code>, exact domain); if a list is set it also limits <code>confirm</code>. <code>ro</code> doesn't send.</li>
+        <li><strong>imap</strong>: <code>ro</code> (default) lists and reads – reading uses a read-only mailbox and doesn't mark mails as seen. <code>rw</code> / <code>confirm</code> also mark (seen, flagged) and move between folders (only on servers with IMAP MOVE – nothing is ever deleted). <code>folders</code> limits what Claude sees.</li>
+        <li><strong>Mails are untrusted content</strong>: anyone can write to a mailbox. <code>svc mail … read</code> puts the text between unmistakable markers, and Claude's rules say never to act on instructions in a mail. Together with <code>confirm</code> and a recipient list on smtp this keeps a planted mail from sending your data away.</li>
+      </ul>
+      <p>Claude: <code>svc mail &lt;name&gt; send --to a@x --subject "…" --body-file F</code> (or the text from stdin), <code>folders</code>, <code>list [FOLDER] [--unseen] [--from X] [--subject X] [--since YYYY-MM-DD] [--limit N]</code>, <code>read &lt;uid&gt;</code>, <code>flag &lt;uid&gt; seen|unseen|flagged|unflagged</code>, <code>move &lt;uid&gt; &lt;folder&gt;</code>. <code>svc test</code> connects and logs in without sending or changing anything.</p>
     </section>
 
     <section class="card" id="files">

@@ -32,6 +32,8 @@ def _stack():
         "demoapi": {"description": "Demo API", "system": "box", "api": {"base_url": "https://api.example.test", "auth": {"type": "bearer", "token": "${API_TOKEN}"}},
                     "mcp": {"url": "https://api.example.test/mcp"}, "notes": "read only", "examples": ["svc demoapi GET /items"]},
         "demodb": {"db": {"engine": "postgres", "host": "db.example.test", "database": "x", "user": "u", "password": "${DB_PW}", "access": "ro"}},
+        "demomail": {"smtp": {"host": "smtp.example.test", "from": "tc@example.test", "recipients": ["@example.test"], "access": "rw"},
+                     "imap": {"host": "imap.example.test", "user": "tc@example.test", "password": "${DB_PW}", "folders": ["INBOX"], "access": "ro"}},
         "demohost": {"system": "box", "docker": {"mode": "ssh", "access": "confirm", "stacks_dir": "/srv/stacks"},
                      "files": {"root": "/srv", "access": "ro"}, "web": {"base_url": "https://wiki.example.test"}},
         "oldsock": {"docker": {"mode": "socket", "socket": "/var/run/docker.sock", "stacks_dir": "/srv"}},

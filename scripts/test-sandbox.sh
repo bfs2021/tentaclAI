@@ -67,6 +67,7 @@ UPDATE_CHECK=false
 EGRESS_MODE=enforce
 EGRESS_DIRECT_IP=block
 API_TOKEN=api-secret-123
+MAIL_PW=mail-secret-456
 PG_PASSWORD=pg-secret-789
 EOF
 chmod 644 .env  # deliberately loose: the entrypoint must fix it
@@ -99,6 +100,7 @@ services:
   pg: {image: "postgres:16-alpine", container_name: tctest-pg, environment: {POSTGRES_PASSWORD: pg-secret-789}, networks: [outside]}
   ntfy: {image: "binwiederhier/ntfy:v2.11.0", container_name: tctest-ntfy, command: ["serve"], networks: [outside]}
   hook: {image: "python:3.12-alpine", container_name: tctest-hook, command: ["python", "/srv/hook.py"], volumes: ["./fixtures/hook.py:/srv/hook.py:ro"], networks: [outside]}
+  mail: {image: "greenmail/standalone:2.1.2", container_name: tctest-mail, networks: [outside], environment: {GREENMAIL_OPTS: "-Dgreenmail.setup.test.smtp -Dgreenmail.setup.test.imap -Dgreenmail.hostname=0.0.0.0 -Dgreenmail.auth.disabled"}}
   sshd:
     image: lscr.io/linuxserver/openssh-server:latest
     container_name: tctest-sshd
@@ -107,6 +109,7 @@ services:
     networks: [outside]
 EOF
 echo '{"name":"testapi","api":{"base_url":"http://tctest-api:8000","auth":{"type":"bearer","token":"${API_TOKEN}"}}}' > services/testapi.json
+echo '{"name":"testmail","smtp":{"host":"tctest-mail","port":3025,"security":"none","from":"tc@example.com","recipients":["@example.com"],"access":"rw"},"imap":{"host":"tctest-mail","port":3143,"security":"none","user":"alice@example.com","password":"${MAIL_PW}","access":"rw"}}' > services/testmail.json
 echo '{"name":"testdb","db":{"engine":"postgres","host":"tctest-pg","database":"postgres","user":"postgres","password":"${PG_PASSWORD}","ssl":"disable","access":"ro"}}' > services/testdb.json
 echo '{"name":"testdbrw","db":{"engine":"postgres","host":"tctest-pg","database":"postgres","user":"postgres","password":"${PG_PASSWORD}","ssl":"disable","access":"rw"}}' > services/testdbrw.json
 printf 'Host testssh\n    HostName tctest-sshd\n    User deploy\n    Port 2222\n    # tentaclai: access=rw\n' > ssh/config.d/testssh.conf
@@ -197,6 +200,18 @@ check "audit entry names the job" "$(docker exec tctest-claude tail -1 "$T/data/
 check "unknown job marker counts as read-only" "$(J fakejob01 'svc ssh testssh touch /tmp/job-fake')" "refused"
 check "a second marker can't lift read-only" "$(J jobro01 "sh -c 'svc ssh testssh touch /tmp/job-lift; exit' tc-job=jobstd01")" "refused"
 check "nested standard markers still write (control)" "$(J jobstd01 "sh -c 'svc ssh testssh touch /tmp/job-nest; exit' tc-job=jobstd01")" "ran"
+# mail: GreenMail takes any login; testmail sends to @example.com only (rw needs that list)
+wait_for 60 docker exec tctest-api python -c "import socket; socket.create_connection(('tctest-mail', 3143), 2)" || stuck "GreenMail not listening"
+MSUBJ="tc test mail $$-$(date +%s)"  # unique: a kept REUSE stack still has the last run's mail
+check "mail: send to an allowed recipient" "$(echo 'Hello from the sandbox test' | $CI svc mail testmail send --to alice@example.com --subject "$MSUBJ" 2>&1 | tail -1)" "✓ sent to alice@example.com"
+check "mail: recipient outside the list refused" "$(echo x | $CI svc mail testmail send --to bob@evil.org --subject x >/dev/null 2>&1 && echo sent || echo refused)" "refused"
+MLIST="$($C svc mail testmail list 2>/dev/null || true)"
+check "mail: list shows it" "$(echo "$MLIST" | grep -c "$MSUBJ" || true)" "1"
+MUID="$(echo "$MLIST" | grep "$MSUBJ" | awk '{print $1}' | head -1)"
+check "mail: read frames the content as untrusted" "$($C svc mail testmail read "$MUID" 2>/dev/null | grep -c -e 'E-MAIL CONTENT – untrusted' -e 'END OF E-MAIL CONTENT' || true)" "2"
+check "mail: reading doesn't mark it seen" "$($C svc mail testmail list --unseen 2>/dev/null | grep -c "$MSUBJ" || true)" "1"
+check "mail: mark as seen (rw)" "$($C svc mail testmail flag "$MUID" seen 2>&1 | tail -1)" "✓ INBOX/$MUID: seen"
+check "mail: read-only job can't send" "$(J jobro01 'echo x | svc mail testmail send --to alice@example.com --subject ro')" "refused"
 docker exec tctest-claude rm -f "$T/data/control/job-runs.json"
 # rename a git service in tentacontrol: file, root's mirror and Claude's working copy move together
 rm -f services/gitdemo.json services/gitdemo2.json

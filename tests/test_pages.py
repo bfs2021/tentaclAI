@@ -5,7 +5,7 @@ import pytest
 NOT_PAGES = ("/login", "/setup", "/logout", "/healthz", "/api/", "/internal/", "/logs/stream", "/builds/", "/static", "/vendor",
              "/topology/ssh-status", "/claude/jobs")  # (ssh-status runs real SSH checks)
 # pages with parameters or variants, rendered with the dummy stack's objects
-VARIANTS = ["/services/oldsock", "/services/demoapi", "/services/demodb", "/services/demohost", "/services/demogit", "/systems/box", "/ssh/box/edit",
+VARIANTS = ["/services/oldsock", "/services/demoapi", "/services/demodb", "/services/demohost", "/services/demogit", "/services/demomail", "/systems/box", "/ssh/box/edit",
             "/ssh/box/remove", "/network?tab=allow", "/network?tab=block"]
 
 

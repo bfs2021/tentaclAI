@@ -92,7 +92,7 @@ def missing(obj, env):
 
 # ---------------------------------------------------------------- services and systems
 
-PARTS = ("api", "mcp", "git", "docker", "db", "web", "files")
+PARTS = ("api", "mcp", "git", "docker", "db", "web", "files", "smtp", "imap")
 
 
 def _load_dir(path, errors=None):
@@ -133,7 +133,15 @@ def load_services(services_dir, systems=None, errors=None):
     return services
 
 
-TLS_PARTS = ("api", "mcp", "git", "db", "web")
+TLS_PARTS = ("api", "mcp", "git", "db", "web", "smtp", "imap")
+# mail parts: security → default port
+MAIL_PORTS = {"smtp": {"starttls": 587, "ssl": 465, "none": 25}, "imap": {"ssl": 993, "starttls": 143, "none": 143}}
+
+
+def mail_port(part, cfg):
+    """port of an smtp/imap part – given, or the default of its security (smtp: starttls, imap: ssl)"""
+    sec = cfg.get("security") or ("starttls" if part == "smtp" else "ssl")
+    return int(cfg.get("port") or MAIL_PORTS[part].get(sec, MAIL_PORTS[part]["none"]))
 
 
 def tls_unverified(svc):
@@ -186,6 +194,10 @@ def reach_hosts(services, env, ssh_hosts_list=()):
         m = re.match(r"^(?:[^@/]+@)?([^:/]+):", g)  # scp-like git@host:path
         if m and "://" not in g:
             out.setdefault((m.group(1).lower(), 22), name)
+        for part in ("smtp", "imap"):
+            m = r.get(part) or {}
+            if m.get("host"):
+                out.setdefault((str(m["host"]).lower(), mail_port(part, m)), name)
         db = r.get("db") or {}
         if db.get("host"):
             out.setdefault((str(db["host"]).lower(), int(db.get("port") or (3306 if str(db.get("engine", "")).lower() in ("mysql", "mariadb") else 5432))), name)

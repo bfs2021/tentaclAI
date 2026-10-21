@@ -575,7 +575,7 @@ def rw_tentacles():
     out = []
     for name, svc in tclib.load_services(SERVICES_DIR, tclib.load_systems(STACK_DIR)).items():
         if tclib.enabled(svc) and any(isinstance(svc.get(p), dict) and svc[p].get("access") == "rw"
-                                      for p in ("docker", "git", "db", "files")):
+                                      for p in ("docker", "git", "db", "files", "smtp", "imap")):
             out.append(name)
     conf = os.path.join(SSH_DIR, "config.d")
     for h in tclib.ssh_hosts(conf):

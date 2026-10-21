@@ -1,0 +1,23 @@
+{
+  "_meta": {
+    "title": "SMTP (with login)",
+    "category": "Mail",
+    "setup": "Ideally a mailbox just for tentaclAI. STARTTLS on 587 or SSL on 465 (security). Put user and password into .env."
+  },
+  "description": "Send mail",
+  "smtp": {
+    "host": "smtp.{{DOMAIN}}",
+    "security": "starttls",
+    "user": "${EXAMPLE_SMTP_USER}",
+    "password": "${EXAMPLE_SMTP_PASSWORD}",
+    "from": "tentaclai@{{DOMAIN}}",
+    "recipients": [],
+    "access": "confirm"
+  },
+  "examples": [
+    "svc mail NAME send --to someone@example.com --subject \"Report\" --body-file report.txt"
+  ],
+  "notes": [
+    "confirm: every mail waits for approval. rw sends without asking and needs smtp.recipients (addresses or @domain)."
+  ]
+}

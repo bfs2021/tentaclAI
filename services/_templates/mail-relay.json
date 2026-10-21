@@ -1,0 +1,24 @@
+{
+  "_meta": {
+    "title": "SMTP relay (no login)",
+    "category": "Mail",
+    "setup": "An internal relay that accepts mail from this host without a login (e.g. Postfix on port 25). Put the allowed recipients into smtp.recipients – addresses or @domain."
+  },
+  "description": "Send mail through the internal relay",
+  "smtp": {
+    "host": "smtp.{{DOMAIN}}",
+    "port": 25,
+    "security": "none",
+    "from": "tentaclai@{{DOMAIN}}",
+    "recipients": [
+      "@{{DOMAIN}}"
+    ],
+    "access": "confirm"
+  },
+  "examples": [
+    "svc mail NAME send --to someone@example.com --subject \"Report\" --body-file report.txt"
+  ],
+  "notes": [
+    "confirm: every mail waits for approval (recipients, subject and the start of the text are shown). rw sends without asking – only to smtp.recipients."
+  ]
+}
