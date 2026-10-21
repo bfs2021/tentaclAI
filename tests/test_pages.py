@@ -206,8 +206,10 @@ def test_approval_shows_where_it_came_from(client, app_module):
 
 def test_favicon_without_login(app_module):
     from fastapi.testclient import TestClient
-    r = TestClient(app_module.app).get("/favicon.ico", follow_redirects=False)
-    assert r.status_code == 200 and r.headers["content-type"].startswith("image/svg+xml")
+    c = TestClient(app_module.app)
+    for path in ("/favicon.ico", "/apple-touch-icon.png", "/apple-touch-icon-precomposed.png"):
+        r = c.get(path, follow_redirects=False)
+        assert r.status_code == 200 and r.headers["content-type"] == "image/png" and r.content[:4] == b"\x89PNG", path
 
 
 def test_badge_disappears_after_the_last_decision(client, app_module):

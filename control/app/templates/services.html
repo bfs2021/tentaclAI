@@ -7,7 +7,7 @@
 <div class="header">
   <div><h1>Services</h1><div class="sub">One file per service in <code>services/</code> – Docker host, API, MCP, git repo, database, web source or files; tokens in <code>.env</code></div></div>
   <div class="row">
-    <button class="btn primary toggle" id="new-svc-toggle" aria-expanded="false" aria-controls="new-svc">{{ icon('plus') }}Add service</button>
+    <button class="btn primary toggle" data-toggle="new-svc" aria-expanded="false" aria-controls="new-svc">{{ icon('plus') }}Add service</button>
     <button class="btn" hx-post="/services/sync">{{ icon('refresh') }}Sync</button>
     <a class="btn ghost" href="/help#services">Help</a>
   </div>
@@ -37,11 +37,6 @@
   </form>
   <div class="help" id="tpl-hint">{{ templates_list | length }} templates: docker hosts, smart home, automation, infrastructure, monitoring, network, security, apps, development, git repos, databases, web sources, files.</div>
   <script>
-    document.getElementById("new-svc-toggle").addEventListener("click", function () {
-      var box = document.getElementById("new-svc"), open = box.hidden;
-      box.hidden = !open; this.setAttribute("aria-expanded", open); this.classList.toggle("open", open);
-      if (open) document.getElementById("tpl-search").focus();
-    });
     document.getElementById("tpl").addEventListener("combo-change", function (e) {
       document.getElementById("tpl-hint").textContent = e.detail.desc;
       var n = document.getElementById("svc-name");

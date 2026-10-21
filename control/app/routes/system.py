@@ -24,9 +24,12 @@ async def healthz():
 
 
 @router.get("/favicon.ico")
-async def favicon():
-    """browsers ask for /favicon.ico on their own (e.g. for JSON pages or bookmarks) – the logo, not the login redirect"""
-    return FileResponse(os.path.join(BASE, "static", "logo.svg"), media_type="image/svg+xml",
+@router.get("/apple-touch-icon.png")
+@router.get("/apple-touch-icon-precomposed.png")
+async def favicon(request: Request):
+    """browsers ask for these on their own (Safari ignores SVG icons) – the logo as PNG, not the login redirect"""
+    name = "favicon-32.png" if request.url.path == "/favicon.ico" else "apple-touch-icon.png"
+    return FileResponse(os.path.join(BASE, "static", name), media_type="image/png",
                         headers={"Cache-Control": "public, max-age=86400"})
 
 

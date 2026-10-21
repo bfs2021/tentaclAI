@@ -9,10 +9,15 @@ All notable changes, newest first. Every release lists **upgrade steps** from th
   Deny (network: Allow 10 min / Deny) – no need to switch to Activity.
 
 ### Changes
-- Services: the *Create service* form is folded away behind an *Add service* button next to *Sync*.
+- Services and Systems: the create forms are folded away behind *Add service* / *Add system* buttons in the header.
 - Topology: the legend just says *SSH host* (the colors are explained in Help).
 
 ### Fixes
+- Browser terminals left their `docker exec` process running when the connection dropped – one stale tmux client per
+  reload, and tmux sized Claude's window to the smallest of them. Closing a terminal now hangs its process up
+  (a tmux client detaches, Claude keeps running).
+- Safari showed a stand-in tab icon: it ignores SVG favicons. PNG icons (32 px, 180 px `apple-touch-icon`) are
+  served too, also at `/favicon.ico` and `/apple-touch-icon.png` without login.
 - Text in the browser terminal could not be selected on a Mac: tmux takes the mouse, and xterm.js only lets Shift + drag
   through on other systems. Option + drag selects on a Mac now; Cmd+C (Safari never fired xterm.js's own copy event) and `Ctrl+Shift+C` copy.
   A plain drag selects in tmux or in Claude's full-screen view: the copy (OSC 52, tmux now passes Claude's on with

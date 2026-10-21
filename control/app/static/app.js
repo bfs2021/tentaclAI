@@ -116,3 +116,13 @@
 document.body.addEventListener("htmx:beforeSwap", function (e) {
   if (e.detail.xhr && e.detail.xhr.status < 300 && !(e.detail.serverResponse || "").trim()) e.detail.shouldSwap = false;
 });
+
+// [data-toggle=<id>] folds a hidden "add" form in and out; opening focuses its first field
+document.addEventListener("click", function (e) {
+  var btn = e.target.closest("[data-toggle]");
+  if (!btn) return;
+  var box = document.getElementById(btn.dataset.toggle), open = box.hidden;
+  box.hidden = !open; btn.setAttribute("aria-expanded", open); btn.classList.toggle("open", open);
+  var f = open && box.querySelector("input:not([type=hidden]), select, textarea");
+  if (f) f.focus();
+});

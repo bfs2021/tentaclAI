@@ -4,6 +4,7 @@ import json
 import re
 import socket
 import threading
+import uuid
 
 from fastapi import WebSocket, WebSocketDisconnect
 
@@ -32,6 +33,10 @@ def onboard_cmd(name):
 async def bridge(ws: WebSocket, cmd, workdir="/workspace", user="claude"):
     """every terminal runs as the unprivileged user claude – the same view and rights Claude has"""
     api = client().api
+    # docker keeps an exec running after its socket closes – a tmux client per lost connection, shrinking the window
+    # to the smallest one. The wrapper notes the pid, so closing hangs it up like a closed terminal window.
+    term = uuid.uuid4().hex
+    cmd = ["sh", "-c", 'echo $$ > "/tmp/.tc-term-$0"; exec "$@"', term, *cmd]
     exec_id = api.exec_create(CLAUDE_CONTAINER, cmd, tty=True, stdin=True, workdir=workdir, user=user,
                               environment={"TERM": "xterm-256color", "COLORTERM": "truecolor", "LANG": "C.UTF-8"})["Id"]
     sock = api.exec_start(exec_id, tty=True, socket=True)
@@ -89,3 +94,14 @@ async def bridge(ws: WebSocket, cmd, workdir="/workspace", user="claude"):
         except OSError:
             pass
         raw.close()
+        await asyncio.to_thread(hangup, term, user)
+
+
+def hangup(term, user):
+    """SIGHUP to the terminal's process (a tmux client detaches, Claude keeps running; a shell exits)"""
+    try:
+        api = client().api
+        e = api.exec_create(CLAUDE_CONTAINER, ["sh", "-c", 'f="/tmp/.tc-term-$0"; p=$(cat "$f") && rm -f "$f" && kill -HUP "$p"', term], user=user)
+        api.exec_start(e["Id"], detach=True)
+    except Exception:  # noqa: BLE001
+        pass
