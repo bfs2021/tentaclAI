@@ -13,6 +13,7 @@
     "docs": "https://docs.pangolin.net"
   },
   "notes": [
-    "The Integration API must be enabled (flags.enable_integration_api) – a Pangolin restart drops all tunnels."
+    "The Integration API must be enabled (flags.enable_integration_api) – a Pangolin restart drops all tunnels.",
+    "Test path: /org/<orgId>/sites (GET / is a health check that answers without the key) – set it under Test API; an org key gets 403 on /orgs."
   ]
 }

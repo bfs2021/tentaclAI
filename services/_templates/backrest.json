@@ -13,6 +13,7 @@
     }
   },
   "notes": [
-    "Never create backups/prunes/plans."
+    "Never create backups/prunes/plans.",
+    "Test API only shows that Backrest is reachable: its API takes POST (Connect RPC) and every GET answers without checking the login. Don't use GetConfig to test – it returns repository passwords."
   ]
 }
