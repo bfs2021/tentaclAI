@@ -381,6 +381,8 @@ What it does **not** (yet) do – keep it in mind:
   callback, an API key just for API jobs.
 - **Jobs that propose:** a read-only job returns proposed actions, one click runs exactly those – no approvals at night
 - **Security:** prompt-injection safeguards
+- **Clearer access names:** `read` / `write` / `confirm` instead of `ro` / `rw` / `confirm` everywhere (UI, service
+  files, Claude's instructions) – the old names keep working, existing files are migrated on start
 - **Export/import** of configuration and templates
 
 ## License
