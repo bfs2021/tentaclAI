@@ -2,7 +2,7 @@
 
 All notable changes, newest first. Every release lists **upgrade steps** from the previous one.
 
-## Unreleased
+## v0.12.0 – 2026-10-21
 
 ### Highlights
 - **Where a request comes from:** approvals in Activity, their notifications and the audit log show the requesting
