@@ -6,7 +6,7 @@
 {% block content %}
 {{ conn_tabs("services") }}
 <div class="header">
-  <div><h1>Services</h1><div class="sub">One file per service in <code>services/</code> – Docker host, API, MCP, git repo, database, web source or files; tokens in <code>.env</code></div></div>
+  <div><h1>Services</h1><div class="sub">One file per service in <code>services/</code> – Docker host, API, MCP, git repo, database, web source, files or mail; tokens in <code>.env</code></div></div>
   <div class="row">
     <button class="btn primary toggle" data-toggle="new-svc" aria-expanded="false" aria-controls="new-svc">{{ icon('plus') }}Add service</button>
     <button class="btn" hx-post="/services/sync">{{ icon('refresh') }}Sync</button>

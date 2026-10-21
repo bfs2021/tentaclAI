@@ -1,4 +1,5 @@
 {% from "_icons.html" import icon %}
+{% macro access(part, mode) %}{% set m = mode if mode in ('ro', 'rw', 'confirm') else 'ro' %}<span class="pill {{ {'rw': 'accent', 'confirm': 'warn'}.get(m, 'info') }}" title="{{ {'ro': 'read only', 'rw': 'read and write', 'confirm': 'every write waits for approval'}[m] }}">{{ part }}: {{ m }}</span>{% endmacro %}
 {% macro service_card(s, systems=[]) %}
   <div class="card service-card">
     <div class="between">
@@ -10,26 +11,33 @@
     <div class="desc">{{ s.description or s.error or "–" }}</div>
     {% if s.tls_off %}<div><span class="pill warn" title="TLS certificates are not verified for {{ s.tls_off | join(', ') }}">TLS not verified</span></div>{% endif %}
     {% if s.base_url %}<div class="small mono faint" style="word-break:break-all">{{ s.base_url }}</div>{% endif %}
-    {% if s.data.api and s.data.api.access in ('ro', 'confirm') %}<div><span class="pill {{ 'warn' if s.data.api.access == 'confirm' else 'info' }}">API: {{ 'confirm writes' if s.data.api.access == 'confirm' else 'read only' }}</span></div>{% endif %}
+    {% if s.data.api %}<div>{{ access('api', s.data.api.access or 'rw') }}</div>{% endif %}
     {% if s.docker %}
     <div class="small">
-      <span class="pill {{ {'rw':'accent','confirm':'warn'}.get(s.docker.access, 'info') }}">{{ {'rw':'read + write (rw)','confirm':'confirm writes'}.get(s.docker.access, 'read only (ro)') }}</span>
+      {{ access('docker', s.docker.access) }}
       <span class="pill info">{{ 'ssh ' ~ s.docker.target if not s.docker.legacy else 'socket – no longer supported' }}</span>
       <div class="mono faint" style="margin-top:6px">{{ s.docker.stacks_dir or '–' }}</div>
     </div>
     {% endif %}
     {% if s.git %}
     <div class="small" style="word-break:break-all">
-      <span class="pill {{ {'rw':'accent','confirm':'warn'}.get(s.git.access, 'info') }}">{{ {'rw':'read + write (rw)','confirm':'confirm writes'}.get(s.git.access, 'read only (ro)') }}</span>
+      {{ access('git', s.git.access) }}
       <span class="pill {{ 'ok' if s.git.cloned else 'off' }}">{{ 'cloned' if s.git.cloned else 'not cloned' }}</span>
       <div class="mono faint" style="margin-top:6px">{{ s.git.url }}</div>
     </div>
     {% endif %}
     {% if s.db %}
     <div class="small" style="word-break:break-all">
-      <span class="pill {{ {'rw':'accent','confirm':'warn'}.get(s.db.access, 'info') }}">{{ {'rw':'read + write (rw)','confirm':'confirm writes'}.get(s.db.access, 'read only (ro)') }}</span>
+      {{ access('db', s.db.access) }}
       <span class="pill info">{{ s.db.engine }}</span>
       <div class="mono faint" style="margin-top:6px">{{ s.db.target }}</div>
+    </div>
+    {% endif %}
+    {% if s.data.smtp or s.data.imap %}
+    <div class="small" style="word-break:break-all">
+      {% if s.data.smtp %}{{ access('smtp', s.data.smtp.access or 'confirm') }}{% endif %}
+      {% if s.data.imap %}{{ access('imap', s.data.imap.access or 'ro') }}{% endif %}
+      <div class="mono faint" style="margin-top:6px">{{ [s.data.smtp.host if s.data.smtp else '', s.data.imap.host if s.data.imap else ''] | select | unique | join(' · ') }}</div>
     </div>
     {% endif %}
     {% if s.web %}
@@ -40,7 +48,7 @@
     {% endif %}
     {% if s.files %}
     <div class="small" style="word-break:break-all">
-      <span class="pill {{ {'rw':'accent','confirm':'warn'}.get(s.files.access, 'info') }}">{{ {'rw':'read + write (rw)','confirm':'confirm writes'}.get(s.files.access, 'read only (ro)') }}</span>
+      {{ access('files', s.files.access) }}
       {% if s.files.sudo %}<span class="pill accent">sudo</span>{% endif %}
       <div class="mono faint" style="margin-top:6px">{{ s.files.target }}</div>
     </div>

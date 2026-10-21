@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% from "_icons.html" import icon, help_link %}
 {% from "_conn_tabs.html" import conn_tabs %}
+{% from "_service_card.html" import access %}
 {% block title %}{{ svc.name }}{% endblock %}
 {% block content %}
 {{ conn_tabs("services") }}
@@ -86,7 +87,7 @@
     {% if svc.docker %}
     <div class="card">
       <div class="card-head"><h2>Docker host</h2>
-        <span class="pill {{ {'rw':'accent','confirm':'warn'}.get(svc.docker.access, 'info') }}">{{ {'rw':'read + write (rw)','confirm':'confirm writes'}.get(svc.docker.access, 'read only (ro)') }}</span></div>
+        {{ access('docker', svc.docker.access) }}</div>
       <dl class="kv">
         <dt>SSH host</dt><dd class="mono small">{{ svc.docker.target or '–' }}</dd>
         <dt>Stacks directory</dt><dd class="mono small">{{ svc.docker.stacks_dir or '–' }}</dd>
@@ -100,7 +101,7 @@
     {% if svc.git %}
     <div class="card">
       <div class="card-head"><h2>Git repository</h2>
-        <span class="pill {{ {'rw':'accent','confirm':'warn'}.get(svc.git.access, 'info') }}">{{ {'rw':'read + write (rw)','confirm':'confirm writes'}.get(svc.git.access, 'read only (ro)') }}</span></div>
+        {{ access('git', svc.git.access) }}</div>
       <dl class="kv">
         <dt>URL</dt><dd class="mono small" style="word-break:break-all">{{ svc.git.url }}</dd>
         <dt>Branch</dt><dd class="mono">{{ svc.git.branch or "default" }}</dd>
@@ -154,7 +155,7 @@
     <details style="margin-top:14px" class="small">
       <summary class="muted">Fields</summary>
       <div class="muted" style="margin-top:8px">
-        <code>docker</code> {mode ssh, ssh_host, stacks_dir, access ro|rw|confirm},
+        <code>docker</code> {mode ssh, ssh_host, stacks_dir, access ro|rw|confirm}, <code>smtp</code> / <code>imap</code> {host, security, user, password, …} (see Help → Mail),
         <code>api.base_url</code>, <code>api.auth.type</code> = <code>none</code> | <code>bearer {token}</code> | <code>header {header, value}</code> | <code>basic {user, password}</code> | <code>query {param, value}</code> | <code>oauth2_client_credentials {token_url, client_id, client_secret, scope}</code>,
         <code>insecure_tls</code> (in api, web, git, db), <code>api.docs</code>, <code>mcp</code> (like <code>.mcp.json</code>: <code>type</code> http/sse + <code>url</code>/<code>headers</code> or stdio + <code>command</code>/<code>args</code>/<code>env</code>),
         <code>git</code> {url, access, branch, path, auth}, <code>examples</code>, <code>notes</code>, <code>test_path</code>, <code>enabled</code>. Secrets only as <code>${VAR}</code>.
