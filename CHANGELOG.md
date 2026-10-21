@@ -29,6 +29,7 @@ All notable changes, newest first. Every release lists **upgrade steps** from th
   first requests counted as "anyone else" and reached the login page. Misses are not cached any more.
 - Safari showed the SVG favicon without its background (a bare red octopus): only the PNG icons are offered now.
 - Pages with a wide tab bar no longer get wider than a phone screen – the tabs scroll.
+- Usage: a hint like *28 % See what fills your context* showed its number alone on the right – it leads the line now.
 - Browser terminals left their `docker exec` process running when the connection dropped – one stale tmux client per
   reload, and tmux sized Claude's window to the smallest of them. Closing a terminal now hangs its process up
   (a tmux client detaches, Claude keeps running).

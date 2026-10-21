@@ -27,7 +27,8 @@
     <div class="stack small" style="gap:6px">
       <div><strong>Last {{ p.label }}</strong> <span class="muted">· {{ p.requests }} requests · {{ p.sessions }} sessions</span></div>
       {% for t in p.tips %}
-      <div class="between" style="gap:10px"><span>{{ t.text }}</span>{% if t.pct is not none %}<span class="mono" style="white-space:nowrap">{{ t.pct }} %</span>{% endif %}</div>
+      {% set text, cmd = (t.text.split(' – run ', 1) + [''])[:2] %}
+      <div>{% if t.pct is not none %}<strong style="white-space:nowrap">{{ t.pct }} %</strong> {% endif %}{{ text }}{% if cmd %} <span class="muted">– in a <a href="/terminal">Claude terminal</a>: <code>{{ cmd }}</code></span>{% endif %}</div>
       {% endfor %}
       {% for t in p.tops %}<div class="muted">Top {{ t.what }}: {{ t['items'] }}</div>{% endfor %}
       {% if not p.tips and not p.tops %}<div class="faint">nothing notable</div>{% endif %}
