@@ -22,11 +22,16 @@ All notable changes, newest first. Every release lists **upgrade steps** from th
 - Topology: the legend just says *SSH host* (the colors are explained in Help).
 
 ### Fixes
+- Redaction: *key* only counts as a name part of its own (`API_KEY`, `key_file`, `apikey`) – labels like
+  `…keycloak….command` stay readable.
+- `local/CLAUDE.md` keeps its last 5 backups (svc and tentacontrol), not every one.
 - **Site rules were not loaded:** `svc config put local` wrote `local/CLAUDE.md` with mode 0600 (svc inherits the
   entrypoint's umask 077), so Claude's `@` import skipped it without a word. svc writes it 0644 now and the
   entrypoint repairs the mode on start.
 - tentacontrol cached a failed lookup of the sandbox's address for 5 s – right after the sandbox started, its
-  first requests counted as "anyone else" and reached the login page. Misses are not cached any more.
+  first requests counted as "anyone else" and reached the login page. Misses are not cached any more, and any other
+  address from the sandbox's network (subnet read from Docker) now counts as the sandbox – a failed lookup gives less
+  access, not more.
 - Safari showed the SVG favicon without its background (a bare red octopus): only the PNG icons are offered now.
 - Pages with a wide tab bar no longer get wider than a phone screen – the tabs scroll.
 - Usage: Claude Code's hint *28 % See what fills your context* showed its number alone on the right – it reads
@@ -51,6 +56,7 @@ All notable changes, newest first. Every release lists **upgrade steps** from th
   value as JSON (always valid), and `tc-scan` skips unreadable inspect output instead of aborting.
 
 ### Development
+- `test-sandbox.sh`: the rename check cleans the last run's copies – it failed on a kept REUSE stack.
 - CI: image layers come from the GitHub Actions cache (`TC_BUILD_CACHE=gha` in `test-sandbox.sh`) instead of a full
   build on every run.
 - `test-sandbox.sh`: checks slower than 2 s print their time; refusal checks test the gateway's `403` instead of
