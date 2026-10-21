@@ -1292,7 +1292,9 @@ def cmd_mail(services, args):
 
         def do_move():
             i.select(imap_folder(cfg, folder))
-            caps = {c.decode().upper() if isinstance(c, bytes) else str(c).upper() for c in i.capabilities}
+            # ask again: imaplib keeps the capabilities from before the login, and servers (Dovecot) list MOVE only after it
+            typ, data = i.capability()
+            caps = set((data[0] or b"").decode(errors="replace").upper().split()) if typ == "OK" and data else set()
             if "MOVE" not in caps:
                 sys.exit("svc: this server has no IMAP MOVE – not moving (copy + delete could remove other mails)")
             typ, _ = i.uid("MOVE", uid, imap_quote(target))
