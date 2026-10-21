@@ -10,7 +10,7 @@ All notable changes, newest first. Every release lists **upgrade steps** from th
 
 ### Fixes
 - Text in the browser terminal could not be selected on a Mac: tmux takes the mouse, and xterm.js only lets Shift + drag
-  through on other systems. Option + drag selects on a Mac now; `Ctrl+Shift+C` copies (Cmd+C as before).
+  through on other systems. Option + drag selects on a Mac now; Cmd+C (Safari never fired xterm.js's own copy event) and `Ctrl+Shift+C` copy.
 - The sidebar's approval badge stayed after the last decision (an empty answer was kept by the page).
 - The favicon changed from page to page: `/favicon.ico` redirected to the login – it serves the logo now.
 - **Plain `http://` from the sandbox now goes through the egress gateway:** only `HTTP_PROXY`/`HTTPS_PROXY` were set,

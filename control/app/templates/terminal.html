@@ -71,12 +71,18 @@
     };
   }
   function sendSize() { if (ws && ws.readyState === 1) ws.send(JSON.stringify({type: "resize", cols: term.cols, rows: term.rows})); }
-  term.attachCustomKeyEventHandler(function (e) {  // Ctrl+Shift+C copies the selection (Cmd+C works natively)
-    if (e.type === "keydown" && e.ctrlKey && e.shiftKey && e.code === "KeyC" && term.hasSelection()) {
-      if (navigator.clipboard) navigator.clipboard.writeText(term.getSelection());
-      e.preventDefault(); return false;
-    }
-    return true;
+  function copySelection() {
+    var text = term.getSelection();
+    if (navigator.clipboard && window.isSecureContext) return navigator.clipboard.writeText(text);
+    var ta = document.createElement("textarea");  // plain http: the Clipboard API is missing
+    ta.value = text; ta.style.position = "fixed"; ta.style.opacity = "0";
+    document.body.appendChild(ta); ta.select(); document.execCommand("copy"); ta.remove(); term.focus();
+  }
+  // Cmd+C / Ctrl+Shift+C copy the selection ourselves – Safari never fires xterm's own copy event
+  term.attachCustomKeyEventHandler(function (e) {
+    var copy = e.code === "KeyC" && (e.metaKey || (e.ctrlKey && e.shiftKey));
+    if (copy && e.type === "keydown" && term.hasSelection()) { copySelection(); e.preventDefault(); return false; }
+    return !(copy && term.hasSelection());
   });
   term.onData(function (d) { if (ws && ws.readyState === 1) ws.send(JSON.stringify({type: "input", data: d})); });
   window.addEventListener("resize", function () { fit.fit(); sendSize(); });
