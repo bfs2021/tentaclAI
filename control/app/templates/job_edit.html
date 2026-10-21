@@ -1,20 +1,18 @@
 {% extends "base.html" %}
-{% from "_tabs.html" import claude_tabs %}
 {% from "_icons.html" import icon, help_link %}
 {% block title %}{{ job.name or 'New job' }}{% endblock %}
 {% block content %}
-{{ claude_tabs('jobs') }}
 {% set s = job.schedule or {} %}
 <div class="header">
-  <div><div class="small"><a href="/claude/jobs">← Jobs</a></div><h1>{{ job.name or 'New job' }}</h1>
+  <div><div class="small"><a href="/jobs">← Jobs</a></div><h1>{{ job.name or 'New job' }}</h1>
     <div class="sub">What Claude should check or report, and when. The answer is a traffic light (ok / warn / alert) with a short summary.</div></div>
-  <div class="row">{% if jid %}<button class="btn danger" hx-post="/claude/jobs/{{ jid }}/delete" hx-confirm="Delete job {{ job.name }}? Its run history stays.">{{ icon('trash') }}Delete</button>{% endif %}{{ help_link('jobs') }}</div>
+  <div class="row">{% if jid %}<button class="btn danger" hx-post="/jobs/{{ jid }}/delete" hx-confirm="Delete job {{ job.name }}? Its run history stays.">{{ icon('trash') }}Delete</button>{% endif %}{{ help_link('jobs') }}</div>
 </div>
 {% if not jid %}
 <div class="row small" style="margin:-8px 0 16px;flex-wrap:wrap;justify-content:flex-start"><span class="muted">Templates:</span>
-  {% for t in templates %}<a href="/claude/jobs/new?template={{ loop.index0 }}">{{ t.name }}</a>{% endfor %}</div>
+  {% for t in templates %}<a href="/jobs/new?template={{ loop.index0 }}">{{ t.name }}</a>{% endfor %}</div>
 {% endif %}
-<form class="card stack" hx-post="/claude/jobs/save" style="gap:14px">
+<form class="card stack" hx-post="/jobs/save" style="gap:14px">
   <input type="hidden" name="jid" value="{{ jid or '' }}">
   <div><label>Name</label><input type="text" name="name" value="{{ job.name or '' }}" maxlength="60" required></div>
   <div><label>Task</label>
@@ -53,7 +51,7 @@
       <div style="width:110px"><label>Max. minutes</label><input type="number" name="max_minutes" min="1" max="120" value="{{ job.max_minutes or 20 }}"></div>
     </div>
   </div>
-  <div class="row"><button class="btn primary">{{ icon('check') }}Save</button><a class="btn ghost" href="/claude/jobs">Cancel</a></div>
+  <div class="row"><button class="btn primary">{{ icon('check') }}Save</button><a class="btn ghost" href="/jobs">Cancel</a></div>
 </form>
 <script>
 (function () {

@@ -403,3 +403,4 @@ input[type=checkbox]:not(.switch-cb) { accent-color: var(--accent-2); }
 .mem-entry summary .faint { margin-left: auto; }
 .job-card h2 { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .job-card h2 svg { width: 18px; height: 18px; color: var(--accent); flex: none; }
+.nav-badge.warn { animation: none; }  /* findings wait, nobody is blocked – no pulse */

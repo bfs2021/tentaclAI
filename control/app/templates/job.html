@@ -14,7 +14,7 @@
 <script>
 (function () {
   var out = document.getElementById("out"), st = document.getElementById("job-state");
-  var es = new EventSource("/jobs/{{ job.id }}/stream");
+  var es = new EventSource("/builds/{{ job.id }}/stream");
   es.onmessage = function (e) {
     var atBottom = out.scrollTop + out.clientHeight >= out.scrollHeight - 30;
     out.textContent += JSON.parse(e.data) + "\n";

@@ -1,4 +1,4 @@
-"""Claude → Jobs: Claude tasks on a schedule, results as notifications (not the build jobs of jobs.py).
+"""Jobs: Claude tasks on a schedule, results as notifications (not the build jobs of jobs.py).
 
 A job is a prompt with a schedule and a profile. The runner starts `claude -p` in the sandbox as user claude, one run at
 a time, with a JSON schema for a traffic-light answer (ok / warn / alert) – that decides whether a notification goes out.
@@ -213,9 +213,12 @@ def get(jid):
     return load().get(jid)
 
 
+RESERVED = {"new", "save", "runs"}  # paths of the Jobs pages
+
+
 def slug(name):
     s = re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")[:40] or "job"
-    return s
+    return f"{s}-job" if s in RESERVED else s
 
 
 def save(form, jid=None):
@@ -456,7 +459,7 @@ def execute(run_id, jid):
         title = f"{icon} {job['name']}: " + (r.get("title") or run.get("error") or status)[:120]
         notify.emit("job_failed" if status in ("failed", "timeout") else "job_result", title,
                     (r.get("summary") or run.get("error") or "")[:600], key=f"job:{run_id}",
-                    link=notify.control_link(f"/claude/jobs#run-{run_id}"))
+                    link=notify.control_link(f"/jobs#run-{run_id}"))
 
 
 async def worker():
@@ -519,6 +522,23 @@ async def scheduler():
         except Exception as e:  # noqa: BLE001
             print(f"jobs scheduler: {e}", flush=True)
         await asyncio.sleep(30)
+
+
+SEEN = os.path.join(DATA_DIR, "jobs-seen.json")
+
+
+def finding(r):
+    return r.get("status") in ("failed", "timeout") or (r.get("status") == "done" and (r.get("result") or {}).get("status") in ("warn", "alert"))
+
+
+def unseen():
+    """runs with a finding or a failure that ended after the Jobs page was last opened (the sidebar badge)"""
+    seen = (jsonstore.load(SEEN) or {}).get("ts", 0)
+    return sum(1 for r in history() if finding(r) and (r.get("ended") or 0) > seen)
+
+
+def mark_seen():
+    jsonstore.save(SEEN, {"ts": time.time()})
 
 
 def overview():

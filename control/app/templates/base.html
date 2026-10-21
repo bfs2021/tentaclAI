@@ -23,7 +23,9 @@
       <a href="/network" class="{{ 'active' if nav == 'network' }}">{{ icon('globe') }}Network</a>
       <a href="/activity" class="{{ 'active' if nav == 'activity' }}">{{ icon('activity') }}Activity
         <span class="nav-count" hx-get="/partials/approval-count" hx-trigger="load, every 5s" hx-swap="innerHTML"></span></a>
-      <a href="/claude/instructions" class="{{ 'active' if nav in ('claude_instructions', 'claude_memory', 'claude_jobs', 'claude_job_edit', 'claude_settings', 'skills', 'models', 'usage') }}">{{ icon('claude') }}Claude</a>
+      <a href="/jobs" class="{{ 'active' if nav in ('jobs', 'job_edit') }}">{{ icon('clock') }}Jobs
+        <span class="nav-count" hx-get="/partials/job-count" hx-trigger="load, every 30s" hx-swap="innerHTML"></span></a>
+      <a href="/claude/instructions" class="{{ 'active' if nav in ('claude_instructions', 'claude_memory', 'claude_settings', 'skills', 'models', 'usage') }}">{{ icon('claude') }}Claude</a>
       <a href="/settings" class="{{ 'active' if nav in ('settings', 'notifications', 'security') }}">{{ icon('settings') }}Settings</a>
       <a href="/updates" class="{{ 'active' if nav in ('updates', 'job') }}">{{ icon('refresh') }}Updates</a>
       <a href="/logs" class="{{ 'active' if nav == 'logs' }}">{{ icon('logs') }}Logs</a>

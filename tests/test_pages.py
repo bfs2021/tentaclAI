@@ -2,8 +2,8 @@
 import pytest
 
 # every GET route without parameters is a page to render – new pages are covered without touching this file
-NOT_PAGES = ("/login", "/setup", "/logout", "/healthz", "/api/", "/internal/", "/logs/stream", "/jobs/", "/static", "/vendor",
-             "/topology/ssh-status")  # (ssh-status runs real SSH checks)
+NOT_PAGES = ("/login", "/setup", "/logout", "/healthz", "/api/", "/internal/", "/logs/stream", "/builds/", "/static", "/vendor",
+             "/topology/ssh-status", "/claude/jobs")  # (ssh-status runs real SSH checks)
 # pages with parameters or variants, rendered with the dummy stack's objects
 VARIANTS = ["/services/oldsock", "/services/demoapi", "/services/demodb", "/services/demohost", "/services/demogit", "/systems/box", "/ssh/box/edit",
             "/ssh/box/remove", "/network?tab=allow", "/network?tab=block"]
@@ -274,7 +274,25 @@ def test_job_pages_render(client, app_module, monkeypatch, tmp_path):
     from app import jsonstore
     jsonstore.save(scheduled.HISTORY, [{"id": "abc123", "job": jid, "name": "Disk space", "status": "done", "queued": 1,
                                         "result": {"status": "warn", "title": "80 % on /", "summary": "s", "details": "d"}}])
-    for path in ("/claude/jobs", f"/claude/jobs/{jid}", "/claude/jobs/new?template=1"):
+    for path in ("/jobs", f"/jobs/{jid}", "/jobs/new?template=1"):
         r = client.get(path)
         assert r.status_code == 200 and "</html>" in r.text, path
-    assert "80 % on /" in client.get("/claude/jobs").text
+    assert "80 % on /" in client.get("/jobs").text
+
+
+def test_job_badge_counts_unseen_findings(client, app_module, monkeypatch, tmp_path):
+    import time
+    from app import jsonstore, scheduled
+    for k, f in (("JOBS", "j.json"), ("HISTORY", "h.json"), ("SEEN", "s.json")):
+        monkeypatch.setattr(scheduled, k, str(tmp_path / f))
+    now = time.time()
+    jsonstore.save(scheduled.HISTORY, [
+        {"id": "a1", "job": "x", "status": "done", "ended": now, "result": {"status": "ok"}},
+        {"id": "a2", "job": "x", "status": "done", "ended": now, "result": {"status": "alert"}},
+        {"id": "a3", "job": "x", "status": "failed", "ended": now}])
+    assert ">2<" in client.get("/partials/job-count").text
+    client.get("/jobs")  # opening the page marks them seen
+    assert "hidden" in client.get("/partials/job-count").text
+    r = client.get("/claude/jobs", follow_redirects=False)
+    assert r.status_code == 301 and r.headers["location"] == "/jobs"
+    assert scheduled.slug("New") == "new-job" and scheduled.slug("Runs") == "runs-job"

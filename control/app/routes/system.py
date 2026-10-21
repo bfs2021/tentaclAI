@@ -172,7 +172,7 @@ async def container_action(request: Request, action: str):
             job = jobs.start("Create & start tentaclai", [COMPOSE + ["up", "-d", "--no-deps", "egress"], COMPOSE + ["up", "-d", "--no-deps", CLAUDE_SERVICE]])
         except RuntimeError as e:
             return PlainTextResponse("", headers=toast(str(e), "err"))
-        return PlainTextResponse("", headers={"HX-Redirect": f"/jobs/{job.id}"})
+        return PlainTextResponse("", headers={"HX-Redirect": f"/builds/{job.id}"})
     if action == "recreate":
         try:
             job = jobs.start("Recreate tentaclai (apply configuration)",
@@ -180,7 +180,7 @@ async def container_action(request: Request, action: str):
                               COMPOSE + ["up", "-d", "--no-deps", "--force-recreate", CLAUDE_SERVICE]])
         except RuntimeError as e:
             return PlainTextResponse("", headers=toast(str(e), "err"))
-        return PlainTextResponse("", headers={"HX-Redirect": f"/jobs/{job.id}"})
+        return PlainTextResponse("", headers={"HX-Redirect": f"/builds/{job.id}"})
     if action not in ("start", "stop", "restart"):
         return PlainTextResponse("unknown action", status_code=400)
     ok, msg = await asyncio.to_thread(dockerops.lifecycle, action)
@@ -287,10 +287,10 @@ async def update_claude():
         job = jobs.start("Update Claude Code (rebuild image)", steps)
     except RuntimeError as e:
         return PlainTextResponse("", headers=toast(str(e), "err"))
-    return PlainTextResponse("", headers={"HX-Redirect": f"/jobs/{job.id}"})
+    return PlainTextResponse("", headers={"HX-Redirect": f"/builds/{job.id}"})
 
 
-@router.get("/jobs/{job_id}", response_class=HTMLResponse)
+@router.get("/builds/{job_id}", response_class=HTMLResponse)
 async def job_page(request: Request, job_id: str):
     job = jobs.JOBS.get(job_id)
     if not job:
@@ -298,7 +298,7 @@ async def job_page(request: Request, job_id: str):
     return page(request, "job.html", job=job)
 
 
-@router.get("/jobs/{job_id}/stream")
+@router.get("/builds/{job_id}/stream")
 async def job_stream(job_id: str):
     job = jobs.JOBS.get(job_id)
     if not job:

@@ -5,13 +5,14 @@ All notable changes, newest first. Every release lists **upgrade steps** from th
 ## Unreleased
 
 ### Highlights
-- **Scheduled jobs** (Claude → Jobs): Claude tasks on a schedule – presets or cron, a traffic-light answer
+- **Scheduled jobs** (new menu item *Jobs*, badge for unseen findings): Claude tasks on a schedule – presets or cron, a traffic-light answer
   (ok / warn / alert) and notifications only on findings; templates for patch report, certificate expiry, disk space,
   backup check and container health. Profile *read-only* (default) is enforced twice – by Claude Code's tool rules
   and by `svc`, which recognises the run and treats every tentacle as `ro`; *standard* works like a terminal session
   (approvals for `confirm`, shown as “Job · name”).
 
 ### Changes
+- The live output of image builds and updates moved from `/jobs/<id>` to `/builds/<id>` – `/jobs` is the new Jobs page.
 - Template *zigbee2mqtt* removed (45 templates).
 - Templates *Pangolin* and *Backrest*: a note on testing – Pangolin's `GET /` answers without the key (use
   `/org/<orgId>/sites`), Backrest's API has no GET that checks the login.
