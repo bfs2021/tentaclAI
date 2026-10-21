@@ -66,14 +66,29 @@ All notable changes, newest first. Every release lists **upgrade steps** from th
   GitHub Actions, the egress image and `tests/requirements.txt`.
 - `scripts/release.sh` pushes main and waits for the green GitHub `checks` run of that commit before it creates the
   release commit, tag and release – a red CI stops it before anything is tagged.
+- tentacontrol's `main.py` (1550 lines) is split: app, middleware and background loops stay (165 lines), pages and
+  endpoints live in `control/app/routes/` (one router per area), shared helpers in `web.py`, the small JSON state
+  files go through `jsonstore.py`. The gateway's rule order is one function (`tclib.egress_rule`), shared with the
+  Network page – they disagreed on allowlist vs. tentacle.
+- Stage 1 renders every parameterless page found in the app's routes – no hand-kept list; stage 2/3 check a few pages
+  and the vendored assets in the real container.
 - `scripts/test-quick.sh`: test packages in `~/.cache/tentaclai-test-deps` (outside the stack, so backups skip them),
   the dummy stack in `/tmp` is removed after each run, `httpx2` for Starlette's TestClient (no deprecation warning left).
 
+### Documentation
+- README: configuration table complete (`EGRESS_*`, `CLAUDE_TELEMETRY`, `UPDATE_*`, `NOTIFY_URL_*`), repository layout
+  with `egress/`, `routes/`, `scripts/`, `tests/` and the three `data/` directories, the Usage page, corrected: where
+  the Claude login lives (`data/claude`), `HOST_DOCS` is referenced (not imported), DNS is no way out.
+- Help: services have seven parts (not four), test path, rename and shared token variables, the Usage page, the new
+  security measures, more troubleshooting; CONTRIBUTING: the three test stages, `release.sh`, template guidance.
+
 ### Upgrade (from v0.9.1)
-`git pull`, `docker compose build`, `docker compose up -d` – recreating `tentaclai` ends running sessions and Remote
-Control; it is only needed for the `svc test` hint (`build control` + `up -d control` brings everything else).
-Services created from older templates may lack `test_path` – their service page now says so and suggests the
-template's value. Developers: the old `.cache/test-deps` in the stack directory can be deleted.
+`./tentaclai.sh update` (or `git pull`), `docker compose build`, `docker compose up -d` – all three containers changed.
+**Recreate `tentaclai`** (ends running sessions and Remote Control): the `svc` fixes – blanked secrets, no tokens in
+child processes – only take effect in a new sandbox container. No `.env` changes. Services created from older templates
+may lack `test_path` – their service page now says so and suggests the template's value. From this release on
+`./tentaclai.sh update` goes to the latest release tag (`--main` for unreleased changes). Developers: the old
+`.cache/test-deps` in the stack directory can be deleted.
 
 ## v0.9.1 – 2026-10-20
 

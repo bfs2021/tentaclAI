@@ -43,7 +43,7 @@ services:
     volumes:
       # this stack (.env, services/, ssh/, scripts), same path as on the host
       - ${TC_DIR}:${TC_DIR}
-      # optional: host documentation for Claude (imported into its CLAUDE.md) – /dev/null = none
+      # optional: host documentation for Claude (referenced in its CLAUDE.md, read on demand) – /dev/null = none
       - ${HOST_DOCS:-/dev/null}:/etc/tentaclai/host-docs.md:ro
       # optional: own root CA (PEM) for internal https services – /dev/null = none
       - ${CA_CERT:-/dev/null}:/etc/tentaclai/ca.crt:ro

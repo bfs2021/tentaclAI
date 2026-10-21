@@ -50,7 +50,7 @@
         <tr><td><code>services/*.json</code></td><td>everything Claude can reach: Docker hosts, APIs, MCP servers, git repositories.</td></tr>
         <tr><td><code>compose.override.yaml</code></td><td>reverse proxy (nginx-proxy, Traefik …), extra mounts, labels for container managers. Template: <code>compose.override.example.yaml</code>.</td></tr>
         <tr><td><code>compose.generated.yaml</code></td><td>written automatically from the local docker services (socket + stacks mounts) – never edit by hand.</td></tr>
-        <tr><td><code>local/CLAUDE.md</code></td><td>rules and knowledge about your site for Claude; imported together with the generic rules and the host docs (<code>HOST_DOCS</code>) on every start.</td></tr>
+        <tr><td><code>local/CLAUDE.md</code></td><td>rules and knowledge about your site for Claude; loaded together with the generic rules on every start. The host docs (<code>HOST_DOCS</code>) are only referenced – Claude reads them before it works on the host.</td></tr>
       </table>
       <h4>Install on a new host</h4>
 <pre>git clone … tentaclai &amp;&amp; cd tentaclai
@@ -103,13 +103,20 @@
 
     <section class="card" id="services">
       <h2>Services</h2>
-      <p>A service is one JSON file in <code>services/</code>. It can have four parts – alone or combined:</p>
+      <p>A service is one JSON file in <code>services/</code>. It can have seven parts – alone or combined (<a href="#db">db</a>, <a href="#web">web</a> and <a href="#files">files</a> have their own sections below):</p>
       <table>
         <tr><td><code>docker</code></td><td>Docker host – local via socket or remote via SSH; Claude manages its stacks with <code>svc docker</code> / <code>svc compose</code>.</td></tr>
         <tr><td><code>api</code></td><td>REST API, called with <code>svc &lt;name&gt; GET /path</code>. <code>svc</code> injects the authentication; tokens never appear in commands.</td></tr>
         <tr><td><code>mcp</code></td><td>MCP server – registered in Claude's configuration on “Sync”.</td></tr>
         <tr><td><code>git</code></td><td>Repository – cloned to <code>/workspace/repos/&lt;name&gt;</code>, read only or read/write.</td></tr>
+        <tr><td><code>db</code> · <code>web</code> · <code>files</code></td><td>Database (<code>svc db</code>), web pages as text (<code>svc web</code>), directories on an SSH host (<code>svc files</code>).</td></tr>
       </table>
+      <ul>
+        <li><strong>Test path</strong> (<code>"test_path"</code>): the endpoint <code>svc test</code> calls for the API – pick one that needs the token, so a wrong token shows up. Without it <code>GET /</code> is used; the service page warns and suggests the template's path (<em>Save as test path</em>).</li>
+        <li><strong>Rename</strong> on the service page: the file, <code>svc &lt;name&gt;</code> calls in examples and notes, and for git services the mirror and <code>/workspace/repos/&lt;name&gt;</code> move together; tokens, system and rules stay.</li>
+        <li><strong>Token variables</strong>: a second service from the same template gets its own variables (<code>&lt;NAME&gt;_…</code>) instead of sharing the first one's tokens. If services do share a variable, the <em>Tokens &amp; variables</em> card says so.</li>
+        <li>Template addresses use the placeholder <code>example.com</code> – the service page reminds you as long as it is there.</li>
+      </ul>
       <h4>Structure</h4>
 <pre>{
   "name": "paperless",
@@ -289,9 +296,11 @@
 
     <section class="card" id="settings">
       <h2>Settings</h2>
-      <p>Edits the stack's <code>.env</code>. Secrets (names containing TOKEN, KEY, PASSWORD, SECRET) are never shown – leaving the field empty keeps the value, the “clear” checkbox removes it. Changes that need a new container show “Apply now” at the top (running sessions end); remote control changes only need “Restart” on the overview.</p>
+      <p>Edits the stack's <code>.env</code>. Secrets are never shown – variables whose name looks like one (TOKEN, KEY, PASS, SECRET, AUTH, PAT …) and every variable a service uses as a credential (in <code>auth</code>, <code>headers</code>, <code>password</code> …) – leaving the field empty keeps the value, the “clear” checkbox removes it. Changes that need a new container show “Apply now” at the top (running sessions end); remote control changes only need “Restart” on the overview.</p>
           <h3>Notifications</h3>
       <p>Settings → <a href="/notifications">Notifications</a>: add channels (ntfy, webhook, or any <a href="https://github.com/caronc/apprise/wiki" target="_blank" rel="noopener">Apprise URL</a> – Telegram, Discord, Slack, Teams, e-mail, Home Assistant), send a test, and tick which event goes to which channel. Urgent events (approval needed, Remote Control down, signed out, container stopped) also come during quiet hours; the same event is sent at most once per dedupe interval. Channel URLs are stored in <code>.env</code> as <code>NOTIFY_URL_…</code>.</p>
+          <h3>Usage</h3>
+      <p><a href="/usage">Usage</a> shows the plan limits (session and week, account-wide) and what contributes to them – from Claude Code's <code>/usage</code>, asked every 10 minutes without a model call – plus tokens per day, the sandbox's sessions and the models used, read from the local session files (usage fields only, never the conversation). A quota notification goes out at 80 %.</p>
 </section>
 
     <section class="card" id="updates">
@@ -326,7 +335,8 @@ gh …                      GitHub CLI without credentials (public data)</pre>
         <li>tentacontrol has the Docker socket of this host (to run tentaclAI) – that is <strong>root on {{ site.hostname }}</strong>. Choose the tentacontrol password accordingly.</li>
         <li>In tentaclAI, Claude runs as the unprivileged user <code>claude</code>. <code>.env</code>, the SSH key, the service files and the audit log belong to root; <code>svc</code> (via sudo) is the only way to services and enforces <code>ro</code>/<code>rw</code>/<code>confirm</code>. Client tools run as a third user (<code>tcrun</code>) with only their own secret.</li>
         <li><strong>Mode</strong>: <em>permissive</em> allows and records every destination; <em>enforce</em> holds a destination without a rule for up to 60 s and asks in Activity (Allow 10 min / 1 h / Always / Deny / Block). <strong>IP targets</strong>: in enforce mode, connections to a bare IP address without a rule are blocked (default) or asked about. Rule order: built-in (never blockable) → blocklist → your allowlist → tentacles → temporary approvals; entries can be <code>host</code>, <code>*.domain</code>, an IP or a range like <code>10.0.0.0/8</code>, optionally with <code>:port</code>.</li>
-        <li><strong>Network</strong> lists every destination the sandbox connected to, with its origin: a tentacle, Claude/Anthropic or unknown. Allow/block lists and approvals for unknown destinations (<code>EGRESS_MODE=enforce</code>) follow.</li>
+        <li><strong>tentacontrol is out of Claude's reach</strong>: from the sandbox only <code>svc</code>'s approval endpoints answer (with its token) – the admin UI, the login and the gateway's endpoints refuse it, and only the gateway may use the latter.</li>
+        <li><strong>Other services' secrets are blanked</strong> in free read-only output: <code>docker … inspect</code>, <code>compose … config</code> and <code>systemctl show|cat</code> show <code>[redacted by svc]</code> for values with secret-looking names and for passwords in URLs. Logs and commands you approve are not filtered. <code>svc</code> also keeps the <code>.env</code> values out of the environment of the programs it starts.</li>
         <li>The sandbox sits in an internal network without a route to the outside; everything leaves through the <strong>egress gateway</strong> (<code>tentaclai-egress</code>), which records every destination. <code>EGRESS_MODE=permissive</code> (default) allows all – allow/block lists and approvals follow.</li>
         <li>An <code>rw</code> docker service is root on that host. A docker service in <code>socket</code> mode is root on this host – and so can read everything in the stack, secrets included; prefer <code>ssh</code> mode.</li>
         <li>Login: bcrypt hash, 12 h session, <code>SameSite=Strict</code> cookie (Secure behind https), origin check for forms and the terminal, throttling after failed attempts.</li>
@@ -346,6 +356,9 @@ gh …                      GitHub CLI without credentials (public data)</pre>
         <tr><td>No remote control session</td><td>Claude signed in? <code>RC_ENABLED</code> on? Open the session in the terminal and confirm the prompts.</td></tr>
         <tr><td>Cloning fails</td><td>check URL/token; private repositories need <code>auth.type = token</code>, SSH URLs a deploy key.</td></tr>
         <tr><td>MCP server missing in Claude</td><td>“Sync”, then <code>/mcp</code> → reconnect in Claude.</td></tr>
+        <tr><td>HTTP 401 shows an HTML error page</td><td>a reverse proxy (e.g. Traefik with error pages) hides the API's own message – test the token against the API directly, check the proxy's access log for the origin status.</td></tr>
+        <tr><td>Token works elsewhere but not here</td><td>it belongs to another instance (two installations of the same app?) or another service shares the variable – see <em>Tokens &amp; variables</em> on the service page.</td></tr>
+        <tr><td>Approval asked for a service just enabled</td><td>fixed since v0.10: the gateway re-reads its rules before it asks. Approvals for SSH commands are the host's access mode (<code>confirm</code>), not the network.</td></tr>
       </table>
     </section>
 
@@ -355,7 +368,7 @@ gh …                      GitHub CLI without credentials (public data)</pre>
         <li><strong>Two-factor sign-in (TOTP)</strong> for tentacontrol.</li>
         <li><strong>Scheduled jobs</strong>: run Claude tasks on a schedule (e.g. patch report, certificate expiry), results as notifications.</li>
         <li><strong>Export/import</strong>: configuration and templates, e.g. for a second installation or to share templates.</li>
-        <li><strong>More sandbox</strong>: DNS filter in the egress gateway, read-only root filesystem, Docker socket only through a filtering proxy, prompt-injection safeguards for content from services.</li>
+        <li><strong>More sandbox</strong>: read-only root filesystem, Docker socket only through a filtering proxy, prompt-injection safeguards for content from services.</li>
       </ul>
     </section>
   </div>

@@ -13,7 +13,6 @@ from . import activity, auth, connectors, dockerops, netguard, notify, skills, u
 from .envfile import read_env
 from .routes import network, settings, ssh, system, tentacles
 from .web import BASE, TC_VERSION
-import tclib  # noqa: E402  shared with the sandbox tools
 
 
 @contextlib.asynccontextmanager

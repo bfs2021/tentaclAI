@@ -131,8 +131,9 @@ Then, in tentacontrol:
 
 Without a reverse proxy tentacontrol listens on `http://127.0.0.1:8484` (`CONTROL_BIND`, `CONTROL_PORT`).
 
-**Updating:** `./tentaclai.sh update` – shows what's new and the upgrade steps, pulls, rebuilds and asks before recreating
-the containers (`--check` only shows). tentacontrol also shows “Update available” in the sidebar.
+**Updating:** `./tentaclai.sh update` – goes to the latest release: shows what's new and the upgrade steps, rebuilds and
+asks before recreating the containers (`--check` only shows, `--main` takes the newest unreleased state of `main`).
+tentacontrol also shows “Update available” in the sidebar.
 
 ## Connecting a service
 
@@ -182,7 +183,7 @@ svc git | git sync [name]                   # repos in /workspace/repos (no cred
 svc git push|pull|fetch <repo> [branch]     # through svc's mirror – access mode and approval apply
 svc ssh <host> [command]                    # command or shell on an SSH host (status commands free, others need approval)
 svc config put service <name> <file>        # Claude proposes a service file – always needs approval
-svc pending                                 # approvals waiting in tentacontrol (also in Claude's status line)
+svc pending | audit [n]                     # approvals waiting in tentacontrol (also in Claude's status line) / last writes
 # tab completion for all of these in the sandbox shells
 tc-scan                                     # read-only inventory of all docker hosts, services, SSH hosts
 ```
@@ -195,10 +196,11 @@ Claude commands: **`/onboard <service>`** and **`/inventory`** (see above).
 |---|---|
 | **Overview** | Status of the sandbox (resources, Claude version, login, plan usage as bars), Remote Control with QR code and on/off switch, Docker and SSH hosts with live status, system inventory. |
 | **Terminal** | xterm.js terminals into the sandbox (Claude, Remote Control, shell, login). Reconnects automatically. |
-| **Tentacles** | Everything Claude can reach, in four tabs: **Services** (grouped by system, live status dot per service; templates, JSON editor, write-only tokens, connection test, onboarding, enable/disable, move between systems) · **SSH hosts** (live status; add with host key check and one-time password key deployment, edit incl. jump host, sudo and rename, remove with key revocation) · **Systems** (groups with SSH host and rules) · **Topology** (live graph incl. optional stacks/containers, search, saved layout, PNG export). |
+| **Tentacles** | Everything Claude can reach, in four tabs: **Services** (grouped by system, live status dot per service; templates, JSON editor, write-only tokens, connection test and test path, onboarding, enable/disable, rename, move between systems; shows which services share a token variable) · **SSH hosts** (live status; add with host key check and one-time password key deployment, edit incl. jump host, sudo and rename, remove with key revocation) · **Systems** (groups with SSH host and rules) · **Topology** (live graph incl. optional stacks/containers, search, saved layout, PNG export). |
 | **Network** | Every destination the sandbox connected to (rule, last connection, filters), your allowlist and blocklist with one-click Allow/Block, the tentacles and the built-in list, and the switches *Mode* (permissive / enforce) and *IP targets* (ask / block) – see [Network control](#network-control). |
 | **Activity** | Pending approvals – writes of `confirm` services (Approve / Approve + 15 min / Deny) and unknown network destinations (Allow 10 min / 1 h / Always / Deny / Block), badge in the sidebar and in Claude's status line – and the audit log of all write actions with filters. |
 | **Settings** | All `.env` settings with descriptions; secrets are write-only. Shows *Apply now* when the sandbox must be recreated. Tab **Notifications**: channels (ntfy, webhook or any Apprise URL), which event goes where, quiet hours. Tab **Skills**: per skill of Claude Code and the account *On* / */command only* / *Off* (each listed skill costs context in every request; sandbox-useless ones start off). Tab **Models**: model and effort for all sessions, subagents and `/inventory`·`/onboard` (subagents and the set-up commands start on Sonnet). |
+| **Usage** | Plan limits (session and week) and what contributes to them, tokens per day, sessions of this sandbox and models – from Claude Code's `/usage` and the local session files (no model call). |
 | **Updates** | Installed tentaclAI version, new releases with their upgrade steps (checked every 6 h, also shown in the sidebar; `UPDATE_CHECK=false` turns it off), Claude Code and image updates. |
 | **Logs / Help** | Container log; full documentation of every feature. |
 
@@ -257,7 +259,7 @@ SSH hosts: tentacontrol → Tentacles → SSH hosts, or `./ssh-host.sh list|add|
 | `TC_DIR` | absolute host path of this stack (mounted under the same path) |
 | `COMPOSE_FILE` | `compose.yaml:compose.generated.yaml:compose.override.yaml` |
 | `DOCKER_SOCKET` | Docker socket of this host – for tentacontrol only |
-| `HOST_DOCS` | optional Markdown file about the host, imported into Claude's instructions |
+| `HOST_DOCS` | optional Markdown file about the host – Claude's instructions point to it, Claude reads it before working on the host |
 | `CA_CERT` | optional own root CA (PEM), trusted by curl, git, python and node in the sandbox |
 | `TC_HOSTNAME`, `TC_DOMAIN` | name of this host for Claude; domain for the suggested tentacontrol address (templates use `example.com`) |
 | `CONTROL_URL`, `CONTROL_BIND`, `CONTROL_PORT` | where tentacontrol is reachable |
@@ -265,6 +267,10 @@ SSH hosts: tentacontrol → Tentacles → SSH hosts, or `./ssh-host.sh list|add|
 | `GIT_USER_NAME`, `GIT_USER_EMAIL` | git identity of Claude's commits |
 | `GH_TOKEN` | example token variable for the GitHub templates (`${GH_TOKEN}`) – no longer handed to `gh` in the sandbox |
 | `RC_ENABLED`, `RC_NAME`, `RC_WORKDIR`, `RC_EXTRA_ARGS`, `RC_RESTART_DELAY` | Remote Control – re-read on every restart of the session |
+| `EGRESS_MODE`, `EGRESS_DIRECT_IP` | egress gateway: `permissive` (default) or `enforce`; bare IP targets in enforce mode `block` (default) or `ask` – see [Network control](#network-control) |
+| `CLAUDE_TELEMETRY` | `true` allows Claude Code's telemetry, error reports and `/bug` (default: off) |
+| `UPDATE_CHECK`, `UPDATE_REPO` | release check every 6 h (`false` = no requests), repository to check (default `mwaldegg/tentaclai`) |
+| `NOTIFY_URL_<ID>` | URL of a notification channel (written by Settings → Notifications) |
 | everything else | service credentials, referenced as `${VAR}` |
 
 <details>
@@ -272,7 +278,7 @@ SSH hosts: tentacontrol → Tentacles → SSH hosts, or `./ssh-host.sh list|add|
 
 ```
 tentaclai/
-├── compose.yaml               services claude (tentaclai) + control (tentacontrol)
+├── compose.yaml               services claude (tentaclai), egress (tentaclai-egress), control (tentacontrol)
 ├── compose.generated.yaml     socket/stacks mounts for local docker services (written by tentacontrol)
 ├── compose.override.*.yaml    site additions: reverse proxy, labels (example + your own)
 ├── .env.example               settings template (your .env: mode 600, git-ignored)
@@ -287,11 +293,16 @@ tentaclai/
 │   ├── commands/              /inventory, /onboard
 │   └── entrypoint.sh, start.sh, rc-loop, cc
 ├── control/                   tentacontrol (FastAPI, HTMX, xterm.js, cytoscape.js – vendored, no CDN at runtime)
+│   └── app/                   main.py (app, middleware, background loops), routes/ (one router per area), web.py
+├── egress/gw.py               egress gateway (forward proxy, rules from tentacontrol)
 ├── services/                  your services (git-ignored) + _template.json + _templates/ (47 templates)
 ├── systems/                   your systems (git-ignored) + _example.json
 ├── ssh/                       /root/.ssh of the sandbox (root only – used by svc): config, config.d/, keys/ (git-ignored)
 ├── local/                     CLAUDE.md with your site rules (template: CLAUDE.example.md)
-├── data/                      Claude login (home), tentacontrol password hash and layout (git-ignored)
+├── data/                      git-ignored: claude/ (Claude's home: login, settings, sessions), home/ (root's home: svc
+│                              state, git mirrors), control/ (tentacontrol: password hash, rules, settings state)
+├── scripts/                   test-quick.sh, test-sandbox.sh, release.sh, check-site-data.sh, brand/screenshots
+├── tests/                     pytest suite of scripts/test-quick.sh
 ├── workspace/                 /workspace: projects, repos/, files/, SERVICES.md
 └── docs/                      screenshots
 ```
@@ -359,12 +370,12 @@ What it does **not** (yet) do – keep it in mind:
 - DNS: the sandbox resolves only the stack's own containers – names outside are looked up by the egress gateway, so
   DNS is no way out either.
 - tentacontrol holds the host's Docker socket – protect it with a strong password and keep it off the internet.
-- `data/home` holds the Claude login and `ssh/keys` the private key – back them up and protect them.
+- `data/claude` holds the Claude login, `data/home` svc's state and `ssh/keys` the private key – back them up and protect them.
 
 ## Roadmap
 
-- **Security:** two-factor sign-in (TOTP) for tentacontrol · DNS filter in the egress gateway · read-only root filesystem,
-  Docker socket proxy, prompt-injection safeguards
+- **Security:** two-factor sign-in (TOTP) for tentacontrol · read-only root filesystem, Docker socket proxy,
+  prompt-injection safeguards
 - **Automation:** scheduled Claude jobs (e.g. patch report, certificate expiry) with results as notifications
 - **Export/import** of configuration and templates
 

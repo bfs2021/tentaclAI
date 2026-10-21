@@ -45,7 +45,7 @@ SETTINGS_GROUPS = [
     ("Paths & mounts", [
         ("TC_DIR", "Stack directory", "set by ./tentaclai.sh init", "readonly"),
         ("DOCKER_SOCKET", "Docker socket of this host", "only for tentacontrol itself (runs tentaclai); Claude's Docker access comes from docker services", "text"),
-        ("HOST_DOCS", "Host documentation", "optional: Markdown file about the host, imported into Claude's instructions", "text"),
+        ("HOST_DOCS", "Host documentation", "optional: Markdown file about the host – Claude's instructions point to it, Claude reads it before working on the host", "text"),
         ("CA_CERT", "Own root CA", "optional: PEM file for internal https services", "text"),
     ]),
     ("Updates", [
