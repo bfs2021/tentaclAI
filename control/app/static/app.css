@@ -413,3 +413,6 @@ input[type=checkbox]:not(.switch-cb) { accent-color: var(--accent-2); }
 .mention-pop div { padding: 6px 10px; cursor: pointer; display: flex; gap: 8px; align-items: baseline; }
 .mention-pop div.sel, .mention-pop div:hover { background: var(--accent-soft); }
 .mention-pop small { color: var(--muted); }
+.job-history { margin-top: 6px; }
+.job-history > summary { cursor: pointer; padding: 6px 0; }
+.job-history .mem-entry:first-of-type { border-top: 1px solid var(--border); padding-top: 10px; }

@@ -20,6 +20,7 @@ All notable changes, newest first. Every release lists **upgrade steps** from th
   "sends mail from a read-only job"); *Only the tentacles named in the task* limits a run to them – `svc` refuses
   every other service and SSH host, MCP servers are off. A running run shows a spinner and its time, the page
   reloads when it ends.
+  The latest run is always shown, earlier ones fold away under *History*.
 
 ### Changes
 - Notifications: channel type **E-mail** – server, port, STARTTLS / SSL / none (internal relay), sender, recipients

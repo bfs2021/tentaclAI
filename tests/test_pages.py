@@ -296,3 +296,14 @@ def test_job_badge_counts_unseen_findings(client, app_module, monkeypatch, tmp_p
     r = client.get("/claude/jobs", follow_redirects=False)
     assert r.status_code == 301 and r.headers["location"] == "/jobs"
     assert scheduled.slug("New") == "new-job" and scheduled.slug("Runs") == "runs-job"
+
+
+def test_jobs_show_latest_run_and_fold_the_rest(client, app_module, monkeypatch, tmp_path):
+    from app import jsonstore, scheduled
+    for k, f in (("JOBS", "j.json"), ("HISTORY", "h.json"), ("SEEN", "s.json")):
+        monkeypatch.setattr(scheduled, k, str(tmp_path / f))
+    jid = scheduled.save({"name": "Disk space", "prompt": "df", "kind": "daily", "time": "06:30"})
+    jsonstore.save(scheduled.HISTORY, [{"id": f"r{i}", "job": jid, "name": "x", "status": "done", "queued": i,
+                                        "result": {"status": "ok", "title": f"title {i}"}} for i in range(3)])
+    html = client.get("/jobs").text
+    assert "History (2 earlier runs)" in html and html.index("title 2") < html.index("job-history") < html.index("title 1")

@@ -2,6 +2,19 @@
 {% from "_icons.html" import icon, help_link %}
 {% block title %}Jobs{% endblock %}
 {% macro light(st) %}{% set r = st.get('result') or {} %}{% set k = r.get('status') if st.status == 'done' else st.status %}<span class="pill {{ {'ok': 'ok', 'warn': 'warn', 'alert': 'err', 'failed': 'err', 'timeout': 'err', 'running': 'accent running', 'queued': 'info queued'}.get(k, 'off') }}">{% if k == 'running' %}<span class="spin" aria-hidden="true"></span>{% endif %}{{ k }}</span>{% endmacro %}
+{% macro run_row(r) %}
+{% set res = r.get('result') or {} %}
+<details class="mem-entry" id="run-{{ r.id }}">
+  <summary>{{ light(r) }} <span>{% if r.status == 'running' %}<span class="muted">Claude is working – <span class="elapsed" data-since="{{ r.started or r.queued }}"></span></span>{% elif r.status == 'queued' %}<span class="muted">waiting for the run before it</span>{% else %}{{ res.get('title') or r.get('error') or '' }}{% endif %}</span><span class="faint small">{{ fmt(r.get('started') or r.queued) }}{% if r.seconds %} · {{ r.seconds }} s{% endif %}{% if r.cost %} · ${{ '%.2f' % r.cost }}{% endif %}{% if r.trigger == 'manual' %} · manual{% endif %}</span></summary>
+  <div class="small" style="margin-top:8px">
+    {% if res.get('summary') %}<p style="margin:0 0 6px">{{ res.summary }}</p>{% endif %}
+    {% if res.get('details') %}<pre class="rc" style="max-height:340px">{{ res.details }}</pre>{% endif %}
+    {% if r.get('error') and r.status != 'done' %}<p class="muted" style="margin:0">{{ r.error }}</p>{% endif %}
+    {% if r.get('denials') %}<p class="muted" style="margin:6px 0 0">{{ r.denials }} tool call(s) refused by the {{ r.profile }} profile.</p>{% endif %}
+    {% if r.status == 'running' %}<button class="btn sm danger" hx-post="/jobs/runs/{{ r.id }}/cancel" hx-confirm="Stop this run?" style="margin-top:8px">Stop</button>{% endif %}
+  </div>
+</details>
+{% endmacro %}
 {% block content %}
 <div class="header">
   <div><h1>Jobs</h1><div class="sub">Claude tasks on a schedule – reports and checks whose result comes as a notification. One run at a time; each run is a fresh Claude session.</div></div>
@@ -31,19 +44,13 @@
   </div>
   {% if j.runs %}
   <div style="margin-top:12px">
-  {% for r in j.runs %}
-    {% set res = r.get('result') or {} %}
-    <details class="mem-entry" id="run-{{ r.id }}">
-      <summary>{{ light(r) }} <span>{% if r.status == 'running' %}<span class="muted">Claude is working – <span class="elapsed" data-since="{{ r.started or r.queued }}"></span></span>{% elif r.status == 'queued' %}<span class="muted">waiting for the run before it</span>{% else %}{{ res.get('title') or r.get('error') or '' }}{% endif %}</span><span class="faint small">{{ fmt(r.get('started') or r.queued) }}{% if r.seconds %} · {{ r.seconds }} s{% endif %}{% if r.cost %} · ${{ '%.2f' % r.cost }}{% endif %}{% if r.trigger == 'manual' %} · manual{% endif %}</span></summary>
-      <div class="small" style="margin-top:8px">
-        {% if res.get('summary') %}<p style="margin:0 0 6px">{{ res.summary }}</p>{% endif %}
-        {% if res.get('details') %}<pre class="rc" style="max-height:340px">{{ res.details }}</pre>{% endif %}
-        {% if r.get('error') and r.status != 'done' %}<p class="muted" style="margin:0">{{ r.error }}</p>{% endif %}
-        {% if r.get('denials') %}<p class="muted" style="margin:6px 0 0">{{ r.denials }} tool call(s) refused by the {{ r.profile }} profile.</p>{% endif %}
-        {% if r.status == 'running' %}<button class="btn sm danger" hx-post="/jobs/runs/{{ r.id }}/cancel" hx-confirm="Stop this run?" style="margin-top:8px">Stop</button>{% endif %}
-      </div>
+    {{ run_row(j.runs[0]) }}
+    {% if j.runs | length > 1 %}
+    <details class="job-history">
+      <summary class="small muted">History ({{ j.runs | length - 1 }} earlier run{{ '' if j.runs | length == 2 else 's' }})</summary>
+      {% for r in j.runs[1:] %}{{ run_row(r) }}{% endfor %}
     </details>
-  {% endfor %}
+    {% endif %}
   </div>
   {% else %}<div class="faint small" style="margin-top:10px">Not run yet.</div>{% endif %}
 </div>
@@ -63,6 +70,12 @@
   document.querySelectorAll("details[id^=run-]").forEach(function (d) {  // a running run is open, so its state shows
     if (d.querySelector(".pill.running")) d.open = true;
   });
+  var target = location.hash && document.getElementById(location.hash.slice(1));  // a link from a notification
+  if (target && target.tagName === "DETAILS") {
+    target.open = true;
+    var h = target.closest(".job-history"); if (h) h.open = true;
+    target.scrollIntoView({block: "center"});
+  }
 })();
 </script>
 {% endblock %}
