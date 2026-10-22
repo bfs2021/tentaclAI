@@ -432,3 +432,6 @@ input[type=checkbox]:not(.switch-cb) { accent-color: var(--accent-2); }
 .job-pending { margin: 4px 0 10px 22px; }
 .job-pending .job-actions { border-color: var(--accent); }
 .pill svg { width: 12px; height: 12px; }
+/* a paused job steps back – its switch and Run now stay fully visible */
+.job-card.paused h2, .job-card.paused .small.muted, .job-card.paused .mem-entry, .job-card.paused .job-history { opacity: .55; }
+.job-card.paused .paused-note { color: var(--text); }

@@ -316,7 +316,7 @@ def test_manual_job_renders_without_next_and_pause(client, app_module, monkeypat
     jid = scheduled.save({"name": "On demand", "prompt": "p", "kind": "manual"})
     html = client.get("/jobs").text
     card = html[html.index("On demand"):]
-    assert "manual" in card and "· next" not in card[:400] and ">Pause<" not in card[:1500]
+    assert "manual" in card and "· next" not in card[:400] and 'role="switch"' not in card[:2500]
     assert client.get(f"/jobs/{jid}").status_code == 200
 
 
@@ -411,3 +411,16 @@ def test_discard_buttons_and_route(client, app_module, monkeypatch, tmp_path):
     assert [a["state"] for a in scheduled.history()[0]["actions"]] == ["proposed", "discarded"]
     client.post("/jobs/runs/r1/discard?all=1", headers={"HX-Request": "true"})
     assert scheduled.pending_proposals() == 0
+
+
+def test_paused_job_is_easy_to_tell(client, app_module, monkeypatch, tmp_path):
+    from app import scheduled
+    for k, f in (("JOBS", "j.json"), ("HISTORY", "h.json"), ("SEEN", "s.json")):
+        monkeypatch.setattr(scheduled, k, str(tmp_path / f))
+    on = scheduled.save({"name": "A on", "prompt": "p", "kind": "daily", "time": "06:30"})
+    off = scheduled.save({"name": "B off", "prompt": "p", "kind": "daily", "time": "06:30"})
+    scheduled.set_enabled(off, False)
+    html = client.get("/jobs").text
+    a, b = html[html.index("A on"):html.index("B off")], html[html.index("B off"):]
+    assert 'aria-checked="true"' in a and "next " in a and "job-card paused" not in html[:html.index("A on")][-300:]
+    assert 'aria-checked="false"' in b and "no automatic runs" in b and "job-card paused" in html[html.index("A on"):html.index("B off")]

@@ -19,6 +19,8 @@ All notable changes, newest first. Every release lists **upgrade steps** from th
   and what asks first) or *proposes* – the same colours as the access labels on service cards; yellow is kept for what
   waits for you. The editor names the profiles *Reads only* and *Can write (like a terminal session)*; the stored values
   stay `read-only` / `standard`.
+- Job list: an on/off switch instead of *Pause*/*Resume*; a paused job's card steps back (dimmed) and says *paused – no
+  automatic runs* instead of an empty next run. *Run now* stays available.
 
 ### Fixes
 - `svc jobs`: long job names no longer run into the schedule column.
