@@ -14,7 +14,7 @@
 {% block content %}
 {{ settings_tabs('license') }}
 <div class="header">
-  <div><h1>License</h1><div class="sub">tentaclAI is open source (MIT). An Enterprise license unlocks the features beyond it, such as compliance reports and the SIEM export.</div></div>
+  <div><h1>License</h1><div class="sub">tentaclAI is open source. An Enterprise license unlocks the features beyond it, such as compliance reports and the SIEM export.</div></div>
 </div>
 
 <div class="card" style="margin-bottom:16px">
@@ -55,7 +55,7 @@
 <div class="card">
   <div class="card-head"><h2>Currently using tentaclAI Community</h2><span class="pill off">no license</span></div>
   {% if lic.state == 'invalid' %}<p class="small"><span class="pill err">invalid</span> The stored key can't be used: {{ lic.error }}.</p>{% endif %}
-  <p class="small">The free, open-source edition (MIT) – everything except the Enterprise features.</p>
+  <p class="small">The free, open-source edition – everything except the Enterprise features.</p>
   <p class="muted small">To use Enterprise features ({% for f in features.values() %}{{ f | lower }}{{ ', ' if not loop.last }}{% endfor %}) and get support, you need a valid Enterprise license. Enter its key here.</p>
   {{ key_form('Activate license') }}
 </div>
