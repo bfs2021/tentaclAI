@@ -13,6 +13,7 @@ from jinja2 import ChoiceLoader, FileSystemLoader
 
 LOADED = []      # names of the extensions that registered
 _features = []   # callables → iterable of unlocked feature names (e.g. "reports")
+_modules = []    # Enterprise modules: {key, title, text, nav, planned} – listed on Modules, nav shown once unlocked
 _edition = ["community"]
 
 
@@ -33,6 +34,11 @@ class Api:
 
     def set_edition(self, name):
         _edition[0] = name
+
+    def add_module(self, key, title, text, nav=None, planned=False):
+        """a module for the Modules page; nav = {"href", "label", "icon"} – its sidebar entry, shown while the license
+        unlocks the feature `key` (and the module isn't planned only)"""
+        _modules.append({"key": key, "title": title, "text": text, "nav": nav, "planned": planned})
 
 
 def load(app, templates):
@@ -65,3 +71,18 @@ def features():
 
 def edition():
     return _edition[0]
+
+
+def modules():
+    return list(_modules)
+
+
+def nav_entries(unlocked):
+    """sidebar entries of the modules the license unlocks: [{href, label, icon, nav_id}]"""
+    out = []
+    for m in _modules:
+        n = m.get("nav")
+        if n and not m["planned"] and m["key"] in unlocked:
+            out.append({"href": n["href"], "label": n["label"], "icon": n.get("icon") or "grid",
+                        "nav_id": n.get("nav_id") or n["href"].strip("/").split("/")[0]})
+    return out

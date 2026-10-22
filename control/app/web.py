@@ -29,8 +29,10 @@ RESTART_FLAG = os.path.join(DATA_DIR, "restart-needed")
 def page(request, name, **ctx):
     st = dockerops.status()
     newer = dockerops.newer_image() if st.get("exists") else False
+    unlocked = extensions.features()
     ctx.update(request=request, nav=name.split(".")[0], cstatus=st, restart_needed=restart_needed(st) or newer, newer_image=newer, site=site(),
-               update=updatecheck.status(TC_VERSION), features=extensions.features(), edition=extensions.edition(),
+               update=updatecheck.status(TC_VERSION), features=unlocked, edition=extensions.edition(),
+               module_nav=extensions.nav_entries(unlocked),
                flash=request.session.pop("flash", None))
     return templates.TemplateResponse(request, name, ctx)
 

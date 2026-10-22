@@ -23,8 +23,9 @@ tentaclAI = sandbox + service gateway for Claude Code. Three containers (`compos
 
 **Community / Enterprise:** this repository is tentaclAI Community. tentaclAI Enterprise is a separate, private package
 (`tentaclai_enterprise`) that tentacontrol loads through `control/app/extensions.py` (`TC_EXTENSIONS`): its routes and
-templates come first, `extensions.features()` / `edition()` tell pages what is unlocked. Keep Enterprise code out of
-this repository – here only the extension points and the placeholders (Modules locked, Reports only once unlocked, Settings → License).
+templates come first, `extensions.features()` / `edition()` tell pages what is unlocked, and `add_module()` registers a module
+(Modules page) with its sidebar entry, shown while the license unlocks it. Keep Enterprise code out of
+this repository – here only the extension points and the placeholders (Modules locked, Settings → License).
 
 Two layers: `svc` decides *what* happens with a tentacle (credentials, `read`/`write`/`confirm`); the gateway decides *where*
 the sandbox may connect. ssh/rsync go through `ProxyCommand tc-connect`, databases and mail through `svc`'s local `tunnel()`.

@@ -2,16 +2,23 @@
 {% from "_icons.html" import icon %}
 {% block title %}Modules{% endblock %}
 {% macro module_cards() %}
+{% if modules %}
 <div class="grid">
-  {% for key, title, text in modules %}
-  {% set on = key in features %}
+  {% for m in modules %}
+  {% set on = m.key in features and not m.planned %}
   <div class="card{{ '' if on else ' module-locked' }}">
-    <div class="card-head"><h2>{{ icon('grid') }}{{ title }}</h2>
-      {% if on %}<span class="pill ok">licensed</span>{% else %}<span class="pill off">{{ icon('lock') }}locked</span>{% endif %}</div>
-    <p class="small muted" style="margin:0">{{ text }}</p>
+    <div class="card-head"><h2>{{ icon((m.nav or {}).icon or 'grid') }}{{ m.title }}</h2>
+      {% if m.planned %}<span class="pill off">planned</span>
+      {% elif on %}<span class="pill ok">licensed</span>
+      {% else %}<span class="pill off">{{ icon('lock') }}locked</span>{% endif %}</div>
+    <p class="small muted" style="margin:0">{{ m.text }}</p>
+    {% if on and m.nav %}<a class="btn sm" href="{{ m.nav.href }}" style="margin-top:10px">Open {{ m.nav.label }}</a>{% endif %}
   </div>
   {% endfor %}
 </div>
+{% else %}
+<div class="empty small">No Enterprise modules installed yet.</div>
+{% endif %}
 {% endmacro %}
 {% block content %}
 <div class="header">

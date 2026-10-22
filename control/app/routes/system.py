@@ -8,7 +8,7 @@ import segno
 from fastapi import APIRouter, Form, Request, WebSocket
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, PlainTextResponse, RedirectResponse, StreamingResponse
 
-from .. import activity, auth, dockerops, egress, jobs, netguard, notify, services_store, sshhosts, updatecheck, usage
+from .. import activity, auth, dockerops, egress, extensions, jobs, netguard, notify, services_store, sshhosts, updatecheck, usage
 from ..config import CLAUDE_SERVICE, COMPOSE
 from ..envfile import read_env, update_env
 from ..terminal import PROFILES, bridge, onboard_cmd
@@ -247,22 +247,17 @@ async def ws_terminal(ws: WebSocket, p: str = "claude", alias: str = ""):
     await bridge(ws, cmd)
 
 
-@router.get("/reports", response_class=HTMLResponse)
-async def reports_page(request: Request):
-    """placeholder: reports are an Enterprise feature"""
-    return page(request, "reports.html")
-
-
-# Enterprise modules (Modules page): (feature, title, what it does) – an extension's license unlocks them by feature name
-MODULES = [
-    ("reports", "Compliance reports", "Reports from the audit log – e.g. all writes to production in a quarter, approvals by approver – as PDF or CSV, as evidence for ISO 27001 or SOC 2."),
-    ("siem", "SIEM export", "Streams the audit log to your SIEM (syslog, Splunk, Elastic) as JSON lines."),
+# what tentaclAI Community shows, locked, on Modules – with tentaclAI Enterprise its registered modules are listed instead
+COMMUNITY_MODULES = [
+    {"key": "reports", "title": "Compliance reports", "text": "Reports from the audit log – e.g. all writes to production in a quarter, approvals by approver – as PDF or CSV, as evidence for ISO 27001 or SOC 2."},
+    {"key": "siem", "title": "SIEM export", "text": "Streams the audit log to your SIEM (syslog, Splunk, Elastic) as JSON lines."},
 ]
 
 
 @router.get("/modules", response_class=HTMLResponse)
 async def modules_page(request: Request):
-    return page(request, "modules.html", modules=MODULES)
+    return page(request, "modules.html",
+                modules=COMMUNITY_MODULES if extensions.edition() == "community" else extensions.modules())
 
 
 @router.get("/help", response_class=HTMLResponse)

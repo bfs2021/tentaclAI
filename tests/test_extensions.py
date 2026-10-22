@@ -7,12 +7,12 @@ def test_community_placeholders(client):
     html = client.get("/license").text
     assert "Currently using tentaclAI Community" in html and "To use Enterprise modules and get support" in html
     assert 'id="instance-id"' in html or "has no ID" in html
-    assert "Reports are only available with a valid Enterprise license" in client.get("/reports").text
+    assert client.get("/reports").status_code == 404  # no Reports in Community – a module brings its own entry
     html = client.get("/modules").text
     assert "Compliance reports" in html and "SIEM export" in html and "Modules are only available with a valid Enterprise license" in html
     nav = client.get("/settings").text
     assert nav.count('title="Enterprise"') == 1 and 'href="/modules"' in nav  # Modules carries the lock
-    assert 'href="/reports"' not in nav  # Reports only shows once a license unlocks it
+    assert 'href="/reports"' not in nav
 
 
 def test_instance_id_comes_from_the_hardware(app_module, tmp_path, monkeypatch):
@@ -57,12 +57,16 @@ def test_an_extension_hooks_in(app_module, tmp_path, monkeypatch):
             api.add_templates(os.path.join(os.path.dirname(__file__), "templates"))
             api.add_features(lambda: {"reports"})
             api.set_edition("enterprise")
+            api.add_module("reports", "Reports", "r", nav={"href": "/reports", "label": "Reports", "icon": "chart"})
+            api.add_module("siem", "SIEM", "s", nav={"href": "/siem", "label": "SIEM"})  # not licensed
+            api.add_module("sso", "SSO", "p", nav={"href": "/sso", "label": "SSO"}, planned=True)
     '''))
     (tmp_path / "tcx_broken.py").write_text("def register(api):\n    raise RuntimeError('boom')\n")
     monkeypatch.syspath_prepend(str(tmp_path))
     monkeypatch.setattr(extensions, "LOADED", [])
     monkeypatch.setattr(extensions, "_features", [])
     monkeypatch.setattr(extensions, "_edition", ["community"])
+    monkeypatch.setattr(extensions, "_modules", [])
     monkeypatch.setenv("TC_EXTENSIONS", "tcx_missing, tcx_broken, tcx_demo")
     app, templates = FastAPI(), Jinja2Templates(directory=str(tmp_path))
     templates.env.loader = DictLoader({"hello.html": "own page"})
@@ -75,5 +79,24 @@ def test_an_extension_hooks_in(app_module, tmp_path, monkeypatch):
     assert TestClient(app).get("/license").text == "from the extension"
     assert templates.env.get_template("hello.html").render() == "ext page"
     assert extensions.features() == {"reports"} and extensions.edition() == "enterprise"
+    assert [m["key"] for m in extensions.modules()] == ["reports", "siem", "sso"]
+    assert extensions.nav_entries(extensions.features()) == [{"href": "/reports", "label": "Reports", "icon": "chart", "nav_id": "reports"}]
+
+
+def test_module_nav_and_modules_page_with_an_extension(client, app_module, monkeypatch):
+    from app import extensions
+    monkeypatch.setattr(extensions, "_edition", ["enterprise"])
+    monkeypatch.setattr(extensions, "_features", [lambda: {"reports"}])
+    monkeypatch.setattr(extensions, "_modules", [
+        {"key": "reports", "title": "Compliance reports", "text": "r", "nav": {"href": "/reports", "label": "Reports", "icon": "chart"}, "planned": False},
+        {"key": "siem", "title": "SIEM export", "text": "s", "nav": None, "planned": False},
+        {"key": "sso", "title": "Single sign-on", "text": "p", "nav": None, "planned": True}])
+    nav = client.get("/settings").text
+    assert 'href="/reports"' in nav and 'title="Enterprise"' not in nav  # the module's entry, Modules unlocked
+    html = client.get("/modules").text
+    assert "Modules are only available" not in html and "Open Reports" in html
+    assert html.count("licensed") == 1 and "planned" in html and "locked" in html
+    monkeypatch.setattr(extensions, "_modules", [])
+    assert "No Enterprise modules installed yet" in client.get("/modules").text
     sys.modules.pop("tcx_demo", None)
     sys.modules.pop("tcx_broken", None)
