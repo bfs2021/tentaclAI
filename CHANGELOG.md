@@ -14,6 +14,11 @@ All notable changes, newest first. Every release lists **upgrade steps** from th
   shows nothing. A decision is used once – a second identical call doesn't ride along.
 
 ### Changes
+- Activity → a *flagged* entry (possible prompt injection) says what was read – the file, URL, search, MCP tool with
+  its arguments or command, e.g. `tool result: Read /workspace/notes.md` instead of `tool result: Read` – and, under
+  *what was found*, each reason with a short excerpt and its line (a base64 block: size and start), secrets blanked;
+  the notification carries the same. The result column reads *Claude warned* instead of *not run*. `tc-guard` now
+  hands its findings to `svc guard-report` on stdin.
 - Activity → audit log: decisions about unknown network destinations (Allow 10 min / 1 h, Always, Deny, Block, or
   *expired*) are logged too, with the part `network` – until now they only showed under *Recent decisions*.
 - Activity → Recent decisions: *Always* shows as *allowed* and *Block* as *blocked* (orange) instead of *approved* /

@@ -739,17 +739,54 @@ _BASE64 = re.compile(r"[A-Za-z0-9+/]{500,}={0,2}")
 def injection_signals(text, limit=200_000):
     """short reasons why someone else's text looks like it tries to instruct an AI agent (empty = nothing found) –
     a heuristic: obvious attempts are found, a well-disguised one is not"""
+    return [r for r, _ in injection_findings(text, limit)]
+
+
+def _excerpt(text, start, end, width=80):
+    """'line 12: …the text around a hit…' – one line, without hidden characters, for the audit log"""
+    part, _ = clean_untrusted(text[max(0, start - width):end + width])
+    part = re.sub(r"\s+", " ", part).strip()
+    part = ("…" if start > width else "") + part + ("…" if end + width < len(text) else "")
+    return f"line {text.count(chr(10), 0, start) + 1}: {part[:240]}"
+
+
+def injection_findings(text, limit=200_000):
+    """[(reason, excerpt)] – injection_signals with where it was found, so the user can judge a finding"""
     if not text:
         return []
     text = text[:limit]
     _, removed = clean_untrusted(text)
-    found = [f"hidden text ({', '.join(removed)})"] if any("tag" in r or "direction" in r for r in removed) else []
+    found = []
+    if any("tag" in r or "direction" in r for r in removed):
+        m = _TAGS.search(text) or _BIDI.search(text)
+        hidden = "".join(chr(ord(c) - 0xE0000) for c in m.group() if 0x20 <= ord(c) - 0xE0000 < 0x7F) if m else ""
+        found.append((f"hidden text ({', '.join(removed)})",
+                      f"hidden text reads: {hidden[:200]}" if hidden else _excerpt(text, m.start(), m.end()) if m else ""))
     for reason, rx in INJECTION_PATTERNS:
-        if reason not in found and rx.search(text):
-            found.append(reason)
-    if _BASE64.search(text):
-        found.append("long base64 block")
+        m = rx.search(text)
+        if m and reason not in (r for r, _ in found):
+            found.append((reason, _excerpt(text, m.start(), m.end())))
+    m = _BASE64.search(text)
+    if m:
+        n = len(m.group())
+        found.append(("long base64 block", f"line {text.count(chr(10), 0, m.start()) + 1}: "
+                      f"{n // 1024} KB of base64 starting {m.group()[:24]}…" if n >= 1024 else
+                      f"line {text.count(chr(10), 0, m.start()) + 1}: {n} characters of base64 starting {m.group()[:24]}…"))
     return found[:5]
+
+
+def tool_target(tool, tin):
+    """what a tool call was about – the file, URL, query or command, shortened to one line – for the audit log"""
+    if not isinstance(tin, dict):
+        return ""
+    if tool.startswith("mcp__"):
+        _, server, name = (tool.split("__", 2) + ["", ""])[:3]
+        args = ", ".join(f"{k}={json.dumps(v, ensure_ascii=False)[:60]}" for k, v in list(tin.items())[:4])
+        v = f"{server} · {name}({args})"
+    else:
+        v = tin.get({"Read": "file_path", "WebFetch": "url", "WebSearch": "query", "Bash": "command"}.get(tool, ""), "")
+    v = re.sub(r"\s+", " ", str(v or "")).strip()
+    return v[:200] + ("…" if len(v) > 200 else "")
 
 
 def guard_hook_settings():

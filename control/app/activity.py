@@ -268,7 +268,7 @@ def audit_entries(limit=300, service="", decision="", origin="", since="", q="")
             break  # the file is in time order – everything further back is older
         if (service and e.get("service") != service) or (decision and e.get("decision") != decision):
             continue
-        if q and not any(q in str(e.get(k, "")).lower() for k in ("action", "service", "detail", "error")):
+        if q and not any(q in str(e.get(k, "")).lower() for k in ("action", "service", "detail", "error", "excerpts")):
             continue
         e["from_label"] = origin_label(e.get("from"))
         if origin and (e["from_label"] != f"Job · {origin[4:]}" if origin.startswith("job:") else origin_group(e.get("from")) != origin):

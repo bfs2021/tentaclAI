@@ -339,6 +339,9 @@ table.audit .tag { white-space: nowrap; }
 table.audit summary { cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 table.audit details[open] summary { white-space: pre-wrap; }
 .audit-detail { margin-top: 3px; }
+.audit-excerpts { margin-top: 4px; white-space: normal; word-break: break-word; }
+.audit-excerpts summary { cursor: pointer; color: var(--muted); font-family: inherit; }
+.audit-excerpts div { margin-top: 3px; padding-left: 8px; border-left: 2px solid var(--warn); }
 .audit-filters { justify-content: flex-end; }
 .audit-filters input[type=search] { width: 180px; height: 30px; min-height: 30px; padding: 2px 10px; }
 .audit-reset { width: 30px; height: 30px; padding: 0; justify-content: center; }
