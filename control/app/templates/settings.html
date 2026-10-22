@@ -40,7 +40,7 @@
 
   <div class="card">
     <h2>Other variables</h2>
-    <p class="muted small">Variables used neither above nor by a service. Service tokens are managed on the <a href="/services">services</a> pages.</p>
+    <p class="muted small">Variables used neither above, by a service nor on another page – e.g. left over from a removed service. Service tokens are managed on the <a href="/services">services</a> pages.</p>
     {% if other %}
     <div class="fields">
       {% for key in other %}
@@ -54,9 +54,15 @@
         {% else %}
         <input type="text" name="k_{{ key }}" value="{{ env.get(key, '') }}">
         {% endif %}
+        <label class="check small"><input type="checkbox" name="remove_{{ key }}"> remove from .env</label>
       </div>
       {% endfor %}
     </div>
+    {% endif %}
+    {% if elsewhere %}
+    <p class="muted small">Managed elsewhere:
+      {% for where, (link, keys) in elsewhere.items() %}<span class="mono">{{ keys|join(', ') }}</span> → {% if link %}<a href="{{ link }}">{{ where }}</a>{% else %}{{ where }}{% endif %}{{ '; ' if not loop.last }}{% endfor %}
+    </p>
     {% endif %}
     <div class="fields" style="margin-top:6px">
       <div class="field"><label>New variable</label><input type="text" name="new_key" placeholder="NAME" class="mono"></div>

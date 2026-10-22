@@ -66,6 +66,24 @@ SETTINGS_GROUPS = [
     ]),
 ]
 
+# .env keys another page (or docker compose itself) manages – listed apart from "Other variables"
+# (key or prefix ending in _, where, link)
+MANAGED_ELSEWHERE = [
+    ("COMPOSE_FILE", "docker compose (set by ./tentaclai.sh init)", None),
+    ("EGRESS_MODE", "Network", "/network"),
+    ("EGRESS_DIRECT_IP", "Network", "/network"),
+    ("NOTIFY_URL_", "Notifications", "/notifications"),
+]
+
+
+def managed_elsewhere(key: str):
+    """(where, link) of the page that manages this .env key, or None"""
+    for k, where, link in MANAGED_ELSEWHERE:
+        if key == k or (k.endswith("_") and key.startswith(k)):
+            return where, link
+    return None
+
+
 # read at container start (not by svc) -> claude container must be recreated
 RESTART_VARS = {"TZ", "TC_HOSTNAME", "CONTROL_URL", "GIT_USER_NAME", "GIT_USER_EMAIL", "CLAUDE_TELEMETRY",
                 "HOST_DOCS", "CA_CERT", "CLAUDE_CPUS", "CLAUDE_MEMORY"}

@@ -529,3 +529,17 @@ def test_audit_filters_error_and_origin_link(client, app_module, tmp_path, monke
     html = client.get("/activity?q=ITEMS").text
     assert "POST /items" in html and "compose web" not in html
     assert "Nothing matches" in client.get("/activity?q=nothing-like-this").text
+
+
+def test_settings_other_vars_managed_elsewhere_and_remove(client):
+    from app.envfile import read_env, update_env
+    html = client.get("/settings").text
+    assert 'name="k_NOTIFY_URL_PHONE"' not in html and "NOTIFY_URL_PHONE</span> → <a href=\"/notifications\">" in html
+    update_env({"LEFTOVER_KEY": ""})
+    assert 'name="remove_LEFTOVER_KEY"' in client.get("/settings").text
+    r = client.post("/settings", data={"k_LEFTOVER_KEY": "", "remove_LEFTOVER_KEY": "on"}, headers={"HX-Request": "true"})
+    assert r.status_code == 200
+    env = read_env()
+    assert "LEFTOVER_KEY" not in env and env.get("TC_HOSTNAME") == "testhost"
+    update_env({"NOT_THERE": None})  # removing a missing key is a no-op, not an append
+    assert "NOT_THERE" not in read_env()

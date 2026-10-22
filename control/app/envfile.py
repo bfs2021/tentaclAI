@@ -21,7 +21,7 @@ def _quote(v: str) -> str:
 
 
 def update_env(changes: dict, path: str = ENV_FILE) -> None:
-    """changes: key -> new value ('' = empty). Existing lines are updated in place, new keys appended."""
+    """changes: key -> new value ('' = empty, None = remove the line). Existing lines are updated in place, new keys appended."""
     try:
         with open(path) as f:
             lines = f.read().splitlines()
@@ -34,9 +34,12 @@ def update_env(changes: dict, path: str = ENV_FILE) -> None:
         m = tclib.ENV_LINE.match(line)
         if m and m.group(1) in pending:
             key = m.group(1)
-            out.append(f"{key}={_quote(pending.pop(key))}")
+            value = pending.pop(key)
+            if value is not None:
+                out.append(f"{key}={_quote(value)}")
         else:
             out.append(line)
+    pending = {k: v for k, v in pending.items() if v is not None}
     if pending:
         out.append("")
         out.append("# added by tentacontrol")

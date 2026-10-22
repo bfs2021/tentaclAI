@@ -7,7 +7,7 @@ from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse
 
 from .. import auth, connectors, models, notify, services_store, skills, totp, usage
-from ..config import RC_VARS, RESTART_VARS, SETTINGS_GROUPS
+from ..config import RC_VARS, RESTART_VARS, SETTINGS_GROUPS, managed_elsewhere
 from ..envfile import read_env, update_env
 from ..config import site
 from ..web import mark_restart, not_applied, page, respond, toast
@@ -129,11 +129,17 @@ async def settings_page(request: Request):
     env = read_env()
     known = {k for _, items in SETTINGS_GROUPS for k, *_ in items}
     service_vars = {v["name"] for s in services_store.load_all() for v in s["vars"]}
-    other = sorted(k for k in env if k not in known and k not in service_vars)
+    rest = sorted(k for k in env if k not in known and k not in service_vars)
+    other = [k for k in rest if not managed_elsewhere(k)]
+    elsewhere = {}  # where -> (link, keys)
+    for k in rest:
+        if m := managed_elsewhere(k):
+            elsewhere.setdefault(m[0], (m[1], []))[1].append(k)
     from .. import scheduled
     # shown greyed out in empty fields whose default lives in code
     placeholders = {"JOB_READONLY_HELPERS": "default: " + ", ".join(scheduled.HELPERS_DEFAULT)}
-    return page(request, "settings.html", groups=SETTINGS_GROUPS, env=env, other=other, placeholders=placeholders,
+    return page(request, "settings.html", groups=SETTINGS_GROUPS, env=env, other=other, elsewhere=elsewhere,
+                placeholders=placeholders,
                 is_secret=services_store.secret_check())
 
 
@@ -151,6 +157,9 @@ async def settings_save(request: Request):
             continue
         k = key[2:]
         if k in READONLY:
+            continue
+        if form.get(f"remove_{k}") and k in env:
+            changes[k] = None
             continue
         value = value.strip()
         if is_secret(k):
@@ -176,7 +185,10 @@ async def settings_save(request: Request):
         update_env(changes)
     except ValueError as e:
         return PlainTextResponse("", headers=toast(str(e), "err"))
-    msg = f"{len(changes)} setting(s) saved"
+    removed = sum(v is None for v in changes.values())
+    msg = f"{len(changes) - removed} setting(s) saved" if removed < len(changes) else ""
+    if removed:
+        msg = (msg + ", " if msg else "") + f"{removed} removed"
     if "INJECTION_GUARD" in changes and not await asyncio.to_thread(connectors.apply):  # the hook in the managed settings
         msg += " – the sandbox gets the hook setting on its next start"
     if RESTART_VARS & set(changes):
