@@ -105,7 +105,8 @@
     return !(copy && have);
   });
   term.onData(function (d) { if (ws && ws.readyState === 1) ws.send(JSON.stringify({type: "input", data: d})); });
-  window.addEventListener("resize", function () { fit.fit(); sendSize(); });
+  // refit whenever the box changes: window resize, and the approval banner coming or going above it
+  new ResizeObserver(function () { fit.fit(); }).observe(document.querySelector(".term-wrap"));
   term.onResize(sendSize);
   btn.addEventListener("click", function () { term.reset(); connect(); });
   connect();

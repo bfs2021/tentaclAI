@@ -133,6 +133,15 @@ tr:last-child td { border-bottom: 0; }
 
 /* terminal & logs */
 .term-wrap { background: #0b0e14; border: 1px solid var(--border); border-radius: var(--radius); padding: 10px; height: calc(100vh - 230px); min-height: 380px; }
+/* terminal page on wide screens: exactly one window high, the page itself never scrolls – a stray wheel
+   outside the terminal used to push the approval banner out of view */
+@media (min-width: 861px) {
+  html:has(.term-wrap), body:has(.term-wrap) { overflow: hidden; overscroll-behavior: none; }
+  .main:has(> .term-wrap) { height: 100vh; display: flex; flex-direction: column; padding-bottom: 16px; }
+  .main:has(> .term-wrap) > * { flex-shrink: 0; }
+  .main > .term-wrap { flex: 1 1 0; height: auto; min-height: 200px; overflow: hidden; }
+  .main:has(> .term-wrap) > .help { margin-bottom: 0; }
+}
 .tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px; }
 .tabs a { padding: 6px 12px; border-radius: 99px; border: 1px solid var(--border); color: var(--muted); font-weight: 550; font-size: 13px; }
 .tabs a.active { background: var(--accent-soft); border-color: transparent; color: var(--accent); }

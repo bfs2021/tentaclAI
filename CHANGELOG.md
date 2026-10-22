@@ -28,6 +28,8 @@ All notable changes, newest first. Every release lists **upgrade steps** from th
   automatic runs* instead of an empty next run. *Run now* stays available.
 
 ### Fixes
+- Terminal: the page is exactly one window high and no longer scrolls – a stray wheel outside the terminal pushed the
+  approval banner out of view and left an empty area below.
 - `svc jobs`: long job names no longer run into the schedule column.
 - `svc mail … folders` returned mangled names (`/" Junk`) on servers that quote them (Dovecot) – the LIST answer is parsed properly now.
 
