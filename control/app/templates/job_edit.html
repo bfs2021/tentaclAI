@@ -38,7 +38,7 @@
         <div class="help">minute hour day month weekday (0 = Sunday) – e.g. <code>0 7 * * 1-5</code> = weekdays at 07:00</div></div>
     </div>
     <div><label>Profile</label>
-      <select name="profile" id="profile">{% for p in profiles %}<option value="{{ p }}" {{ 'selected' if job.profile == p }}>{{ p }}</option>{% endfor %}</select>
+      <select name="profile" id="profile">{% for p in profiles %}<option value="{{ p }}" {{ 'selected' if job.profile == p }}>{{ labels[p] }}</option>{% endfor %}</select>
       <div class="help prof" data-p="read-only">Reads only: every tentacle counts as <code>ro</code>, no file edits, no MCP tools.</div>
       <div class="help prof" data-p="standard">Like a terminal session: <code>confirm</code> tentacles wait for your approval in Activity (expires after 10 min), <code>rw</code> tentacles are written without asking.</div>
       {% if rw %}<div class="card flat small prof" data-p="standard" style="margin-top:8px"><span class="pill warn">writes without asking</span> {{ rw | join(', ') }}</div>{% endif %}

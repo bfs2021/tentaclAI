@@ -937,13 +937,36 @@ def mark_seen():
     jsonstore.save(SEEN, {"ts": time.time()})
 
 
+PROFILE_LABELS = {"read-only": "Reads only", "standard": "Can write (like a terminal session)"}
+
+
+def reach(job, known):
+    """what a job may change: (writes without asking, asks first) – from its tentacles' access, the named ones if limited"""
+    if job.get("profile") != "standard":
+        return [], []
+    names = mentions(job.get("prompt")) if job.get("scope") else list(known)
+    writes, asks = [], []
+    for n in names:
+        t = known.get(n)
+        if not t or not t["enabled"]:
+            continue
+        modes = set(t["parts"].values())
+        if "rw" in modes:
+            writes.append(n)
+        if "confirm" in modes:
+            asks.append(n)
+    return writes, asks
+
+
 def overview():
-    """jobs for the page: definition + next start in words + last run"""
+    """jobs for the page: definition + next start in words + last run + what it may change"""
     h = history()
+    known = tentacles()
     rows = []
     for jid, job in sorted(load().items(), key=lambda kv: kv[1]["name"].lower()):
         runs = [r for r in h if r.get("job") == jid]
-        rows.append(dict(job, id=jid, when=describe(job["schedule"]), last_run=runs[-1] if runs else None,
+        writes, asks = reach(job, known)
+        rows.append(dict(job, id=jid, when=describe(job["schedule"]), last_run=runs[-1] if runs else None, writes=writes, asks=asks,
                          runs=list(reversed(runs[-10:])), busy=jid in _current.values() or any(r["status"] in ("queued", "running") for r in runs)
                          or any(x.get("state") in ("queued", "running") for r in runs for x in r.get("actions") or [])))
     return rows

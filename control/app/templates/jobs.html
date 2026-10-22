@@ -61,7 +61,7 @@
   <div class="between" style="align-items:flex-start;gap:12px">
     <div style="min-width:0">
       <h2 style="margin:0">{{ icon('clock') }}{{ j.name }}{% if not j.enabled %} <span class="pill off">paused</span>{% endif %}</h2>
-      <div class="small muted" style="margin-top:4px">{{ j.when }}{% if j.schedule.kind != 'manual' %} · next {{ fmt(j.next) if j.enabled else '–' }}{% endif %} · <span class="pill {{ 'warn' if j.profile == 'standard' else 'off' }}">{{ j.profile }}</span>{% if j.propose %} · <span class="pill accent">proposes</span>{% endif %} · notify {{ j.notify }}</div>
+      <div class="small muted" style="margin-top:4px">{{ j.when }}{% if j.schedule.kind != 'manual' %} · next {{ fmt(j.next) if j.enabled else '–' }}{% endif %} · {% if j.propose %}<span class="pill off" title="reads only and proposes svc commands – you pick which ones run">{{ icon('bulb') }}proposes</span>{% elif j.profile == 'standard' %}<span class="pill accent" title="{% if j.writes %}writes without asking: {{ j.writes | join(', ') }}{% endif %}{% if j.writes and j.asks %} · {% endif %}{% if j.asks %}asks first: {{ j.asks | join(', ') }}{% endif %}{% if not j.writes and not j.asks %}no writable tentacle{% endif %}">writes</span>{% else %}<span class="pill off" title="every tentacle is read-only for this job">reads</span>{% endif %}{% if j.scope %} · <span class="faint" title="svc refuses every tentacle not named in the task">only named tentacles</span>{% endif %} · notify {{ j.notify }}</div>
     </div>
     <div class="row" style="flex-wrap:nowrap">
       <button class="btn sm primary" hx-post="/jobs/{{ j.id }}/run" {{ 'disabled' if j.busy }}>{{ icon('play') }}Run now</button>

@@ -19,7 +19,7 @@ def _job_page(request, jid=None, job=None, error=None, status=200):
         job = scheduled.get(jid)
     known = scheduled.tentacles()
     warnings = scheduled.check_mentions(job, known)[1] if job and job.get("prompt") else []
-    resp = page(request, "job_edit.html", jid=jid, job=job or {}, error=error, profiles=scheduled.PROFILES,
+    resp = page(request, "job_edit.html", jid=jid, job=job or {}, error=error, profiles=scheduled.PROFILES, labels=scheduled.PROFILE_LABELS,
                 notify_rules=scheduled.NOTIFY, days=scheduled.DAYS, templates=scheduled.TEMPLATES,
                 rw=[x for x in scheduled.rw_tentacles()
                     if not (job or {}).get("scope") or x.removeprefix("ssh ") in scheduled.mentions(job.get("prompt"))],

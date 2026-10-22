@@ -14,6 +14,12 @@ All notable changes, newest first. Every release lists **upgrade steps** from th
   The badge next to *Jobs* counts them and pulses like the approval badge until they are run, discarded or expire
   (*Discard selected* / *Discard all*).
 
+### Changes
+- Job list: the profile shows as *reads* (neutral), *writes* (purple, the tooltip lists what it writes to without asking
+  and what asks first) or *proposes* – the same colours as the access labels on service cards; yellow is kept for what
+  waits for you. The editor names the profiles *Reads only* and *Can write (like a terminal session)*; the stored values
+  stay `read-only` / `standard`.
+
 ### Fixes
 - `svc jobs`: long job names no longer run into the schedule column.
 - `svc mail … folders` returned mangled names (`/" Junk`) on servers that quote them (Dovecot) – the LIST answer is parsed properly now.

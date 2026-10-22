@@ -338,3 +338,11 @@ def test_discard(sj, monkeypatch, tmp_path):
     assert sj.discard_actions("r1") == 1 and sj.pending_proposals() == 0
     with pytest.raises(ValueError, match="nothing picked"):
         sj.discard_actions("r1")
+
+
+def test_reach(sj):
+    known = dict(KNOWN, slow={"kind": "service", "parts": {"smtp": "confirm"}, "enabled": True, "description": ""})
+    assert sj.reach({"profile": "read-only", "prompt": "@mailrelay"}, known) == ([], [])
+    w, a = sj.reach({"profile": "standard", "prompt": "x"}, known)
+    assert "mailrelay" in w and "nas" in w and "n8n" not in w and "slow" in a and "slowmail" in a  # n8n is disabled
+    assert sj.reach({"profile": "standard", "scope": True, "prompt": "@mailrelay and @imap_x"}, known) == (["mailrelay"], [])
