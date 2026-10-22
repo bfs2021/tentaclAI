@@ -330,6 +330,7 @@ def test_settings_show_default_job_helpers(client):
     from app import scheduled
     html = client.get("/settings").text
     assert 'placeholder="default: ' + ", ".join(scheduled.HELPERS_DEFAULT) + '"' in html
+    assert html.count('class="field wide"') == 2  # JOB_READONLY_HELPERS + INJECTION_GUARD: long help, whole row
 
 
 def test_settings_refuse_dangerous_job_helpers(client):

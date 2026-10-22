@@ -111,6 +111,8 @@ input:focus, select:focus, textarea:focus { border-color: var(--accent); box-sha
 textarea { font-family: var(--mono); font-size: 12.5px; line-height: 1.5; resize: vertical; min-height: 360px; tab-size: 2; }
 .field { margin-bottom: 14px; }
 .fields { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 4px 18px; }
+.field.wide { grid-column: 1 / -1; }  /* long help text: whole row instead of a narrow column */
+.field.wide select { max-width: 260px; }
 .secret-row { display: flex; gap: 8px; align-items: center; }
 .secret-row input { flex: 1; }
 .check { display: inline-flex; gap: 6px; align-items: center; font-weight: 500; color: var(--muted); font-size: 12.5px; margin: 0; white-space: nowrap; }

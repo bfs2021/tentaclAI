@@ -14,7 +14,7 @@
     <h2>{{ group }}</h2>
     <div class="fields">
       {% for key, label, help, kind in items %}
-      <div class="field">
+      <div class="field{{ ' wide' if help|length > 160 }}">
         <label for="f-{{ key }}">{{ label }} <span class="faint mono small">{{ key }}</span></label>
         {% if kind == 'readonly' %}
         <input id="f-{{ key }}" type="text" value="{{ env.get(key, '') }}" disabled>
