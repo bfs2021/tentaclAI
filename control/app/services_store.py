@@ -94,9 +94,8 @@ def files_info(f):
 
 
 def docker_info(d, env):
-    """docker hosts run over ssh; legacy = an old "mode": "socket" entry (removed in v0.11) that svc refuses"""
-    return {"access": tclib.access(d.get("access")), "stacks_dir": _sub(d.get("stacks_dir"), env), "target": d.get("ssh_host", ""),
-            "legacy": d.get("mode", "ssh") != "ssh"}  # a missing ssh_host may come from the system – svc test tells
+    """docker hosts run over ssh (a missing ssh_host may come from the system – svc test tells)"""
+    return {"access": tclib.access(d.get("access")), "stacks_dir": _sub(d.get("stacks_dir"), env), "target": d.get("ssh_host", "")}
 
 
 PLACEHOLDER_DOMAIN = "example.com"  # {{DOMAIN}} in templates – the user enters the real address, nothing is guessed

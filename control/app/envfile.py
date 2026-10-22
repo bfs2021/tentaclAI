@@ -48,13 +48,3 @@ def update_env(changes: dict, path: str = ENV_FILE) -> None:
         f.write("\n".join(out) + "\n")
     os.chmod(tmp, mode or 0o600)
     os.replace(tmp, path)
-
-
-def drop_generated_compose(path: str = ENV_FILE) -> bool:
-    """v0.11 removed docker services in socket mode and with them compose.generated.yaml – take it out of COMPOSE_FILE
-    (the stale file itself is left alone; it is no longer read). True if .env was changed."""
-    parts = [p for p in read_env(path).get("COMPOSE_FILE", "").split(":") if p]
-    if "compose.generated.yaml" not in parts:
-        return False
-    update_env({"COMPOSE_FILE": ":".join(p for p in parts if p != "compose.generated.yaml")}, path)
-    return True

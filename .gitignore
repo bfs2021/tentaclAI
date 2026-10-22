@@ -10,7 +10,6 @@
 
 # site configuration
 compose.override.yaml
-compose.generated.yaml
 local/*
 !local/CLAUDE.example.md
 

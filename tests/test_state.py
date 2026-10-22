@@ -190,15 +190,6 @@ def test_migrate_access_rewrites_service_files(app_module):
             os.remove(f)
 
 
-def test_drop_generated_compose(app_module, tmp_path):
-    from app.envfile import drop_generated_compose, read_env
-    f = tmp_path / ".env"
-    f.write_text("# compose files\nCOMPOSE_FILE=compose.yaml:compose.generated.yaml:compose.override.yaml\nTZ=UTC\n")
-    assert drop_generated_compose(str(f)) is True
-    assert read_env(str(f))["COMPOSE_FILE"] == "compose.yaml:compose.override.yaml" and "# compose files" in f.read_text()
-    assert drop_generated_compose(str(f)) is False  # only once
-
-
 def test_origin_label(app_module, monkeypatch):
     from app import activity, usage
     sid = "369797fa-acf1-46dc-9752-e0a7fdab4d35"

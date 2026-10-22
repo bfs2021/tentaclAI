@@ -110,10 +110,10 @@ def test_migrate_access():
 
 
 def test_ssh_migrate_access(tmp_path):
-    (tmp_path / "a.conf").write_text("Host a\n    HostName a.test\n    # tentaclai: access=ro\nHost b\n    # tentaclaude: access=rw\n")
+    (tmp_path / "a.conf").write_text("Host a\n    HostName a.test\n    # tentaclai: access=ro\nHost b\n    # tentaclai: access=rw\n")
     (tmp_path / "c.conf").write_text("Host c\n    # tentaclai: access=confirm\n")
     assert tclib.ssh_migrate_access(str(tmp_path)) == ["a.conf"]
-    assert (tmp_path / "a.conf").read_text() == "Host a\n    HostName a.test\n    # tentaclai: access=read\nHost b\n    # tentaclaude: access=write\n"
+    assert (tmp_path / "a.conf").read_text() == "Host a\n    HostName a.test\n    # tentaclai: access=read\nHost b\n    # tentaclai: access=write\n"
     assert "access=ro" in next(tmp_path.glob("a.conf.bak-*-access")).read_text()
     assert [h["access"] for h in tclib.ssh_hosts(str(tmp_path))] == ["read", "write", "confirm"]
     assert tclib.ssh_migrate_access(str(tmp_path)) == []

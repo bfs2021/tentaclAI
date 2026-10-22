@@ -57,7 +57,6 @@ ACTION_REFUSED = {"config", "sync", "mcp-proxy", "git-credential", "git-push-hoo
 
 def check_action(command):
     """a proposed command → argv, or ValueError: one svc call, no shell syntax, nothing interactive"""
-    import shlex
     command = (command or "").strip()
     if not command or len(command) > 500 or ACTION_BAD.search(command):
         raise ValueError("not a single plain svc command")
@@ -985,8 +984,3 @@ def rw_tentacles():
         if tclib.ssh_access(conf, h["alias"]) == "write":
             out.append(f"ssh {h['alias']}")
     return sorted(set(out))
-
-
-def shell_preview(job):
-    """the command line as text – for the editor's 'what runs' hint"""
-    return shlex.join(claude_argv(job, "RUN", "SESSION")[:3]) + " …"

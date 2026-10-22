@@ -330,8 +330,7 @@ def migrate_access(data):
 
 # ---------------------------------------------------------------- SSH hosts (ssh/config.d/*.conf)
 
-META = re.compile(r"^\s*#\s*tentacl(?:ai|aude):\s*(sudo|access)\s*=\s*(.*?)\s*$")
-SSH_ACCESS = ("read", "write", "confirm")
+META = re.compile(r"^\s*#\s*tentaclai:\s*(sudo|access)\s*=\s*(.*?)\s*$")
 SSH_ACCESS_DEFAULT = "confirm"
 SUDO_RE = re.compile(r"^[A-Za-z0-9 ._/=-]{1,60}$")
 ALIAS_RE = re.compile(r"^[A-Za-z0-9._-]{1,40}$")

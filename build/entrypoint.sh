@@ -33,16 +33,6 @@ chown -R root:root /root/.ssh 2>/dev/null || true
 chmod 700 /root/.ssh /root/.ssh/keys 2>/dev/null || true
 chmod 600 /root/.ssh/config /root/.ssh/keys/*_ed25519 2>/dev/null || true
 
-# Claude's home moved from /root to /home/claude (v0.4.0): carry over login, settings and history once
-migrated=""
-if [ ! -e /home/claude/.claude ] && [ -d /root/.claude ]; then
-    echo "migrating Claude's home from /root to /home/claude"
-    for f in .claude .claude.json .bash_history; do
-        [ -e "/root/$f" ] && mv "/root/$f" /home/claude/ || true
-    done
-    rm -rf /root/.claude.json.backup*
-    migrated=1
-fi
 # everything in Claude's areas belongs to Claude (no symlinks followed)
 find /home/claude /workspace -xdev ! -user claude -exec chown -h claude:claude {} + 2>/dev/null || true
 chmod 700 /home/claude
@@ -128,8 +118,6 @@ PY
 # Services (services/*.json): MCP -> Claude config, clone missing repos, regenerate /workspace/SERVICES.md
 echo "svc sync:"
 svc sync || echo "svc sync failed – container starts anyway"
-# after a migration: svc sync replaced MCP entries that held tokens inline – drop config backups that still have them
-[ -n "$migrated" ] && rm -rf /home/claude/.claude/backups /home/claude/.claude.json.backup*
 
 # CMD as Claude, with a clean environment
 exec setpriv --reuid=claude --regid=claude --init-groups env -i HOME=/home/claude USER=claude LOGNAME=claude SHELL=/bin/bash \

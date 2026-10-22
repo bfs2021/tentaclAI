@@ -94,7 +94,6 @@
       </dl>
       <p class="help">Claude uses <code>svc docker {{ svc.name }} …</code> and <code>svc compose {{ svc.name }} &lt;stack&gt; …</code>. With <code>read</code> only read-only commands are allowed.
       The SSH user must be allowed to run <code>docker</code> (or sudo it); for this host use an SSH host for <code>host.docker.internal</code>.</p>
-      {% if svc.docker.legacy %}<p class="small"><span class="pill err">not usable</span> Docker hosts run over SSH only – <code>"mode": "socket"</code> was removed in v0.11. Add this host under <a href="/ssh">SSH hosts</a> and set <code>"mode": "ssh"</code> and <code>"ssh_host"</code> in the JSON.</p>{% endif %}
     </div>
     {% endif %}
 

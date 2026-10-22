@@ -5,7 +5,7 @@ import pytest
 NOT_PAGES = ("/login", "/setup", "/logout", "/healthz", "/api/", "/internal/", "/logs/stream", "/builds/", "/static", "/vendor",
              "/topology/ssh-status", "/claude/jobs")  # (ssh-status runs real SSH checks)
 # pages with parameters or variants, rendered with the dummy stack's objects
-VARIANTS = ["/services/oldsock", "/services/demoapi", "/services/demodb", "/services/demohost", "/services/demogit", "/services/demomail", "/systems/box", "/ssh/box/edit",
+VARIANTS = ["/services/demoapi", "/services/demodb", "/services/demohost", "/services/demogit", "/services/demomail", "/systems/box", "/ssh/box/edit",
             "/ssh/box/remove", "/network?tab=allow", "/network?tab=block"]
 
 
@@ -188,11 +188,6 @@ def test_credential_values_never_reach_the_browser(client):
     """ODD_ACCESS has no secret-looking name, but credsvc uses it as a header token"""
     for path in ("/settings", "/services/credsvc"):
         assert "visible-if-broken-123" not in client.get(path).text, path
-
-
-def test_old_socket_service_is_flagged(client):
-    assert "not usable" in client.get("/services/oldsock").text
-    assert "not usable" not in client.get("/services/demohost").text
 
 
 def test_approval_shows_where_it_came_from(client, app_module):

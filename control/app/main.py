@@ -13,7 +13,7 @@ import tclib
 
 from . import activity, auth, connectors, dockerops, netguard, notify, scheduled, services_store, skills, updatecheck, usage
 from .config import SSH_DIR
-from .envfile import drop_generated_compose, read_env
+from .envfile import read_env
 from .routes import claude, jobs, network, settings, ssh, system, tentacles
 from .web import BASE, TC_VERSION
 
@@ -69,8 +69,6 @@ async def secure_cookie(request: Request, call_next):
 
 async def migrate():
     """one-time adjustments of an existing installation"""
-    if drop_generated_compose():
-        print("migration: compose.generated.yaml removed from COMPOSE_FILE (docker services run over SSH only)", flush=True)
     services = services_store.migrate_access()
     hosts = tclib.ssh_migrate_access(os.path.join(SSH_DIR, "config.d"))
     if services or hosts:

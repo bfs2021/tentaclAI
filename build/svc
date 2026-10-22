@@ -818,7 +818,7 @@ def get_docker(services, name):
     d = render(svc["docker"])
     if d.get("mode", "ssh") != "ssh" or not d.get("ssh_host"):
         sys.exit(f"svc: {name}: docker services run over SSH only – set \"mode\": \"ssh\" and \"ssh_host\" "
-                 "(this host: an SSH host for host.docker.internal; \"mode\": \"socket\" was removed in v0.11)")
+                 "(this host: an SSH host for host.docker.internal)")
     return d
 
 
@@ -2291,7 +2291,7 @@ def cmd_test(services, name):
         elif part == "docker":
             d = render(svc["docker"])
             if d.get("mode", "ssh") != "ssh" or not d.get("ssh_host"):
-                report("docker", False, "runs over SSH only – \"mode\": \"socket\" was removed, use an SSH host")
+                report("docker", False, "runs over SSH only – set \"mode\": \"ssh\" and \"ssh_host\"")
                 continue
             argv = docker_argv(name, d, ["version", "--format", "{{.Server.Version}}"])
             r = subprocess.run(argv, capture_output=True, text=True, timeout=40)

@@ -33,7 +33,7 @@
     <div class="svc-chips">
       {% for k in s.kinds %}
         {% if k == 'api' %}{{ access('api', s.data.api.access or 'write') }}
-        {% elif k == 'docker' %}{{ access('docker', s.docker.access) }}<span class="pill info">{{ 'ssh ' ~ s.docker.target if not s.docker.legacy else 'socket – no longer supported' }}</span>
+        {% elif k == 'docker' %}{{ access('docker', s.docker.access) }}<span class="pill info">{{ 'ssh ' ~ s.docker.target }}</span>
         {% elif k == 'git' %}{{ access('git', s.git.access) }}{% if not s.git.cloned %}<span class="pill off">not cloned</span>{% endif %}
         {% elif k == 'db' %}{{ access('db', s.db.access) }}<span class="pill info">{{ s.db.engine }}</span>
         {% elif k == 'smtp' %}{{ access('smtp', s.data.smtp.access or 'confirm') }}

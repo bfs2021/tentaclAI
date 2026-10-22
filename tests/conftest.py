@@ -36,7 +36,6 @@ def _stack():
                      "imap": {"host": "imap.example.test", "user": "tc@example.test", "password": "${DB_PW}", "folders": ["INBOX"], "access": "ro"}},
         "demohost": {"system": "box", "docker": {"mode": "ssh", "access": "confirm", "stacks_dir": "/srv/stacks"},
                      "files": {"root": "/srv", "access": "ro"}, "web": {"base_url": "https://wiki.example.test"}},
-        "oldsock": {"docker": {"mode": "socket", "socket": "/var/run/docker.sock", "stacks_dir": "/srv"}},
         "credsvc": {"api": {"base_url": "https://c.example.test", "auth": {"type": "header", "header": "X-Key", "value": "${ODD_ACCESS}"}}},
         "demogit": {"git": {"url": "git@git.example.test:me/repo.git", "access": "rw"}, "enabled": False},
     }
