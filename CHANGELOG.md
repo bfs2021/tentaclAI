@@ -2,7 +2,7 @@
 
 All notable changes, newest first. Every release lists **upgrade steps** from the previous one.
 
-## Unreleased
+## v0.18.0 – 2026-10-22
 
 ### Highlights
 - **Prompt-injection safeguards** (`INJECTION_GUARD`, Settings → Security group, on by default): `svc web` now frames
