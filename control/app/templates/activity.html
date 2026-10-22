@@ -32,10 +32,10 @@
         <td class="mono small nowrap">{{ e.ts[:10] }} {{ e.ts[11:19] }}</td>
         <td>{{ e.service }}</td>
         <td><span class="tag">{{ e.part }}</span></td>
-        <td class="mono small audit-action" title="{{ e.detail or '' }}">{{ e.action }}</td>
+        <td class="mono small audit-action">{% if e.action | length > 80 or '\n' in e.action %}<details><summary>{{ e.action }}</summary></details>{% else %}{{ e.action }}{% endif %}</td>
         <td class="small muted">{{ e.from_label or '–' }}</td>
         <td class="small">{{ e.mode }}</td>
-        <td><span class="pill {{ {'auto':'info','approved':'ok','denied':'err','blocked':'warn','expired':'off','error':'err'}.get(e.decision, 'off') }}">{{ e.decision }}</span></td>
+        <td><span class="pill {{ {'auto':'info','approved':'ok','denied':'err','blocked':'warn','expired':'off','error':'err'}.get(e.decision, 'off') }}">{{ e.decision }}</span>{% if e.detail %}<div class="small faint audit-detail">{{ e.detail }}</div>{% endif %}</td>
         <td class="small nowrap">{% if e.exit is defined %}{{ '✓' if e.exit == 0 else '✗ exit ' ~ e.exit }}{% if e.seconds is defined %} <span class="faint">{{ e.seconds }} s</span>{% endif %}{% else %}<span class="faint">not run</span>{% endif %}</td>
       </tr>
     {% endfor %}

@@ -484,3 +484,17 @@ def test_network_seen_table_is_sortable(client, monkeypatch):
         assert f'data-sort="{key}"' in html
     assert 'aria-sort="descending"' in html  # newest first, as the server sorts
     assert 'data-count="7" data-last="200"' in html and 'data-rule="0"' in html and 'data-rule="2demo"' in html
+
+
+def test_audit_long_action_collapses(client, app_module, tmp_path, monkeypatch):
+    import json
+    from app import activity
+    f = tmp_path / "audit.jsonl"
+    rows = [{"ts": "2026-10-22T10:00:00+0000", "service": "demohost", "part": "docker", "mode": "confirm",
+             "action": "docker ps", "decision": "approved", "detail": "tentacontrol + 15 min"},
+            {"ts": "2026-10-22T10:01:00+0000", "service": "demohost", "part": "docker", "mode": "confirm",
+             "action": "compose up -d " + "x" * 120, "decision": "auto"}]
+    f.write_text("".join(json.dumps(r) + "\n" for r in rows))
+    monkeypatch.setattr(activity, "AUDIT_FILE", str(f))
+    html = client.get("/activity").text
+    assert html.count("<details><summary>") == 1 and "tentacontrol + 15 min" in html
