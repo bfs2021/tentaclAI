@@ -7,7 +7,7 @@ import time
 from fastapi.responses import PlainTextResponse
 from fastapi.templating import Jinja2Templates
 
-from . import dockerops, services_store, updatecheck
+from . import dockerops, license, services_store, updatecheck
 from .config import DATA_DIR, RESTART_VARS, site
 from .envfile import read_env
 
@@ -30,7 +30,7 @@ def page(request, name, **ctx):
     st = dockerops.status()
     newer = dockerops.newer_image() if st.get("exists") else False
     ctx.update(request=request, nav=name.split(".")[0], cstatus=st, restart_needed=restart_needed(st) or newer, newer_image=newer, site=site(),
-               update=updatecheck.status(TC_VERSION),
+               update=updatecheck.status(TC_VERSION), reports_unlocked=license.has("reports"),
                flash=request.session.pop("flash", None))
     return templates.TemplateResponse(request, name, ctx)
 

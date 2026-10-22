@@ -4,7 +4,7 @@
 {% block content %}
 <div class="header">
   <div><h1>Reports</h1><div class="sub">Compliance reports from the audit log and export to your SIEM.</div></div>
-  <div class="row"><span class="pill off">{{ icon('lock') }}Enterprise</span></div>
+  <div class="row"><span class="pill {{ 'ok' if reports_unlocked else 'off' }}">{{ icon('lock') }}Enterprise</span></div>
 </div>
 
 <div class="locked">
@@ -21,9 +21,16 @@
     </div>
   </div>
   <div class="locked-note card">
+    {% if reports_unlocked %}
+    <div class="locked-icon">{{ icon('chart') }}</div>
+    <h2>Reports are coming in a later version.</h2>
+    <p class="muted small">Your Enterprise license includes them – they appear here with the update that brings them.</p>
+    {% else %}
     <div class="locked-icon">{{ icon('lock') }}</div>
     <h2>Reports are only available with a valid Enterprise license.</h2>
     <p class="muted small">Compliance reports and the SIEM export of the audit log are part of tentaclAI Enterprise.</p>
+    <a class="btn sm" href="/license" style="margin-top:6px">Enter a license key</a>
+    {% endif %}
   </div>
 </div>
 {% endblock %}

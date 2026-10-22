@@ -1,4 +1,4 @@
-"""Settings and its tabs: notifications, skills, models, security (two-factor sign-in) – plus usage."""
+"""Settings and its tabs: notifications, skills, models, security (two-factor sign-in), license – plus usage."""
 import asyncio
 import time
 
@@ -6,7 +6,7 @@ import segno
 from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse
 
-from .. import auth, connectors, models, notify, services_store, skills, totp, usage
+from .. import auth, connectors, license, models, notify, services_store, skills, totp, usage
 from ..config import RC_VARS, RESTART_VARS, SETTINGS_GROUPS, managed_elsewhere
 from ..envfile import read_env, update_env
 from ..config import site
@@ -255,3 +255,23 @@ async def security_disable(request: Request, password: str = Form(""), code: str
         return _security(request, error="Password and a current code (or a recovery code) are needed to switch it off.", status=400)
     auth.disable_twofactor()
     return RedirectResponse("/security", status_code=303)
+
+
+@router.get("/license", response_class=HTMLResponse)
+async def license_page(request: Request):
+    return page(request, "license.html", lic=license.status(), features=license.FEATURES)
+
+
+@router.post("/license", response_class=HTMLResponse)
+async def license_install(request: Request, key: str = Form("")):
+    try:
+        st = license.install(key)
+    except ValueError as e:
+        return respond(request, f"License not installed: {e}", "err")
+    return respond(request, f"License {st['license']['id']} for {st['license']['licensee']} installed", refresh=True)
+
+
+@router.post("/license/remove", response_class=HTMLResponse)
+async def license_remove(request: Request):
+    license.remove()
+    return respond(request, "License removed", refresh=True)

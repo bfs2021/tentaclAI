@@ -26,7 +26,7 @@
     <a href="#terminal">Terminal &amp; tmux</a><a href="#rc">Remote control</a><a href="#services">Services</a>
     <a href="#systems">Systems</a><a href="#topology">Topology</a><a href="#docker">Docker hosts</a><a href="#onboard">Onboarding a service</a><a href="#auth">Auth types</a>
     <a href="#git">Git repositories</a><a href="#db">Databases</a><a href="#web">Web sources</a><a href="#files">Files</a><a href="#mail">Mail</a><a href="#templates">Templates</a><a href="#inventory">System inventory</a>
-    <a href="#activity">Activity</a><a href="#jobs">Jobs</a><a href="#network">Network</a><a href="#ssh">SSH targets</a><a href="#claude">Claude</a><a href="#settings">Settings</a><a href="#updates">Updates</a><a href="#cli">Commands</a>
+    <a href="#activity">Activity</a><a href="#jobs">Jobs</a><a href="#network">Network</a><a href="#ssh">SSH targets</a><a href="#claude">Claude</a><a href="#settings">Settings</a><a href="#license">License</a><a href="#updates">Updates</a><a href="#cli">Commands</a>
     <a href="#security">Security</a><a href="#troubleshooting">Troubleshooting</a><a href="#roadmap">Roadmap</a>
   </nav>
   <div class="doc">
@@ -360,6 +360,11 @@
       <p>Import is two steps: the uploaded file is compared with this installation (<em>new</em>, <em>changed</em> with a diff, <em>same</em>, <em>invalid</em> with the reason) and nothing changes until you pick entries and click <em>Import picked</em>. Every entry goes through the same checks as the editor; SSH hosts come over only as host, user, port, jump host, host key alias, sudo and access – no other ssh options. An overwritten file keeps a copy <code>*.bak-&lt;date&gt;-import</code>; new jobs start paused, new notification channels disabled; network entries are added to the lists, not replacing them. Site rules and settings are not picked by default. Afterwards the variables still empty can be filled in right there; imported SSH hosts need this installation's public key.</p>
       <p><strong>Templates:</strong> “Template” on a service page downloads the service as a template – name, system and TLS exception left out, its own variables as <code>EXAMPLE_…</code>, <code>svc &lt;name&gt;</code> as <code>svc NAME</code>, the internal domain (<code>TC_DOMAIN</code>) as <code>{{ '{{DOMAIN}}' }}</code>; fixed addresses that remain are pointed out. Services → <em>Import a template …</em> saves one in <code>local/templates/</code> (marked <em>own</em> in the list); names of built-in templates and plain values in credential fields are refused.</p>
 </section>
+
+    <section class="card" id="license">
+      <h2>License &amp; Enterprise</h2>
+      <p>tentaclAI is open source (MIT). Settings → <a href="/license">License</a> takes an <strong>Enterprise license key</strong>, which unlocks the features beyond it – for now the <a href="/reports">Reports</a> placeholder (compliance reports and the SIEM export of the audit log, in preparation). The page shows the installed license (licensee, ID, edition, validity, seats, features) and lets you replace or remove it. A key (<code>TCL1.…</code>) is signed: tentacontrol checks it offline with a public key built into tentaclAI – no license server, nothing is sent anywhere. An expired key keeps showing with its end date, the features lock.</p>
+    </section>
 
     <section class="card" id="updates">
       <h2>Updates</h2>

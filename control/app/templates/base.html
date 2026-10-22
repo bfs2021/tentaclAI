@@ -25,7 +25,7 @@
         <span class="nav-count" hx-get="/partials/approval-count" hx-trigger="load, every 5s" hx-swap="innerHTML"></span></a>
       <a href="/jobs" class="{{ 'active' if nav in ('jobs', 'job_edit') }}">{{ icon('clock') }}Jobs
         <span class="nav-count" hx-get="/partials/job-count" hx-trigger="load, every 30s" hx-swap="innerHTML"></span></a>
-      <a href="/reports" class="nav-locked {{ 'active' if nav == 'reports' }}" title="Enterprise">{{ icon('chart') }}Reports<span class="nav-count">{{ icon('lock') }}</span></a>
+      <a href="/reports" class="{{ 'nav-locked' if not reports_unlocked }} {{ 'active' if nav == 'reports' }}"{% if not reports_unlocked %} title="Enterprise"{% endif %}>{{ icon('chart') }}Reports{% if not reports_unlocked %}<span class="nav-count">{{ icon('lock') }}</span>{% endif %}</a>
       <a href="/claude/instructions" class="{{ 'active' if nav in ('claude_instructions', 'claude_memory', 'claude_settings', 'skills', 'models', 'usage') }}">{{ icon('claude') }}Claude</a>
       <a href="/settings" class="{{ 'active' if nav in ('settings', 'notifications', 'security', 'backup') }}">{{ icon('settings') }}Settings</a>
       <a href="/updates" class="{{ 'active' if nav in ('updates', 'job') }}">{{ icon('refresh') }}Updates</a>
