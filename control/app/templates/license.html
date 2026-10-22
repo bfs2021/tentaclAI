@@ -22,8 +22,6 @@
     {% if instance %}<button class="btn sm ghost" type="button" data-copy="#instance-id">{{ icon('copy') }}Copy</button>{% endif %}</div>
   {% if instance %}
   <div class="mono" id="instance-id" style="font-size:16px">{{ instance }}</div>
-  <p class="help">Send this ID when you order or renew a license: a key issued for it works on this installation only.
-    Derived from {{ "this machine's hardware (the system UUID of its firmware)" if instance_source == 'hardware' else "this host's Docker installation (its firmware reports no system UUID)" }} – it stays the same across updates and reinstalls of tentaclAI{{ '' if instance_source == 'hardware' else ', not across a reinstall of Docker' }}, and changes with new hardware.</p>
   {% else %}
   <p class="muted small">This installation has no ID – neither the firmware nor Docker report one. Keys bound to an installation can't be used here.</p>
   {% endif %}

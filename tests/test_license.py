@@ -135,6 +135,6 @@ def test_key_bound_to_another_installation(client, lic, monkeypatch):
         license.install(issue(instance="TCI-1111-2222-3333-4444"))
     assert license.check(issue())["state"] == "valid"  # without a binding: any installation
     html = client.get("/license").text
-    assert "TCI-AAAA-BBBB-CCCC-DDDD" in html and "hardware" in html
+    assert "TCI-AAAA-BBBB-CCCC-DDDD" in html
     license.install(issue(instance="TCI-AAAA-BBBB-CCCC-DDDD"))
     assert "(this one)" in client.get("/license").text
