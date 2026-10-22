@@ -401,8 +401,9 @@ def test_discard_buttons_and_route(client, app_module, monkeypatch, tmp_path):
     from app import jsonstore, scheduled
     for k, f in (("JOBS", "j.json"), ("HISTORY", "h.json"), ("SEEN", "s.json")):
         monkeypatch.setattr(scheduled, k, str(tmp_path / f))
+    jid = scheduled.save({"name": "Spam", "prompt": "p", "kind": "manual", "propose": "1"})
     acts = [{"title": "a", "command": "svc m move 1 Junk", "state": "proposed"}, {"title": "b", "command": "svc m move 2 Junk", "state": "proposed"}]
-    jsonstore.save(scheduled.HISTORY, [{"id": "r1", "job": "x", "name": "x", "status": "done", "queued": 1, "ended": 2,
+    jsonstore.save(scheduled.HISTORY, [{"id": "r1", "job": jid, "name": "x", "status": "done", "queued": 1, "ended": 2,
                                         "actions": acts, "actions_until": time.time() + 600, "result": {"status": "warn", "title": "t"}}])
     html = client.get("/jobs").text
     assert "Discard selected" in html and "Discard all" in html
