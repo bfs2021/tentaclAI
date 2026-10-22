@@ -52,7 +52,7 @@ SETTINGS_GROUPS = [
         ("JOB_READONLY_HELPERS", "Helpers in read-only jobs",
          "commands besides svc a read-only job may run, comma-separated – text tools only (e.g. head, grep, jq); svc still guards every tentacle. Empty = the defaults (echo, head, tail, grep, jq, sort, uniq, wc, cut, tr, date, sleep). Shells, interpreters, awk/sed/find/xargs and network or write tools are refused.", "text"),
     ]),
-    ("Security", [
+    ("Prompt injection", [
         ("INJECTION_GUARD", "Prompt-injection safeguards",
          "on (default): svc marks mail and web pages as untrusted, removes hidden text and flags content that looks like it tries to instruct Claude (warning for Claude, Activity, notification); a hook does the same for WebFetch, WebSearch and MCP tools. A heuristic – it warns, it doesn't block", "bool"),
     ]),

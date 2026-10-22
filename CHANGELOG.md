@@ -2,10 +2,19 @@
 
 All notable changes, newest first. Every release lists **upgrade steps** from the previous one.
 
+## Unreleased
+
+### Changes
+- Settings → General: the group of the prompt-injection switch is called *Prompt injection* (was *Security*, easy to
+  mix up with the Security tab); Help names where the switch is.
+
+### Upgrade
+- `git pull`, `docker compose build control`, `docker compose up -d control` – only tentacontrol is recreated.
+
 ## v0.18.0 – 2026-10-22
 
 ### Highlights
-- **Prompt-injection safeguards** (`INJECTION_GUARD`, Settings → Security group, on by default): `svc web` now frames
+- **Prompt-injection safeguards** (`INJECTION_GUARD`, Settings → General, group *Prompt injection*, on by default): `svc web` now frames
   pages as untrusted like mail; mail and web text lose what a reader can't see (zero-width, direction and Unicode tag
   characters, elements hidden by CSS / `hidden` / `aria-hidden`). Mail, web pages, `svc files cat|grep` and API
   responses are checked for text that tries to instruct Claude; a new Claude Code hook (`tc-guard`, `PostToolUse` in the
