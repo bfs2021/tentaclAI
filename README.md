@@ -261,7 +261,8 @@ A service file can combine any of these parts:
 
 **TLS:** internal services with your own CA → set `CA_CERT` (trusted by curl, git, python and node). For devices with self-signed
 certificates, `"insecure_tls": true` in `api`, `web`, `git`, `db`, `smtp` or `imap` (or the switch on the service page) skips certificate
-verification for that part only – the connection stays encrypted. MCP connections are made by Claude Code and need `CA_CERT`.
+verification for that part only – the connection stays encrypted. For `mcp` it works when the server needs a token
+(svc bridges those); MCP servers without secrets are reached by Claude Code directly and need `CA_CERT`.
 
 **Access modes** (`access` in `api`, `docker`, `git`, `db`, `files`, `smtp`, `imap`): `read` refuses writes, `write` allows them, `confirm` makes
 every write wait for your approval in tentacontrol → **Activity** (denied or no answer within 10 minutes = not executed).
@@ -284,6 +285,7 @@ SSH hosts: tentacontrol → Tentacles → SSH hosts, or `./ssh-host.sh list|add|
 | Variable (`.env`) | Meaning |
 |---|---|
 | `TC_DIR` | absolute host path of this stack (mounted under the same path) |
+| `TZ` | time zone of the containers (default `UTC`) – job schedules use it |
 | `COMPOSE_FILE` | `compose.yaml:compose.override.yaml` |
 | `DOCKER_SOCKET` | Docker socket of this host – for tentacontrol only |
 | `HOST_DOCS` | optional Markdown file about the host – Claude's instructions point to it, Claude reads it before working on the host |
@@ -332,7 +334,7 @@ tentaclai/
 ├── scripts/                   test-quick.sh, test-sandbox.sh, release.sh, check-site-data.sh, brand/screenshots
 ├── tests/                     pytest suite of scripts/test-quick.sh
 ├── workspace/                 /workspace: projects, repos/, files/, SERVICES.md
-└── docs/                      screenshots
+└── docs/                      screenshots, brand images
 ```
 </details>
 

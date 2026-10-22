@@ -305,7 +305,7 @@ def delete(name):
 
 
 def set_insecure_tls(name, on):
-    """switch certificate verification for every TLS part of a service (api, mcp, git, db, web)"""
+    """switch certificate verification for every TLS part of a service (tclib.TLS_PARTS)"""
     data = json.loads(read_raw(name))
     for part in tclib.TLS_PARTS:
         if isinstance(data.get(part), dict):

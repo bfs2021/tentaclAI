@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# SSH hosts for tentaclAI on the command line – same logic as tentacontrol → Connections → SSH hosts.
+# SSH hosts for tentaclAI on the command line – same logic as tentacontrol → Tentacles → SSH hosts.
 #
 #   ./ssh-host.sh list
 #   ./ssh-host.sh add <alias> <user@host[:port]> [--jump <alias>] [--sudo | --sudo-cmd "<cmd>"]

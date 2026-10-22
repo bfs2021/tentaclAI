@@ -26,7 +26,7 @@ the sandbox may connect. ssh/rsync go through `ProxyCommand tc-connect`, databas
 
 Shared logic lives in **`lib/tclib.py`** (`.env`, `${VAR}`, services, systems, SSH hosts) and is copied into both images –
 `svc`, `tc-scan`, `claude-instructions` and tentacontrol use it. Never re-implement these parsers elsewhere; extend tclib.
-All images build from the repository root (`.dockerignore` whitelists `build/`, `control/`, `lib/`, `egress/`).
+All images build from the repository root (`.dockerignore` whitelists `build/`, `control/`, `lib/`, `egress/`, `VERSION`).
 
 Display name **tentaclAI**, technical name **tentaclai** (container, image, paths, scripts). See `README.md` for the
 architecture and `CONTRIBUTING.md` for the ground rules.
@@ -83,8 +83,9 @@ Every release gets an entry in **`CHANGELOG.md`** (newest first) and the same te
 
 Release with **`scripts/release.sh X.Y.Z "subtitle"`** (`--dry-run` first if unsure): it refuses unless main is clean
 and up to date and `## Unreleased` has an `### Upgrade` part, runs the **mandatory** tests – `scripts/test-quick.sh` and
-the **full** `scripts/test-sandbox.sh` (fresh images and state, a kept REUSE stack is removed) – and only then renames
-the section, sets `VERSION`, commits, tags, pushes and creates the GitHub release from the same notes. Test the upgrade path from the previous release in an isolated instance when the Upgrade section is more than a
+the **full** `scripts/test-sandbox.sh` (fresh images and state, a kept REUSE stack is removed), pushes main and waits for
+the GitHub `checks` workflow of that commit to be green – and only then renames the section, sets `VERSION`, commits,
+tags, pushes and creates the GitHub release from the same notes. Test the upgrade path from the previous release in an isolated instance when the Upgrade section is more than a
 plain rebuild.
 
 ## Brand images

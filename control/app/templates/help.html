@@ -140,7 +140,7 @@
         <li>New tokens work for <code>svc</code> immediately. Only settings read at container start (e.g. <code>GIT_*</code>, <code>TZ</code>, resources) need “Apply now” – the banner also appears when a newer tentaclAI image was built.</li>
         <li>Running Claude sessions see new MCP servers after <code>/mcp</code> → reconnect or in a new session.</li>
         <li>Internal https services with your own CA: set <code>CA_CERT</code> in the settings – the CA becomes trusted in the container. Single devices with self-signed certificates: <code>"insecure_tls": true</code>.</li>
-        <li><strong>Self-signed certificates</strong> (routers, NAS, hypervisors): the switch <em>Ignore TLS certificate errors</em> on the service page sets <code>insecure_tls</code> for its <code>api</code>, <code>web</code>, <code>git</code>, <code>db</code>, <code>smtp</code> and <code>imap</code> parts – encrypted, but the server is not verified. MCP connections are made by Claude Code and always verify; use <code>CA_CERT</code> for them.</li>
+        <li><strong>Self-signed certificates</strong> (routers, NAS, hypervisors): the switch <em>Ignore TLS certificate errors</em> on the service page sets <code>insecure_tls</code> for its <code>api</code>, <code>web</code>, <code>git</code>, <code>db</code>, <code>smtp</code>, <code>imap</code> and <code>mcp</code> parts – encrypted, but the server is not verified. For <code>mcp</code> this works when the server needs a token (svc bridges those); MCP servers without secrets are reached by Claude Code directly and always verify – use <code>CA_CERT</code> for them.</li>
       </ul>
     </section>
 
