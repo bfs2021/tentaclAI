@@ -75,7 +75,7 @@ def test_install_has_and_remove(lic):
 def test_license_pages(client, lic):
     license, issue = lic
     html = client.get("/license").text
-    assert "No license installed" in html and "Activate license" in html
+    assert "Currently using tentaclAI Community" in html and "get support, you need a valid Enterprise license" in html and "Activate license" in html
     assert "Reports are only available with a valid Enterprise license" in client.get("/reports").text
     r = client.post("/license", data={"key": "TCL1.broken.key"})
     assert "License not installed" in r.headers.get("hx-trigger", "") and license.status()["state"] == "none"

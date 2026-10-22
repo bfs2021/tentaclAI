@@ -55,9 +55,10 @@
 </div>
 {% else %}
 <div class="card">
-  <h2>No license installed</h2>
+  <div class="card-head"><h2>Currently using tentaclAI Community</h2><span class="pill off">no license</span></div>
   {% if lic.state == 'invalid' %}<p class="small"><span class="pill err">invalid</span> The stored key can't be used: {{ lic.error }}.</p>{% endif %}
-  <p class="muted small">Enter your Enterprise license key to unlock {% for f in features.values() %}{{ f | lower }}{{ ', ' if not loop.last }}{% endfor %}.</p>
+  <p class="small">The free, open-source edition (MIT) – everything except the Enterprise features.</p>
+  <p class="muted small">To use Enterprise features ({% for f in features.values() %}{{ f | lower }}{{ ', ' if not loop.last }}{% endfor %}) and get support, you need a valid Enterprise license. Enter its key here.</p>
   {{ key_form('Activate license') }}
 </div>
 {% endif %}
