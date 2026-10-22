@@ -83,7 +83,7 @@ async def jobs_state(v: str = ""):
 @router.get("/jobs", response_class=HTMLResponse)
 async def jobs_page(request: Request):
     scheduled.mark_seen()
-    return page(request, "jobs.html", rows=scheduled.overview(), templates=scheduled.TEMPLATES, token=scheduled.state_token(),
+    return page(request, "jobs.html", rows=scheduled.overview(), templates=scheduled.TEMPLATES, token=scheduled.state_token(), now=time.time(),
                 fmt=lambda ts: time.strftime("%Y-%m-%d %H:%M", time.localtime(ts)) if ts else "–")
 
 
@@ -149,6 +149,16 @@ async def job_delete(request: Request, jid: str):
     except ValueError as e:
         return respond(request, str(e), "err")
     return respond(request, "Job deleted", redirect="/jobs")
+
+
+@router.post("/jobs/runs/{rid}/actions", response_class=HTMLResponse)
+async def run_actions(request: Request, rid: str):
+    picks = (await request.form()).getlist("pick")
+    try:
+        n = await asyncio.to_thread(scheduled.run_actions, rid, picks)
+    except ValueError as e:
+        return respond(request, f"Not run: {e}", "err")
+    return respond(request, f"{n} proposal{'s' if n != 1 else ''} running – confirm tentacles ask for approval as usual", refresh=True)
 
 
 @router.get("/jobs/runs/{rid}/log", response_class=HTMLResponse)

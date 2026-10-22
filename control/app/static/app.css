@@ -425,3 +425,7 @@ input[type=checkbox]:not(.switch-cb) { accent-color: var(--accent-2); }
 .jl-out .jl-text { color: var(--muted); }
 .jl-err .jl-text, .jl-err .jl-mark { color: var(--err); }
 .job-steps > summary { cursor: pointer; }
+.job-actions { border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 8px 10px; }
+.ja-row { display: flex; gap: 10px; align-items: flex-start; padding: 5px 0; }
+.ja-row > input { margin-top: 3px; }
+.ja-row code { word-break: break-all; }

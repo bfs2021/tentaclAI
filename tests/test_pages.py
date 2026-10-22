@@ -341,3 +341,21 @@ def test_internal_job_endpoints_need_the_svc_token(client, app_module):
     c = TestClient(app_module.app)
     for path in ("/internal/jobs/check", "/internal/jobs/put"):
         assert c.post(path, json={"name": "x", "definition": {}}).status_code == 403
+
+
+def test_job_proposals_render(client, app_module, monkeypatch, tmp_path):
+    import time
+    from app import jsonstore, scheduled
+    for k, f in (("JOBS", "j.json"), ("HISTORY", "h.json"), ("SEEN", "s.json")):
+        monkeypatch.setattr(scheduled, k, str(tmp_path / f))
+    jid = scheduled.save({"name": "Spam check", "prompt": "p", "kind": "manual", "propose": "1"})
+    acts = [{"title": "move spam 912", "command": "svc mail box move 912 Junk", "state": "proposed"},
+            {"title": "move spam 913", "command": "svc mail box move 913 Junk", "state": "done", "output": "✓ moved"}]
+    jsonstore.save(scheduled.HISTORY, [{"id": "r1", "job": jid, "name": "x", "status": "done", "queued": 1, "ended": 2,
+                                        "actions": acts, "actions_until": time.time() + 3600, "result": {"status": "warn", "title": "2 spam"}}])
+    html = client.get("/jobs").text
+    assert "Run selected" in html and 'name="pick" value="0"' in html and "proposes" in html and "✓ moved" in html
+    jsonstore.save(scheduled.HISTORY, [dict(scheduled.history()[0], actions_until=time.time() - 1)])
+    html = client.get("/jobs").text
+    assert "Run selected" not in html and "expired" in html
+    assert "Propose actions" in client.get(f"/jobs/{jid}").text

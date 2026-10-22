@@ -11,6 +11,19 @@
     {% if res.get('details') %}<pre class="rc" style="max-height:340px">{{ res.details }}</pre>{% endif %}
     {% if r.get('error') and r.status != 'done' %}<p class="muted" style="margin:0">{{ r.error }}</p>{% endif %}
     {% if r.get('denials') %}<p class="muted" style="margin:6px 0 0">{{ r.denials }} tool call(s) refused by the {{ r.profile }} profile.</p>{% endif %}
+    {% if r.actions %}{% set open_for = (r.actions_until or 0) > now %}
+    <form class="job-actions" hx-post="/jobs/runs/{{ r.id }}/actions" style="margin-top:8px">
+      <div class="small muted" style="margin-bottom:4px">Proposals{% if open_for %} – pick what runs, exactly as written (until {{ fmt(r.actions_until) }}){% else %} – expired{% endif %}</div>
+      {% for a in r.actions %}
+      <div class="ja-row">
+        {% if a.state == 'proposed' and open_for %}<input type="checkbox" name="pick" value="{{ loop.index0 }}" aria-label="pick">{% else %}<span class="pill {{ {'done': 'ok', 'failed': 'err', 'refused': 'err', 'running': 'accent running', 'queued': 'info queued'}.get(a.state, 'off') }}">{% if a.state == 'running' %}<span class="spin" aria-hidden="true"></span>{% endif %}{{ a.state if a.state != 'proposed' else 'expired' }}</span>{% endif %}
+        <div style="min-width:0"><div>{{ a.title }}</div><code class="small">{{ a.command }}</code>
+          {% if a.output %}<details class="small"><summary class="muted">output</summary><pre class="rc" style="max-height:200px">{{ a.output }}</pre></details>{% endif %}</div>
+      </div>
+      {% endfor %}
+      {% if open_for and r.actions | selectattr('state', 'equalto', 'proposed') | list %}<button class="btn sm primary" style="margin-top:6px">{{ icon('play') }}Run selected</button>{% endif %}
+    </form>
+    {% endif %}
     {% if r.status in ('running', 'queued') %}
     <div class="job-live" hx-get="/jobs/runs/{{ r.id }}/log" hx-trigger="load, every 2s" style="margin-top:8px"></div>
     {% if r.status == 'running' %}<button class="btn sm danger" hx-post="/jobs/runs/{{ r.id }}/cancel" hx-confirm="Stop this run?" style="margin-top:8px">Stop</button>{% endif %}
@@ -39,7 +52,7 @@
   <div class="between" style="align-items:flex-start;gap:12px">
     <div style="min-width:0">
       <h2 style="margin:0">{{ icon('clock') }}{{ j.name }}{% if not j.enabled %} <span class="pill off">paused</span>{% endif %}</h2>
-      <div class="small muted" style="margin-top:4px">{{ j.when }}{% if j.schedule.kind != 'manual' %} · next {{ fmt(j.next) if j.enabled else '–' }}{% endif %} · <span class="pill {{ 'warn' if j.profile == 'standard' else 'off' }}">{{ j.profile }}</span> · notify {{ j.notify }}</div>
+      <div class="small muted" style="margin-top:4px">{{ j.when }}{% if j.schedule.kind != 'manual' %} · next {{ fmt(j.next) if j.enabled else '–' }}{% endif %} · <span class="pill {{ 'warn' if j.profile == 'standard' else 'off' }}">{{ j.profile }}</span>{% if j.propose %} · <span class="pill accent">proposes</span>{% endif %} · notify {{ j.notify }}</div>
     </div>
     <div class="row" style="flex-wrap:nowrap">
       <button class="btn sm primary" hx-post="/jobs/{{ j.id }}/run" {{ 'disabled' if j.busy }}>{{ icon('play') }}Run now</button>

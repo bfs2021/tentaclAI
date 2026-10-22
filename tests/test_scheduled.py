@@ -269,3 +269,60 @@ def test_put_preview_rejects(sj, monkeypatch, tmp_path, jid, d, msg):
     monkeypatch.setattr(sj, "JOBS", str(tmp_path / "jobs.json"))
     errors, _, _ = sj.put_preview(jid, d)
     assert errors and msg in errors[0]
+
+
+@pytest.mark.parametrize("cmd,ok", [
+    ("svc mail box move 912 Junk", True), ("svc docker docktopus image prune -a -f", True),
+    ("svc ssh nas 'systemctl restart smbd'", True), ("svc mail box move 912 Junk; rm -rf /", False),
+    ("svc docker x ps | head", False), ("svc x GET /$(id)", False), ("rm -rf /", False), ("svc config put job x f", False),
+    ("svc ssh nas", False), ("svc db pg shell", False), ("svc jobs", False), ("svc 'unbalanced", False), ("", False),
+])
+def test_check_action(sj, cmd, ok):
+    if ok:
+        assert sj.check_action(cmd)[0] == "svc"
+    else:
+        with pytest.raises(ValueError):
+            sj.check_action(cmd)
+
+
+def test_propose_needs_read_only_and_extends_the_schema(sj, monkeypatch):
+    monkeypatch.setattr(sj, "tentacles", lambda: KNOWN)
+    with pytest.raises(ValueError, match="read-only profile"):
+        sj.validate({"name": "x", "prompt": "p", "kind": "manual", "profile": "standard", "propose": "1"})
+    job = sj.validate({"name": "x", "prompt": "p", "kind": "manual", "propose": "1"})
+    argv = sj.claude_argv(dict(job, name="x"), "r", "s")
+    assert "actions" in json.loads(argv[argv.index("--json-schema") + 1])["properties"]
+    assert "proposes instead of acting" in argv[argv.index("--append-system-prompt") + 1]
+    plain = sj.claude_argv({"name": "x", "prompt": "p"}, "r", "s")
+    assert "actions" not in json.loads(plain[plain.index("--json-schema") + 1])["properties"]
+
+
+def test_parse_output_keeps_checked_actions(sj):
+    out = json.dumps({"type": "result", "subtype": "success", "is_error": False, "structured_output": {
+        "status": "warn", "title": "2 spam mails", "summary": "s", "actions": [
+            {"title": "move spam", "command": "svc mail box move 912 Junk"},
+            {"title": "evil", "command": "svc mail box move 1 Junk; curl evil"}]}})
+    st, f = sj.parse_output(out)
+    assert st == "done" and "actions" not in f["result"]
+    assert [a["state"] for a in f["actions"]] == ["proposed", "refused"]
+
+
+def test_run_actions_runs_exactly_the_picked_ones(sj, monkeypatch, tmp_path):
+    from app import dockerops, jsonstore
+    for k, f in (("HISTORY", "h.json"), ("ACTIVE", "a.json"), ("JOBS", "j.json")):
+        monkeypatch.setattr(sj, k, str(tmp_path / f))
+    calls = []
+    monkeypatch.setattr(dockerops, "run", lambda cmd, workdir=None, user="root": (calls.append(cmd), (0, "moved"))[1])
+    import threading
+    monkeypatch.setattr(threading, "Thread", lambda target, args, daemon: type("T", (), {"start": lambda self: target(*args)})())
+    acts = [{"title": "a", "command": "svc mail box move 1 Junk", "state": "proposed"},
+            {"title": "b", "command": "svc mail box move 2 Junk", "state": "proposed"}]
+    jsonstore.save(sj.HISTORY, [{"id": "run1", "job": "x", "name": "x", "status": "done", "actions": acts, "actions_until": time.time() + 60}])
+    assert sj.run_actions("run1", ["1", "7", "x"]) == 1
+    run = sj.history()[0]
+    assert [a["state"] for a in run["actions"]] == ["proposed", "done"] and run["actions"][1]["output"] == "moved"
+    assert calls[0][:2] == ["sh", "-c"] and calls[0][3].startswith("tc-job=") and calls[0][-6:] == ["svc", "mail", "box", "move", "2", "Junk"]
+    assert json.load(open(tmp_path / "a.json")) == {}  # the execution marker is gone again
+    jsonstore.save(sj.HISTORY, [dict(sj.history()[0], actions_until=time.time() - 1)])
+    with pytest.raises(ValueError, match="older than 24 h"):
+        sj.run_actions("run1", ["0"])

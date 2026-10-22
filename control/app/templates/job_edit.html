@@ -19,6 +19,7 @@
   <div style="position:relative"><label for="prompt">Task</label>
     <textarea name="prompt" id="prompt" style="min-height:160px;font-family:inherit" required placeholder="e.g. Check the free disk space on @docktopus and warn above 80 %.">{{ job.prompt or '' }}</textarea>
     <div class="help">Name tentacles with <code>@</code> (e.g. <code>@mailrelay</code>) – Claude gets their details, and the job can be limited to them. Say when it is ok, warn or alert – that decides whether you hear about it.</div></div>
+  <label class="check"><input type="checkbox" name="propose" value="1" {{ 'checked' if job.propose }}> Propose actions instead of changing anything (read-only profile) – the run suggests <code>svc</code> commands, you pick on this page which ones run</label>
   <label class="check"><input type="checkbox" name="scope" value="1" {{ 'checked' if job.scope }}> Only the tentacles named in the task (<code>@name</code>) – <code>svc</code> refuses every other one, MCP servers are off</label>
 
   <div class="grid2">

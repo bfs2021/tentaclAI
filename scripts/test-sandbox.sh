@@ -229,6 +229,22 @@ check "svc jobs lists it" "$($C svc jobs 2>/dev/null | grep -c '^tjob ' || true)
 check "svc jobs <name> shows the definition" "$($C svc jobs tjob 2>/dev/null | grep -c '"prompt": "check @testapi"' || true)" "1"
 check "an invalid job is refused before any approval" "$($C svc config put job badjob /tmp/badjob.json 2>&1 | tail -1)" "svc: not a valid job – unknown profile"
 check "a running job can't create jobs" "$(J jobstd01 'svc config put job x /tmp/job.json')" "refused"
+# job proposals: the user picks, tentacontrol runs exactly those through svc – a limited job stays limited
+docker exec tctest-control python3 -c "
+import json, time
+json.dump({'ptest': {'name': 'P test', 'prompt': 'check @testapi', 'profile': 'read-only', 'scope': True, 'propose': True,
+                     'schedule': {'kind': 'manual'}, 'enabled': True, 'notify': 'findings'}}, open('/data/jobs.json', 'w'))
+h = json.load(open('/data/job-history.json')) if __import__('os').path.exists('/data/job-history.json') else []
+h.append({'id': 'prop000001', 'job': 'ptest', 'name': 'P test', 'status': 'done', 'queued': time.time(), 'ended': time.time(),
+          'actions_until': time.time() + 3600, 'actions': [
+              {'title': 'api write', 'command': 'svc testapi POST /proposal', 'state': 'proposed'},
+              {'title': 'other tentacle', 'command': 'svc ssh testssh touch /tmp/proposal', 'state': 'proposed'}]})
+json.dump(h, open('/data/job-history.json', 'w'))"
+curl -s -b "$J" -H "$H" -o /dev/null -X POST "http://$IP:8080/jobs/runs/prop000001/actions" -d "pick=0&pick=1"
+PSTATE() { docker exec tctest-control python3 -c "import json; print(' '.join(a['state'] for r in json.load(open('/data/job-history.json')) if r['id'] == 'prop000001' for a in r['actions']))"; }
+wait_for 60 sh -c "! docker exec tctest-control grep -q -e '\"state\": \"queued\"' -e '\"state\": \"running\"' /data/job-history.json" || true
+check "proposals: the picked ones ran – the other tentacle was refused" "$(PSTATE)" "done failed"
+check "proposals: the audit names the job" "$(docker exec tctest-claude grep -q '"action": "POST /proposal".*"job"' "$T/data/control/audit.jsonl" 2>/dev/null && echo yes || echo no)" "yes"
 docker exec tctest-claude rm -f "$T/data/control/job-runs.json"
 # rename a git service in tentacontrol: file, root's mirror and Claude's working copy move together
 rm -f services/gitdemo.json services/gitdemo2.json

@@ -4,12 +4,19 @@ All notable changes, newest first. Every release lists **upgrade steps** from th
 
 ## Unreleased
 
+### Highlights
+- **Jobs that propose:** with *Propose actions* (read-only profile) a run only analyses and returns proposed changes –
+  a title and exactly one `svc` command each (checked: no shell syntax, no `svc config`, nothing interactive). The run
+  lists them with check boxes for 24 h; *Run selected* runs exactly the picked commands through `svc`, without Claude –
+  `ro` stays `ro`, `confirm` asks as usual, a limited job stays limited. Notifications say how many proposals wait;
+  `svc jobs <name>` shows them too.
+
 ### Fixes
 - `svc jobs`: long job names no longer run into the schedule column.
 
 ### Upgrade (from v0.14.0)
-`./tentaclai.sh update`, `docker compose build claude`, `docker compose up -d claude` – recreating `tentaclai` ends running
-sessions and Remote Control.
+`./tentaclai.sh update`, `docker compose build`, `docker compose up -d` – both images changed; recreating `tentaclai` ends
+running sessions and Remote Control. Existing jobs keep working; *Propose actions* is off until you tick it.
 
 ## v0.14.0 – 2026-10-22
 

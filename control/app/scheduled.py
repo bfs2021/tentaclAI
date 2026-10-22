@@ -43,6 +43,43 @@ SCHEMA = {"type": "object", "additionalProperties": False, "required": ["status"
     "title": {"type": "string", "description": "one line, e.g. '2 certificates expire within 14 days'"},
     "summary": {"type": "string", "description": "at most three sentences"},
     "details": {"type": "string", "description": "optional details (Markdown)"}}}
+ACTIONS_SCHEMA = {"type": "array", "maxItems": 10, "description": "proposed actions – only when the task asks for them",
+                  "items": {"type": "object", "additionalProperties": False, "required": ["title", "command"], "properties": {
+                      "title": {"type": "string", "description": "what it does and why, one line"},
+                      "command": {"type": "string", "description": "exactly one svc command, e.g. svc mail box move 912 Junk – no pipes, ; or $"}}}}
+SYSTEM_PROPOSE = (" This job proposes instead of acting: do not change anything; put each change you recommend into "
+                  "\"actions\" as one plain svc command (no pipes, ;, &, $ or redirects; no svc config) with a one-line title. "
+                  "The user picks which ones run later – exactly as written. Propose only what the task asks for.")
+ACTION_TTL = 24 * 3600
+ACTION_BAD = re.compile(r"[;&|`$<>\n\\]")
+ACTION_REFUSED = {"config", "sync", "mcp-proxy", "git-credential", "git-push-hook", "jobs", "pending", "audit", "help"}
+
+
+def check_action(command):
+    """a proposed command → argv, or ValueError: one svc call, no shell syntax, nothing interactive"""
+    import shlex
+    command = (command or "").strip()
+    if not command or len(command) > 500 or ACTION_BAD.search(command):
+        raise ValueError("not a single plain svc command")
+    try:
+        argv = shlex.split(command)
+    except ValueError:
+        raise ValueError("unbalanced quotes")
+    if len(argv) < 2 or argv[0] != "svc" or argv[1] in ACTION_REFUSED:
+        raise ValueError("only svc commands that act on a tentacle")
+    if argv[1] == "ssh" and len(argv) < 4:
+        raise ValueError("svc ssh needs a command (no interactive shell)")
+    if argv[1] == "db" and "shell" in argv[2:4]:
+        raise ValueError("no interactive SQL shell")
+    return argv
+
+
+def schema(job):
+    if not job.get("propose"):
+        return SCHEMA
+    return dict(SCHEMA, properties=dict(SCHEMA["properties"], actions=ACTIONS_SCHEMA))
+
+
 SYSTEM = ("This is an unattended scheduled job of tentaclAI named {name!r}; nobody watches the run and nobody can answer "
           "questions – decide on your own, keep it short. Your final answer is the JSON object of the given schema: "
           "status ok (nothing to do), warn (needs attention soon) or alert (act now), a one-line title, a summary of at "
@@ -338,11 +375,14 @@ def validate(form):
         raise ValueError("max. runtime: 1–120 minutes")
     sched = clean_schedule(form)
     scope = bool(form.get("scope"))
+    propose = bool(form.get("propose"))
+    if propose and profile != "read-only":
+        raise ValueError("proposing actions needs the read-only profile – the run only analyses, you pick what runs")
     errors, _ = check_mentions({"prompt": prompt, "profile": profile, "scope": scope})
     if errors:
         raise ValueError("; ".join(errors))
     return {"name": name, "prompt": prompt, "profile": profile, "notify": rule, "model": model, "effort": effort,
-            "scope": scope, "max_minutes": minutes, "schedule": sched}
+            "scope": scope, "propose": propose, "max_minutes": minutes, "schedule": sched}
 
 
 def save(form, jid=None, new_id=None, enabled=True):
@@ -377,7 +417,7 @@ def form_from_definition(d):
     """a job definition as JSON (svc config put job) → form values: the schedule object is flattened"""
     if not isinstance(d, dict):
         raise ValueError("a job is a JSON object")
-    unknown = set(d) - {"name", "prompt", "schedule", "profile", "scope", "notify", "model", "effort", "max_minutes"}
+    unknown = set(d) - {"name", "prompt", "schedule", "profile", "scope", "propose", "notify", "model", "effort", "max_minutes"}
     if unknown:
         raise ValueError(f"unknown fields: {', '.join(sorted(unknown))}")
     sched = d.get("schedule") or {"kind": "manual"}
@@ -385,14 +425,15 @@ def form_from_definition(d):
         raise ValueError('schedule: an object, e.g. {"kind": "daily", "time": "07:00"}')
     form = {k: v for k, v in d.items() if k != "schedule"}
     form.update({k: str(v) for k, v in sched.items()})
-    if form.get("scope") in (False, "false", "0", 0):
-        form["scope"] = ""
+    for flag in ("scope", "propose"):
+        if form.get(flag) in (False, "false", "0", 0):
+            form[flag] = ""
     return form
 
 
 def definition(job):
     """the editable fields of a job as JSON – what `svc jobs <name>` shows and `svc config put job` takes"""
-    return {k: job.get(k) for k in ("name", "prompt", "schedule", "profile", "scope", "notify", "model", "effort", "max_minutes")}
+    return {k: job.get(k) for k in ("name", "prompt", "schedule", "profile", "scope", "propose", "notify", "model", "effort", "max_minutes")}
 
 
 def put_preview(jid, d):
@@ -469,8 +510,10 @@ def claude_argv(job, run_id, session_id):
     if job.get("scope"):
         system += (" This run may only use those tentacles – svc refuses every other one, and MCP servers are off. "
                    "If the task needs another tentacle, say so in the summary.")
+    if job.get("propose"):
+        system += SYSTEM_PROPOSE
     argv = ["claude", "-p", job["prompt"], "--output-format", "stream-json", "--verbose", "--session-id", session_id,
-            "--json-schema", json.dumps(SCHEMA), "--append-system-prompt", system]
+            "--json-schema", json.dumps(schema(job)), "--append-system-prompt", system]
     if ro or job.get("scope"):
         argv += ["--strict-mcp-config"]  # no MCP servers: their tools could reach other services past svc
     if model:
@@ -503,6 +546,19 @@ def parse_output(out):
                   "denials": len(d.get("permission_denials") or []), "session": d.get("session_id")}
         if d.get("is_error") or d.get("subtype") != "success":
             return "failed", dict(fields, error=str(d.get("result") or d.get("subtype") or "error")[:500])
+        acts = []
+        for x in (so.get("actions") or [])[:10] if isinstance(so.get("actions"), list) else []:
+            if not isinstance(x, dict):
+                continue
+            item = {"title": str(x.get("title", ""))[:200], "command": str(x.get("command", ""))[:500], "state": "proposed"}
+            try:
+                check_action(item["command"])
+            except ValueError as e:
+                item.update(state="refused", output=str(e))
+            acts.append(item)
+        if acts:
+            fields["actions"] = acts
+            fields["result"] = {k: v for k, v in fields["result"].items() if k != "actions"}
         if so.get("status") not in ("ok", "warn", "alert"):
             return "done", dict(fields, result=dict(fields["result"], status="warn",
                                                     title=fields["result"].get("title") or "no structured answer"))
@@ -708,14 +764,64 @@ def execute(run_id, jid):
     else:
         status, fields = parse_output(out) if code is not None else ("failed", {"error": out[:500]})
     run = dict(fields, status=status, ended=time.time(), seconds=round(time.time() - started))
+    if run.get("actions"):
+        run["actions_until"] = time.time() + ACTION_TTL
     _update_run(run_id, **run)
     if should_notify(job, run):
         r = run.get("result") or {}
         icon = {"ok": "✓", "warn": "⚠", "alert": "‼"}.get(r.get("status"), "✗")
-        title = f"{icon} {job['name']}: " + (r.get("title") or run.get("error") or status)[:120]
+        n = sum(1 for x in run.get("actions") or [] if x["state"] == "proposed")
+        title = f"{icon} {job['name']}: " + (r.get("title") or run.get("error") or status)[:120] + (f" – {n} proposal{'s' if n != 1 else ''}" if n else "")
         notify.emit("job_failed" if status in ("failed", "timeout") else "job_result", title,
                     (r.get("summary") or run.get("error") or "")[:600], key=f"job:{run_id}",
                     link=notify.control_link(f"/jobs#run-{run_id}"))
+
+
+def run_actions(run_id, picks):
+    """run the proposals the user picked – exactly as proposed, one after the other, in the background.
+    They go through svc like everything else: ro stays ro, confirm still asks in Activity, a limited job stays limited."""
+    import threading
+    run = next((r for r in history() if r.get("id") == run_id), None)
+    if run is None or not run.get("actions"):
+        raise ValueError("no proposals for this run")
+    if time.time() > run.get("actions_until", 0):
+        raise ValueError("these proposals are older than 24 h – run the job again")
+    job = get(run.get("job")) or {"name": run.get("name", "?"), "prompt": ""}
+    acts = run["actions"]
+    chosen = sorted({int(i) for i in picks if str(i).isdigit() and int(i) < len(acts) and acts[int(i)]["state"] == "proposed"})
+    if not chosen:
+        raise ValueError("nothing picked")
+    for i in chosen:
+        acts[i]["state"] = "queued"
+    _update_run(run_id, actions=acts)
+    threading.Thread(target=_run_actions, args=(run_id, chosen, job), daemon=True).start()
+    return len(chosen)
+
+
+def _run_actions(run_id, chosen, job):
+    exec_id = secrets.token_hex(6)
+    _register(exec_id, {"name": f"{job['name']} (proposal)", "profile": "standard", "scope": job.get("scope"), "prompt": job.get("prompt", "")})
+    try:
+        for i in chosen:
+            run = next((r for r in history() if r.get("id") == run_id), {})
+            acts = run.get("actions") or []
+            a = acts[i]
+            a["state"] = "running"
+            _update_run(run_id, actions=acts)
+            try:
+                argv = check_action(a["command"])  # checked again: the history file is tentacontrol's, but be strict
+                # the sh stays the parent: its command line carries the marker (tc-job=…) svc uses for scope and origin
+                code, out = dockerops.run(["sh", "-c", '"$@"; exit', f"tc-job={exec_id}", "timeout", "700"] + argv,
+                                          workdir="/workspace", user=dockerops.CLAUDE_USER)
+                a.update(state="done" if code == 0 else "failed", output=_short(out, 1500), ran=time.time())
+            except ValueError as e:
+                a.update(state="refused", output=str(e))
+            run = next((r for r in history() if r.get("id") == run_id), {})
+            acts = run.get("actions") or []
+            acts[i] = a
+            _update_run(run_id, actions=acts)
+    finally:
+        _unregister(exec_id)
 
 
 async def worker():
@@ -797,7 +903,8 @@ def state_token():
     """changes whenever a run is queued, starts, ends – or a job is added, edited, paused"""
     import hashlib
     h = history()[-50:]
-    raw = json.dumps([(r.get("id"), r.get("status")) for r in h]) + str(os.path.getmtime(JOBS) if os.path.exists(JOBS) else 0)
+    raw = json.dumps([(r.get("id"), r.get("status"), [x.get("state") for x in r.get("actions") or []]) for r in h]) \
+        + str(os.path.getmtime(JOBS) if os.path.exists(JOBS) else 0)
     return hashlib.sha1(raw.encode()).hexdigest()[:12]
 
 
@@ -812,7 +919,8 @@ def overview():
     for jid, job in sorted(load().items(), key=lambda kv: kv[1]["name"].lower()):
         runs = [r for r in h if r.get("job") == jid]
         rows.append(dict(job, id=jid, when=describe(job["schedule"]), last_run=runs[-1] if runs else None,
-                         runs=list(reversed(runs[-10:])), busy=jid in _current.values() or any(r["status"] in ("queued", "running") for r in runs)))
+                         runs=list(reversed(runs[-10:])), busy=jid in _current.values() or any(r["status"] in ("queued", "running") for r in runs)
+                         or any(x.get("state") in ("queued", "running") for r in runs for x in r.get("actions") or [])))
     return rows
 
 
