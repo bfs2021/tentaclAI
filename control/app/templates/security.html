@@ -50,9 +50,16 @@
     <button class="btn">New recovery codes</button>
     <span class="help">the old ones stop working</span>
   </form>
+  <h3 style="margin-top:20px">Switch off</h3>
+  <form method="post" action="/security/disable" autocomplete="off" class="row" style="gap:8px;flex-wrap:wrap">
+    <input type="password" name="password" placeholder="password" aria-label="Password" autocomplete="current-password" required style="max-width:220px">
+    <input name="code" placeholder="code or recovery code" aria-label="Code" class="mono" style="max-width:200px" required>
+    <button class="btn danger">Switch off</button>
+  </form>
+  <p class="help">Without the phone and recovery codes: <code>./tentaclai.sh reset-2fa</code> on the host.</p>
 </div>
 
-<div class="card" style="margin-bottom:16px">
+<div class="card">
   <div class="card-head"><h2>Trusted browsers</h2>
     {% if st.trusted %}<form method="post" action="/security/revoke"><button class="btn sm ghost">Revoke all</button></form>{% endif %}</div>
   <p class="help" style="margin-top:-4px">Browsers where you ticked “Trust this browser” skip the code for {{ days }} days (the password is still needed).</p>
@@ -67,14 +74,5 @@
   {% else %}<div class="empty small">None.</div>{% endif %}
 </div>
 
-<div class="card">
-  <h2>Switch off</h2>
-  <form method="post" action="/security/disable" autocomplete="off" class="row" style="gap:8px;flex-wrap:wrap">
-    <input type="password" name="password" placeholder="password" aria-label="Password" autocomplete="current-password" required style="max-width:220px">
-    <input name="code" placeholder="code or recovery code" aria-label="Code" class="mono" style="max-width:200px" required>
-    <button class="btn danger">Switch off</button>
-  </form>
-  <p class="help">Without the phone and recovery codes: <code>./tentaclai.sh reset-2fa</code> on the host.</p>
-</div>
 {% endif %}
 {% endblock %}
