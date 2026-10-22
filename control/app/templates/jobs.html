@@ -12,7 +12,12 @@
           {% if a.output %}<details class="small"><summary class="muted">output</summary><pre class="rc" style="max-height:200px">{{ a.output }}</pre></details>{% endif %}</div>
       </div>
       {% endfor %}
-      {% if open_for and r.actions | selectattr('state', 'equalto', 'proposed') | list %}<button class="btn sm primary" style="margin-top:6px">{{ icon('play') }}Run selected</button>{% endif %}
+      {% if open_for and r.actions | selectattr('state', 'equalto', 'proposed') | list %}
+      <div class="row" style="margin-top:6px;justify-content:flex-start">
+        <button class="btn sm primary">{{ icon('play') }}Run selected</button>
+        <button class="btn sm" hx-post="/jobs/runs/{{ r.id }}/discard">Discard selected</button>
+        <button class="btn sm ghost" type="button" hx-post="/jobs/runs/{{ r.id }}/discard?all=1" hx-confirm="Discard all open proposals of this run?">Discard all</button>
+      </div>{% endif %}
     </form>
 {% endmacro %}
 {% macro run_row(r) %}

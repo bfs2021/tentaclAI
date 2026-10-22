@@ -326,3 +326,15 @@ def test_run_actions_runs_exactly_the_picked_ones(sj, monkeypatch, tmp_path):
     jsonstore.save(sj.HISTORY, [dict(sj.history()[0], actions_until=time.time() - 1)])
     with pytest.raises(ValueError, match="older than 24 h"):
         sj.run_actions("run1", ["0"])
+
+
+def test_discard(sj, monkeypatch, tmp_path):
+    from app import jsonstore
+    monkeypatch.setattr(sj, "HISTORY", str(tmp_path / "h.json"))
+    acts = [{"title": t, "command": f"svc m move {i} Junk", "state": st} for i, (t, st) in enumerate([("a", "proposed"), ("b", "proposed"), ("c", "done")])]
+    jsonstore.save(sj.HISTORY, [{"id": "r1", "job": "x", "status": "done", "actions": acts, "actions_until": time.time() + 60}])
+    assert sj.discard_actions("r1", ["0", "2"]) == 1  # a done one stays done
+    assert [a["state"] for a in sj.history()[0]["actions"]] == ["discarded", "proposed", "done"]
+    assert sj.discard_actions("r1") == 1 and sj.pending_proposals() == 0
+    with pytest.raises(ValueError, match="nothing picked"):
+        sj.discard_actions("r1")

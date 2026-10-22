@@ -798,6 +798,24 @@ def run_actions(run_id, picks):
     return len(chosen)
 
 
+def discard_actions(run_id, picks=None):
+    """mark proposals as discarded – the picked ones, or all still open (picks None)"""
+    run = next((r for r in history() if r.get("id") == run_id), None)
+    if run is None or not run.get("actions"):
+        raise ValueError("no proposals for this run")
+    acts = run["actions"]
+    idx = range(len(acts)) if picks is None else {int(i) for i in picks if str(i).isdigit()}
+    n = 0
+    for i in idx:
+        if i < len(acts) and acts[i]["state"] == "proposed":
+            acts[i]["state"] = "discarded"
+            n += 1
+    if not n:
+        raise ValueError("nothing picked")
+    _update_run(run_id, actions=acts)
+    return n
+
+
 def _run_actions(run_id, chosen, job):
     exec_id = secrets.token_hex(6)
     _register(exec_id, {"name": f"{job['name']} (proposal)", "profile": "standard", "scope": job.get("scope"), "prompt": job.get("prompt", "")})

@@ -164,6 +164,16 @@ async def run_actions(request: Request, rid: str):
     return respond(request, f"{n} proposal{'s' if n != 1 else ''} running – confirm tentacles ask for approval as usual", refresh=True)
 
 
+@router.post("/jobs/runs/{rid}/discard", response_class=HTMLResponse)
+async def run_discard(request: Request, rid: str, all: int = 0):
+    picks = None if all else (await request.form()).getlist("pick")
+    try:
+        n = await asyncio.to_thread(scheduled.discard_actions, rid, picks)
+    except ValueError as e:
+        return respond(request, f"Not discarded: {e}", "err")
+    return respond(request, f"{n} proposal{'s' if n != 1 else ''} discarded", refresh=True)
+
+
 @router.get("/jobs/runs/{rid}/log", response_class=HTMLResponse)
 async def run_log(request: Request, rid: str):
     run = next((r for r in scheduled.history() if r.get("id") == rid), None)
