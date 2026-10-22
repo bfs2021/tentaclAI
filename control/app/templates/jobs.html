@@ -2,16 +2,7 @@
 {% from "_icons.html" import icon, help_link %}
 {% block title %}Jobs{% endblock %}
 {% macro light(st) %}{% set r = st.get('result') or {} %}{% set k = r.get('status') if st.status == 'done' else st.status %}<span class="pill {{ {'ok': 'ok', 'warn': 'warn', 'alert': 'err', 'failed': 'err', 'timeout': 'err', 'running': 'accent running', 'queued': 'info queued'}.get(k, 'off') }}">{% if k == 'running' %}<span class="spin" aria-hidden="true"></span>{% endif %}{{ k }}</span>{% endmacro %}
-{% macro run_row(r) %}
-{% set res = r.get('result') or {} %}
-<details class="mem-entry" id="run-{{ r.id }}">
-  <summary>{{ light(r) }} <span>{% if r.status == 'running' %}<span class="muted">Claude is working – <span class="elapsed" data-since="{{ r.started or r.queued }}"></span></span>{% elif r.status == 'queued' %}<span class="muted">waiting for the run before it</span>{% else %}{{ res.get('title') or r.get('error') or '' }}{% endif %}</span><span class="faint small">{{ fmt(r.get('started') or r.queued) }}{% if r.seconds %} · {{ r.seconds }} s{% endif %}{% if r.cost %} · ${{ '%.2f' % r.cost }}{% endif %}{% if r.trigger == 'manual' %} · manual{% endif %}</span></summary>
-  <div class="small" style="margin-top:8px">
-    {% if res.get('summary') %}<p style="margin:0 0 6px">{{ res.summary }}</p>{% endif %}
-    {% if res.get('details') %}<pre class="rc" style="max-height:340px">{{ res.details }}</pre>{% endif %}
-    {% if r.get('error') and r.status != 'done' %}<p class="muted" style="margin:0">{{ r.error }}</p>{% endif %}
-    {% if r.get('denials') %}<p class="muted" style="margin:6px 0 0">{{ r.denials }} tool call(s) refused by the {{ r.profile }} profile.</p>{% endif %}
-    {% if r.actions %}{% set open_for = (r.actions_until or 0) > now %}
+{% macro proposals(r) %}{% set open_for = (r.actions_until or 0) > now %}
     <form class="job-actions" hx-post="/jobs/runs/{{ r.id }}/actions" style="margin-top:8px">
       <div class="small muted" style="margin-bottom:4px">Proposals{% if open_for %} – pick what runs, exactly as written (until {{ fmt(r.actions_until) }}){% else %} – expired{% endif %}</div>
       {% for a in r.actions %}
@@ -23,7 +14,19 @@
       {% endfor %}
       {% if open_for and r.actions | selectattr('state', 'equalto', 'proposed') | list %}<button class="btn sm primary" style="margin-top:6px">{{ icon('play') }}Run selected</button>{% endif %}
     </form>
-    {% endif %}
+{% endmacro %}
+{% macro run_row(r) %}
+{% set res = r.get('result') or {} %}
+{# proposals waiting for a decision (or running) stay visible below the row – settled ones live inside it #}
+{% set pend = r.actions and (r.actions_until or 0) > now and (r.actions | selectattr('state', 'in', ['proposed', 'queued', 'running']) | list | length) > 0 %}
+<details class="mem-entry" id="run-{{ r.id }}">
+  <summary>{{ light(r) }} <span>{% if r.status == 'running' %}<span class="muted">Claude is working – <span class="elapsed" data-since="{{ r.started or r.queued }}"></span></span>{% elif r.status == 'queued' %}<span class="muted">waiting for the run before it</span>{% else %}{{ res.get('title') or r.get('error') or '' }}{% endif %}</span><span class="faint small">{{ fmt(r.get('started') or r.queued) }}{% if r.seconds %} · {{ r.seconds }} s{% endif %}{% if r.cost %} · ${{ '%.2f' % r.cost }}{% endif %}{% if r.trigger == 'manual' %} · manual{% endif %}</span></summary>
+  <div class="small" style="margin-top:8px">
+    {% if res.get('summary') %}<p style="margin:0 0 6px">{{ res.summary }}</p>{% endif %}
+    {% if res.get('details') %}<pre class="rc" style="max-height:340px">{{ res.details }}</pre>{% endif %}
+    {% if r.get('error') and r.status != 'done' %}<p class="muted" style="margin:0">{{ r.error }}</p>{% endif %}
+    {% if r.get('denials') %}<p class="muted" style="margin:6px 0 0">{{ r.denials }} tool call(s) refused by the {{ r.profile }} profile.</p>{% endif %}
+    {% if r.actions and not pend %}{{ proposals(r) }}{% endif %}
     {% if r.status in ('running', 'queued') %}
     <div class="job-live" hx-get="/jobs/runs/{{ r.id }}/log" hx-trigger="load, every 2s" style="margin-top:8px"></div>
     {% if r.status == 'running' %}<button class="btn sm danger" hx-post="/jobs/runs/{{ r.id }}/cancel" hx-confirm="Stop this run?" style="margin-top:8px">Stop</button>{% endif %}
@@ -33,6 +36,7 @@
     {% endif %}
   </div>
 </details>
+{% if pend %}<div class="job-pending">{{ proposals(r) }}</div>{% endif %}
 {% endmacro %}
 {% block content %}
 <div class="header">

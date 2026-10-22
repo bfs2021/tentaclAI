@@ -429,3 +429,5 @@ input[type=checkbox]:not(.switch-cb) { accent-color: var(--accent-2); }
 .ja-row { display: flex; gap: 10px; align-items: flex-start; padding: 5px 0; }
 .ja-row > input { margin-top: 3px; }
 .ja-row code { word-break: break-all; }
+.job-pending { margin: 4px 0 10px 22px; }
+.job-pending .job-actions { border-color: var(--accent); }

@@ -10,6 +10,7 @@ All notable changes, newest first. Every release lists **upgrade steps** from th
   lists them with check boxes for 24 h; *Run selected* runs exactly the picked commands through `svc`, without Claude –
   `ro` stays `ro`, `confirm` asks as usual, a limited job stays limited. Notifications say how many proposals wait;
   `svc jobs <name>` shows them too.
+  Proposals that wait for a decision show right below the run, without unfolding it.
 
 ### Fixes
 - `svc jobs`: long job names no longer run into the schedule column.

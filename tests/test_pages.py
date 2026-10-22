@@ -359,3 +359,20 @@ def test_job_proposals_render(client, app_module, monkeypatch, tmp_path):
     html = client.get("/jobs").text
     assert "Run selected" not in html and "expired" in html
     assert "Propose actions" in client.get(f"/jobs/{jid}").text
+
+
+def test_pending_proposals_show_outside_the_folded_run(client, app_module, monkeypatch, tmp_path):
+    import time
+    from app import jsonstore, scheduled
+    for k, f in (("JOBS", "j.json"), ("HISTORY", "h.json"), ("SEEN", "s.json")):
+        monkeypatch.setattr(scheduled, k, str(tmp_path / f))
+    jid = scheduled.save({"name": "Spam", "prompt": "p", "kind": "manual", "propose": "1"})
+    run = {"id": "r1", "job": jid, "name": "x", "status": "done", "queued": 1, "ended": 2, "result": {"status": "warn", "title": "t"},
+           "actions": [{"title": "a", "command": "svc mail b move 1 Junk", "state": "proposed"}], "actions_until": time.time() + 600}
+    jsonstore.save(scheduled.HISTORY, [run])
+    html = client.get("/jobs").text
+    assert "job-pending" in html and html.index("</details>") < html.index("Run selected")  # below the row, not inside it
+    for changed in ({"actions_until": time.time() - 1}, {"actions": [dict(run["actions"][0], state="done")]}):
+        jsonstore.save(scheduled.HISTORY, [dict(run, **changed)])
+        html = client.get("/jobs").text
+        assert '<div class="job-pending">' not in html  # expired or settled: inside the row again
