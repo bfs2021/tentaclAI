@@ -424,3 +424,12 @@ def test_paused_job_is_easy_to_tell(client, app_module, monkeypatch, tmp_path):
     a, b = html[html.index("A on"):html.index("B off")], html[html.index("B off"):]
     assert 'aria-checked="true"' in a and "next " in a and "job-card paused" not in html[:html.index("A on")][-300:]
     assert 'aria-checked="false"' in b and "no automatic runs" in b and "job-card paused" in html[html.index("A on"):html.index("B off")]
+
+
+def test_service_cards_are_compact(client):
+    html = client.get("/services").text
+    card = html[html.index('href="/services/demodb" title="Edit demodb"'):]
+    card = card[:card.index('class="card service-card')]
+    assert "db · ro" in card and "token missing" in card and "DB_PW" in card  # problems stay visible by name
+    assert ">active<" not in html  # the green dot says it already
+    assert 'hx-post="/services/demodb/toggle"' in card and 'class="menu-item"' in card  # Disable lives in the … menu

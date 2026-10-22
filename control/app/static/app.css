@@ -148,8 +148,16 @@ pre.rc { background: var(--bg); border: 1px solid var(--border); border-radius: 
 .auth .brand { justify-content: center; padding: 0 0 18px; font-size: 18px; }
 .error { background: var(--err-soft); color: var(--err); padding: 9px 12px; border-radius: var(--radius-sm); margin-bottom: 14px; font-size: 13px; }
 
-.service-card { display: flex; flex-direction: column; gap: 10px; }
-.service-card .desc { color: var(--muted); font-size: 13px; min-height: 38px; }
+.service-card { display: flex; flex-direction: column; gap: 8px; }
+.service-card .desc { color: var(--muted); font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.service-card.off h2, .service-card.off .desc, .service-card.off .svc-chips, .service-card.off .clip { opacity: .55; }
+.svc-head { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.svc-head h2 { display: flex; align-items: center; gap: 9px; margin: 0 auto 0 0; min-width: 0; }
+.svc-head h2 a { color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.svc-head h2 a:hover { color: var(--accent); }
+.svc-head .menu { margin-left: 0; }
+.svc-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.clip { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .empty { padding: 40px; text-align: center; color: var(--muted); border: 1px dashed var(--border); border-radius: var(--radius); }
 .htmx-indicator { opacity: 0; transition: opacity .2s; } .htmx-request .htmx-indicator, .htmx-request.htmx-indicator { opacity: 1; }
 .spinner { width: 14px; height: 14px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin .7s linear infinite; display: inline-block; }
@@ -262,6 +270,7 @@ dialog.modal .card-head { margin-bottom: 12px; }
   background: none; color: var(--text); font: inherit; font-size: 13px; text-align: left; cursor: pointer; }
 .menu-item:hover { background: var(--panel-2); }
 .menu-item svg { width: 14px; height: 14px; color: var(--muted); }
+.menu-pop.down { top: calc(100% + 6px); bottom: auto; }
 .menu-sep { height: 1px; background: var(--border); margin: 4px 2px; }
 /* wordmark: tentacl + AI in the brand gradient */
 .ai-grad { margin-left: .04em; background: linear-gradient(100deg, #a78bfa, #7c9cf5 45%, #22d3ee);

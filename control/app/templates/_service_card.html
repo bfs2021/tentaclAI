@@ -1,82 +1,50 @@
 {% from "_icons.html" import icon %}
-{% macro access(part, mode) %}{% set m = mode if mode in ('ro', 'rw', 'confirm') else 'ro' %}<span class="pill {{ {'rw': 'accent', 'confirm': 'warn'}.get(m, 'info') }}" title="{{ {'ro': 'read only', 'rw': 'read and write', 'confirm': 'every write waits for approval'}[m] }}">{{ part }}: {{ m }}</span>{% endmacro %}
+{% macro access(part, mode) %}{% set m = mode if mode in ('ro', 'rw', 'confirm') else 'ro' %}<span class="pill {{ {'rw': 'accent', 'confirm': 'warn'}.get(m, 'info') }}" title="{{ {'ro': 'read only', 'rw': 'read and write', 'confirm': 'every write waits for approval'}[m] }}">{{ part }} · {{ m }}</span>{% endmacro %}
 {% macro service_card(s, systems=[]) %}
-  <div class="card service-card">
-    <div class="between">
-      <h2 class="row" style="margin:0;gap:9px;flex-wrap:nowrap">
-        <span class="ssh-dot" hx-get="/services/{{ s.name }}/status" hx-trigger="load" hx-swap="innerHTML"><span class="dot" title="checking …"></span></span>{{ s.name }}</h2>
-      <span class="pill {{ s.state }}">{{ s.label }}</span>
-    </div>
-    <div class="row">{% for k in s.kinds %}<span class="tag">{{ k }}</span>{% endfor %}</div>
-    <div class="desc">{{ s.description or s.error or "–" }}</div>
-    {% if s.tls_off %}<div><span class="pill warn" title="TLS certificates are not verified for {{ s.tls_off | join(', ') }}">TLS not verified</span></div>{% endif %}
-    {% if s.base_url %}<div class="small mono faint" style="word-break:break-all">{{ s.base_url }}</div>{% endif %}
-    {% if s.data.api %}<div>{{ access('api', s.data.api.access or 'rw') }}</div>{% endif %}
-    {% if s.docker %}
-    <div class="small">
-      {{ access('docker', s.docker.access) }}
-      <span class="pill info">{{ 'ssh ' ~ s.docker.target if not s.docker.legacy else 'socket – no longer supported' }}</span>
-      <div class="mono faint" style="margin-top:6px">{{ s.docker.stacks_dir or '–' }}</div>
-    </div>
-    {% endif %}
-    {% if s.git %}
-    <div class="small" style="word-break:break-all">
-      {{ access('git', s.git.access) }}
-      <span class="pill {{ 'ok' if s.git.cloned else 'off' }}">{{ 'cloned' if s.git.cloned else 'not cloned' }}</span>
-      <div class="mono faint" style="margin-top:6px">{{ s.git.url }}</div>
-    </div>
-    {% endif %}
-    {% if s.db %}
-    <div class="small" style="word-break:break-all">
-      {{ access('db', s.db.access) }}
-      <span class="pill info">{{ s.db.engine }}</span>
-      <div class="mono faint" style="margin-top:6px">{{ s.db.target }}</div>
-    </div>
-    {% endif %}
-    {% if s.data.smtp or s.data.imap %}
-    <div class="small" style="word-break:break-all">
-      {% if s.data.smtp %}{{ access('smtp', s.data.smtp.access or 'confirm') }}{% endif %}
-      {% if s.data.imap %}{{ access('imap', s.data.imap.access or 'ro') }}{% endif %}
-      <div class="mono faint" style="margin-top:6px">{{ [s.data.smtp.host if s.data.smtp else '', s.data.imap.host if s.data.imap else ''] | select | unique | join(' · ') }}</div>
-    </div>
-    {% endif %}
-    {% if s.web %}
-    <div class="small" style="word-break:break-all">
-      <span class="pill info">auth: {{ s.web.auth }}</span>
-      <div class="mono faint" style="margin-top:6px">{{ s.web.url }}</div>
-    </div>
-    {% endif %}
-    {% if s.files %}
-    <div class="small" style="word-break:break-all">
-      {{ access('files', s.files.access) }}
-      {% if s.files.sudo %}<span class="pill accent">sudo</span>{% endif %}
-      <div class="mono faint" style="margin-top:6px">{{ s.files.target }}</div>
-    </div>
-    {% endif %}
-    {% if s.vars %}
-    <div class="row small">
-      {% for v in s.vars %}<span class="pill {{ 'ok' if v.set else 'warn' }}" title="{{ 'set' if v.set else 'empty' }}">{{ '✓' if v.set else '○' }} {{ v.name }}</span>{% endfor %}
-    </div>
-    {% endif %}
-    <div class="row" style="margin-top:auto">
-      <a class="btn sm primary" href="/services/{{ s.name }}">Edit</a>
-      <button class="btn sm" hx-post="/services/{{ s.name }}/toggle">{{ 'Disable' if s.enabled else 'Enable' }}</button>
-      {% if systems %}
+  {% set targets = [s.base_url, s.docker.stacks_dir if s.docker, s.git.url if s.git, s.db.target if s.db,
+                    s.data.smtp.host if s.data.smtp, s.data.imap.host if s.data.imap, s.web.url if s.web, s.files.target if s.files]
+                   | select | unique | list %}
+  {% set have = s.vars | selectattr('set') | map(attribute='name') | list %}
+  <div class="card service-card{{ ' off' if not s.enabled }}">
+    <div class="svc-head">
+      <h2><span class="ssh-dot" hx-get="/services/{{ s.name }}/status" hx-trigger="load" hx-swap="innerHTML"><span class="dot" title="checking …"></span></span><a href="/services/{{ s.name }}" title="Edit {{ s.name }}">{{ s.name }}</a></h2>
+      {% if s.state != 'ok' %}<span class="pill {{ s.state }}">{{ s.label }}</span>{% endif %}
+      <a class="btn sm ghost" href="/services/{{ s.name }}" title="Edit" aria-label="Edit">{{ icon('edit') }}</a>
       <details class="menu">
         <summary class="btn sm ghost" title="More actions" aria-label="More actions">{{ icon('more') }}</summary>
-        <div class="menu-pop">
+        <div class="menu-pop down">
+          <button class="menu-item" hx-post="/services/{{ s.name }}/toggle">{{ icon('stop' if s.enabled else 'play') }}{{ 'Disable' if s.enabled else 'Enable' }}</button>
+          {% if s.git and s.state == 'ok' %}<button class="menu-item" hx-post="/services/{{ s.name }}/git-sync">{{ icon('refresh') }}{{ 'Fetch repository' if s.git.cloned else 'Clone repository' }}</button>{% endif %}
+          {% if systems %}
+          <div class="menu-sep"></div>
           <div class="menu-label">Move to system</div>
           {% for x in systems if x.name != s.system %}
           <button class="menu-item" hx-post="/services/{{ s.name }}/system" hx-vals='{"system": "{{ x.name }}"}'>{{ icon('server') }}{{ x.name }}</button>
           {% endfor %}
           {% if s.system %}
-          <div class="menu-sep"></div>
           <button class="menu-item" hx-post="/services/{{ s.name }}/system" hx-vals='{"system": ""}'>Make standalone</button>
+          {% endif %}
           {% endif %}
         </div>
       </details>
-      {% endif %}
-      {% if s.git and s.state == 'ok' %}<button class="btn sm" hx-post="/services/{{ s.name }}/git-sync" title="clone or fetch">{{ icon('refresh') }}{{ 'Fetch' if s.git.cloned else 'Clone' }}</button>{% endif %}
     </div>
+    <div class="svc-chips">
+      {% for k in s.kinds %}
+        {% if k == 'api' %}{{ access('api', s.data.api.access or 'rw') }}
+        {% elif k == 'docker' %}{{ access('docker', s.docker.access) }}<span class="pill info">{{ 'ssh ' ~ s.docker.target if not s.docker.legacy else 'socket – no longer supported' }}</span>
+        {% elif k == 'git' %}{{ access('git', s.git.access) }}{% if not s.git.cloned %}<span class="pill off">not cloned</span>{% endif %}
+        {% elif k == 'db' %}{{ access('db', s.db.access) }}<span class="pill info">{{ s.db.engine }}</span>
+        {% elif k == 'smtp' %}{{ access('smtp', s.data.smtp.access or 'confirm') }}
+        {% elif k == 'imap' %}{{ access('imap', s.data.imap.access or 'ro') }}
+        {% elif k == 'files' %}{{ access('files', s.files.access) }}{% if s.files.sudo %}<span class="pill accent">sudo</span>{% endif %}
+        {% elif k == 'web' %}<span class="pill info">web · {{ s.web.auth }}</span>
+        {% else %}<span class="pill info">{{ k }}</span>{% endif %}
+      {% endfor %}
+      {% if s.tls_off %}<span class="pill warn" title="TLS certificates are not verified for {{ s.tls_off | join(', ') }}">TLS not verified</span>{% endif %}
+      {% if have %}<span class="pill ok" title="Set: {{ have | join(', ') }}">{{ icon('key') }}{{ have | length }} ✓</span>{% endif %}
+      {% for v in s.vars if not v.set %}<span class="pill warn" title="empty – set it in Edit">○ {{ v.name }}</span>{% endfor %}
+    </div>
+    {% if s.description or s.error %}<div class="desc" title="{{ s.description or s.error }}">{{ s.description or s.error }}</div>{% endif %}
+    {% for t in targets %}<div class="small mono faint clip" title="{{ t }}">{{ t | replace('https://', '') }}</div>{% endfor %}
   </div>
 {% endmacro %}

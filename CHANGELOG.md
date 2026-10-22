@@ -15,6 +15,8 @@ All notable changes, newest first. Every release lists **upgrade steps** from th
   (*Discard selected* / *Discard all*).
 
 ### Changes
+- Services: compact cards – one access chip per part, set variables as one key chip (missing ones stay named),
+  one-line description, no "active" pill; Edit as pencil, Disable/Fetch/move in the … menu. Disabled cards are dimmed.
 - Job list: the profile shows as *reads* (neutral), *writes* (purple, the tooltip lists what it writes to without asking
   and what asks first) or *proposes* – the same colours as the access labels on service cards; yellow is kept for what
   waits for you. The editor names the profiles *Reads only* and *Can write (like a terminal session)*; the stored values
