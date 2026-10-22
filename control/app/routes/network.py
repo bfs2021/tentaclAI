@@ -33,7 +33,7 @@ async def internal_event(request: Request):
     if not _svc_auth(request):
         return JSONResponse({"error": "forbidden"}, status_code=403)
     d = await request.json()
-    if d.get("event") in ("blocked",):
+    if d.get("event") in ("blocked", "injection"):
         notify.emit(d["event"], str(d.get("title", ""))[:200], str(d.get("body", ""))[:500])
     return JSONResponse({"ok": True})
 

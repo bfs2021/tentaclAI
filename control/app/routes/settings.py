@@ -6,7 +6,7 @@ import segno
 from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse
 
-from .. import auth, models, notify, services_store, skills, totp, usage
+from .. import auth, connectors, models, notify, services_store, skills, totp, usage
 from ..config import RC_VARS, RESTART_VARS, SETTINGS_GROUPS
 from ..envfile import read_env, update_env
 from ..config import site
@@ -173,6 +173,8 @@ async def settings_save(request: Request):
     except ValueError as e:
         return PlainTextResponse("", headers=toast(str(e), "err"))
     msg = f"{len(changes)} setting(s) saved"
+    if "INJECTION_GUARD" in changes and not await asyncio.to_thread(connectors.apply):  # the hook in the managed settings
+        msg += " – the sandbox gets the hook setting on its next start"
     if RESTART_VARS & set(changes):
         mark_restart(env, changes)
     elif RC_VARS & set(changes):

@@ -11,7 +11,7 @@ t0=$(date +%s)
 fail() { echo "✗ $1"; exit 1; }
 
 echo "== syntax"
-python3 -m py_compile lib/tclib.py build/svc build/tc-scan build/claude-instructions control/passwd.py control/sshcli.py \
+python3 -m py_compile lib/tclib.py build/svc build/tc-scan build/tc-guard build/claude-instructions control/passwd.py control/sshcli.py \
     control/app/*.py || fail "python syntax"
 for f in tentaclai.sh ssh-host.sh build/entrypoint.sh build/start.sh build/rc-loop build/cc scripts/*.sh .githooks/pre-commit; do
     bash -n "$f" || fail "shell syntax: $f"

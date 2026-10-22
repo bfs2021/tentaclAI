@@ -2,6 +2,24 @@
 
 All notable changes, newest first. Every release lists **upgrade steps** from the previous one.
 
+## Unreleased
+
+### Highlights
+- **Prompt-injection safeguards** (`INJECTION_GUARD`, Settings → Security group, on by default): `svc web` now frames
+  pages as untrusted like mail; mail and web text lose what a reader can't see (zero-width, direction and Unicode tag
+  characters, elements hidden by CSS / `hidden` / `aria-hidden`). Mail, web pages, `svc files cat|grep` and API
+  responses are checked for text that tries to instruct Claude; a new Claude Code hook (`tc-guard`, `PostToolUse` in the
+  root-owned managed settings) does the same for WebFetch, WebSearch, MCP tools and files Claude reads. A finding warns
+  Claude next to the content, shows as *flagged* in Activity and sends the new notification *Possible prompt injection*
+  (routed like approvals until you change it). A heuristic – it warns, it doesn't block; the hard limits stay
+  `read`/`confirm`, the egress gateway and mail recipient lists.
+
+### Upgrade
+- `git pull`, `docker compose build`, `docker compose up -d` – both images change (`svc`, `tc-guard`, the managed
+  settings and the instructions in `tentaclai`; settings, Activity and notifications in `tentacontrol`). Recreating
+  `tentaclai` ends running Claude sessions and Remote Control.
+- New optional `.env` variable `INJECTION_GUARD` (default on; `false` switches the cleaning, the scanning and the hook off).
+
 ## v0.17.0 – 2026-10-22
 
 ### Highlights

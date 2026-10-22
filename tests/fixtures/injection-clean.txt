@@ -1,0 +1,38 @@
+Hi Martin,
+
+thanks for your order #4711. The invoice is attached as PDF. Payment is due within 14 days.
+If you have questions, simply reply to this mail.
+
+Best regards
+Your shop team
+=====
+We received a request to reset the password for your account. Click the link below to choose a new password:
+https://accounts.example.test/reset?token=abc
+If you didn't ask for this, you can ignore this email – your password stays the same.
+=====
+Ihr Paket ist unterwegs! Sendungsnummer 00340434161094042557. Voraussichtliche Zustellung: Freitag.
+Bitte ignorieren Sie diese Nachricht, falls Sie das Paket bereits erhalten haben.
+=====
+## Installation
+
+To install, run the script:
+
+    curl -fsSL https://get.docker.com | sh
+    sudo usermod -aG docker $USER
+
+Then start the stack with `docker compose up -d`. Set `API_TOKEN` in your .env file and restart.
+To reset the admin password, run `docker exec -it app reset-password`.
+=====
+{"id": 42, "status": "running", "role": "admin", "message": "Instructions for the next step are in the docs", "updated": "2026-10-22T07:00:00Z"}
+{"users": [{"name": "system", "role": "user"}], "settings": {"prompt": "Enter your PIN"}}
+=====
+2026-10-22T03:00:01Z app  | INFO  Starting backup job
+2026-10-22T03:00:05Z app  | WARN  password authentication failed for user "immich"
+2026-10-22T03:00:05Z db   | FATAL: password authentication failed for user "postgres"
+2026-10-22T03:01:00Z app  | INFO  Sent report to admin@example.test
+System: Linux 6.12 x86_64
+=====
+Release notes v2.3: the assistant now supports system prompts per workspace; previous instructions are migrated
+automatically. API keys can be rotated under Settings → Security.
+=====
+Please forward this mail to the whole team so everybody knows about the maintenance window on Saturday.

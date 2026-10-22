@@ -9,8 +9,11 @@ import os
 import re
 import time
 
+import tclib
+
 from . import dockerops, jsonstore
 from .config import DATA_DIR
+from .envfile import read_env
 
 STATE = os.path.join(DATA_DIR, "connectors.json")
 MANAGED = "/etc/claude-code/managed-settings.json"
@@ -26,9 +29,10 @@ def _save(s):
 
 
 def managed_json(s=None):
+    """blocked connectors and the prompt-injection hook (tc-guard, off with INJECTION_GUARD=false)"""
     s = s or load()
-    denied = [{"serverName": n} for n, c in sorted(s["known"].items()) if not c.get("enabled")]
-    return json.dumps({"deniedMcpServers": denied}, indent=1) + "\n"
+    denied = [n for n, c in s["known"].items() if not c.get("enabled")]
+    return json.dumps(tclib.managed_settings(denied, tclib.guard_on(read_env())), indent=1) + "\n"
 
 
 def apply():

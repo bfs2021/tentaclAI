@@ -31,7 +31,7 @@ ARG CACHE_BUST=0
 RUN echo "cache bust: ${CACHE_BUST}" && npm install -g @anthropic-ai/claude-code@${CLAUDE_CODE_VERSION} \
     && npm cache clean --force
 
-COPY build/entrypoint.sh build/start.sh build/rc-loop build/cc build/svc build/claude-instructions build/tc-scan build/tc-statusline build/tc-connect /usr/local/bin/
+COPY build/entrypoint.sh build/start.sh build/rc-loop build/cc build/svc build/claude-instructions build/tc-scan build/tc-statusline build/tc-connect build/tc-guard /usr/local/bin/
 COPY lib/tclib.py /usr/local/lib/tentaclai/tclib.py
 COPY build/svc-completion.bash /etc/bash_completion.d/svc
 COPY VERSION /etc/tentaclai/VERSION
@@ -49,7 +49,7 @@ RUN groupadd -g ${CLAUDE_UID} claude && useradd -m -d /home/claude -u ${CLAUDE_U
         'Defaults:claude env_keep += "CLAUDE_CODE_SESSION_ID CLAUDE_CODE_ENTRYPOINT TMUX TMUX_PANE"' \
         'claude ALL=(root) NOPASSWD: /usr/local/bin/svc, /usr/local/bin/tc-scan' > /etc/sudoers.d/tentaclai \
     && chmod 0440 /etc/sudoers.d/tentaclai && visudo -cq
-RUN chmod 0755 /usr/local/bin/entrypoint.sh /usr/local/bin/start.sh /usr/local/bin/rc-loop /usr/local/bin/cc /usr/local/bin/svc /usr/local/bin/claude-instructions /usr/local/bin/tc-scan /usr/local/bin/tc-statusline /usr/local/bin/tc-connect \
+RUN chmod 0755 /usr/local/bin/entrypoint.sh /usr/local/bin/start.sh /usr/local/bin/rc-loop /usr/local/bin/cc /usr/local/bin/svc /usr/local/bin/claude-instructions /usr/local/bin/tc-scan /usr/local/bin/tc-statusline /usr/local/bin/tc-connect /usr/local/bin/tc-guard \
     # tmux: mouse scrolling, bigger scrollback, truecolor for Claude's TUI, copies (also Claude's own, OSC 52) reach the browser
     # tab completion in interactive shells (Debian ships it disabled in bash.bashrc)
     && printf '%s\n' '[ -n "$PS1" ] && [ -f /usr/share/bash-completion/bash_completion ] && . /usr/share/bash-completion/bash_completion' >> /etc/bash.bashrc \

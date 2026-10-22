@@ -663,3 +663,87 @@ def write_model_commands(m, src="/etc/tentaclai/commands", dst=None):
         with open(out + ".tmp", "w") as f:
             f.write(command_frontmatter(text, m.get("commands", ""), m.get("commands_effort", "")))
         os.replace(out + ".tmp", out)
+
+
+# ---------------------------------------------------------------- prompt-injection safeguards
+# Hardening and early warning, no guarantee: hidden text is removed, obvious attempts are flagged. The hard limits stay
+# svc's access modes, the egress gateway and Claude never holding a secret.
+
+GUARD_DEFAULT = True  # INJECTION_GUARD in .env; off only with "false"
+_ZERO_WIDTH = re.compile("[​-‏⁠-⁤﻿­]")
+_BIDI = re.compile("[‪-‮⁦-⁩]")
+_TAGS = re.compile("[\U000e0000-\U000e007f]+")
+_CONTROL = re.compile("[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
+
+
+def guard_on(env):
+    return str(env.get("INJECTION_GUARD", "")).strip().lower() not in ("false", "0", "off", "no")
+
+
+def clean_untrusted(text):
+    """someone else's text without what a human reader can't see → (text, [what was removed])"""
+    removed = []
+    for rx, what, repl in ((_TAGS, "hidden tag characters", "[hidden text removed]"), (_ZERO_WIDTH, "zero-width characters", ""),
+                           (_BIDI, "direction overrides", ""), (_CONTROL, "control characters", "")):
+        text, n = rx.subn(repl, text)
+        if n:
+            removed.append(f"{n} {what}" if repl == "" else what)
+    return text, removed
+
+
+_I = re.IGNORECASE | re.MULTILINE
+INJECTION_PATTERNS = [
+    ("asks to ignore instructions", re.compile(
+        r"\b(ignore|disregard|forget|override|bypass)\b[^.\n]{0,40}\b(previous|prior|above|earlier|all|any|your|the)\b[^.\n]{0,25}"
+        r"\b(instructions?|prompts?|rules|guidelines|directives|messages)\b", _I)),
+    ("asks to ignore instructions", re.compile(
+        r"\b(ignorier\w*|vergiss|missachte\w*)\b[^.\n]{0,40}\b(anweisungen|instruktionen|regeln|vorgaben)\b", _I)),
+    ("tries to change the assistant's role", re.compile(
+        r"\b(you are now|from now on,? you|act as (an?|the) (ai|assistant|agent|admin)|du bist (jetzt|ab sofort)|ab sofort bist du)\b", _I)),
+    ("claims new instructions", re.compile(r"\b(new|updated|real|actual|hidden) (system )?(instructions?|prompt|orders)\b\s*[:\-]", _I)),
+    ("mentions the system prompt", re.compile(r"\b(system prompt|developer message|systemanweisung)\b", _I)),
+    ("fake chat or tool markup", re.compile(
+        r"(<\|im_(start|end)\|>|\[/?INST\]|<<SYS>>|</?(system|instructions?|assistant|user_query|function_calls|antml:[a-z_]+)>"
+        r"|\"role\"\s*:\s*\"system\"|^(Human|Assistant):\s)", _I)),
+    ("addresses an AI agent", re.compile(
+        r"\b(as an? (ai|llm|language model|assistant|agent)|dear (ai|assistant|agent|claude)|(hey|hi|attention),? (claude|ai|assistant|agent))\b"
+        r"|^\s*claude[,:]", _I)),
+    ("asks to run commands", re.compile(  # svc is this sandbox's own gateway – no ordinary document tells a reader to run it
+        r"\b(run|execute|call|use|type|führe?)\b[^.\n]{0,30}`?\bsvc (docker|compose|ssh|files|mail|db|web|git|config|[a-z0-9_-]+ (POST|PUT|PATCH|DELETE))\b"
+        r"|\b(run|execute)\b[^.\n]{0,20}`?(rm -rf /|sudo rm\b|mkfs\b|dd if=)", _I)),
+    ("asks to send secrets somewhere", re.compile(
+        r"\b(send|forward|upload|post|exfiltrate|leak|e-?mail|schicke?|sende|leite)\b[^\n]{0,80}"
+        r"(\b(passwords?|tokens?|secrets?|credentials|api[ _-]?keys?|ssh keys?|private keys?|passw[oö]rter|zugangsdaten)\b|\.env\b|id_(rsa|ed25519))"
+        r"[^\n]{0,80}\b(to|an|at|nach)\b\s+\S*([\w.+-]+@[\w-]+\.[\w.]+|https?://)", _I)),
+]
+_BASE64 = re.compile(r"[A-Za-z0-9+/]{500,}={0,2}")
+
+
+def injection_signals(text, limit=200_000):
+    """short reasons why someone else's text looks like it tries to instruct an AI agent (empty = nothing found) –
+    a heuristic: obvious attempts are found, a well-disguised one is not"""
+    if not text:
+        return []
+    text = text[:limit]
+    _, removed = clean_untrusted(text)
+    found = [f"hidden text ({', '.join(removed)})"] if any("tag" in r or "direction" in r for r in removed) else []
+    for reason, rx in INJECTION_PATTERNS:
+        if reason not in found and rx.search(text):
+            found.append(reason)
+    if _BASE64.search(text):
+        found.append("long base64 block")
+    return found[:5]
+
+
+def guard_hook_settings():
+    """the PostToolUse hook in Claude Code's managed settings: tc-guard scans tool results for injection attempts"""
+    return {"PostToolUse": [{"matcher": "WebFetch|WebSearch|Read|Bash|mcp__.*",
+                             "hooks": [{"type": "command", "command": "/usr/local/bin/tc-guard", "timeout": 10}]}]}
+
+
+def managed_settings(denied, guard=True):
+    """/etc/claude-code/managed-settings.json in the sandbox (root-owned): blocked claude.ai connectors and the guard hook"""
+    s = {"deniedMcpServers": [{"serverName": n} for n in sorted(denied)]}
+    if guard:
+        s["hooks"] = guard_hook_settings()
+    return s

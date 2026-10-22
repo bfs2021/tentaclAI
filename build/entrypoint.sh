@@ -101,17 +101,20 @@ os.replace(p + ".tmp", p)
 tclib.write_model_commands(m)  # after the plain copy above: /inventory and /onboard with their model
 PY
 
-# claude.ai connectors that are switched off in tentacontrol (default: all) – root-owned managed settings
-python3 - "$TC_DIR/data/control/connectors.json" <<'PY' || true
+# root-owned managed settings: claude.ai connectors switched off in tentacontrol (default: all) and the tc-guard hook
+python3 - "$TC_DIR/data/control/connectors.json" "$TC_DIR/.env" <<'PY' || true
 import json, os, sys
+sys.path.insert(0, "/usr/local/lib/tentaclai")
+import tclib
 try:
     known = json.load(open(sys.argv[1])).get("known", {})
 except (OSError, ValueError):
     known = {}
 os.makedirs("/etc/claude-code", exist_ok=True)
 os.chmod("/etc/claude-code", 0o755)  # umask 077 above – Claude must be able to read its policy, or it is silently ignored
+settings = tclib.managed_settings([n for n, c in known.items() if not c.get("enabled")], tclib.guard_on(tclib.read_env(sys.argv[2])))
 with open("/etc/claude-code/managed-settings.json", "w") as f:
-    json.dump({"deniedMcpServers": [{"serverName": n} for n, c in sorted(known.items()) if not c.get("enabled")]}, f, indent=1)
+    json.dump(settings, f, indent=1)
 os.chmod("/etc/claude-code/managed-settings.json", 0o644)
 PY
 

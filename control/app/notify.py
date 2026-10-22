@@ -26,6 +26,7 @@ EVENTS = {
     "update":     ("Update available", "low", "a new tentaclAI release is out"),
     "quota":      ("Quota running low", "normal", "the Claude session or weekly limit passed 80 %"),
     "signin":     ("Sign-in with a recovery code", "high", "someone signed in to tentacontrol with a 2FA recovery code"),
+    "injection":  ("Possible prompt injection", "normal", "content from a service or a tool result looks like it tries to instruct Claude"),
     "job_result": ("Job finding", "normal", "a scheduled Claude job reported something (by its notification rule)"),
     "job_failed": ("Job failed", "normal", "a scheduled Claude job failed or ran out of time"),
 }

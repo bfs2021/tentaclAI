@@ -298,6 +298,7 @@ SSH hosts: tentacontrol → Tentacles → SSH hosts, or `./ssh-host.sh list|add|
 | `RC_ENABLED`, `RC_NAME`, `RC_WORKDIR`, `RC_EXTRA_ARGS`, `RC_RESTART_DELAY` | Remote Control – re-read on every restart of the session |
 | `JOB_READONLY_HELPERS` | text tools a read-only job may chain with `svc` (empty = the defaults: echo, head, tail, grep, jq, sort, uniq, wc, cut, tr, date, sleep) – shells, interpreters, awk/sed/find/xargs, network and write tools are refused |
 | `EGRESS_MODE`, `EGRESS_DIRECT_IP` | egress gateway: `permissive` (default) or `enforce`; bare IP targets in enforce mode `block` (default) or `ask` – see [Network control](#network-control) |
+| `INJECTION_GUARD` | prompt-injection safeguards (default on): untrusted markers and hidden-text cleaning for mail/web, scanning in `svc` and the `tc-guard` hook – `false` turns them off, see [Security](#security) |
 | `CLAUDE_TELEMETRY` | `true` allows Claude Code's telemetry, error reports and `/bug` (default: off) |
 | `UPDATE_CHECK`, `UPDATE_REPO` | release check every 6 h (`false` = no requests), repository to check (default `mwaldegg/tentaclai`) |
 | `NOTIFY_URL_<ID>` | URL of a notification channel (written by Settings → Notifications) |
@@ -380,6 +381,14 @@ What tentaclAI does:
   without prompts – `confirm` tentacles still wait for your approval.
 - **Mail is untrusted content:** `svc mail … read` frames a mail between markers Claude's rules say never to obey;
   sending is `confirm` by default and `write` only with a recipient list.
+- **Prompt-injection safeguards** (`INJECTION_GUARD`, on by default): mail and web pages come between untrusted-content
+  markers, without hidden text (zero-width/direction/Unicode tag characters, elements hidden by CSS or `hidden`).
+  Everything `svc` reads – and, through a Claude Code `PostToolUse` hook in the root-owned managed settings, WebFetch,
+  WebSearch, MCP tools and files Claude reads – is checked for text that tries to instruct an AI. A finding gives Claude
+  a warning next to the content, an entry *flagged* in Activity and a notification. This is a heuristic: hidden
+  injections lose their effect and obvious ones are noticed, a well-disguised one can get through. The hard limits stay
+  `read`/`confirm`, no secrets in the sandbox, the egress gateway and mail recipient lists – keep writes of tentacles
+  that read mail or the web on `confirm`.
 
 - **Privilege separation** in the sandbox: Claude runs as the unprivileged user `claude`. `.env`, the SSH key, the service
   files, git credentials and the audit log belong to root; Claude reaches them only through `svc` (via sudo), which enforces
@@ -414,7 +423,6 @@ What it does **not** (yet) do – keep it in mind:
   (*read-only* / *standard*, the svc and gateway guard rails stay), wait for the result or poll a job id, structured
   answers via a JSON schema, an MCP endpoint (`ask_claude`) for n8n's MCP client; off by default. Later: webhook
   callback, an API key just for API jobs.
-- **Security:** prompt-injection safeguards
 
 ## License
 
