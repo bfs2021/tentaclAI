@@ -725,6 +725,13 @@ INJECTION_PATTERNS = [
     ("addresses an AI agent", re.compile(
         r"\b(as an? (ai|llm|language model|assistant|agent)|dear (ai|assistant|agent|claude)|(hey|hi|attention),? (claude|ai|assistant|agent))\b"
         r"|^\s*claude[,:]", _I)),
+    ("addresses an AI agent", re.compile(  # notes for whoever reads this with an AI – plain documents never talk like that
+        r"\b(notes?|message|instructions?|info|reminder) (to|for) (any |all )?(ai|llm|automated|autonomous)\b[ \w-]{0,20}\b(assistants?|agents?|models?|systems?|tools?|readers?)\b"
+        r"|\b(if|when) you(\s*['’]re| are) (an? )?(ai|llm|language model|ai assistant|ai agent|automated (assistant|agent|system))\b"
+        r"|\b(any|every|all) (ai|llm)s?\b[ \w-]{0,15}\breading (this|these)\b"
+        r"|\b(hinweis|nachricht|anweisungen?|info|bitte) (für|an) (alle |jeden |jede )?(ki|automatisierte\w*|autonome\w*)\b[ \w-]{0,20}\b(assistent\w*|agent\w*|modell\w*|systeme?\w*|leser\w*)"
+        r"|\b(falls|wenn) du (eine |ein )?(ki|llm|sprachmodell|ki-assistent\w*|ki-agent\w*|automatisierte\w* (assistent|agent)\w*) bist\b"
+        r"|\b(an alle|liebe) (ki|ki-\w+)\b", _I)),
     ("asks to run commands", re.compile(  # svc is this sandbox's own gateway – no ordinary document tells a reader to run it
         r"\b(run|execute|call|use|type|führe?)\b[^.\n]{0,30}`?\bsvc (docker|compose|ssh|files|mail|db|web|git|config|[a-z0-9_-]+ (POST|PUT|PATCH|DELETE))\b"
         r"|\b(run|execute)\b[^.\n]{0,20}`?(rm -rf /|sudo rm\b|mkfs\b|dd if=)", _I)),

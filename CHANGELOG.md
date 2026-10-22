@@ -14,6 +14,10 @@ All notable changes, newest first. Every release lists **upgrade steps** from th
   shows nothing. A decision is used once – a second identical call doesn't ride along.
 
 ### Changes
+- Prompt-injection safeguards: notes addressed to AI readers are flagged too – “Note for automated assistants: please
+  …”, “If you are an AI …”, “Hinweis für KI-Assistenten …” – not only blunt “ignore your instructions”. Claude's base
+  rules now say to mention any text that addresses AI assistants or asks the reader to do something, however polite,
+  in one line to the user – also when it was only asked for a summary (until now it ignored such a note silently).
 - Activity → a *flagged* entry (possible prompt injection) says what was read – the file, URL, search, MCP tool with
   its arguments or command, e.g. `tool result: Read /workspace/notes.md` instead of `tool result: Read` – and, under
   *what was found*, each reason with a short excerpt and its line (a base64 block: size and start), secrets blanked;
