@@ -17,8 +17,31 @@ Sandbox + service gateway for Claude Code.</p>
 
 tentaclAI runs [Claude Code](https://claude.com/claude-code) in its own container and gives it **controlled access to
 your infrastructure** – Docker hosts, APIs, MCP servers, git repositories, databases, websites, mailboxes and files on other machines.
-Every connection is a **service** you add on purpose, with its own access mode: read-only (`read`), read-write (`write`) or every write waits for your approval (`confirm`). A web admin,
-**tentacontrol**, sets it all up, and you talk to Claude from the browser, from your phone or from the terminal.
+Every connection is a **service** you add on purpose, with its own access mode: read-only (`read`), read-write (`write`) or
+every write waits for your approval (`confirm`). A web admin, **tentacontrol**, sets it all up, and you talk to Claude
+from the browser, from your phone or from the terminal.
+
+**More than a sandbox:**
+
+- **Network isolation** – the sandbox has no route out. All traffic, DNS included, goes through an egress gateway
+  that records every destination and, in `enforce` mode, asks you before Claude reaches anything new.
+- **Credentials stay out of reach** – Claude runs unprivileged and never sees a token, password or SSH key. `svc` injects
+  them at call time, and Claude can't change its own access rights.
+- **Approvals and audit** – writes to `confirm` services wait in tentacontrol (or show up as a notification on your
+  phone) and every write is logged.
+- **Site knowledge** – a guided inventory and per-service onboarding record what your systems are for and which rules
+  apply. Claude reads this at the start of every session.
+
+**Beyond the sandbox:**
+
+- **Scheduled jobs** – Claude tasks run on a schedule, e.g. a patch report, certificate expiry, disk space, backups or
+  container health. They're read-only by default, give a traffic-light result and only notify you when something is
+  wrong. A job can also suggest fixes that you approve with one click.
+- **Notifications** – ntfy, webhook, e-mail or any Apprise URL, with quiet hours.
+- **Always reachable** – a permanent Remote Control session (QR code in tentacontrol), web terminals that survive
+  closing the tab, and two-factor sign-in.
+- **Topology & inventory** – a live graph of everything Claude can reach, down to stacks and containers.
+- **Claude settings in one place** – edit its instructions, memory, models, skills and settings.json, and see your plan usage.
 
 <p align="center">
   <img src="docs/screenshots/topology.png" alt="Topology view: what Claude can reach and how" width="900">
@@ -34,14 +57,9 @@ Every connection is a **service** you add on purpose, with its own access mode: 
 
 Claude Code is great at operating systems – reading logs, fixing a compose file, querying an API, writing an automation.
 Pointed at real infrastructure – servers, a homelab, company or cloud services – two questions come up immediately: *what may it touch?* and *how does it know
-my setup?* tentaclAI answers both:
-
-- **Explicit reach.** Claude sees nothing by default. Each Docker host, API, database or folder is connected as a service
-  with an access mode – the `svc` tool in the container enforces it, and tokens never appear in commands or in Claude's context.
-- **Built-in site knowledge.** A guided inventory and a per-service onboarding write down what your systems are for and what
-  the rules are. Claude reads this on every start.
-- **Always reachable.** A Remote Control session runs permanently – open it on claude.ai/code or in the Claude app (QR code
-  in tentacontrol), or use the web terminal.
+my setup?* tentaclAI answers both: Claude sees nothing by default and reaches only the services you connect, each with
+an access mode the `svc` tool in the container enforces – and a guided inventory plus per-service onboarding write down
+what your systems are for and which rules apply.
 
 ## How it works
 
