@@ -149,7 +149,9 @@ pre.rc { background: var(--bg); border: 1px solid var(--border); border-radius: 
 .error { background: var(--err-soft); color: var(--err); padding: 9px 12px; border-radius: var(--radius-sm); margin-bottom: 14px; font-size: 13px; }
 
 .service-card { display: flex; flex-direction: column; gap: 8px; }
-.service-card .desc { color: var(--muted); font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.service-card .desc { color: var(--muted); font-size: 13px; cursor: pointer; overflow: hidden;
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; }
+.service-card .desc.open { display: block; -webkit-line-clamp: unset; line-clamp: none; white-space: pre-line; }
 .service-card.off h2, .service-card.off .desc, .service-card.off .svc-chips, .service-card.off .clip { opacity: .55; }
 .svc-head { display: flex; align-items: center; gap: 6px; min-width: 0; }
 .svc-head h2 { display: flex; align-items: center; gap: 9px; margin: 0 auto 0 0; min-width: 0; }

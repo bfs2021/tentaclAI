@@ -44,7 +44,7 @@
       {% if have %}<span class="pill ok" title="Set: {{ have | join(', ') }}">{{ icon('key') }}{{ have | length }} ✓</span>{% endif %}
       {% for v in s.vars if not v.set %}<span class="pill warn" title="empty – set it in Edit">○ {{ v.name }}</span>{% endfor %}
     </div>
-    {% if s.description or s.error %}<div class="desc" title="{{ s.description or s.error }}">{{ s.description or s.error }}</div>{% endif %}
+    {% if s.description or s.error %}<div class="desc" title="Click to show all" onclick="this.classList.toggle('open')">{{ s.description or s.error }}</div>{% endif %}
     {% for t in targets %}<div class="small mono faint clip" title="{{ t }}">{{ t | replace('https://', '') }}</div>{% endfor %}
   </div>
 {% endmacro %}

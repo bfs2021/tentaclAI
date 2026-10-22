@@ -136,7 +136,7 @@
 }</pre>
       <ul>
         <li><strong>Status</strong>: a card shows a pill only when something is off – <span class="pill warn">token missing</span> at least one <code>${VAR}</code> empty (named on the card) · <span class="pill off">disabled</span> <code>"enabled": false</code> (the card is dimmed). Active services need no pill.</li>
-        <li><strong>Cards</strong>: one chip per part with its access (<span class="pill accent">api · rw</span>), the key chip counts the variables that are set (names on hover), the description is one line (full text on hover). Edit with the pencil or the name; Disable/Enable, git Fetch and moving to another system are in the <strong>…</strong> menu.</li>
+        <li><strong>Cards</strong>: one chip per part with its access (<span class="pill accent">api · rw</span>), the key chip counts the variables that are set (names on hover), the description shows two lines – click it for the full text, click again to fold it. Edit with the pencil or the name; Disable/Enable, git Fetch and moving to another system are in the <strong>…</strong> menu.</li>
         <li>New tokens work for <code>svc</code> immediately. Only settings read at container start (e.g. <code>GIT_*</code>, <code>TZ</code>, resources) need “Apply now” – the banner also appears when a newer tentaclAI image was built.</li>
         <li>Running Claude sessions see new MCP servers after <code>/mcp</code> → reconnect or in a new session.</li>
         <li>Internal https services with your own CA: set <code>CA_CERT</code> in the settings – the CA becomes trusted in the container. Single devices with self-signed certificates: <code>"insecure_tls": true</code>.</li>
