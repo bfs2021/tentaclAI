@@ -298,10 +298,40 @@ def egress_rule(host, port, ips=(), default=(), block=(), allow=(), tentacles=No
     return "unknown", ""
 
 
+# ---------------------------------------------------------------- access modes
+
+ACCESS = ("read", "write", "confirm")
+ACCESS_ALIASES = {"ro": "read", "rw": "write"}  # the names before v0.16 – still understood, no longer written
+ACCESS_NAMES = ACCESS + tuple(ACCESS_ALIASES)
+
+
+def access(value, default="read"):
+    """normalise an access mode (ro → read, rw → write); an unknown value is read – the safe side"""
+    mode = str(default if value in (None, "") else value).strip().lower()
+    mode = ACCESS_ALIASES.get(mode, mode)
+    return mode if mode in ACCESS else "read"
+
+
+def part_default(part):
+    """the access a service part has without an explicit one: smtp asks, api writes, everything else reads"""
+    return {"smtp": "confirm", "api": "write"}.get(part, "read")
+
+
+def migrate_access(data):
+    """rewrite ro/rw in a service's parts to read/write – returns True if something changed"""
+    changed = False
+    for p in PARTS:
+        d = data.get(p)
+        if isinstance(d, dict) and str(d.get("access", "")).strip().lower() in ACCESS_ALIASES:
+            d["access"] = ACCESS_ALIASES[str(d["access"]).strip().lower()]
+            changed = True
+    return changed
+
+
 # ---------------------------------------------------------------- SSH hosts (ssh/config.d/*.conf)
 
 META = re.compile(r"^\s*#\s*tentacl(?:ai|aude):\s*(sudo|access)\s*=\s*(.*?)\s*$")
-SSH_ACCESS = ("ro", "rw", "confirm")
+SSH_ACCESS = ("read", "write", "confirm")
 SSH_ACCESS_DEFAULT = "confirm"
 SUDO_RE = re.compile(r"^[A-Za-z0-9 ._/=-]{1,60}$")
 ALIAS_RE = re.compile(r"^[A-Za-z0-9._-]{1,40}$")
@@ -323,8 +353,9 @@ def ssh_hosts(conf_d):
         for line in open(f):
             m = META.match(line)
             if m:
+                val = access(m.group(2), SSH_ACCESS_DEFAULT) if m.group(1) == "access" else m.group(2)
                 for h in block:
-                    h[m.group(1)] = m.group(2)
+                    h[m.group(1)] = val
                 continue
             parts = line.strip().split(None, 1)
             if not parts or parts[0].startswith("#"):
@@ -351,10 +382,8 @@ def ssh_sudo(conf_d, alias):
 
 
 def ssh_access(conf_d, alias):
-    """access mode of `svc ssh <alias>`: ro = no ssh commands, confirm = each needs approval, rw = allowed"""
-    h = ssh_host(conf_d, alias)
-    mode = (h or {}).get("access") or SSH_ACCESS_DEFAULT
-    return mode if mode in SSH_ACCESS else "ro"
+    """access mode of `svc ssh <alias>`: read = no ssh commands, confirm = each needs approval, write = allowed"""
+    return access((ssh_host(conf_d, alias) or {}).get("access"), SSH_ACCESS_DEFAULT)
 
 
 def ssh_validate(fields, aliases=None):
@@ -376,8 +405,8 @@ def ssh_validate(fields, aliases=None):
     sudo = fields.get("sudo", "")
     if sudo and not SUDO_RE.match(sudo):
         raise ValueError("sudo command: letters, digits, space . _ / = - only")
-    if fields.get("access", SSH_ACCESS_DEFAULT) not in SSH_ACCESS:
-        raise ValueError("access: ro, rw or confirm")
+    if fields.get("access", SSH_ACCESS_DEFAULT) not in ACCESS_NAMES:
+        raise ValueError("access: read, write or confirm")
     if aliases is not None and fields["alias"] in aliases:
         raise ValueError(f"alias {fields['alias']} exists already")
 
@@ -391,8 +420,9 @@ def _block_lines(fields, extra=()):
     lines += list(extra)
     if fields.get("sudo"):
         lines.append(f"    # tentaclai: sudo={fields['sudo']}\n")
-    if fields.get("access", SSH_ACCESS_DEFAULT) != SSH_ACCESS_DEFAULT:
-        lines.append(f"    # tentaclai: access={fields['access']}\n")
+    mode = access(fields.get("access"), SSH_ACCESS_DEFAULT)
+    if mode != SSH_ACCESS_DEFAULT:
+        lines.append(f"    # tentaclai: access={mode}\n")
     return lines
 
 
@@ -466,6 +496,24 @@ def ssh_set_sudo(conf_d, alias, cmd):
     if not h:
         raise ValueError(f"host {alias} not found")
     ssh_update(conf_d, alias, dict(h, sudo=(cmd or "").strip()))
+
+
+def ssh_migrate_access(conf_d):
+    """rewrite `# tentaclai: access=ro|rw` to read/write in every host file – returns the changed file names"""
+    changed = []
+    for f in _conf_files(conf_d):
+        lines = open(f).read().splitlines(keepends=True)
+        new = []
+        for line in lines:
+            m = META.match(line)
+            if m and m.group(1) == "access" and m.group(2).lower() in ACCESS_ALIASES:
+                line = line[:m.start(2)] + ACCESS_ALIASES[m.group(2).lower()] + line[m.end(2):]
+            new.append(line)
+        if new != lines:
+            _write(f + time.strftime(".bak-%Y-%m-%d-access"), lines)
+            _write(f, new)
+            changed.append(os.path.basename(f))
+    return changed
 
 
 def ssh_known_name(fields):

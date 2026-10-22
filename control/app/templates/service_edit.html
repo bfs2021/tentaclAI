@@ -92,7 +92,7 @@
         <dt>SSH host</dt><dd class="mono small">{{ svc.docker.target or '–' }}</dd>
         <dt>Stacks directory</dt><dd class="mono small">{{ svc.docker.stacks_dir or '–' }}</dd>
       </dl>
-      <p class="help">Claude uses <code>svc docker {{ svc.name }} …</code> and <code>svc compose {{ svc.name }} &lt;stack&gt; …</code>. With <code>ro</code> only read-only commands are allowed.
+      <p class="help">Claude uses <code>svc docker {{ svc.name }} …</code> and <code>svc compose {{ svc.name }} &lt;stack&gt; …</code>. With <code>read</code> only read-only commands are allowed.
       The SSH user must be allowed to run <code>docker</code> (or sudo it); for this host use an SSH host for <code>host.docker.internal</code>.</p>
       {% if svc.docker.legacy %}<p class="small"><span class="pill err">not usable</span> Docker hosts run over SSH only – <code>"mode": "socket"</code> was removed in v0.11. Add this host under <a href="/ssh">SSH hosts</a> and set <code>"mode": "ssh"</code> and <code>"ssh_host"</code> in the JSON.</p>{% endif %}
     </div>
@@ -112,7 +112,7 @@
       <div class="row" style="margin-top:14px">
         <button class="btn sm primary" hx-post="/services/{{ svc.name }}/git-sync" {{ 'disabled' if svc.state != 'ok' }}>{{ icon('refresh') }}{{ 'Fetch & apply protection' if svc.git.cloned else 'Clone now' }}</button>
       </div>
-      <p class="help">ro: push is blocked by push URL and pre-push hook. To change access set <code>"access"</code> to <code>"ro"</code>/<code>"rw"</code> in the JSON and save – applied immediately.</p>
+      <p class="help">read: push is blocked by push URL and pre-push hook. To change access set <code>"access"</code> to <code>"read"</code>/<code>"write"</code> in the JSON and save – applied immediately.</p>
     </div>
     {% endif %}
 
@@ -155,7 +155,7 @@
     <details style="margin-top:14px" class="small">
       <summary class="muted">Fields</summary>
       <div class="muted" style="margin-top:8px">
-        <code>docker</code> {mode ssh, ssh_host, stacks_dir, access ro|rw|confirm}, <code>smtp</code> / <code>imap</code> {host, security, user, password, …} (see Help → Mail),
+        <code>docker</code> {mode ssh, ssh_host, stacks_dir, access read|write|confirm}, <code>smtp</code> / <code>imap</code> {host, security, user, password, …} (see Help → Mail),
         <code>api.base_url</code>, <code>api.auth.type</code> = <code>none</code> | <code>bearer {token}</code> | <code>header {header, value}</code> | <code>basic {user, password}</code> | <code>query {param, value}</code> | <code>oauth2_client_credentials {token_url, client_id, client_secret, scope}</code>,
         <code>insecure_tls</code> (in api, web, git, db), <code>api.docs</code>, <code>mcp</code> (like <code>.mcp.json</code>: <code>type</code> http/sse + <code>url</code>/<code>headers</code> or stdio + <code>command</code>/<code>args</code>/<code>env</code>),
         <code>git</code> {url, access, branch, path, auth}, <code>examples</code>, <code>notes</code>, <code>test_path</code>, <code>enabled</code>. Secrets only as <code>${VAR}</code>.

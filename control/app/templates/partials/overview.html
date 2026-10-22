@@ -140,7 +140,7 @@
       <div class="between">
         <span class="row" style="gap:8px;flex-wrap:nowrap"><span class="dot {{ 'ok' if s.state == 'ok' else 'warn' if s.state == 'warn' else '' }}"></span>
           <strong>{{ s.name }}</strong><span class="muted">{{ 'ssh ' ~ s.docker.target }}</span></span>
-        <span class="pill {{ 'accent' if s.docker.access == 'rw' else 'info' }}">{{ s.docker.access }}</span>
+        <span class="pill {{ 'accent' if s.docker.access == 'write' else 'info' }}">{{ s.docker.access }}</span>
       </div>
       {% endfor %}
     </div>

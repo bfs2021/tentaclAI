@@ -1,5 +1,5 @@
 {% from "_icons.html" import icon %}
-{% macro access(part, mode) %}{% set m = mode if mode in ('ro', 'rw', 'confirm') else 'ro' %}<span class="pill {{ {'rw': 'accent', 'confirm': 'warn'}.get(m, 'info') }}" title="{{ {'ro': 'read only', 'rw': 'read and write', 'confirm': 'every write waits for approval'}[m] }}">{{ part }} · {{ m }}</span>{% endmacro %}
+{% macro access(part, mode) %}{% set m = {'ro': 'read', 'rw': 'write'}.get(mode, mode) %}{% set m = m if m in ('read', 'write', 'confirm') else 'read' %}<span class="pill {{ {'write': 'accent', 'confirm': 'warn'}.get(m, 'info') }}" title="{{ {'read': 'read only', 'write': 'read and write', 'confirm': 'every write waits for approval'}[m] }}">{{ part }} · {{ m }}</span>{% endmacro %}
 {% macro service_card(s, systems=[]) %}
   {% set targets = [s.base_url, s.docker.stacks_dir if s.docker, s.git.url if s.git, s.db.target if s.db,
                     s.data.smtp.host if s.data.smtp, s.data.imap.host if s.data.imap, s.web.url if s.web, s.files.target if s.files]
@@ -32,12 +32,12 @@
     {% if s.mailbox %}<div class="svc-mailbox" title="Mailbox">{{ s.mailbox }}</div>{% endif %}
     <div class="svc-chips">
       {% for k in s.kinds %}
-        {% if k == 'api' %}{{ access('api', s.data.api.access or 'rw') }}
+        {% if k == 'api' %}{{ access('api', s.data.api.access or 'write') }}
         {% elif k == 'docker' %}{{ access('docker', s.docker.access) }}<span class="pill info">{{ 'ssh ' ~ s.docker.target if not s.docker.legacy else 'socket – no longer supported' }}</span>
         {% elif k == 'git' %}{{ access('git', s.git.access) }}{% if not s.git.cloned %}<span class="pill off">not cloned</span>{% endif %}
         {% elif k == 'db' %}{{ access('db', s.db.access) }}<span class="pill info">{{ s.db.engine }}</span>
         {% elif k == 'smtp' %}{{ access('smtp', s.data.smtp.access or 'confirm') }}
-        {% elif k == 'imap' %}{{ access('imap', s.data.imap.access or 'ro') }}
+        {% elif k == 'imap' %}{{ access('imap', s.data.imap.access or 'read') }}
         {% elif k == 'files' %}{{ access('files', s.files.access) }}{% if s.files.sudo %}<span class="pill accent">sudo</span>{% endif %}
         {% elif k == 'web' %}<span class="pill info">web · {{ s.web.auth }}</span>
         {% else %}<span class="pill info">{{ k }}</span>{% endif %}

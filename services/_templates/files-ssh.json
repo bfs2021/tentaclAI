@@ -8,7 +8,7 @@
   "files": {
     "ssh_host": "",
     "path": "/srv/example",
-    "access": "ro",
+    "access": "read",
     "sudo": false
   },
   "examples": [

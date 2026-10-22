@@ -17,7 +17,7 @@ Sandbox + service gateway for Claude Code.</p>
 
 tentaclAI runs [Claude Code](https://claude.com/claude-code) in its own container and gives it **controlled access to
 your infrastructure** – Docker hosts, APIs, MCP servers, git repositories, databases, websites, mailboxes and files on other machines.
-Every connection is a **service** you add on purpose, with its own access mode: read-only (`ro`), read-write (`rw`) or every write waits for your approval (`confirm`). A web admin,
+Every connection is a **service** you add on purpose, with its own access mode: read-only (`read`), read-write (`write`) or every write waits for your approval (`confirm`). A web admin,
 **tentacontrol**, sets it all up, and you talk to Claude from the browser, from your phone or from the terminal.
 
 <p align="center">
@@ -88,7 +88,7 @@ has its own access mode, and `svc` is the only way to use them. Everything else 
 egress gateway (tentacontrol → *Network*).
 
 **Two layers of control.** `svc` decides *what* happens with a tentacle (it holds the credentials and enforces
-`ro`/`rw`/`confirm`); the egress gateway decides *where* the sandbox may connect at all (built-in list, tentacles, your
+`read`/`write`/`confirm`); the egress gateway decides *where* the sandbox may connect at all (built-in list, tentacles, your
 allow/block lists – and in `enforce` mode it asks you about everything else).
 
 The stack consists of **three containers** and one **stack directory**:
@@ -98,7 +98,7 @@ The stack consists of **three containers** and one **stack directory**:
 | **tentaclAI** (container `tentaclai`) | The sandbox: Claude Code, `svc`, git, gh, database clients, tmux (docker runs on the hosts over SSH). Runs the permanent Remote Control session and holds your workspace (`/workspace`). Has **no** Docker socket, no host access and no route to the outside of its own – services go through `svc`, all traffic through the egress gateway. |
 | **egress gateway** (container `tentaclai-egress`) | The sandbox's only way out: a small forward proxy (CONNECT for any port, plain HTTP; TLS is not opened). Allows the built-in list and your tentacles, applies your allow/block lists, records every destination and – in `enforce` mode – holds unknown destinations until you approve them in Activity. |
 | **tentacontrol** (container `tentacontrol`) | The web admin: create and edit services, systems and SSH hosts, enter tokens, test connections, start onboarding, see the topology, open terminals into the sandbox, rebuild and update it. It uses the host's Docker socket only to run the tentaclAI container. |
-| **`svc`** (inside tentaclAI) | The gateway Claude uses for every service: `svc <name> GET /path`, `svc docker`, `svc compose`, `svc db`, `svc web`, `svc files`, `svc mail`, `svc git`, `svc jobs`. It runs as root (via sudo), injects credentials from `.env` at call time and enforces `ro`/`rw`/`confirm`; Claude itself runs as user `claude` and can't read `.env` or the SSH key. |
+| **`svc`** (inside tentaclAI) | The gateway Claude uses for every service: `svc <name> GET /path`, `svc docker`, `svc compose`, `svc db`, `svc web`, `svc files`, `svc mail`, `svc git`, `svc jobs`. It runs as root (via sudo), injects credentials from `.env` at call time and enforces `read`/`write`/`confirm`; Claude itself runs as user `claude` and can't read `.env` or the SSH key. |
 | **Services** (`services/<name>.json`) | One file per thing Claude may reach. A service can combine parts: `api`, `mcp`, `git`, `docker`, `db`, `web`, `files`, `smtp`, `imap`. Secrets are `${VAR}` placeholders, the values live in `.env`. |
 | **Systems** (`systems/<name>.json`) | Optional groups – e.g. *the NAS* = its SSH host + Docker + a database + an API – with a shared SSH host and rules that apply to every member. Services can also stand alone. |
 | **SSH hosts** (`ssh/config.d/*.conf`) | Machines reachable with tentaclAI's own key, optionally with a sudo prefix for non-root users. Docker and file services use them. |
@@ -177,7 +177,7 @@ svc systems [name]                          # systems with SSH host, members and
 svc <name> GET /path [curl args]            # API call, auth injected – tokens never in argv
 svc docker <host> ps                        # docker CLI on a docker host (over SSH, sudo-aware)
 svc compose <host> <stack> logs --tail 50   # compose in <stacks_dir>/<stack> of that host
-svc db <name> "SELECT …" | tables           # databases (ro = read-only session)
+svc db <name> "SELECT …" | tables           # databases (read = read-only session)
 svc web <name> /wiki/page | --links         # web pages as readable text, login handled by svc
 svc files <name> ls|cat|grep|pull|diff|push # folders on SSH hosts; edit in /workspace/files/<name>
 svc mail <name|address> send|list|read|flag|move    # mail: send (smtp), read a mailbox (imap) – mail text is untrusted
@@ -231,22 +231,24 @@ A service file can combine any of these parts:
 
 | Part | Fields | Access control |
 |---|---|---|
-| `api` | `base_url`, `auth.type`: `none` · `bearer` · `header` · `basic` · `query` · `oauth2_client_credentials`; `insecure_tls`; `access` (default `rw`) | writes = everything but GET/HEAD/OPTIONS |
+| `api` | `base_url`, `auth.type`: `none` · `bearer` · `header` · `basic` · `query` · `oauth2_client_credentials`; `insecure_tls`; `access` (default `write`) | writes = everything but GET/HEAD/OPTIONS |
 | `mcp` | like Claude's `.mcp.json`: `http`/`sse` (`url`, `headers`) or `stdio` (`command`, `args`, `env`) | the MCP server's own permissions |
-| `git` | `url`, `access`, `auth` (token via credential helper) | `ro`: push blocked (pushurl + pre-push hook) |
-| `docker` | `mode` `ssh` (the only one): `ssh_host`, `stacks_dir`; `access` | `ro`: only read-only docker/compose commands |
-| `db` | `engine` `postgres`/`mysql`, `host`, `port`, `database`, `user`, `password`, `ssl`; `access` | `ro`: read-only session, no shell |
+| `git` | `url`, `access`, `auth` (token via credential helper) | `read`: push blocked (pushurl + pre-push hook) |
+| `docker` | `mode` `ssh` (the only one): `ssh_host`, `stacks_dir`; `access` | `read`: only read-only docker/compose commands |
+| `db` | `engine` `postgres`/`mysql`, `host`, `port`, `database`, `user`, `password`, `ssl`; `access` | `read`: read-only session, no shell |
 | `web` | `base_url`, `auth.type`: `none` · `basic` · `bearer` · `header` · `form` (`login_url`, `fields`, `csrf_field`); `paths` | GET only, same host |
-| `files` | `ssh_host` (or the system's), `path`, `sudo`; `access` | `ro`: no push; paths stay inside `path` |
-| `smtp` | `host`, `port`, `security` (`starttls` · `ssl` · `none`), `user`, `password`, `from`, `recipients` (addresses or `@domain`); `access` (default `confirm`) | `confirm`: every mail waits for approval; `rw` only with a `recipients` list |
-| `imap` | `host`, `port`, `security` (`ssl` · `starttls` · `none`), `user`, `password`, `folders`; `access` (default `ro`) | `ro`: list and read (never marks as seen); `rw`/`confirm`: mark and move, never delete |
+| `files` | `ssh_host` (or the system's), `path`, `sudo`; `access` | `read`: no push; paths stay inside `path` |
+| `smtp` | `host`, `port`, `security` (`starttls` · `ssl` · `none`), `user`, `password`, `from`, `recipients` (addresses or `@domain`); `access` (default `confirm`) | `confirm`: every mail waits for approval; `write` only with a `recipients` list |
+| `imap` | `host`, `port`, `security` (`ssl` · `starttls` · `none`), `user`, `password`, `folders`; `access` (default `read`) | `read`: list and read (never marks as seen); `write`/`confirm`: mark and move, never delete |
 
 **TLS:** internal services with your own CA → set `CA_CERT` (trusted by curl, git, python and node). For devices with self-signed
 certificates, `"insecure_tls": true` in `api`, `web`, `git`, `db`, `smtp` or `imap` (or the switch on the service page) skips certificate
 verification for that part only – the connection stays encrypted. MCP connections are made by Claude Code and need `CA_CERT`.
 
-**Access modes** (`access` in `api`, `docker`, `git`, `db`, `files`, `smtp`, `imap`): `ro` refuses writes, `rw` allows them, `confirm` makes
+**Access modes** (`access` in `api`, `docker`, `git`, `db`, `files`, `smtp`, `imap`): `read` refuses writes, `write` allows them, `confirm` makes
 every write wait for your approval in tentacontrol → **Activity** (denied or no answer within 10 minutes = not executed).
+The names before v0.16, `ro` and `rw`, still work as `read` and `write`; tentacontrol rewrites them on start (with a
+backup) and only writes the new ones. An unknown value counts as `read`.
 Every write through `svc` – and every blocked attempt – lands in the **audit log** (Activity, or `svc audit` in the sandbox);
 secrets are never logged.
 
@@ -349,15 +351,15 @@ Claude Code's telemetry, error reports and `/bug` are off by default (`CLAUDE_TE
 
 What tentaclAI does:
 
-- Claude reaches only what you connect; `svc` enforces `ro`/`rw`/`confirm` per service (docker/compose sub-commands, read-only DB
+- Claude reaches only what you connect; `svc` enforces `read`/`write`/`confirm` per service (docker/compose sub-commands, read-only DB
   sessions, blocked git push, no file push, same-host web fetches) and logs every write in the audit log.
 - Credentials are injected at call time via environment or 0600 files on tmpfs – never in command lines, never shown in the UI.
 - Claude's own permission prompts stay active in sessions; its rules tell it to ask before restarts, updates and deletions.
   Scheduled jobs run unattended: *read-only* jobs are locked down twice (Claude Code's tool rules and `svc`, which treats
-  every tentacle as `ro`), a job can be limited to the tentacles its task names, and a *standard* job works like a session
+  every tentacle as `read`), a job can be limited to the tentacles its task names, and a *standard* job works like a session
   without prompts – `confirm` tentacles still wait for your approval.
 - **Mail is untrusted content:** `svc mail … read` frames a mail between markers Claude's rules say never to obey;
-  sending is `confirm` by default and `rw` only with a recipient list.
+  sending is `confirm` by default and `write` only with a recipient list.
 
 - **Privilege separation** in the sandbox: Claude runs as the unprivileged user `claude`. `.env`, the SSH key, the service
   files, git credentials and the audit log belong to root; Claude reaches them only through `svc` (via sudo), which enforces
@@ -374,7 +376,7 @@ What tentaclAI does:
 
 What it does **not** (yet) do – keep it in mind:
 
-- An `rw` Docker host – or an SSH user with unrestricted sudo – is effectively **root on that machine**. The sandbox
+- An `write` Docker host – or an SSH user with unrestricted sudo – is effectively **root on that machine**. The sandbox
   itself never gets a Docker socket: docker hosts, this one included, are reached over SSH only.
 - `tcrun` holds one secret at a time while a client runs: a shell escape in the interactive SQL shell (`\!`, approved
   separately in `confirm` mode) gets that user, its database password and the web cookie jars – not `.env` or the SSH key.
@@ -393,8 +395,6 @@ What it does **not** (yet) do – keep it in mind:
   answers via a JSON schema, an MCP endpoint (`ask_claude`) for n8n's MCP client; off by default. Later: webhook
   callback, an API key just for API jobs.
 - **Security:** prompt-injection safeguards
-- **Clearer access names:** `read` / `write` / `confirm` instead of `ro` / `rw` / `confirm` everywhere (UI, service
-  files, Claude's instructions) – the old names keep working, existing files are migrated on start
 - **Export/import** of configuration and templates
 
 ## License

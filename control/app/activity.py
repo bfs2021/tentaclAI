@@ -11,6 +11,8 @@ import re
 import secrets
 import time
 
+import tclib
+
 from . import dockerops, notify, usage
 from .config import DATA_DIR
 
@@ -179,6 +181,8 @@ def audit_entries(limit=300, service="", decision=""):
         if (service and e.get("service") != service) or (decision and e.get("decision") != decision):
             continue
         e["from_label"] = origin_label(e.get("from"))
+        if e.get("mode") in tclib.ACCESS_ALIASES:  # entries written before v0.16
+            e["mode"] = tclib.ACCESS_ALIASES[e["mode"]]
         out.append(e)
         if len(out) >= limit:
             break

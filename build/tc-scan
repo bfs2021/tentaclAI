@@ -259,7 +259,7 @@ def docker_hosts():
         if not d or not tclib.enabled(svc):
             continue
         res.append({"name": svc.get("name") or name, "ssh_host": d.get("ssh_host"),
-                    "stacks_dir": tclib.render(str(d.get("stacks_dir") or ""), env), "access": d.get("access", "ro")})
+                    "stacks_dir": tclib.render(str(d.get("stacks_dir") or ""), env), "access": tclib.access(d.get("access"))})
     return res
 
 

@@ -171,6 +171,25 @@ def test_second_service_from_a_template_gets_own_variables(app_module):
                 pass
 
 
+def test_migrate_access_rewrites_service_files(app_module):
+    import glob
+    import os
+    from app import services_store as s
+    s.save_raw("acc-new", json.dumps({"git": {"url": "x", "access": "rw"}}))  # saving already writes the new names
+    assert json.loads(s.read_raw("acc-new"))["git"]["access"] == "write"
+    p = s.path_of("acc-old")
+    with open(p, "w") as f:
+        json.dump({"name": "acc-old", "db": {"access": "ro"}, "smtp": {"access": "confirm"}}, f)
+    try:
+        assert "acc-old" in s.migrate_access() and "acc-new" not in s.migrate_access()
+        assert json.loads(s.read_raw("acc-old")) == {"name": "acc-old", "db": {"access": "read"}, "smtp": {"access": "confirm"}}
+        baks = glob.glob(p + ".bak-*-access")
+        assert len(baks) == 1 and json.load(open(baks[0]))["db"]["access"] == "ro"
+    finally:
+        for f in glob.glob(p + "*") + glob.glob(s.path_of("acc-new") + "*"):
+            os.remove(f)
+
+
 def test_drop_generated_compose(app_module, tmp_path):
     from app.envfile import drop_generated_compose, read_env
     f = tmp_path / ".env"

@@ -4,6 +4,12 @@ All notable changes, newest first. Every release lists **upgrade steps** from th
 
 ## Unreleased
 
+### Highlights
+- **Clearer access names:** `read` / `write` / `confirm` instead of `ro` / `rw` / `confirm` everywhere – UI, service
+  templates, `svc` output, the audit log and Claude's instructions. The old names keep working; tentacontrol rewrites
+  them in `services/*.json` and in SSH hosts (`# tentaclai: access=`) on start, with a backup `*.bak-<date>-access`.
+  An unknown value still counts as `read`. Older audit entries are shown with the new names in Activity.
+
 ### Changes
 - Network → Seen: click a column header to sort (destination, rule, last result, connections, last) – again to reverse;
   the choice is remembered in the browser.
@@ -19,6 +25,12 @@ All notable changes, newest first. Every release lists **upgrade steps** from th
 ### Upgrade (from v0.15.0)
 `./tentaclai.sh update`, `docker compose build`, `docker compose up -d` – all three images changed (svc, Python 3.15);
 recreating `tentaclai` ends running sessions and Remote Control.
+
+Access names: nothing to do – on its first start tentacontrol rewrites `ro`/`rw` to `read`/`write` in `services/*.json`
+and `ssh/config.d/*.conf` (log line `migration: access ro/rw → read/write in …`) and keeps each old file as
+`*.bak-<date>-access`. Rolling back to v0.15.0 needs those backups (copy them back over the files): v0.15.0 treats the
+new names as unknown, i.e. as read-only. Git working copies get the new `tentaclai.access` value on
+the next `svc git sync`.
 
 ## v0.15.0 – 2026-10-22
 

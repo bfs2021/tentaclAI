@@ -18,6 +18,6 @@
     "svc mail NAME send --to someone@example.com --subject \"Report\" --body-file report.txt"
   ],
   "notes": [
-    "confirm: every mail waits for approval. rw sends without asking and needs smtp.recipients (addresses or @domain)."
+    "confirm: every mail waits for approval. write sends without asking and needs smtp.recipients (addresses or @domain)."
   ]
 }

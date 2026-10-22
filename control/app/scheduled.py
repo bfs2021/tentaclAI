@@ -4,10 +4,10 @@ A job is a prompt with a schedule and a profile. The runner starts `claude -p` i
 a time, with a JSON schema for a traffic-light answer (ok / warn / alert) – that decides whether a notification goes out.
 
 Profiles – the job's limit on top of each tentacle's own access (the stricter one wins):
-- read-only: Claude Code only allows reading tools and `svc` (dontAsk), and svc treats every tentacle as ro. svc
+- read-only: Claude Code only allows reading tools and `svc` (dontAsk), and svc treats every tentacle as read. svc
   recognises the job by the marker tc-job=<run id> in the command line of the run's wrapper process (an ancestor of
   every svc call) plus job-runs.json (root's file).
-- standard: like a terminal session – ro/rw/confirm of the tentacles apply; confirm waits for an approval in Activity.
+- standard: like a terminal session – read/write/confirm of the tentacles apply; confirm waits for an approval in Activity.
 
 State: jobs.json (definitions), job-history.json (last runs), job-runs.json (running now – read by svc).
 """
@@ -144,7 +144,7 @@ def tentacles():
     from .config import SERVICES_DIR, SSH_DIR, STACK_DIR
     out = {}
     for name, svc in tclib.load_services(SERVICES_DIR, tclib.load_systems(STACK_DIR)).items():
-        parts = {p: str(svc[p].get("access", "confirm" if p == "smtp" else ("rw" if p == "api" else "ro")))
+        parts = {p: tclib.access(svc[p].get("access"), tclib.part_default(p))
                  for p in tclib.PARTS if isinstance(svc.get(p), dict) and p != "mcp"}
         if "mcp" in svc:
             parts["mcp"] = "tools"
@@ -177,7 +177,7 @@ def check_mentions(job, known=None):
             continue
         if not t["enabled"]:
             warnings.append(f"@{n} is disabled – the job can't use it")
-        writes = [p for p, a in t["parts"].items() if a in ("rw", "confirm")]
+        writes = [p for p, a in t["parts"].items() if a in ("write", "confirm")]
         if ro and "smtp" in t["parts"]:
             warnings.append(f"@{n} can't send mail in a read-only job")
         elif not ro and any(t["parts"][p] == "confirm" for p in writes):
@@ -779,7 +779,7 @@ def execute(run_id, jid):
 
 def run_actions(run_id, picks):
     """run the proposals the user picked – exactly as proposed, one after the other, in the background.
-    They go through svc like everything else: ro stays ro, confirm still asks in Activity, a limited job stays limited."""
+    They go through svc like everything else: read stays read, confirm still asks in Activity, a limited job stays limited."""
     import threading
     run = next((r for r in history() if r.get("id") == run_id), None)
     if run is None or not run.get("actions"):
@@ -951,7 +951,7 @@ def reach(job, known):
         if not t or not t["enabled"]:
             continue
         modes = set(t["parts"].values())
-        if "rw" in modes:
+        if "write" in modes:
             writes.append(n)
         if "confirm" in modes:
             asks.append(n)
@@ -977,12 +977,12 @@ def rw_tentacles():
     from .config import SERVICES_DIR, SSH_DIR, STACK_DIR
     out = []
     for name, svc in tclib.load_services(SERVICES_DIR, tclib.load_systems(STACK_DIR)).items():
-        if tclib.enabled(svc) and any(isinstance(svc.get(p), dict) and svc[p].get("access") == "rw"
+        if tclib.enabled(svc) and any(isinstance(svc.get(p), dict) and tclib.access(svc[p].get("access")) == "write"
                                       for p in ("docker", "git", "db", "files", "smtp", "imap")):
             out.append(name)
     conf = os.path.join(SSH_DIR, "config.d")
     for h in tclib.ssh_hosts(conf):
-        if tclib.ssh_access(conf, h["alias"]) == "rw":
+        if tclib.ssh_access(conf, h["alias"]) == "write":
             out.append(f"ssh {h['alias']}")
     return sorted(set(out))
 

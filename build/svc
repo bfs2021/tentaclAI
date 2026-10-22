@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""svc – the service gateway of tentaclAI: credentials, access modes (ro/rw/confirm) and audit for every tentacle.
+"""svc – the service gateway of tentaclAI: credentials, access modes (read/write/confirm) and audit for every tentacle.
 
 One JSON file per service in $TC_DIR/services/*.json.
 A service can have an "api", an "mcp" and/or a "git" part. Secrets are ${VAR} placeholders,
@@ -13,7 +13,7 @@ resolved from the stack's .env (read fresh on every call) and the container envi
                                    API call with auth injected, e.g.
                                    svc arcane GET /environments
                                    svc mealie POST /households/shopping/items -d '{"note":"milk"}'
-  svc git                          git repos: path, access (ro/rw), branch, ahead/behind, changes
+  svc git                          git repos: path, access (read/write), branch, ahead/behind, changes
   svc git sync [name...]           clone missing repos, apply settings, fetch
   svc git fetch|pull <name>        fetch from the remote (pull: also fast-forward the current branch)
   svc git push <name> [branch] [--force]   push a branch (credentials stay with svc)
@@ -25,7 +25,7 @@ resolved from the stack's .env (read fresh on every call) and the container envi
   svc docker <name> <args...>      docker CLI against that host, e.g. svc docker gate ps
   svc compose <name> <stack> <args...>
                                    docker compose in <stacks_dir>/<stack> of that host, e.g. svc compose gate pangolin ps
-  (access "ro": only read-only docker/compose commands are allowed)
+  (access "read": only read-only docker/compose commands are allowed)
   svc audit [n]                    last n write actions (audit log: auto / approved / denied / blocked)
   (access "confirm": writes wait for the user's approval in tentacontrol → Activity)
   svc test <name>                  connection test of every part (api, mcp, git, docker, db, web, files)
@@ -387,7 +387,7 @@ def cmd_call(services, name, method, path, extra):
         if method.upper() in ("GET", "HEAD", "OPTIONS"):
             return subprocess.call(cmd + list(extra), **runner())
         body = " (with body)" if any(a in ("-d", "--data", "--data-raw", "--data-binary", "--json", "-F", "--form", "-T") for a in extra) else ""
-        return guarded(name, "api", access_mode(svc["api"], "rw"), f"{method.upper()} {path}{body}",
+        return guarded(name, "api", access_mode(svc["api"], "write"), f"{method.upper()} {path}{body}",
                        lambda: subprocess.call(cmd + list(extra), **runner()))
     finally:
         for f in files:
@@ -544,7 +544,7 @@ def configure_repo(name, path, git):
     claude_git(["config", "--unset-all", "credential.helper"], path, quiet=True)
     claude_git(["config", "--unset", "remote.origin.pushurl"], path, quiet=True)
     claude_git(["config", "tentaclai.service", name], path)
-    claude_git(["config", "tentaclai.access", git.get("access", "ro")], path)
+    claude_git(["config", "tentaclai.access", tclib.access(git.get("access"))], path)
     if git.get("insecure_tls"):
         claude_git(["config", "http.sslVerify", "false"], path)
     else:
@@ -580,14 +580,14 @@ def git_sync(services, names=None, fetch=True):
                 print(f"  ✗ {name}: clone failed")
                 continue
             configure_repo(name, path, git)
-            print(f"  ✓ {name}: cloned to {path} ({git.get('access', 'ro')})")
+            print(f"  ✓ {name}: cloned to {path} ({tclib.access(git.get('access'))})")
             continue
         configure_repo(name, path, git)
         if fetch:
             ok = bundle_to_claude(name, git, path)
-            print(f"  {'✓' if ok else '✗'} {name}: {'updated (fetch)' if ok else 'fetch failed'} – {git.get('access', 'ro')}")
+            print(f"  {'✓' if ok else '✗'} {name}: {'updated (fetch)' if ok else 'fetch failed'} – {tclib.access(git.get('access'))}")
         else:
-            print(f"  ✓ {name}: present ({git.get('access', 'ro')})")
+            print(f"  ✓ {name}: present ({tclib.access(git.get('access'))})")
 
 
 def git_state(path):
@@ -617,7 +617,7 @@ def cmd_git_list(services):
         git = svc["git"]
         path = repo_path(name, git)
         state = status(svc) if status(svc) != "active" else git_state(path)
-        print(f"{name:<18}{git.get('access', 'ro'):<9}{state:<28}{path}")
+        print(f"{name:<18}{tclib.access(git.get('access')):<9}{state:<28}{path}")
 
 
 def get_git(services, name):
@@ -832,7 +832,7 @@ def cmd_docker(services, args):
         for n, s in ds.items():
             d = render(s["docker"])
             st = status(s)
-            print(f"{n:<16}{d.get('access', 'ro'):<9}{docker_target(d):<34}{d.get('stacks_dir', '–')}"
+            print(f"{n:<16}{tclib.access(d.get('access')):<9}{docker_target(d):<34}{d.get('stacks_dir', '–')}"
                   + ("" if st == "active" else f"  ({st})"))
         return 0
     name, rest = args[0], args[1:]
@@ -967,8 +967,8 @@ def db_engine(db):
 
 
 def db_run(name, db, sql=None, fmt="table", interactive=False):
-    """run SQL (or an interactive client) – password only in env / a 0600 tmpfs file, ro enforced per session"""
-    ro = access_mode(db) == "ro"
+    """run SQL (or an interactive client) – password only in env / a 0600 tmpfs file, read enforced per session"""
+    ro = access_mode(db) == "read"
     if sql is not None and ro and DB_RO_BYPASS.search(sql):
         sys.exit(f"svc: {name} is read-only – statements that change the transaction mode are not allowed")
     if db_engine(db) == "postgres":
@@ -1014,7 +1014,7 @@ def cmd_db(services, args):
         for n, s in dbs.items():
             d = render(s["db"])
             tgt = f"{d.get('host', '')}:{d.get('port') or (3306 if db_engine(d) == 'mysql' else 5432)}/{d.get('database', '')}"
-            print(f"{n:<16}{db_engine(d):<10}{d.get('access', 'ro'):<8}{tgt:<36}{status(s)}")
+            print(f"{n:<16}{db_engine(d):<10}{tclib.access(d.get('access')):<8}{tgt:<36}{status(s)}")
         return 0
     name, rest = args[0], args[1:]
     db = get_part(services, name, "db")
@@ -1026,7 +1026,7 @@ def cmd_db(services, args):
     pg = db_engine(db) == "postgres"
     mode = access_mode(db)
     if rest[0] == "shell":
-        if mode == "ro":
+        if mode == "read":
             sys.exit(f"svc: {name} is read-only – use svc db {name} \"<SQL>\" (the shell could switch the session to read-write)")
         return guarded(name, "db", mode, "interactive SQL shell", lambda: db_run(name, db, interactive=True))
     if rest[0] == "tables":
@@ -1037,7 +1037,7 @@ def cmd_db(services, args):
             sys.exit("svc: invalid table name")
         return db_run(name, db, f"\\d {t}" if pg else f"DESCRIBE `{t.replace('.', '`.`')}`", fmt)
     sql = " ".join(rest)
-    if mode != "ro" and sql_writes(sql):
+    if mode != "read" and sql_writes(sql):
         return guarded(name, "db", mode, f"SQL: {sql}", lambda: db_run(name, db, sql, fmt))
     return db_run(name, db, sql, fmt)
 
@@ -1271,7 +1271,7 @@ def cmd_mail(services, args):
             for part in ("smtp", "imap"):
                 if part in s:
                     c = render(s[part])
-                    print(f"{n:<{w}}{tclib.mail_address(s, ENV) or '–':<{aw}}{part:<6}{c.get('access', 'ro' if part == 'imap' else 'confirm'):<9}"
+                    print(f"{n:<{w}}{tclib.mail_address(s, ENV) or '–':<{aw}}{part:<6}{tclib.access(c.get('access'), tclib.part_default(part)):<9}"
                           f"{str(c.get('host', '')) + ':' + str(tclib.mail_port(part, c)):<34}{status(s)}")
         return 0
     if len(args) < 2:
@@ -1424,8 +1424,8 @@ def mail_send(name, cfg, args):
     mode = access_mode(cfg, "confirm")
     allowed = cfg.get("recipients") or []
     rcpts = to + cc
-    if mode == "rw" and not allowed:
-        sys.exit(f"svc: {name}: rw sends without asking – that needs a recipients list in the service (addresses or @domain); "
+    if mode == "write" and not allowed:
+        sys.exit(f"svc: {name}: write sends without asking – that needs a recipients list in the service (addresses or @domain); "
                  "with access confirm every mail waits for approval instead")
     if allowed:
         bad = [r for r in rcpts if not recipient_allowed(r, allowed)]
@@ -1509,7 +1509,7 @@ def db_test(name, db):
         finally:
             os.unlink(cfg)
     if r.returncode == 0:
-        return True, f"{db_engine(db)} {db.get('host')}/{db.get('database', '')} → {r.stdout.strip()[:80]} ({db.get('access', 'ro')})"
+        return True, f"{db_engine(db)} {db.get('host')}/{db.get('database', '')} → {r.stdout.strip()[:80]} ({tclib.access(db.get('access'))})"
     return False, (r.stderr.strip().splitlines() or ["error"])[-1][:180]
 
 
@@ -1734,7 +1734,7 @@ def cmd_files(services, args):
         print(f"{'Name':<16}{'Access':<8}{'Target':<44}Status")
         for n, s in fs.items():
             f = render(s["files"])
-            print(f"{n:<16}{f.get('access', 'ro'):<8}{(f.get('ssh_host') or '?') + ':' + f.get('path', ''):<44}{status(s)}")
+            print(f"{n:<16}{tclib.access(f.get('access')):<8}{(f.get('ssh_host') or '?') + ':' + f.get('path', ''):<44}{status(s)}")
         return 0
     if len(args) < 2:
         sys.exit("usage: svc files <name> ls|tree|cat|grep|pull|diff|push [path]")
@@ -1755,8 +1755,8 @@ def cmd_files(services, args):
     if op in ("pull", "diff", "push"):
         sub = rest[0] if rest else ""
         remote, dest = files_sub(root, sub), os.path.join(local, sub) if sub else local
-        if op == "push" and access_mode(f) == "ro":
-            audit(name, "files", "ro", f"push {sub or '.'} → {host}:{remote}", "blocked")
+        if op == "push" and access_mode(f) == "read":
+            audit(name, "files", "read", f"push {sub or '.'} → {host}:{remote}", "blocked")
             sys.exit(f"svc: {name} is read-only – push is not allowed")
         is_dir = subprocess.run(["ssh", host, (sudo + " " if sudo else "") + f"test -d {shlex.quote(remote)}"]).returncode == 0
         src_r = remote + "/" if is_dir else remote
@@ -1802,15 +1802,15 @@ def files_test(name, f):
     if r.returncode != 0:
         return False, (r.stderr.strip().splitlines() or ["ssh failed"])[-1][:180]
     if out.startswith("dir"):
-        return True, f"{host}:{root} – directory, {out.split()[1]} entries ({f.get('access', 'ro')}{', sudo' if sudo else ''})"
+        return True, f"{host}:{root} – directory, {out.split()[1]} entries ({tclib.access(f.get('access'))}{', sudo' if sudo else ''})"
     if out == "file":
-        return True, f"{host}:{root} – file ({f.get('access', 'ro')})"
+        return True, f"{host}:{root} – file ({tclib.access(f.get('access'))})"
     return False, f"{host}:{root} not found"
 
 
 # ---------- ssh ----------
 
-# Read-only commands that `svc ssh` runs without approval (also on ro hosts): status only, no file contents
+# Read-only commands that `svc ssh` runs without approval (also on read hosts): status only, no file contents
 # (cat/grep could read a host's .env – those need approval). No shell syntax: one plain command, checked word by word.
 SSH_READ = {"uptime", "df", "free", "ps", "ls", "hostname", "whoami", "id", "uname", "date", "lsblk", "findmnt",
             "nproc", "lscpu", "vmstat", "iostat", "who", "w", "last", "docker", "systemctl", "journalctl", "ip", "ss"}
@@ -1863,7 +1863,7 @@ def cmd_ssh(name_args):
     if not tclib.ssh_host(SSH_CONF_D, alias):
         sys.exit(f"svc: unknown SSH host '{alias}' (svc ssh)")
     require_allowed(alias)
-    mode = "ro" if job_read_only() else tclib.ssh_access(SSH_CONF_D, alias)
+    mode = "read" if job_read_only() else tclib.ssh_access(SSH_CONF_D, alias)
     remote = " ".join(cmd)
     tty = not cmd or sys.stdin.isatty() and sys.stdout.isatty()
     argv = ["ssh"] + (["-t"] if tty else ["-T"]) + ["--", alias] + ([remote] if remote else [])
@@ -2102,14 +2102,11 @@ CONTROL_INTERNAL = os.environ.get("TC_CONTROL_INTERNAL", "http://tentacontrol:80
 AUDIT_FILE = os.path.join(TC_DIR, "data", "control", "audit.jsonl")
 TOKEN_FILE = os.path.join(TC_DIR, "data", "control", "svc-token")
 APPROVAL_TIMEOUT = 600
-MODES = ("ro", "rw", "confirm")
-
-
-def access_mode(part, default="ro"):
+def access_mode(part, default="read"):
+    """the effective access of a part – ro/rw are understood as read/write, unknown values are read"""
     if job_read_only():
-        return "ro"  # a read-only scheduled job: every tentacle is read-only, whatever its own access
-    mode = str(part.get("access", default))
-    return mode if mode in MODES else "ro"
+        return "read"  # a read-only scheduled job: every tentacle is read-only, whatever its own access
+    return tclib.access(part.get("access"), default)
 
 
 def audit(service, part, mode, action, decision, rc=None, duration=None, detail=""):
@@ -2187,8 +2184,8 @@ def report(event, title, body=""):
 
 
 def guarded(service, part, mode, action, run):
-    """run() performs a write: blocked for ro, logged for rw, approved first for confirm"""
-    if mode == "ro":
+    """run() performs a write: blocked for read, logged for write, approved first for confirm"""
+    if mode == "read":
         audit(service, part, mode, action, "blocked")
         report("blocked", f"Blocked: {service} ({part}) is read-only", action)
         sys.exit(f"svc: {service} is read-only ({part}) – '{action[:80]}' is not allowed")
@@ -2335,19 +2332,19 @@ def cmd_info(services, name):
     dk = svc.get("docker")
     if dk:
         d = render(dk)
-        print(f"Docker: {docker_target(d)}  [{d.get('access', 'ro')}]  Stacks: {d.get('stacks_dir', '–')}")
+        print(f"Docker: {docker_target(d)}  [{tclib.access(d.get('access'))}]  Stacks: {d.get('stacks_dir', '–')}")
         print(f"  $ svc docker {name} ps    ·    svc compose {name} <stack> ps")
     git = svc.get("git")
     if git:
         path = repo_path(name, git)
-        print(f"Git:  {git.get('url')}  [{git.get('access', 'ro')}]  -> {path}  ({git_state(path)})")
+        print(f"Git:  {git.get('url')}  [{tclib.access(git.get('access'))}]  -> {path}  ({git_state(path)})")
     for part in ("smtp", "imap"):
         if part in svc:
             m = render(svc[part])
             extra = (f"  from {m.get('from', '?')}, recipients: {', '.join(m.get('recipients') or []) or 'any (each mail needs approval)'}"
                      if part == "smtp" else f"  folders: {', '.join(m.get('folders') or []) or 'all'}")
             print(f"{part.upper()}: {m.get('host')}:{tclib.mail_port(part, m)} ({mail_security(part, m)})  "
-                  f"[{m.get('access', 'confirm' if part == 'smtp' else 'ro')}]{extra}  → svc mail {name} …")
+                  f"[{tclib.access(m.get('access'), tclib.part_default(part))}]{extra}  → svc mail {name} …")
     off = tclib.tls_unverified(svc)
     if off:
         print(f"TLS:  certificates NOT verified for {', '.join(off)} (insecure_tls) – fine for self-signed devices, risky elsewhere")
@@ -2541,7 +2538,7 @@ def write_catalog(services):
         "",
         "Call APIs with `svc <name> <METHOD> <path> [curl args]` – auth is injected, tokens never appear in commands.",
         "Details per service: `svc info <name>`. Status \"missing: VAR\" = token not set in `.env` → tell the user, don't work around it.",
-        "Read freely; write actions only when the user asked for them. Access modes: `ro` = read only, `rw` = writes allowed, "
+        "Read freely; write actions only when the user asked for them. Access modes: `read` = read only, `write` = writes allowed, "
         "`confirm` = every write waits for approval in tentacontrol → Activity.",
         "",
         "| Service | Type | Status | Description | API / MCP | Docs |",
@@ -2571,31 +2568,31 @@ def write_catalog(services):
     if dks:
         lines += ["", "## Docker hosts", "",
                   "Manage with `svc docker <name> <docker args>` and `svc compose <name> <stack> <compose args>` (docker runs on the host through ssh). "
-                  "`ro` = read only (ps, logs, inspect, config …) – changes are blocked; `rw` = changes allowed, but ask before restarts/updates/deletions; "
+                  "`read` = read only (ps, logs, inspect, config …) – changes are blocked; `write` = changes allowed, but ask before restarts/updates/deletions; "
                   "`confirm` = every change waits for approval.",
                   "", "| Host | Access | Target | Stacks dir | Status | Description |", "|---|---|---|---|---|---|"]
         for name, svc in dks.items():
             d = render(svc["docker"])
-            lines.append(f"| **{name}** | {d.get('access', 'ro')} | {docker_target(d, md=True)} | `{d.get('stacks_dir', '–')}` | {status(svc)} | {svc.get('description', '')} |")
+            lines.append(f"| **{name}** | {tclib.access(d.get('access'))} | {docker_target(d, md=True)} | `{d.get('stacks_dir', '–')}` | {status(svc)} | {svc.get('description', '')} |")
     repos = {n: s for n, s in services.items() if "git" in s}
     if repos:
         lines += ["", "## Git repositories", "",
-                  "Working copies have no credentials: commit locally, push with `svc git push <repo> [branch]` (`ro` = blocked, "
+                  "Working copies have no credentials: commit locally, push with `svc git push <repo> [branch]` (`read` = blocked, "
                   "`confirm` = waits for approval), update with `svc git fetch|pull <repo>`. Never put tokens into remotes.",
                   "Update all: `svc git sync`, overview: `svc git`.", "",
                   "| Repo | Access | Status | URL | Path | Description |", "|---|---|---|---|---|---|"]
         for name, svc in repos.items():
             git = svc["git"]
-            lines.append(f"| **{name}** | {git.get('access', 'ro')} | {status(svc)} | {git.get('url')} | `{repo_path(name, git)}` | {svc.get('description', '')} |")
+            lines.append(f"| **{name}** | {tclib.access(git.get('access'))} | {status(svc)} | {git.get('url')} | `{repo_path(name, git)}` | {svc.get('description', '')} |")
     dbs = part_services(services, "db")
     if dbs:
         lines += ["", "## Databases", "",
-                  "Query with `svc db <name> \"<SQL>\"` (`tables`, `describe <table>`, `--csv`). `ro` = the session is read-only and "
-                  "statements that switch it to read-write are refused; `rw` = writes allowed, but ask first and back up before bulk changes.", "",
+                  "Query with `svc db <name> \"<SQL>\"` (`tables`, `describe <table>`, `--csv`). `read` = the session is read-only and "
+                  "statements that switch it to read-write are refused; `write` = writes allowed, but ask first and back up before bulk changes.", "",
                   "| Database | Engine | Access | Target | Status | Description |", "|---|---|---|---|---|---|"]
         for name, svc in dbs.items():
             d = render(svc["db"])
-            lines.append(f"| **{name}** | {db_engine(d)} | {d.get('access', 'ro')} | `{d.get('host', '')}:{d.get('port') or (3306 if db_engine(d) == 'mysql' else 5432)}/{d.get('database', '')}` "
+            lines.append(f"| **{name}** | {db_engine(d)} | {tclib.access(d.get('access'))} | `{d.get('host', '')}:{d.get('port') or (3306 if db_engine(d) == 'mysql' else 5432)}/{d.get('database', '')}` "
                          f"| {status(svc)} | {svc.get('description', '')} |")
     webs = part_services(services, "web")
     if webs:
@@ -2610,11 +2607,11 @@ def write_catalog(services):
     if fss:
         lines += ["", "## Files on hosts", "",
                   "`svc files <name> ls|tree|cat|grep [path]` reads directly; `pull [path]` copies into `/workspace/files/<name>/`, "
-                  "edit there, `diff [path]` shows what would change, `push [path]` writes back (`rw` only, ask first). Paths are relative to the service path.", "",
+                  "edit there, `diff [path]` shows what would change, `push [path]` writes back (`write` only, ask first). Paths are relative to the service path.", "",
                   "| Name | Access | Target | Status | Description |", "|---|---|---|---|---|"]
         for name, svc in fss.items():
             f = render(svc["files"])
-            lines.append(f"| **{name}** | {f.get('access', 'ro')} | `{f.get('ssh_host', '?')}:{f.get('path', '')}` | {status(svc)} | {svc.get('description', '')} |")
+            lines.append(f"| **{name}** | {tclib.access(f.get('access'))} | `{f.get('ssh_host', '?')}:{f.get('path', '')}` | {status(svc)} | {svc.get('description', '')} |")
     mails = {n: s for n, s in services.items() if "smtp" in s or "imap" in s}
     if mails:
         lines += ["", "## Mail", "",
@@ -2626,7 +2623,7 @@ def write_catalog(services):
             for part in ("smtp", "imap"):
                 if part in svc:
                     m = render(svc[part])
-                    lines.append(f"| **{name}** | {tclib.mail_address(svc, ENV) or '–'} | {part} | {m.get('access', 'confirm' if part == 'smtp' else 'ro')} | "
+                    lines.append(f"| **{name}** | {tclib.mail_address(svc, ENV) or '–'} | {part} | {tclib.access(m.get('access'), tclib.part_default(part))} | "
                                  f"`{m.get('host', '')}:{tclib.mail_port(part, m)}` | {status(svc)} | {svc.get('description', '')} |")
     for name, svc in services.items():
         if svc.get("examples") or svc.get("notes"):

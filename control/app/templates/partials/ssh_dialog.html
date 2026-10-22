@@ -34,7 +34,7 @@
   </div>
   <div class="field"><label>Claude's shell access (<code>svc ssh</code>)</label>
     <select name="access">
-      {% for v, t in (("confirm", "confirm – every command needs your approval"), ("rw", "rw – commands run without asking"), ("ro", "ro – no shell, only docker/files services")) %}
+      {% for v, t in (("confirm", "confirm – every command needs your approval"), ("write", "write – commands run without asking"), ("read", "read – no shell, only docker/files services")) %}
       <option value="{{ v }}" {{ 'selected' if (f.get('access') or 'confirm') == v }}>{{ t }}</option>{% endfor %}
     </select>
     <div class="help">Docker and files services on this host keep their own access mode.</div></div>

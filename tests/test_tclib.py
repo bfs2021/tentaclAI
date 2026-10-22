@@ -82,13 +82,41 @@ def test_ssh_roundtrip(tmp_path):
     tclib.ssh_add(conf, fields)
     assert oct(os.stat(tmp_path / "box.conf").st_mode & 0o777) == "0o600"
     h = tclib.ssh_host(conf, "box")
-    assert (h["hostname"], h["port"], h["sudo"], h["access"]) == ("box.test", "2222", "sudo -n", "rw")
-    assert tclib.ssh_access(conf, "box") == "rw" and tclib.ssh_access(conf, "nope") == "confirm"
+    assert (h["hostname"], h["port"], h["sudo"], h["access"]) == ("box.test", "2222", "sudo -n", "write")  # rw → write
+    assert "access=write" in (tmp_path / "box.conf").read_text()
+    assert tclib.ssh_access(conf, "box") == "write" and tclib.ssh_access(conf, "nope") == "confirm"
     with pytest.raises(ValueError):
         tclib.ssh_add(conf, fields)  # exists
     tclib.ssh_set_sudo(conf, "box", "")
     assert tclib.ssh_sudo(conf, "box") == ""
     assert tclib.ssh_known_name({"hostname": "box.test", "port": "2222"}) == "[box.test]:2222"
+
+
+@pytest.mark.parametrize("value,default,mode", [
+    ("ro", "read", "read"), ("read", "read", "read"), ("rw", "read", "write"), ("write", "read", "write"),
+    (" RW ", "read", "write"), ("confirm", "read", "confirm"), (None, "confirm", "confirm"), ("", "write", "write"),
+    (None, "rw", "write"), ("readwrite", "write", "read"), ("yes", "confirm", "read"),  # unknown → read, the safe side
+])
+def test_access_aliases(value, default, mode):
+    assert tclib.access(value, default) == mode
+
+
+def test_migrate_access():
+    data = {"git": {"access": "rw"}, "db": {"access": "ro"}, "smtp": {"access": "confirm"}, "web": {}, "notes": ["rw"]}
+    assert tclib.migrate_access(data)
+    assert data == {"git": {"access": "write"}, "db": {"access": "read"}, "smtp": {"access": "confirm"}, "web": {}, "notes": ["rw"]}
+    assert not tclib.migrate_access(data)
+    assert [tclib.part_default(p) for p in ("api", "smtp", "imap", "db")] == ["write", "confirm", "read", "read"]
+
+
+def test_ssh_migrate_access(tmp_path):
+    (tmp_path / "a.conf").write_text("Host a\n    HostName a.test\n    # tentaclai: access=ro\nHost b\n    # tentaclaude: access=rw\n")
+    (tmp_path / "c.conf").write_text("Host c\n    # tentaclai: access=confirm\n")
+    assert tclib.ssh_migrate_access(str(tmp_path)) == ["a.conf"]
+    assert (tmp_path / "a.conf").read_text() == "Host a\n    HostName a.test\n    # tentaclai: access=read\nHost b\n    # tentaclaude: access=write\n"
+    assert "access=ro" in next(tmp_path.glob("a.conf.bak-*-access")).read_text()
+    assert [h["access"] for h in tclib.ssh_hosts(str(tmp_path))] == ["read", "write", "confirm"]
+    assert tclib.ssh_migrate_access(str(tmp_path)) == []
 
 
 @pytest.mark.parametrize("bad", [

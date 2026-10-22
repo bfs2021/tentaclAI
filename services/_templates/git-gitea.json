@@ -6,7 +6,7 @@
   "description": "Repo on your own Gitea/Forgejo",
   "git": {
     "url": "https://git.{{DOMAIN}}/OWNER/REPO.git",
-    "access": "rw",
+    "access": "write",
     "auth": {
       "type": "token",
       "token": "${GITEA_TOKEN}",

@@ -137,11 +137,11 @@ def test_clone_starts_paused(sj, monkeypatch, tmp_path):
     assert sj.get(jid)["enabled"] is True
 
 
-KNOWN = {"mailrelay": {"kind": "service", "parts": {"smtp": "rw"}, "enabled": True, "description": "relay"},
-         "imap_x": {"kind": "service", "parts": {"imap": "ro"}, "enabled": True, "description": ""},
+KNOWN = {"mailrelay": {"kind": "service", "parts": {"smtp": "write"}, "enabled": True, "description": "relay"},
+         "imap_x": {"kind": "service", "parts": {"imap": "read"}, "enabled": True, "description": ""},
          "slowmail": {"kind": "service", "parts": {"smtp": "confirm"}, "enabled": True, "description": ""},
-         "n8n": {"kind": "service", "parts": {"api": "rw", "mcp": "tools"}, "enabled": False, "description": ""},
-         "nas": {"kind": "ssh", "parts": {"ssh": "rw"}, "enabled": True, "description": "SSH host nas"}}
+         "n8n": {"kind": "service", "parts": {"api": "write", "mcp": "tools"}, "enabled": False, "description": ""},
+         "nas": {"kind": "ssh", "parts": {"ssh": "write"}, "enabled": True, "description": "SSH host nas"}}
 
 
 def test_mentions(sj):
@@ -165,7 +165,7 @@ def test_context_scope_and_strict_mcp(sj, monkeypatch):
     job = {"name": "mail test", "prompt": "send via @mailrelay, check @imap_x", "profile": "standard", "scope": True}
     argv = sj.claude_argv(job, "run1", "sid")
     system = argv[argv.index("--append-system-prompt") + 1]
-    assert "@mailrelay = service mailrelay (smtp rw) – relay" in system and "svc refuses every other one" in system
+    assert "@mailrelay = service mailrelay (smtp write) – relay" in system and "svc refuses every other one" in system
     assert "--strict-mcp-config" in argv
     assert "--strict-mcp-config" not in sj.claude_argv(dict(job, scope=False), "run1", "sid")
     assert "--strict-mcp-config" in sj.claude_argv(dict(job, scope=False, profile="read-only"), "run1", "sid")

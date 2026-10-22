@@ -289,7 +289,7 @@
       actions = "<a class='btn sm primary' href='" + esc(d.href) + "'>Edit system</a>";
     } else if (d.kind === "service") {
       h += "<div class='row' style='margin:8px 0'>" + pill(d.state, d.status) + (d.kinds || []).map(function (k) { return "<span class='tag'>" + esc(k) + "</span>"; }).join("") +
-        (d.access ? pill(d.access === "rw" ? "accent" : "info", d.access) : "") + "</div>";
+        (d.access ? pill(d.access === "write" ? "accent" : "info", d.access) : "") + "</div>";
       h += d.info ? "<p class='small'>" + esc(d.info) + "</p>" : "";
       dl = row("System", d.system ? "<a href='/systems/" + esc(d.system) + "'>" + esc(d.system) + "</a>" : "–") +
            row("URL", d.url ? "<span class='mono small' style='word-break:break-all'>" + esc(d.url) + "</span>" : "") +

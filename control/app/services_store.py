@@ -3,6 +3,8 @@ import glob
 import json
 import os
 import re
+import shutil
+import time
 
 import tclib
 
@@ -67,7 +69,7 @@ def git_info(name, git):
     path = git.get("path") or f"/workspace/repos/{name}"
     host_path = path.replace("/workspace", os.path.join(STACK_DIR, "workspace"), 1) if path.startswith("/workspace") else None
     cloned = bool(host_path and os.path.isdir(os.path.join(host_path, ".git")))
-    return {"url": git.get("url", ""), "access": git.get("access", "ro"), "branch": git.get("branch", ""),
+    return {"url": git.get("url", ""), "access": tclib.access(git.get("access")), "branch": git.get("branch", ""),
             "path": path, "cloned": cloned, "auth": (git.get("auth") or {}).get("type", "none")}
 
 
@@ -78,7 +80,7 @@ def _sub(v, env):
 def db_info(d, env):
     """connection target only – user/password stay hidden"""
     engine = "mysql" if (d.get("engine") or "postgres").lower() in ("mysql", "mariadb") else "postgres"
-    return {"engine": engine, "access": d.get("access", "ro"),
+    return {"engine": engine, "access": tclib.access(d.get("access")),
             "target": f"{_sub(d.get('host'), env)}:{_sub(d.get('port'), env) or ('3306' if engine == 'mysql' else '5432')}/{_sub(d.get('database'), env)}"}
 
 
@@ -87,13 +89,13 @@ def web_info(w, env):
 
 
 def files_info(f):
-    return {"target": f"{f.get('ssh_host') or '(system SSH host)'}:{f.get('path', '')}", "access": f.get("access", "ro"),
+    return {"target": f"{f.get('ssh_host') or '(system SSH host)'}:{f.get('path', '')}", "access": tclib.access(f.get("access")),
             "sudo": bool(f.get("sudo"))}
 
 
 def docker_info(d, env):
     """docker hosts run over ssh; legacy = an old "mode": "socket" entry (removed in v0.11) that svc refuses"""
-    return {"access": d.get("access", "ro"), "stacks_dir": _sub(d.get("stacks_dir"), env), "target": d.get("ssh_host", ""),
+    return {"access": tclib.access(d.get("access")), "stacks_dir": _sub(d.get("stacks_dir"), env), "target": d.get("ssh_host", ""),
             "legacy": d.get("mode", "ssh") != "ssh"}  # a missing ssh_host may come from the system – svc test tells
 
 
@@ -129,6 +131,7 @@ def save_raw(name, text):
     if not isinstance(data, dict):
         raise ValueError("JSON must be an object")
     data["name"] = name
+    tclib.migrate_access(data)  # ro/rw are still understood, but only read/write are written
     p = path_of(name)
     tmp = p + ".tmp"
     with open(tmp, "w") as f:
@@ -136,6 +139,26 @@ def save_raw(name, text):
         f.write("\n")
     os.chmod(tmp, 0o644)
     os.replace(tmp, p)
+
+
+def migrate_access():
+    """ro/rw → read/write in every service file (a backup of each changed file stays) – returns the changed names"""
+    changed = []
+    for p in sorted(glob.glob(os.path.join(SERVICES_DIR, "*.json"))):
+        try:
+            data = json.load(open(p))
+        except (OSError, ValueError):
+            continue
+        if isinstance(data, dict) and tclib.migrate_access(data):
+            shutil.copy2(p, f"{p}.bak-{time.strftime('%Y-%m-%d')}-access")
+            tmp = p + ".tmp"
+            with open(tmp, "w") as f:
+                json.dump(data, f, ensure_ascii=False, indent=2)
+                f.write("\n")
+            os.chmod(tmp, os.stat(p).st_mode & 0o777)
+            os.replace(tmp, p)
+            changed.append(os.path.basename(p)[:-5])
+    return changed
 
 
 def variable_users():

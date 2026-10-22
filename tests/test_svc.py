@@ -213,3 +213,29 @@ def test_statusline_shows_context_fill(used, shown):
                        input=json.dumps({"context_window": {"used_percentage": used}}), env={"PATH": "/nonexistent"})
     assert r.returncode == 0
     assert (shown in r.stdout) if shown else "ctx" not in r.stdout
+
+
+@pytest.mark.parametrize("old,new", [("ro", "read"), ("rw", "write"), ("confirm", "confirm")])
+def test_old_access_names_behave_like_new_ones(monkeypatch, old, new):
+    monkeypatch.setattr(svc, "_job", {})  # not a scheduled job
+    assert svc.access_mode({"access": old}) == svc.access_mode({"access": new}) == new
+    assert svc.access_mode({}) == "read" and svc.access_mode({}, "rw") == "write" and svc.access_mode({"access": "x"}) == "read"
+
+
+def test_read_blocks_writes_also_under_the_old_name(monkeypatch):
+    monkeypatch.setattr(svc, "_job", {})
+    logged = []
+    monkeypatch.setattr(svc, "audit", lambda *a, **k: logged.append(a))
+    monkeypatch.setattr(svc, "report", lambda *a, **k: None)
+    ran = []
+    for old in ("ro", "read"):
+        with pytest.raises(SystemExit):
+            svc.guarded("demo", "git", svc.access_mode({"access": old}), "push", lambda: ran.append(1))
+    assert not ran and [a[2] for a in logged] == ["read", "read"] and {a[4] for a in logged} == {"blocked"}
+    assert svc.guarded("demo", "git", svc.access_mode({"access": "rw"}), "push", lambda: 0) == 0
+    assert logged[-1][2] == "write"
+
+
+def test_read_only_job_reads_everything(monkeypatch):
+    monkeypatch.setattr(svc, "_job", {"run": "r1", "read_only": True})
+    assert svc.access_mode({"access": "rw"}) == svc.access_mode({"access": "write"}) == "read"

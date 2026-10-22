@@ -12,13 +12,13 @@
     "database": "app",
     "user": "${EXAMPLE_DB_USER}",
     "password": "${EXAMPLE_DB_PASSWORD}",
-    "access": "ro"
+    "access": "read"
   },
   "examples": [
     "svc db NAME tables",
     "svc db NAME \"SELECT count(*) FROM users\""
   ],
   "notes": [
-    "ro: the session is read-only – a read-only database user is the real protection."
+    "read: the session is read-only – a read-only database user is the real protection."
   ]
 }

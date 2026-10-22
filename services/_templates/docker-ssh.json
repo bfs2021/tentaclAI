@@ -9,13 +9,13 @@
     "mode": "ssh",
     "ssh_host": "ALIAS",
     "stacks_dir": "/srv/stacks",
-    "access": "ro"
+    "access": "read"
   },
   "examples": [
     "svc docker NAME ps",
     "svc compose NAME <stack> ps"
   ],
   "notes": [
-    "Default is ro – set to rw if Claude may change stacks there."
+    "Default is read – set to write if Claude may change stacks there."
   ]
 }

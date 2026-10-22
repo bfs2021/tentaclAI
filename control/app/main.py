@@ -9,7 +9,10 @@ from fastapi.responses import PlainTextResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
 
-from . import activity, auth, connectors, dockerops, netguard, notify, scheduled, skills, updatecheck, usage
+import tclib
+
+from . import activity, auth, connectors, dockerops, netguard, notify, scheduled, services_store, skills, updatecheck, usage
+from .config import SSH_DIR
 from .envfile import drop_generated_compose, read_env
 from .routes import claude, jobs, network, settings, ssh, system, tentacles
 from .web import BASE, TC_VERSION
@@ -68,6 +71,11 @@ async def migrate():
     """one-time adjustments of an existing installation"""
     if drop_generated_compose():
         print("migration: compose.generated.yaml removed from COMPOSE_FILE (docker services run over SSH only)", flush=True)
+    services = services_store.migrate_access()
+    hosts = tclib.ssh_migrate_access(os.path.join(SSH_DIR, "config.d"))
+    if services or hosts:
+        print(f"migration: access ro/rw → read/write in {', '.join(services + hosts)} (backups: *.bak-*-access)",
+              flush=True)
 
 
 async def prepare_activity():

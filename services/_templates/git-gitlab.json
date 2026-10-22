@@ -6,7 +6,7 @@
   "description": "Repo on GitLab",
   "git": {
     "url": "https://gitlab.com/OWNER/REPO.git",
-    "access": "rw",
+    "access": "write",
     "auth": {
       "type": "token",
       "token": "${GITLAB_TOKEN}",

@@ -10,7 +10,7 @@ Thanks for your interest in tentaclAI! Issues, ideas and pull requests are welco
 - **English** for code, UI, messages, docs and templates.
 - **One implementation.** Parsing of `.env`, services, systems and SSH hosts lives in `lib/tclib.py` – extend it instead of
   writing another parser.
-- **Guard rails first.** Changes to `svc` must keep `ro`/`rw` enforcement and never put secrets into command lines, logs or the UI.
+- **Guard rails first.** Changes to `svc` must keep `read`/`write` enforcement and never put secrets into command lines, logs or the UI.
 
 ## Development
 

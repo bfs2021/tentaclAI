@@ -25,7 +25,7 @@
             <strong>{{ h.alias }}</strong></span></td>
           <td class="mono small">{{ h.user }}@{{ h.hostname }}{% if h.port != '22' %}:{{ h.port }}{% endif %}{% if h.proxyjump %} <span class="pill info">via {{ h.proxyjump }}</span>{% endif %}
             <div class="ssh-result" id="t-{{ loop.index }}"></div></td>
-          <td><span class="pill {{ 'warn' if h.access == 'rw' else ('off' if h.access == 'ro' else 'info') }}" title="svc ssh access">{{ h.access }}</span></td>
+          <td><span class="pill {{ 'warn' if h.access == 'write' else ('off' if h.access == 'read' else 'info') }}" title="svc ssh access">{{ h.access }}</span></td>
           <td>
             <details class="sudo-edit">
               <summary>{% if h.sudo %}<span class="pill accent mono">{{ h.sudo }}</span>{% else %}<span class="faint small">–</span>{% endif %}</summary>

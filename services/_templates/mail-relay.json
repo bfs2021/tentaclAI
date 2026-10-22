@@ -19,6 +19,6 @@
     "svc mail NAME send --to someone@example.com --subject \"Report\" --body-file report.txt"
   ],
   "notes": [
-    "confirm: every mail waits for approval (recipients, subject and the start of the text are shown). rw sends without asking – only to smtp.recipients."
+    "confirm: every mail waits for approval (recipients, subject and the start of the text are shown). write sends without asking – only to smtp.recipients."
   ]
 }

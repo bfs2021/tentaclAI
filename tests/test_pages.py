@@ -430,7 +430,7 @@ def test_service_cards_are_compact(client):
     html = client.get("/services").text
     card = html[html.index('href="/services/demodb" title="Edit demodb"'):]
     card = card[:card.index('class="card service-card')]
-    assert "db · ro" in card and "token missing" in card and "DB_PW" in card  # problems stay visible by name
+    assert "db · read" in card and "token missing" in card and "DB_PW" in card  # problems stay visible by name
     assert ">active<" not in html  # the green dot says it already
     assert 'hx-post="/services/demodb/toggle"' in card and 'class="menu-item"' in card  # Disable lives in the … menu
 

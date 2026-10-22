@@ -6,12 +6,12 @@
   "description": "Repo over SSH (add the tentaclai key as deploy key)",
   "git": {
     "url": "git@github.com:OWNER/REPO.git",
-    "access": "rw",
+    "access": "write",
     "auth": {
       "type": "none"
     }
   },
   "notes": [
-    "Add the public key from tentacontrol → SSH as deploy key (write access only for rw)."
+    "Add the public key from tentacontrol → SSH as deploy key (write access only for write)."
   ]
 }
