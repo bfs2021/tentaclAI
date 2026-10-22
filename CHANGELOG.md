@@ -10,7 +10,8 @@ All notable changes, newest first. Every release lists **upgrade steps** from th
   them in `services/*.json` and in SSH hosts (`# tentaclai: access=`) on start, with a backup `*.bak-<date>-access`.
   An unknown value still counts as `read`. Older audit entries are shown with the new names in Activity.
 - **A more useful audit log:** a failed write records its last two error lines (secrets blanked, also in `svc audit`);
-  search plus filters by time (24 h / 7 / 30 days) and origin (Claude sessions, all jobs, one job, tentacontrol / host);
+  search plus filters by time (last 24 h by default, 7 / 30 days, any time) and origin (Claude sessions, jobs, one job,
+  tentacontrol / host), reset with one click;
   the origin links to the job run or the terminal; who approved a write or why it was blocked shows under the decision.
   Long actions and errors collapse to one line (click for the full text), and the table fits the page.
 
