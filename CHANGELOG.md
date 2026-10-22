@@ -7,9 +7,12 @@ All notable changes, newest first. Every release lists **upgrade steps** from th
 ### Changes
 - Network → Seen: click a column header to sort (destination, rule, last result, connections, last) – again to reverse;
   the choice is remembered in the browser.
+- `svc mail` takes the mailbox address instead of the service name (`svc mail info@example.com list`) – it must belong
+  to exactly one service; `svc mail` and the catalog list the address of every mail service.
 
 ### Upgrade (from v0.15.0)
-`./tentaclai.sh update`, `docker compose up -d --build control` – only tentacontrol changed.
+`./tentaclai.sh update`, `docker compose build`, `docker compose up -d` – both images changed (svc); recreating `tentaclai`
+ends running sessions and Remote Control.
 
 ## v0.15.0 – 2026-10-22
 

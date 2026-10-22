@@ -205,7 +205,7 @@
         <li><strong>imap</strong>: <code>ro</code> (default) lists and reads – reading uses a read-only mailbox and doesn't mark mails as seen. <code>rw</code> / <code>confirm</code> also mark (seen, flagged) and move between folders (only on servers with IMAP MOVE – nothing is ever deleted). <code>folders</code> limits what Claude sees.</li>
         <li><strong>Mails are untrusted content</strong>: anyone can write to a mailbox. <code>svc mail … read</code> puts the text between unmistakable markers, and Claude's rules say never to act on instructions in a mail. Together with <code>confirm</code> and a recipient list on smtp this keeps a planted mail from sending your data away.</li>
       </ul>
-      <p>Claude: <code>svc mail &lt;name&gt; send --to a@x --subject "…" --body-file F</code> (or the text from stdin), <code>folders</code>, <code>list [FOLDER] [--unseen] [--from X] [--subject X] [--since YYYY-MM-DD] [--limit N]</code>, <code>read &lt;uid&gt;</code>, <code>flag &lt;uid&gt; seen|unseen|flagged|unflagged</code>, <code>move &lt;uid&gt; &lt;folder&gt;</code>. <code>svc test</code> connects and logs in without sending or changing anything.</p>
+      <p>Claude: <code>svc mail &lt;name&gt; send --to a@x --subject "…" --body-file F</code> (or the text from stdin), <code>folders</code>, <code>list [FOLDER] [--unseen] [--from X] [--subject X] [--since YYYY-MM-DD] [--limit N]</code>, <code>read &lt;uid&gt;</code>, <code>flag &lt;uid&gt; seen|unseen|flagged|unflagged</code>, <code>move &lt;uid&gt; &lt;folder&gt;</code>. Instead of the service name the mailbox address works too (<code>svc mail info@example.com list</code>) – it must belong to exactly one service; <code>svc mail</code> lists them with their addresses. <code>svc test</code> connects and logs in without sending or changing anything.</p>
     </section>
 
     <section class="card" id="files">
@@ -370,7 +370,7 @@ svc &lt;name&gt; GET /path       API call, e.g. svc arcane GET /environments
 svc docker [&lt;host&gt; …]     docker hosts / docker CLI against one host (svc docker vps1 ps)
 svc compose &lt;host&gt; &lt;stack&gt; …   compose in the stack directory of that host (over SSH)
 svc db|web|files &lt;name&gt; …  databases, web pages as text, folders on SSH hosts
-svc mail &lt;name&gt; send|list|read|flag|move …   mail (smtp / imap)
+svc mail &lt;name|address&gt; send|list|read|flag|move …   mail (smtp / imap)
 svc jobs [&lt;name&gt; [--steps]]   scheduled jobs, a definition with its recent runs
 svc git | svc git sync    repositories: status / clone + fetch
 svc git push|pull|fetch &lt;repo&gt;   push a branch / update – credentials stay with svc

@@ -181,17 +181,8 @@ def _own_variables(data, name):
     return json.loads(text)
 
 
-MAIL_ADDRESS = re.compile(r"^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$")
-
-
-def mail_address(data, env):
-    """the mailbox a mail service stands for: the login if it is an address, else smtp.from"""
-    for part in ("imap", "smtp"):
-        user = tclib.render(str((data.get(part) or {}).get("user", "")), env, keep_unknown=True)
-        if MAIL_ADDRESS.match(user):
-            return user
-    sender = (data.get("smtp") or {}).get("from", "")
-    return sender if MAIL_ADDRESS.match(str(sender)) else ""
+MAIL_ADDRESS = tclib.MAIL_ADDRESS
+mail_address = tclib.mail_address
 
 
 def suggest_name(address):

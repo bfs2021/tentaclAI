@@ -172,6 +172,24 @@ def test_mail_ports_and_gateway_targets():
     assert hosts[("mail.example.com", 587)] == "m" and hosts[("imap.example.com", 143)] == "m"
 
 
+def test_mail_service_by_address(monkeypatch):
+    import tclib
+    monkeypatch.setattr(svc, "ENV", {"INFO_USER": "Info@Example.com"})
+    services = {"mail-info": {"imap": {"user": "${INFO_USER}"}, "smtp": {"user": "${INFO_USER}", "from": "info@example.com"}},
+                "relay": {"smtp": {"host": "relay", "from": "noreply@example.com"}},
+                "relay2": {"smtp": {"host": "relay2", "from": "noreply@example.com"}},
+                "web": {"web": {"url": "https://example.com"}}}
+    assert tclib.mail_addresses(services["mail-info"], svc.ENV) == ["Info@Example.com", "info@example.com"]
+    assert tclib.mail_address(services["web"], svc.ENV) == ""
+    assert svc.mail_service(services, "info@example.com", "imap") == "mail-info"  # case doesn't matter
+    assert svc.mail_service(services, "INFO@example.com", "smtp") == "mail-info"
+    assert svc.mail_service(services, "relay", "smtp") == "relay"  # a name stays a name
+    with pytest.raises(SystemExit, match="several services"):
+        svc.mail_service(services, "noreply@example.com", "smtp")
+    with pytest.raises(SystemExit, match="no mail service with imap"):
+        svc.mail_service(services, "noreply@example.com", "imap")  # the relays can only send
+
+
 def test_mail_password_counts_as_credential():
     import tclib
     assert tclib.secret_variables({"imap": {"user": "${MAIL_USER}", "password": "${MAIL_PW}"}}) == {"MAIL_PW"}

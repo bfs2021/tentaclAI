@@ -161,6 +161,21 @@ def schedule_text(sched):
     return "?"
 
 
+MAIL_ADDRESS = re.compile(r"^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$")
+
+
+def mail_addresses(svc, env):
+    """the addresses a mail service stands for, primary first: the imap/smtp login where it is an address, then smtp.from"""
+    found = [render(str((svc.get(part) or {}).get(key, "")), env, keep_unknown=True)
+             for part, key in (("imap", "user"), ("smtp", "user"), ("smtp", "from"))]
+    return list(dict.fromkeys(a for a in found if MAIL_ADDRESS.match(a)))
+
+
+def mail_address(svc, env):
+    """the mailbox a mail service stands for – its first address, '' if it has none"""
+    return (mail_addresses(svc, env) or [""])[0]
+
+
 def mail_port(part, cfg):
     """port of an smtp/imap part – given, or the default of its security (smtp: starttls, imap: ssl)"""
     sec = cfg.get("security") or ("starttls" if part == "smtp" else "ssl")
