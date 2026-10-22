@@ -15,6 +15,7 @@
         <div class="menu-pop down">
           <button class="menu-item" hx-post="/services/{{ s.name }}/toggle">{{ icon('stop' if s.enabled else 'play') }}{{ 'Disable' if s.enabled else 'Enable' }}</button>
           {% if s.git and s.state == 'ok' %}<button class="menu-item" hx-post="/services/{{ s.name }}/git-sync">{{ icon('refresh') }}{{ 'Fetch repository' if s.git.cloned else 'Clone repository' }}</button>{% endif %}
+          {% if s.can_add_mailbox %}<a class="menu-item" href="/services?like={{ s.name }}">{{ icon('plus') }}Another mailbox on this server</a>{% endif %}
           {% if systems %}
           <div class="menu-sep"></div>
           <div class="menu-label">Move to system</div>
@@ -28,6 +29,7 @@
         </div>
       </details>
     </div>
+    {% if s.mailbox %}<div class="svc-mailbox" title="Mailbox">{{ s.mailbox }}</div>{% endif %}
     <div class="svc-chips">
       {% for k in s.kinds %}
         {% if k == 'api' %}{{ access('api', s.data.api.access or 'rw') }}

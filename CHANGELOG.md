@@ -15,6 +15,9 @@ All notable changes, newest first. Every release lists **upgrade steps** from th
   (*Discard selected* / *Discard all*).
 
 ### Changes
+- Mail services: *Mail address* field when adding one from a Mail template (name suggested from it, e.g.
+  `mail-root-example`; login and sender filled in), **… → Another mailbox on this server** copies host, TLS, folders,
+  access and system with own variables, and mail cards show the address under the name.
 - Services: compact cards – one access chip per part, set variables as one key chip (missing ones stay named),
   two-line description (click for the full text), no "active" pill; Edit as pencil, Disable/Fetch/move in the … menu. Disabled cards are dimmed.
 - Job list: the profile shows as *reads* (neutral), *writes* (purple, the tooltip lists what it writes to without asking

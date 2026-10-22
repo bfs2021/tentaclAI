@@ -433,3 +433,46 @@ def test_service_cards_are_compact(client):
     assert "db · ro" in card and "token missing" in card and "DB_PW" in card  # problems stay visible by name
     assert ">active<" not in html  # the green dot says it already
     assert 'hx-post="/services/demodb/toggle"' in card and 'class="menu-item"' in card  # Disable lives in the … menu
+
+
+def test_mailbox_name_address_and_another_mailbox(client, app_module):
+    import json
+    import os
+    import shutil
+    from app import services_store
+    from app.envfile import read_env
+    assert services_store.suggest_name("Root@bitbunker.at") == "mail-root-bitbunker"
+    assert services_store.suggest_name("a.b+c@x.y.z") == "mail-a-b-c-x"
+    tpl = os.path.join(services_store.TEMPLATES_DIR, "mail-imap.json")
+    shutil.copy(os.path.join(os.path.dirname(__file__), "..", "services", "_templates", "mail-imap.json"), tpl)
+    try:
+        r = client.post("/services/new", data={"name": "mail-root-bit", "template": "mail-imap", "address": "root@bit.test"},
+                        headers={"HX-Request": "true"})
+        assert r.headers.get("HX-Redirect") == "/services/mail-root-bit"
+        d = json.loads(services_store.read_raw("mail-root-bit"))
+        assert d["imap"]["host"] == "imap.bit.test" and d["smtp"]["from"] == "root@bit.test"
+        user_var = d["imap"]["user"][2:-1]
+        assert read_env()[user_var] == "root@bit.test"
+        d["system"] = "box"
+        services_store.save_raw("mail-root-bit", json.dumps(d))
+        html = client.get("/services").text
+        assert "root@bit.test" in html and "/services?like=mail-root-bit" in html
+        assert "Another mailbox on the server of" in client.get("/services?like=mail-root-bit").text
+        assert "Another mailbox" not in client.get("/services?like=demoapi").text.split('id="new-svc"')[1][:400]
+        r = client.post("/services/new", data={"name": "mail-info-bit", "like": "mail-root-bit", "address": "info@bit.test"},
+                        headers={"HX-Request": "true"})
+        assert r.headers.get("HX-Redirect") == "/services/mail-info-bit"
+        c = json.loads(services_store.read_raw("mail-info-bit"))
+        assert c["imap"]["host"] == "imap.bit.test" and c["system"] == "box" and c["description"] == "Mailbox info@bit.test"
+        assert c["imap"]["user"] != d["imap"]["user"] and c["imap"]["user"].startswith("${MAIL_INFO_BIT_")
+        assert c["imap"]["password"].startswith("${MAIL_INFO_BIT_") and c["smtp"]["from"] == "info@bit.test"
+        assert read_env()[c["imap"]["user"][2:-1]] == "info@bit.test"
+        r = client.post("/services/new", data={"name": "x1", "like": "mail-root-bit", "address": "nope"}, headers={"HX-Request": "true"})
+        assert not r.headers.get("HX-Redirect")
+        r = client.post("/services/new", data={"name": "x2", "like": "demoapi", "address": "a@b.test"}, headers={"HX-Request": "true"})
+        assert not r.headers.get("HX-Redirect")
+    finally:
+        os.remove(tpl)
+        for n in ("mail-root-bit", "mail-info-bit"):
+            if os.path.exists(services_store.path_of(n)):
+                services_store.delete(n)

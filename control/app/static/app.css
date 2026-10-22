@@ -159,6 +159,9 @@ pre.rc { background: var(--bg); border: 1px solid var(--border); border-radius: 
 .svc-head h2 a:hover { color: var(--accent); }
 .svc-head .menu { margin-left: 0; }
 .svc-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.svc-mailbox { margin-top: -4px; font-size: 13px; font-weight: 600; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.like-src { min-height: 36px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+a.menu-item { text-decoration: none; }
 .clip { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .empty { padding: 40px; text-align: center; color: var(--muted); border: 1px dashed var(--border); border-radius: var(--radius); }
 .htmx-indicator { opacity: 0; transition: opacity .2s; } .htmx-request .htmx-indicator, .htmx-request.htmx-indicator { opacity: 1; }

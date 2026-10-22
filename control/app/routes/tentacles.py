@@ -21,7 +21,10 @@ router = APIRouter()
 @router.get("/services", response_class=HTMLResponse)
 async def services_page(request: Request):
     systems = systems_store.load_all()
-    return page(request, "services.html", services=services_store.load_all(), templates_list=services_store.list_templates(),
+    services = services_store.load_all()
+    like = request.query_params.get("like", "")
+    like = next((x for x in services if x["name"] == like and x["can_add_mailbox"]), None)
+    return page(request, "services.html", services=services, templates_list=services_store.list_templates(), like=like,
                 systems=systems, system_names={x["name"] for x in systems}, connectors=connectors.listing())
 
 
@@ -162,11 +165,15 @@ async def system_delete(request: Request, name: str):
 
 
 @router.post("/services/new")
-async def services_new(request: Request, name: str = Form(...), template: str = Form("")):
+async def services_new(request: Request, name: str = Form(...), template: str = Form(""), address: str = Form(""),
+                       like: str = Form("")):
     name = name.strip().lower()
     try:
-        services_store.create(name, template.strip())
-    except ValueError as e:
+        if like:
+            services_store.create_like(name, like.strip(), address)
+        else:
+            services_store.create(name, template.strip(), address)
+    except (ValueError, FileNotFoundError) as e:
         return PlainTextResponse("", headers=toast(str(e), "err"))
     await sync_services()
     return respond(request, f"{name} created – check URL/tokens, then “Test connection” and “Onboard with Claude”",

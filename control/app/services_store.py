@@ -7,7 +7,7 @@ import re
 import tclib
 
 from .config import SERVICES_DIR, STACK_DIR, is_secret  # noqa: F401  (STACK_DIR re-exported)
-from .envfile import read_env
+from .envfile import read_env, update_env
 
 TEMPLATES_DIR = os.path.join(SERVICES_DIR, "_templates")
 
@@ -59,6 +59,7 @@ def describe(name, data, env=None, error=None):
         "vars": [{"name": v, "set": bool(env.get(v)), "secret": is_secret(v, creds),
                   "value": "" if is_secret(v, creds) else env.get(v, "")} for v in vars_],
         "missing": missing, "state": state, "label": label,
+        "mailbox": mail_address(data, env), "can_add_mailbox": is_mailbox(data),
     }
 
 
@@ -180,10 +181,79 @@ def _own_variables(data, name):
     return json.loads(text)
 
 
-def create(name, template=""):
+MAIL_ADDRESS = re.compile(r"^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$")
+
+
+def mail_address(data, env):
+    """the mailbox a mail service stands for: the login if it is an address, else smtp.from"""
+    for part in ("imap", "smtp"):
+        user = tclib.render(str((data.get(part) or {}).get("user", "")), env, keep_unknown=True)
+        if MAIL_ADDRESS.match(user):
+            return user
+    sender = (data.get("smtp") or {}).get("from", "")
+    return sender if MAIL_ADDRESS.match(str(sender)) else ""
+
+
+def suggest_name(address):
+    """root@bitbunker.at → mail-root-bitbunker (same rule as the form's suggestion)"""
+    local, _, domain = address.lower().partition("@")
+    raw = f"mail-{local}-{domain.split('.')[0]}" if domain else ""
+    return re.sub(r"-{2,}", "-", re.sub(r"[^a-z0-9_-]", "-", raw)).strip("-")[:41]
+
+
+def is_mailbox(data):
+    """a mail service with a login – only those get 'another mailbox on this server'"""
+    return any((data.get(p) or {}).get("user") for p in ("imap", "smtp"))
+
+
+def _set_address(data, address):
+    """put a mailbox address into a mail service: the login (into .env when it is a ${VAR}) and the sender"""
+    env, changes = read_env(), {}
+    for part in ("imap", "smtp"):
+        d = data.get(part)
+        if not isinstance(d, dict) or not d.get("user"):
+            continue
+        m = tclib.VAR.fullmatch(str(d["user"]))
+        if m:
+            if not env.get(m.group(1)):
+                changes[m.group(1)] = address
+        else:
+            d["user"] = address
+    if isinstance(data.get("smtp"), dict) and data["smtp"].get("user"):
+        data["smtp"]["from"] = address
+    if changes:
+        update_env(changes)
+
+
+def create_like(name, like, address):
+    """another mailbox on the same server: host, port, TLS, folders, access and system of `like`, own variables"""
     p = path_of(name)
     if os.path.exists(p):
         raise ValueError(f"{name} already exists")
+    address = address.strip()
+    if not MAIL_ADDRESS.match(address):
+        raise ValueError("mail address: name@domain")
+    data = json.loads(read_raw(like))
+    if not is_mailbox(data):
+        raise ValueError(f"{like} is not a mailbox with a login")
+    data = {k: v for k, v in data.items() if k not in ("name", "enabled", "description")}
+    old, up = like.upper().replace("-", "_") + "_", name.upper().replace("-", "_") + "_"
+    text = json.dumps(data, ensure_ascii=False).replace(f"svc mail {like} ", f"svc mail {name} ")
+    for v in sorted(variables({k: x for k, x in data.items() if k in PARTS})):
+        new = up + v[len(old):] if v.startswith(old) else up + v
+        text = text.replace("${" + v + "}", "${" + new + "}")
+    data = json.loads(text)
+    _set_address(data, address)
+    save_raw(name, json.dumps({"name": name, "description": f"Mailbox {address}", **data}, ensure_ascii=False))
+
+
+def create(name, template="", address=""):
+    p = path_of(name)
+    if os.path.exists(p):
+        raise ValueError(f"{name} already exists")
+    address = address.strip()
+    if address and not MAIL_ADDRESS.match(address):
+        raise ValueError("mail address: name@domain")
     src = os.path.join(TEMPLATES_DIR, f"{template}.json") if template else os.path.join(SERVICES_DIR, "_template.json")
     if template and not NAME.match(template):
         raise ValueError("invalid template")
@@ -197,10 +267,12 @@ def create(name, template=""):
     if setup:
         tpl["notes"] = [f"Setup: {setup}"] + tpl.get("notes", [])
     up = name.upper().replace("-", "_")
-    domain = PLACEHOLDER_DOMAIN
+    domain = address.partition("@")[2].lower() if address else PLACEHOLDER_DOMAIN
     text = json.dumps(tpl, ensure_ascii=False).replace("svc NAME ", f"svc {name} ").replace(" NAME ", f" {name} ").replace("svc docker NAME", f"svc docker {name}").replace("{{DOMAIN}}", domain)
     text = text.replace("EXAMPLE_", f"{up}_").replace('"example"', f'"{name}"')
     data = _own_variables(json.loads(text), name)
+    if address and is_mailbox(data):
+        _set_address(data, address)
     data = {"name": name, **{k: v for k, v in data.items() if k != "name"}}
     save_raw(name, json.dumps(data, ensure_ascii=False))
 

@@ -8,13 +8,20 @@
 <div class="header">
   <div><h1>Services</h1><div class="sub">One file per service in <code>services/</code> – Docker host, API, MCP, git repo, database, web source, files or mail; tokens in <code>.env</code></div></div>
   <div class="row">
-    <button class="btn primary toggle" data-toggle="new-svc" aria-expanded="false" aria-controls="new-svc">{{ icon('plus') }}Add service</button>
+    <button class="btn primary toggle" data-toggle="new-svc" aria-expanded="{{ 'true' if like else 'false' }}" aria-controls="new-svc">{{ icon('plus') }}Add service</button>
     <button class="btn" hx-post="/services/sync">{{ icon('refresh') }}Sync</button>
     {{ help_link('services') }}
   </div>
 </div>
-<div class="card flat" id="new-svc" style="margin-bottom:18px" hidden>
+<div class="card flat" id="new-svc" style="margin-bottom:18px"{{ ' hidden' if not like }}>
   <form class="row" hx-post="/services/new" style="align-items:flex-end">
+    {% if like %}
+    <input type="hidden" name="like" value="{{ like.name }}">
+    <div style="flex:2;min-width:260px">
+      <label>Another mailbox on the server of</label>
+      <div class="like-src"><strong>{{ like.name }}</strong>{% if like.mailbox %} <span class="muted">({{ like.mailbox }})</span>{% endif %} <a class="small" href="/services">cancel</a></div>
+    </div>
+    {% else %}
     <div style="flex:2;min-width:260px">
       <label for="tpl-search">Template</label>
       <div class="combo" data-combo id="tpl">
@@ -24,25 +31,49 @@
           <div class="combo-opt" role="option" data-value="" data-label="Custom (own definition)" data-desc="">Custom <span class="faint">(own definition)</span></div>
           {% for cat, items in templates_list | groupby("category") %}
           <div class="combo-group">{{ cat }}</div>
-          {% for t in items %}<div class="combo-opt" role="option" data-value="{{ t.id }}" data-label="{{ t.title }}" data-search="{{ cat }} {{ t.description }}" data-desc="{{ t.description }}{% if t.setup %} – {{ t.setup }}{% endif %}">{{ t.title }}<span class="combo-kinds">{{ t.kinds | join('+') }}</span></div>{% endfor %}
+          {% for t in items %}<div class="combo-opt" role="option" data-value="{{ t.id }}" data-label="{{ t.title }}" data-kinds="{{ t.kinds | join(' ') }}" data-search="{{ cat }} {{ t.description }}" data-desc="{{ t.description }}{% if t.setup %} – {{ t.setup }}{% endif %}">{{ t.title }}<span class="combo-kinds">{{ t.kinds | join('+') }}</span></div>{% endfor %}
           {% endfor %}
           <div class="combo-empty" hidden>No matching template</div>
         </div>
       </div>
     </div>
+    {% endif %}
+    <div style="flex:1.4;min-width:200px" id="mail-addr"{{ ' hidden' if not like }}>
+      <label for="svc-addr">Mail address</label>
+      <input type="email" id="svc-addr" name="address" placeholder="e.g. root@example.com" autocomplete="off"{{ ' required' if like }}>
+    </div>
     <div style="flex:1;min-width:180px">
       <label>Name</label>
       <input type="text" id="svc-name" name="name" placeholder="e.g. n8n" pattern="[a-z0-9][a-z0-9_-]*" required oninput="this.dataset.touched=1">
     </div>
-    <button class="btn primary">{{ icon('plus') }}Create service</button>
+    <button class="btn primary">{{ icon('plus') }}{{ 'Add mailbox' if like else 'Create service' }}</button>
   </form>
-  <div class="help" id="tpl-hint">{{ templates_list | length }} templates: docker hosts, smart home, automation, infrastructure, monitoring, network, security, apps, development, git repos, databases, web sources, files.</div>
+  {% if like %}
+  <div class="help">Host, port, TLS, folders, access and system are copied; the new service gets its own variables – enter the password in its Edit page afterwards.</div>
+  {% else %}
+  <div class="help" id="tpl-hint">{{ templates_list | length }} templates: docker hosts, smart home, automation, infrastructure, monitoring, network, security, apps, development, git repos, databases, web sources, files, mail.</div>
+  {% endif %}
   <script>
-    document.getElementById("tpl").addEventListener("combo-change", function (e) {
-      document.getElementById("tpl-hint").textContent = e.detail.desc;
-      var n = document.getElementById("svc-name");
-      if (!n.dataset.touched) n.value = e.detail.value.replace(/^custom-.*/, "");
-    });
+    (function () {
+      var n = document.getElementById("svc-name"), a = document.getElementById("svc-addr"), box = document.getElementById("mail-addr");
+      // root@bitbunker.at → mail-root-bitbunker (same rule as services_store.suggest_name)
+      function suggest(addr) {
+        var at = addr.toLowerCase().split("@");
+        if (at.length < 2 || !at[1]) return "";
+        return ("mail-" + at[0] + "-" + at[1].split(".")[0]).replace(/[^a-z0-9_-]/g, "-").replace(/-{2,}/g, "-").replace(/^-+|-+$/g, "").slice(0, 41);
+      }
+      a.addEventListener("input", function () { if (!n.dataset.touched) n.value = suggest(a.value); });
+      var tpl = document.getElementById("tpl");
+      if (tpl) tpl.addEventListener("combo-change", function (e) {
+        document.getElementById("tpl-hint").textContent = e.detail.desc;
+        var opt = tpl.querySelector('.combo-opt[data-value="' + e.detail.value + '"]');
+        var mail = !!opt && /\b(imap|smtp)\b/.test(opt.dataset.kinds || "");
+        box.hidden = !mail;
+        if (!mail) a.value = "";
+        if (!n.dataset.touched) n.value = mail && a.value ? suggest(a.value) : e.detail.value.replace(/^custom-.*/, "");
+      });
+      {% if like %}a.focus();{% endif %}
+    })();
   </script>
 </div>
 {% if services %}
