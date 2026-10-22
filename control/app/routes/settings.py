@@ -259,7 +259,8 @@ async def security_disable(request: Request, password: str = Form(""), code: str
 
 @router.get("/license", response_class=HTMLResponse)
 async def license_page(request: Request):
-    return page(request, "license.html", lic=license.status(), features=license.FEATURES)
+    iid, source = license.instance_id()
+    return page(request, "license.html", lic=license.status(), features=license.FEATURES, instance=iid, instance_source=source)
 
 
 @router.post("/license", response_class=HTMLResponse)

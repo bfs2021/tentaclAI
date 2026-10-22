@@ -103,3 +103,38 @@ def test_shipped_public_key_is_well_formed(app_module):
     from app import license
     if license.PUBLIC_KEY:  # 32 raw bytes, base64url
         assert len(base64.urlsafe_b64decode(license.PUBLIC_KEY + "=" * (-len(license.PUBLIC_KEY) % 4))) == 32
+
+
+def test_instance_id_comes_from_the_hardware(app_module, tmp_path, monkeypatch):
+    from app import license
+    uuid = tmp_path / "product_uuid"
+    monkeypatch.setattr(license, "DMI_UUID", str(uuid))
+    monkeypatch.setattr(license, "_engine_id", lambda: "ENGINE-1")
+    def fresh():
+        monkeypatch.setattr(license, "_instance", None)
+        return license.instance_id()
+    uuid.write_text("CA19E780-8A0C-11EE-A162-34D2D6982C00\n")
+    iid, kind = fresh()
+    assert kind == "hardware" and iid.startswith("TCI-") and len(iid) == 23 and iid == fresh()[0]  # stable
+    uuid.write_text("ca19e780-8a0c-11ee-a162-34d2d6982c01")
+    assert fresh()[0] != iid  # other hardware, other ID
+    uuid.write_text("03000200-0400-0500-0006-000700080009")  # a board's placeholder: Docker's engine ID instead
+    assert fresh()[1] == "docker"
+    uuid.unlink()
+    monkeypatch.setattr(license, "_engine_id", lambda: "")
+    assert fresh() == ("", "")
+
+
+def test_key_bound_to_another_installation(client, lic, monkeypatch):
+    license, issue = lic
+    monkeypatch.setattr(license, "instance_id", lambda: ("TCI-AAAA-BBBB-CCCC-DDDD", "hardware"))
+    assert license.check(issue(instance="TCI-AAAA-BBBB-CCCC-DDDD"))["state"] == "valid"
+    st = license.check(issue(instance="TCI-1111-2222-3333-4444"))
+    assert st["state"] == "invalid" and "TCI-1111-2222-3333-4444" in st["error"] and "TCI-AAAA-BBBB-CCCC-DDDD" in st["error"]
+    with pytest.raises(ValueError, match="another|not for this one"):
+        license.install(issue(instance="TCI-1111-2222-3333-4444"))
+    assert license.check(issue())["state"] == "valid"  # without a binding: any installation
+    html = client.get("/license").text
+    assert "TCI-AAAA-BBBB-CCCC-DDDD" in html and "hardware" in html
+    license.install(issue(instance="TCI-AAAA-BBBB-CCCC-DDDD"))
+    assert "(this one)" in client.get("/license").text

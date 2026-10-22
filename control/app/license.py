@@ -1,10 +1,12 @@
 """Enterprise license: an offline key, signed with tentaclAI's private Ed25519 key – tentacontrol only holds the public one.
 
 Key format:  TCL1.<payload>.<signature>   (both base64url, no padding; the signature covers the payload bytes)
-Payload (JSON): id, licensee, email, edition, features, seats, issued, expires (YYYY-MM-DD, or null = no end).
+Payload (JSON): id, licensee, email, edition, features, seats, issued, expires (YYYY-MM-DD, or null = no end),
+optionally instance – then the key works only on the installation with that ID (instance_id()).
 No license server, no call home: a key is checked here only. scripts/license-key.py creates the key pair and keys.
 """
 import base64
+import hashlib
 import json
 import os
 import time
@@ -18,6 +20,41 @@ PREFIX = "TCL1"
 # the public half of the signing key – the private half never leaves the issuer (scripts/license-key.py init)
 PUBLIC_KEY = "WxhdXTzPskN_rfrGIz-hHuJzDs6jGC6vEfjuTyt8mjc"
 FEATURES = {"reports": "Compliance reports", "siem": "SIEM export of the audit log"}
+
+
+DMI_UUID = "/sys/class/dmi/id/product_uuid"
+# placeholders some boards report instead of a real system UUID
+_DUMMY_UUIDS = {"00000000-0000-0000-0000-000000000000", "ffffffff-ffff-ffff-ffff-ffffffffffff",
+                "03000200-0400-0500-0006-000700080009", "not settable", "not present", "to be filled by o.e.m."}
+_instance = None
+
+
+def _engine_id():
+    try:
+        from . import dockerops
+        return str(dockerops.client().info().get("ID") or "")
+    except Exception:  # noqa: BLE001 – no Docker: no fallback
+        return ""
+
+
+def instance_id():
+    """(ID, source) of this installation – TCI-XXXX-XXXX-XXXX-XXXX, a hash of the machine's system UUID from the firmware
+    (source "hardware"), or of the Docker engine's ID where the firmware has none ("docker"); ("", "") if neither.
+    Worked out on every start and never stored: it can't be set by hand or copied along with the data directory."""
+    global _instance
+    if _instance is None:
+        try:
+            with open(DMI_UUID) as f:
+                uuid = f.read().strip().lower()
+        except OSError:
+            uuid = ""
+        src, kind = (uuid, "hardware") if uuid and uuid not in _DUMMY_UUIDS else (_engine_id(), "docker")
+        if src:
+            h = hashlib.sha256(f"tentaclai-instance|{src}".encode()).hexdigest()[:16].upper()
+            _instance = ("TCI-" + "-".join(h[i:i + 4] for i in range(0, 16, 4)), kind)
+        else:
+            _instance = ("", "")
+    return _instance
 
 
 def _b64d(s):
@@ -55,6 +92,9 @@ def check(key, public_key=None, today=None):
         lic = parse(key, public_key)
     except ValueError as e:
         return {"state": "invalid", "license": None, "error": str(e)}
+    if lic.get("instance") and lic["instance"] != instance_id()[0]:
+        return {"state": "invalid", "license": lic, "days_left": None,
+                "error": f"the key was issued for the installation {lic['instance']}, not for this one ({instance_id()[0] or 'no ID'})"}
     out = {"state": "valid", "license": lic, "days_left": None, "error": ""}
     if lic.get("expires"):
         try:

@@ -364,6 +364,7 @@
     <section class="card" id="license">
       <h2>License &amp; Enterprise</h2>
       <p>tentaclAI is open source (MIT). Settings → <a href="/license">License</a> takes an <strong>Enterprise license key</strong>, which unlocks the features beyond it – for now the <a href="/reports">Reports</a> placeholder (compliance reports and the SIEM export of the audit log, in preparation). The page shows the installed license (licensee, ID, edition, validity, seats, features) and lets you replace or remove it. A key (<code>TCL1.…</code>) is signed: tentacontrol checks it offline with a public key built into tentaclAI – no license server, nothing is sent anywhere. An expired key keeps showing with its end date, the features lock.</p>
+      <p>The page also shows this installation's <strong>Installation ID</strong> (<code>TCI-…</code>). It is derived from the machine's hardware – a hash of the system UUID its firmware reports, or of the Docker engine's ID where there is none – worked out on every start and never stored, so it can't be set by hand or copied along with the data. A key issued for an ID works only on that installation; keys without one (e.g. trials) work anywhere. New hardware means a new ID and a new key.</p>
     </section>
 
     <section class="card" id="updates">

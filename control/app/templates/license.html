@@ -17,6 +17,18 @@
   <div><h1>License</h1><div class="sub">tentaclAI is open source (MIT). An Enterprise license unlocks the features beyond it, such as compliance reports and the SIEM export.</div></div>
 </div>
 
+<div class="card" style="margin-bottom:16px">
+  <div class="card-head"><h2>Installation ID</h2>
+    {% if instance %}<button class="btn sm ghost" type="button" data-copy="#instance-id">{{ icon('copy') }}Copy</button>{% endif %}</div>
+  {% if instance %}
+  <div class="mono" id="instance-id" style="font-size:16px">{{ instance }}</div>
+  <p class="help">Send this ID when you order or renew a license: a key issued for it works on this installation only.
+    Derived from {{ "this machine's hardware (the system UUID of its firmware)" if instance_source == 'hardware' else "this host's Docker installation (its firmware reports no system UUID)" }} – it stays the same across updates and reinstalls of tentaclAI{{ '' if instance_source == 'hardware' else ', not across a reinstall of Docker' }}, and changes with new hardware.</p>
+  {% else %}
+  <p class="muted small">This installation has no ID – neither the firmware nor Docker report one. Keys bound to an installation can't be used here.</p>
+  {% endif %}
+</div>
+
 {% set l = lic.license %}
 {% if lic.state in ('valid', 'expired') %}
 <div class="card" style="margin-bottom:16px">
@@ -29,6 +41,7 @@
     <dt>Edition</dt><dd>{{ (l.edition or 'enterprise') | capitalize }}</dd>
     <dt>Valid</dt><dd>{{ l.issued or '–' }} → {{ l.expires or 'no end date' }}</dd>
     <dt>Seats</dt><dd>{{ l.seats if l.seats else 'not limited' }}</dd>
+    <dt>Installation</dt><dd>{% if l.instance %}<span class="mono">{{ l.instance }}</span> <span class="muted">(this one)</span>{% else %}any{% endif %}</dd>
     <dt>Features</dt><dd>{% for f in l.features or [] %}<span class="tag">{{ features.get(f, f) }}</span> {% else %}–{% endfor %}</dd>
   </dl>
   {% if lic.state == 'valid' and lic.days_left is not none and lic.days_left <= 30 %}<p class="small" style="margin-top:12px"><span class="pill warn">ends soon</span> Renew the license before {{ l.expires }} – Enterprise features lock when it ends.</p>{% endif %}

@@ -5,7 +5,7 @@
                                                   offline and backed up) – prints the public key for
                                                   control/app/license.py (PUBLIC_KEY)
   license-key.py issue <private.pem> --licensee "Example GmbH" [--email a@b] [--id L-2026-0001]
-                 [--features reports,siem] [--seats 10] [--edition enterprise]
+                 [--features reports,siem] [--seats 10] [--edition enterprise] [--instance TCI-XXXX-XXXX-XXXX-XXXX]
                  (--expires 2027-12-31 | --days 365 | --perpetual)
                                                   prints a key: TCL1.<payload>.<signature>
   license-key.py show <key>                       the payload of a key (not verified)
@@ -60,7 +60,8 @@ def payload_of(args):
     today = date.today()
     return {"id": args.id or f"L-{today:%Y%m%d}-{os.urandom(3).hex()}", "licensee": args.licensee, "email": args.email or "",
             "edition": args.edition, "features": [f.strip() for f in args.features.split(",") if f.strip()],
-            "seats": args.seats, "issued": today.isoformat(), "expires": expires}
+            "seats": args.seats, "issued": today.isoformat(), "expires": expires,
+            **({"instance": args.instance.strip().upper()} if args.instance.strip() else {})}
 
 
 def main(argv):
@@ -76,6 +77,7 @@ def main(argv):
     p.add_argument("--edition", default="enterprise")
     p.add_argument("--features", default="reports,siem")
     p.add_argument("--seats", type=int, default=0, help="0 = not limited")
+    p.add_argument("--instance", default="", help="the customer's installation ID (Settings → License) – the key works only there")
     when = p.add_mutually_exclusive_group(required=True)
     when.add_argument("--expires")
     when.add_argument("--days", type=int)

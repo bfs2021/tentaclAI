@@ -16,7 +16,7 @@ All notable changes, newest first. Every release lists **upgrade steps** from th
 ### Changes
 - Settings → *License*: shows the installed Enterprise license (licensee, ID, edition, validity, seats, features) or
   takes a key; replace or remove it there. Keys (`TCL1.<payload>.<signature>`) are Ed25519-signed and checked offline
-  – no license server. A valid license with the feature `reports` unlocks the Reports entry. New dependency of
+  – no license server. A key can be bound to one installation: the tab shows its *Installation ID*, derived from the hardware (system UUID of the firmware, else the Docker engine ID) and never stored. A valid license with the feature `reports` unlocks the Reports entry. New dependency of
   tentacontrol: `cryptography`. Issuing keys: `scripts/license-key.py` (for the issuer, not for installations).
 - Sidebar: a *Reports* entry (locked) – a placeholder for compliance reports and the SIEM export of the audit log, which
   need an Enterprise license; the page shows a greyed-out preview.
