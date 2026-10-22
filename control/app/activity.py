@@ -10,6 +10,7 @@ import os
 import re
 import secrets
 import time
+from datetime import datetime
 
 import tclib
 
@@ -167,20 +168,58 @@ def recent_decisions(limit=10):
     return sorted(done, key=lambda a: a.get("decided", 0), reverse=True)[:limit]
 
 
-def audit_entries(limit=300, service="", decision=""):
+SINCE = {"24h": 86400, "7d": 7 * 86400, "30d": 30 * 86400}  # time filter of the audit log
+
+
+def origin_group(o):
+    """host (tentacontrol / host) · job · session – for the audit log's From filter"""
+    o = clean_origin(o)
+    if not o:
+        return ""
+    if o.get("by") == "root":
+        return "host"
+    return "job" if o.get("job") else "session"
+
+
+def origin_link(o):
+    """where to look next: the job's run, or the terminal of a session that can be reattached without starting anything"""
+    o = clean_origin(o)
+    if o.get("job"):
+        return f"/jobs#run-{o['job']}"
+    return {"claude-workspace": "/terminal?p=claude", "claude-rc": "/terminal?p=rc"}.get(o.get("tmux", ""), "")
+
+
+def _epoch(ts):
+    try:
+        return datetime.strptime(ts, "%Y-%m-%dT%H:%M:%S%z").timestamp()
+    except (TypeError, ValueError):
+        return 0
+
+
+def audit_entries(limit=300, service="", decision="", origin="", since="", q=""):
+    """newest first; origin is a group (session/job/host) or "job:<name>", since a key of SINCE, q a text search"""
     try:
         lines = open(AUDIT_FILE).read().splitlines()
     except OSError:
         return []
+    cutoff = time.time() - SINCE[since] if since in SINCE else 0
+    q = q.strip().lower()
     out = []
     for line in reversed(lines):
         try:
             e = json.loads(line)
         except ValueError:
             continue
+        if cutoff and _epoch(e.get("ts")) < cutoff:
+            break  # the file is in time order – everything further back is older
         if (service and e.get("service") != service) or (decision and e.get("decision") != decision):
             continue
+        if q and not any(q in str(e.get(k, "")).lower() for k in ("action", "service", "detail", "error")):
+            continue
         e["from_label"] = origin_label(e.get("from"))
+        if origin and (e["from_label"] != f"Job · {origin[4:]}" if origin.startswith("job:") else origin_group(e.get("from")) != origin):
+            continue
+        e["from_link"] = origin_link(e.get("from"))
         if e.get("mode") in tclib.ACCESS_ALIASES:  # entries written before v0.16
             e["mode"] = tclib.ACCESS_ALIASES[e["mode"]]
         out.append(e)

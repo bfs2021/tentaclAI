@@ -328,10 +328,16 @@ dialog.modal { max-height: calc(100vh - 40px); overflow-y: auto; }
 .approval { border-color: var(--warn); box-shadow: 0 0 0 3px var(--warn-soft); }
 .approval-action { white-space: pre-wrap; word-break: break-all; margin: 8px 0 0; }
 table.audit td { vertical-align: top; }
-.audit-action { word-break: break-all; max-width: 520px; }
-.audit-action summary { cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.audit-action details[open] summary { white-space: pre-wrap; }
-.audit-detail { margin-top: 3px; max-width: 220px; }
+/* the action column takes the room that is left; long actions and errors collapse to one line (click = full text) */
+table.audit { table-layout: fixed; min-width: 680px; }
+table.audit td { overflow-wrap: anywhere; }
+table.audit .tag { white-space: nowrap; }
+.audit-error { color: var(--err); margin-top: 3px; }
+table.audit summary { cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+table.audit details[open] summary { white-space: pre-wrap; }
+.audit-detail { margin-top: 3px; }
+.audit-filters { justify-content: flex-end; }
+.audit-filters input[type=search] { width: 180px; padding-right: 10px; }
 .nowrap { white-space: nowrap; }
 /* network page */
 form.inline { display: inline; margin: 0; }

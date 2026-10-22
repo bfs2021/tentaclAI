@@ -841,7 +841,7 @@ def cmd_docker(services, args):
     run = lambda: call(docker_argv(name, d, rest))  # noqa: E731
     if _ro_allowed(rest):
         return run()
-    return guarded(name, "docker", access_mode(d), "docker " + shlex.join(rest), run)
+    return guarded(name, "docker", access_mode(d), "docker " + shlex.join(rest), run, interactive=wants_tty(rest))
 
 
 def cmd_compose(services, name, stack, rest):
@@ -849,7 +849,7 @@ def cmd_compose(services, name, stack, rest):
     if _ro_allowed(rest, compose=True):
         return _compose(name, d, stack, rest)
     return guarded(name, "docker", access_mode(d), f"compose {stack} {shlex.join(rest)}",
-                   lambda: _compose(name, d, stack, rest))
+                   lambda: _compose(name, d, stack, rest), interactive=wants_tty(rest, compose=True))
 
 
 def _compose(name, d, stack, rest):
@@ -1028,7 +1028,7 @@ def cmd_db(services, args):
     if rest[0] == "shell":
         if mode == "read":
             sys.exit(f"svc: {name} is read-only – use svc db {name} \"<SQL>\" (the shell could switch the session to read-write)")
-        return guarded(name, "db", mode, "interactive SQL shell", lambda: db_run(name, db, interactive=True))
+        return guarded(name, "db", mode, "interactive SQL shell", lambda: db_run(name, db, interactive=True), interactive=True)
     if rest[0] == "tables":
         return db_run(name, db, "\\dt+" if pg else "SHOW FULL TABLES", fmt)
     if rest[0] == "describe" and len(rest) == 2:
@@ -1876,7 +1876,7 @@ def cmd_ssh(name_args):
             return call_redacted(["ssh", "-T", "--", alias, remote])
         return subprocess.call(argv)
     return guarded(alias, "ssh", mode, f"ssh {alias} {remote}" if remote else f"ssh {alias} (interactive shell)",
-                   lambda: subprocess.call(argv))
+                   lambda: subprocess.call(argv), interactive=tty)
 
 
 def cmd_config(services, args):
@@ -2109,7 +2109,7 @@ def access_mode(part, default="read"):
     return tclib.access(part.get("access"), default)
 
 
-def audit(service, part, mode, action, decision, rc=None, duration=None, detail=""):
+def audit(service, part, mode, action, decision, rc=None, duration=None, detail="", error=""):
     """append one line to the audit log – never lets the command fail"""
     entry = {"ts": time.strftime("%Y-%m-%dT%H:%M:%S%z"), "service": service, "part": part, "mode": mode,
              "action": action[:500], "decision": decision}
@@ -2119,6 +2119,8 @@ def audit(service, part, mode, action, decision, rc=None, duration=None, detail=
         entry["seconds"] = round(duration, 1)
     if detail:
         entry["detail"] = detail[:300]
+    if error:
+        entry["error"] = error
     if origin():
         entry["from"] = origin()
     try:
@@ -2183,8 +2185,47 @@ def report(event, title, body=""):
         pass
 
 
-def guarded(service, part, mode, action, run):
-    """run() performs a write: blocked for read, logged for write, approved first for confirm"""
+def run_teed(run, keep=4096):
+    """run() with fd 2 passed through a pipe: everything still reaches the caller, the end is kept for the audit log
+    (child processes inherit fd 2, so their stderr is caught as well) → (rc, captured stderr tail)"""
+    import threading
+    sys.stderr.flush()
+    saved = os.dup(2)
+    r, w = os.pipe()
+    os.dup2(w, 2)
+    os.close(w)
+    buf = bytearray()
+
+    def pump():
+        while chunk := os.read(r, 4096):
+            view = memoryview(chunk)
+            while view:
+                view = view[os.write(saved, view):]
+            buf.extend(chunk)
+            del buf[:-keep]
+    t = threading.Thread(target=pump, daemon=True)
+    t.start()
+    try:
+        rc = run()
+    finally:
+        sys.stderr.flush()
+        os.dup2(saved, 2)  # closes the last write end of svc itself – the pump ends once the children's copies are gone
+        t.join(timeout=3)  # a background process that keeps fd 2 open must not hold svc up
+        if not t.is_alive():
+            os.close(r)
+            os.close(saved)
+    return rc, buf.decode(errors="replace")
+
+
+def error_tail(text, lines=2, limit=300):
+    """the last lines of a failed write's stderr – secrets blanked, svc's own progress lines left out"""
+    keep = [ln.strip() for ln in text.splitlines() if ln.strip() and not ln.startswith("svc: ⏳") and not ln.startswith("svc: ✓")]
+    return _redact_text("\n".join(keep[-lines:]))[-limit:]
+
+
+def guarded(service, part, mode, action, run, interactive=False):
+    """run() performs a write: blocked for read, logged for write, approved first for confirm
+    (interactive: a terminal session – stderr stays the terminal, nothing is captured)"""
     if mode == "read":
         audit(service, part, mode, action, "blocked")
         report("blocked", f"Blocked: {service} ({part}) is read-only", action)
@@ -2198,8 +2239,9 @@ def guarded(service, part, mode, action, run):
                      "Not executed – tell the user, don't work around it.")
         print(f"svc: ✓ approved{' – ' + by if by.startswith('grant') else ''}", file=sys.stderr, flush=True)
     t = time.time()
-    rc = run()
-    audit(service, part, mode, action, decision, rc=rc, duration=time.time() - t, detail=by)
+    rc, err = (run(), "") if interactive else run_teed(run)
+    audit(service, part, mode, action, decision, rc=rc, duration=time.time() - t, detail=by,
+          error=error_tail(err) if rc else "")
     return rc
 
 
@@ -2217,6 +2259,8 @@ def cmd_audit(args):
             continue
         rc = f" exit {e['exit']}" if "exit" in e else ""
         print(f"{e['ts'][:19]}  {e['decision']:<8} {e['service']:<14} {e['part']:<7} {e['action'][:90]}{rc}")
+        if e.get("error"):
+            print(f"{'':<21}↳ {e['error'].replace(chr(10), ' · ')[:160]}")
     return 0
 
 

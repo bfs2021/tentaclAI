@@ -9,6 +9,10 @@ All notable changes, newest first. Every release lists **upgrade steps** from th
   templates, `svc` output, the audit log and Claude's instructions. The old names keep working; tentacontrol rewrites
   them in `services/*.json` and in SSH hosts (`# tentaclai: access=`) on start, with a backup `*.bak-<date>-access`.
   An unknown value still counts as `read`. Older audit entries are shown with the new names in Activity.
+- **A more useful audit log:** a failed write records its last two error lines (secrets blanked, also in `svc audit`);
+  search plus filters by time (24 h / 7 / 30 days) and origin (Claude sessions, all jobs, one job, tentacontrol / host);
+  the origin links to the job run or the terminal; who approved a write or why it was blocked shows under the decision.
+  Long actions and errors collapse to one line (click for the full text), and the table fits the page.
 
 ### Changes
 - Network → Seen: click a column header to sort (destination, rule, last result, connections, last) – again to reverse;
@@ -19,12 +23,15 @@ All notable changes, newest first. Every release lists **upgrade steps** from th
 - Long sessions: Claude's status line shows how full the context window is (`ctx 42 %`, yellow from 60 %, red with
   `→ /compact` from 80 %), and a new base rule has Claude suggest `/compact` once in a long session, where a topic ends
   (not in jobs).
+- Removed: migrations for installations before v0.11 (Claude's home move from v0.4, the `# tentaclaude:` marker,
+  dropping `compose.generated.yaml` from `COMPOSE_FILE`, the hint for docker `"mode": "socket"`) and unused code.
 - Dependencies: tentacontrol and the egress gateway run on Python 3.15, Apprise 2 is allowed; CI on
   `actions/checkout` v7 and `actions/setup-python` v7, tests allow pytest 9.
 
 ### Upgrade (from v0.15.0)
 `./tentaclai.sh update`, `docker compose build`, `docker compose up -d` – all three images changed (svc, Python 3.15);
-recreating `tentaclai` ends running sessions and Remote Control.
+recreating `tentaclai` ends running sessions and Remote Control. Coming from a version before v0.11: update to v0.15.0
+first (`git checkout v0.15.0`, build, start once) – its one-time migrations are gone now.
 
 Access names: nothing to do – on its first start tentacontrol rewrites `ro`/`rw` to `read`/`write` in `services/*.json`
 and `ssh/config.d/*.conf` (log line `migration: access ro/rw → read/write in …`) and keeps each old file as

@@ -3,6 +3,8 @@ import importlib.machinery
 import importlib.util
 import json
 import os
+import subprocess
+import sys
 
 import pytest
 
@@ -239,3 +241,15 @@ def test_read_blocks_writes_also_under_the_old_name(monkeypatch):
 def test_read_only_job_reads_everything(monkeypatch):
     monkeypatch.setattr(svc, "_job", {"run": "r1", "read_only": True})
     assert svc.access_mode({"access": "rw"}) == svc.access_mode({"access": "write"}) == "read"
+
+
+def test_failed_write_logs_its_stderr_tail(monkeypatch, capfd):
+    monkeypatch.setattr(svc, "_job", {})
+    logged = []
+    monkeypatch.setattr(svc, "audit", lambda *a, **k: logged.append(k))
+    script = "import sys; print('step 1', file=sys.stderr); print('PASSWORD=hunter2', file=sys.stderr); print('boom: no such stack', file=sys.stderr); sys.exit(3)"
+    rc = svc.guarded("demo", "docker", "write", "compose x up -d", lambda: subprocess.call([sys.executable, "-c", script]))
+    assert rc == 3
+    assert logged[-1]["error"] == "PASSWORD=[redacted by svc]\nboom: no such stack"
+    assert "step 1" in capfd.readouterr().err  # the caller still sees everything
+    assert svc.guarded("demo", "docker", "write", "ok", lambda: 0) == 0 and logged[-1]["error"] == ""

@@ -498,3 +498,28 @@ def test_audit_long_action_collapses(client, app_module, tmp_path, monkeypatch):
     monkeypatch.setattr(activity, "AUDIT_FILE", str(f))
     html = client.get("/activity").text
     assert html.count("<details><summary>") == 1 and "tentacontrol + 15 min" in html
+
+
+def test_audit_filters_error_and_origin_link(client, app_module, tmp_path, monkeypatch):
+    import json
+    import time
+    from app import activity
+    now = time.strftime("%Y-%m-%dT%H:%M:%S%z")
+    f = tmp_path / "audit.jsonl"
+    rows = [{"ts": "2020-01-01T10:00:00+0000", "service": "demohost", "part": "docker", "mode": "write",
+             "action": "compose old up -d", "decision": "auto", "exit": 0},
+            {"ts": now, "service": "demohost", "part": "docker", "mode": "write", "action": "compose web up -d",
+             "decision": "auto", "exit": 1, "error": "no such service: web", "from": {"tmux": "claude-workspace"}},
+            {"ts": now, "service": "demoapi", "part": "api", "mode": "write", "action": "POST /items",
+             "decision": "auto", "exit": 0, "from": {"by": "root"}}]
+    f.write_text("".join(json.dumps(r) + "\n" for r in rows))
+    monkeypatch.setattr(activity, "AUDIT_FILE", str(f))
+    html = client.get("/activity").text
+    assert "no such service: web" in html and 'href="/terminal?p=claude"' in html and "compose old" in html
+    html = client.get("/activity?since=24h").text
+    assert "compose old" not in html and "POST /items" in html
+    html = client.get("/activity?origin=session").text
+    assert "compose web" in html and "POST /items" not in html and "Reset" in html
+    html = client.get("/activity?q=ITEMS").text
+    assert "POST /items" in html and "compose web" not in html
+    assert "Nothing matches" in client.get("/activity?q=nothing-like-this").text
