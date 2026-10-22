@@ -50,7 +50,7 @@ SETTINGS_GROUPS = [
     ]),
     ("Approvals", [
         ("APPROVAL_HANDOFF", "Show the approval link in the chat after (s)",
-         "a Claude session waits this long for an approval, then svc hands the request back and Claude posts its link in the chat (a running command shows nothing there, e.g. Remote Control in the browser) and waits again for the same request. Default 20, 0 = wait silently", "text"),
+         "a Claude session waits this long for an approval, then svc hands the request back and Claude posts its link in the chat (a running command shows nothing there, e.g. Remote Control in the browser) and waits again for the same request. Default 30, 0 = wait silently", "text"),
     ]),
     ("Jobs", [
         ("JOB_READONLY_HELPERS", "Helpers in read-only jobs",

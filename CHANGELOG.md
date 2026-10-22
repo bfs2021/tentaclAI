@@ -8,7 +8,7 @@ All notable changes, newest first. Every release lists **upgrade steps** from th
 - **Approvals you don't miss**: tentacontrol shows waiting approvals in the tab title and on its icon, and can send
   desktop notifications from the browser (Activity → *Desktop notifications*) while it is open in any tab, also in the
   background – a click opens the request (`/activity#a-<id>`).
-- **The approval link in the chat**: a Claude session waits `APPROVAL_HANDOFF` seconds (default 20, Settings →
+- **The approval link in the chat**: a Claude session waits `APPROVAL_HANDOFF` seconds (default 30, Settings →
   Approvals, 0 = off) for a decision; then `svc` exits with code 75 and the link, Claude posts it and runs the same
   command again, which waits for the same request. Useful with Remote Control in the browser, where a running command
   shows nothing. A decision is used once – a second identical call doesn't ride along.
@@ -24,7 +24,7 @@ All notable changes, newest first. Every release lists **upgrade steps** from th
 ### Upgrade
 - `git pull`, `docker compose build`, `docker compose up -d` – tentaclai is recreated too (new `svc` and base
   instructions), which ends running Claude sessions and Remote Control. New optional `.env` variable
-  `APPROVAL_HANDOFF` (seconds, default 20, `0` = Claude waits silently as before).
+  `APPROVAL_HANDOFF` (seconds, default 30, `0` = Claude waits silently as before).
 
 ## v0.18.0 – 2026-10-22
 

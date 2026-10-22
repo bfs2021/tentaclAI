@@ -667,7 +667,7 @@ def write_model_commands(m, src="/etc/tentaclai/commands", dst=None):
 
 # ---------------------------------------------------------------- approvals
 
-APPROVAL_HANDOFF = 20  # s; APPROVAL_HANDOFF in .env, 0/off = a Claude session waits for the decision in one go
+APPROVAL_HANDOFF = 30  # s; APPROVAL_HANDOFF in .env, 0/off = a Claude session waits for the decision in one go
 
 
 def approval_handoff(env):
