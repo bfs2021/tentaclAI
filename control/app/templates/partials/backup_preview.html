@@ -1,0 +1,34 @@
+{% from "_icons.html" import icon %}
+{% if error %}
+<p style="margin-top:12px"><span class="pill err">not read</span> {{ error }}</p>
+{% elif doc %}
+<form hx-post="/backup/import/apply" hx-target="#import-area" class="stack" style="margin-top:14px">
+  <p class="small">Export of <strong>{{ doc.host or '?' }}</strong>{% if doc.created %}, {{ doc.created[:16] | replace('T', ' ') }}{% endif %}{% if doc.tentaclai %}, tentaclAI {{ doc.tentaclai }}{% endif %}.
+    Overwritten files keep a copy (<code>.bak-…-import</code>). New jobs start paused, new notification channels disabled.</p>
+  {% for sec, items in rows.items() if items %}
+  {% set c = counts[sec] %}
+  <h3 style="margin:10px 0 4px">{{ sections[sec] }}
+    <span class="faint small">{% if c.new %}{{ c.new }} new {% endif %}{% if c.changed %}{{ c.changed }} changed {% endif %}{% if c.same %}{{ c.same }} same {% endif %}{% if c.invalid %}{{ c.invalid }} invalid{% endif %}</span></h3>
+  <div class="table-wrap"><table>
+    <tbody>
+    {% for r in items %}
+      <tr>
+        <td style="width:28px"><input type="checkbox" name="pick" value="{{ r.id }}" aria-label="Import {{ r.label }}"{{ ' checked' if r.checked }}{{ ' disabled' if r.status in ('same', 'invalid') }}></td>
+        <td class="mono">{{ r.label }}</td>
+        <td><span class="pill {{ {'new': 'ok', 'changed': 'warn', 'same': 'off', 'invalid': 'err'}[r.status] }}">{{ r.status }}</span></td>
+        <td class="small">
+          {% if r.error %}<span class="err-text">{{ r.error }}</span>{% elif r.note %}<span class="muted">{{ r.note }}</span>{% endif %}
+          {% if r.diff %}<details><summary class="small">what changes</summary><pre class="mono small diff">{{ r.diff }}</pre></details>{% endif %}
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table></div>
+  {% endfor %}
+  {% if not rows %}<p class="muted">The file holds nothing to import.</p>{% endif %}
+  <div class="row">
+    <button class="btn primary"{{ ' disabled' if not rows }}>{{ icon('check') }}Import picked</button>
+    <span class="help">Site rules and settings are not picked by default – they change how Claude works and what this installation is.</span>
+  </div>
+</form>
+{% endif %}

@@ -195,8 +195,13 @@ async def service_edit(request: Request, name: str):
     users = services_store.variable_users()
     for v in svc["vars"]:
         v["shared_with"] = [n for n in users.get(v["name"], []) if n != name]
+    try:
+        tpl, tpl_warnings = services_store.to_template(name)
+    except (ValueError, OSError):
+        tpl, tpl_warnings = None, []
     return page(request, "service_edit.html", svc=svc, raw=raw, systems=systems_store.load_all(),
-                suggested_test_path=services_store.template_test_path(name))
+                suggested_test_path=services_store.template_test_path(name), tpl=tpl, tpl_warnings=tpl_warnings,
+                categories=sorted({t["category"] for t in services_store.list_templates()}))
 
 
 @router.post("/services/{name}/tls")

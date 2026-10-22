@@ -12,6 +12,7 @@ from .config import SERVICES_DIR, STACK_DIR, is_secret  # noqa: F401  (STACK_DIR
 from .envfile import read_env, update_env
 
 TEMPLATES_DIR = os.path.join(SERVICES_DIR, "_templates")
+OWN_TEMPLATES_DIR = os.path.join(STACK_DIR, "local", "templates")  # imported templates (site data, git-ignored)
 
 NAME = re.compile(r"^[a-z0-9][a-z0-9_-]{0,40}$")
 PARTS = tclib.PARTS
@@ -101,10 +102,22 @@ def docker_info(d, env):
 PLACEHOLDER_DOMAIN = "example.com"  # {{DOMAIN}} in templates – the user enters the real address, nothing is guessed
 
 
+def template_path(tid):
+    """file of a template id – the shipped ones first, then own (imported) ones"""
+    if not NAME.match(tid or ""):
+        raise ValueError("invalid template")
+    p = os.path.join(TEMPLATES_DIR, f"{tid}.json")
+    own = os.path.join(OWN_TEMPLATES_DIR, f"{tid}.json")
+    return own if not os.path.exists(p) and os.path.exists(own) else p
+
+
 def list_templates():
     out = []
     domain = PLACEHOLDER_DOMAIN
-    for p in sorted(glob.glob(os.path.join(TEMPLATES_DIR, "*.json"))):
+    shipped = sorted(glob.glob(os.path.join(TEMPLATES_DIR, "*.json")))
+    taken = {os.path.basename(p) for p in shipped}
+    own = [p for p in sorted(glob.glob(os.path.join(OWN_TEMPLATES_DIR, "*.json"))) if os.path.basename(p) not in taken]
+    for p in shipped + own:
         try:
             with open(p) as f:
                 data = json.load(f)
@@ -113,7 +126,8 @@ def list_templates():
         meta = data.get("_meta", {})
         out.append({"id": os.path.basename(p)[:-5], "title": meta.get("title", os.path.basename(p)[:-5]),
                     "category": meta.get("category", "General"), "description": data.get("description", ""),
-                    "setup": meta.get("setup", "").replace("{{DOMAIN}}", domain), "kinds": [k for k in PARTS if k in data]})
+                    "setup": meta.get("setup", "").replace("{{DOMAIN}}", domain), "kinds": [k for k in PARTS if k in data],
+                    "own": p in own})
     order = ["Docker hosts", "Smart Home", "Automation", "Docker & Infra", "Monitoring", "Network", "Security", "Apps", "Development",
              "Git repos", "Databases", "Web sources", "Files", "General"]
     out.sort(key=lambda t: (order.index(t["category"]) if t["category"] in order else 99, t["title"].lower()))
@@ -267,9 +281,7 @@ def create(name, template="", address=""):
     address = address.strip()
     if address and not MAIL_ADDRESS.match(address):
         raise ValueError("mail address: name@domain")
-    src = os.path.join(TEMPLATES_DIR, f"{template}.json") if template else os.path.join(SERVICES_DIR, "_template.json")
-    if template and not NAME.match(template):
-        raise ValueError("invalid template")
+    src = template_path(template) if template else os.path.join(SERVICES_DIR, "_template.json")
     try:
         with open(src) as f:
             tpl = json.load(f)
@@ -288,6 +300,95 @@ def create(name, template="", address=""):
         _set_address(data, address)
     data = {"name": name, **{k: v for k, v in data.items() if k != "name"}}
     save_raw(name, json.dumps(data, ensure_ascii=False))
+
+
+# ---------------------------------------------------------------- own templates (export a service, import a template)
+
+IPV4 = re.compile(r"\b\d{1,3}(\.\d{1,3}){3}\b")
+URL_HOST = re.compile(r"\b[a-z][a-z0-9+.-]*://(?:[^@/\s\"]*@)?([A-Za-z0-9.-]+)")
+SITE_ONLY = ("name", "system", "enabled")  # top-level keys that belong to this installation
+
+
+def _blank(data, path):
+    obj = data
+    for k in path[:-1]:
+        obj = obj[k]
+    obj[path[-1]] = ""
+
+
+def _path_label(path):
+    return ".".join(str(k) for k in path)
+
+
+def to_template(name, title="", category="", setup=""):
+    """a service as a template like services/_templates/*.json: (template, warnings). Its own variables become EXAMPLE_…,
+    `svc <name>` becomes `svc NAME`, the internal domain {{DOMAIN}}; plain values in credential positions are blanked."""
+    data = json.loads(read_raw(name))
+    data = {k: v for k, v in data.items() if k not in SITE_ONLY and not k.startswith("_")}
+    for p in PARTS:
+        if isinstance(data.get(p), dict):
+            data[p].pop("insecure_tls", None)
+    warnings = []
+    for path in tclib.literal_secrets(data):
+        warnings.append(f"{_path_label(path)}: a plain value in a credential field was left out – use a ${{VAR}}")
+        _blank(data, path)
+    if isinstance(data.get("notes"), list):
+        setup = setup or next((n[7:] for n in data["notes"] if isinstance(n, str) and n.startswith("Setup: ")), "")
+        data["notes"] = [n for n in data["notes"] if not (isinstance(n, str) and n.startswith("Setup: "))]
+    text = json.dumps(data, ensure_ascii=False)
+    up = name.upper().replace("-", "_")
+    for v in sorted(variables(data), key=len, reverse=True):
+        if v.startswith(up + "_"):
+            text = text.replace("${" + v + "}", "${EXAMPLE_" + v[len(up) + 1:] + "}")
+    text = (text.replace(f"svc docker {name}", "svc docker NAME").replace(f"svc {name} ", "svc NAME ")
+            .replace(f" {name} ", " NAME ").replace(f'"{name}"', '"example"'))
+    domain = (read_env().get("TC_DOMAIN") or "").strip().lower()
+    if len(domain) > 3 and "." in domain:
+        text = re.sub(re.escape(domain), "{{DOMAIN}}", text, flags=re.I)
+    data = json.loads(text)
+    fixed = sorted({h for h in URL_HOST.findall(text) if "{{DOMAIN}}" not in h and h != "example.com"} | {m.group(0) for m in IPV4.finditer(text)})
+    if fixed:
+        warnings.append("fixed addresses: " + ", ".join(fixed) + " – fine for a public service, otherwise replace them with {{DOMAIN}}")
+    meta = {"title": (title or data.get("description") or name).strip()[:60], "category": (category or "General").strip()[:40]}
+    if setup.strip():
+        meta["setup"] = setup.strip()
+    return {"_meta": meta, **data}, warnings
+
+
+def check_template(data):
+    """refuses what is no usable template – and any plain value in a credential field (it would be a leaked secret)"""
+    if not isinstance(data, dict):
+        raise ValueError("a template is a JSON object")
+    if not isinstance(data.get("_meta"), dict) or not str(data["_meta"].get("title", "")).strip():
+        raise ValueError('no "_meta" with a title – not a tentaclAI template')
+    if not any(isinstance(data.get(p), dict) for p in PARTS):
+        raise ValueError(f"no part ({', '.join(PARTS)})")
+    bad = tclib.literal_secrets(data)
+    if bad:
+        raise ValueError("plain values in credential fields (use ${VAR}): " + ", ".join(_path_label(p) for p in bad))
+
+
+def save_template(tid, text):
+    """an own template into local/templates/<id>.json – ids of shipped templates are refused"""
+    tid = (tid or "").strip().lower()
+    if not NAME.match(tid):
+        raise ValueError("template name: lowercase letters, digits, - and _")
+    if os.path.exists(os.path.join(TEMPLATES_DIR, f"{tid}.json")):
+        raise ValueError(f"{tid} is a built-in template – pick another name")
+    data = json.loads(text)
+    check_template(data)
+    os.makedirs(OWN_TEMPLATES_DIR, exist_ok=True)
+    p = os.path.join(OWN_TEMPLATES_DIR, f"{tid}.json")
+    existed = os.path.exists(p)
+    if existed:
+        shutil.copy2(p, f"{p}.bak-{time.strftime('%Y-%m-%d-%H%M%S')}")
+    tmp = p + ".tmp"
+    with open(tmp, "w") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+        f.write("\n")
+    os.chmod(tmp, 0o644)
+    os.replace(tmp, p)
+    return tid, existed
 
 
 def set_enabled(name, enabled):
@@ -324,7 +425,7 @@ def template_test_path(name):
     if not NAME.match(name):
         return ""
     try:
-        with open(os.path.join(TEMPLATES_DIR, f"{name}.json")) as f:
+        with open(template_path(name)) as f:
             return json.load(f).get("test_path", "")
     except (OSError, ValueError):
         return ""

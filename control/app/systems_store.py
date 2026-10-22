@@ -51,6 +51,13 @@ def _write(path, data):
     os.replace(tmp, path)
 
 
+def save_raw(name, data):
+    """write a whole system definition (import) – members still come from the services' own "system" field"""
+    if not isinstance(data, dict):
+        raise ValueError("a system is a JSON object")
+    _write(path_of(name), {"name": name, **{k: v for k, v in data.items() if k != "name"}})
+
+
 def set_service_system(name, system):
     data = json.loads(services_store.read_raw(name))
     if system:

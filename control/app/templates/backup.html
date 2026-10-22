@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% from "_tabs.html" import settings_tabs %}
+{% from "_icons.html" import icon, help_link %}
+{% block title %}Export / Import{% endblock %}
+{% block content %}
+{{ settings_tabs('backup') }}
+<div class="header">
+  <div><h1>Export / Import</h1><div class="sub">The configuration of this installation as one JSON file – to keep it, or to set up a second installation. Secrets stay in <code>.env</code>: the file only names the variables the other side has to fill in.</div></div>
+  <div class="row">{{ help_link('backup') }}</div>
+</div>
+
+<div class="card" style="margin-bottom:16px">
+  <h2>Export</h2>
+  <form method="get" action="/backup/export" class="stack">
+    <div class="row" style="flex-wrap:wrap;gap:6px 18px">
+      {% for key, label in sections.items() %}
+      <label class="check"><input type="checkbox" name="part" value="{{ key }}" checked> {{ label }}</label>
+      {% endfor %}
+    </div>
+    <div class="row">
+      <button class="btn primary">{{ icon('download') }}Download</button>
+      <span class="help">No tokens or passwords, no SSH keys – but host names, addresses and your site rules: don't share it publicly.</span>
+    </div>
+  </form>
+  {% if left_out %}
+  <p class="small" style="margin-top:10px"><span class="pill warn">left out</span> Plain values in credential fields are not exported – move them to <code>.env</code> as a <code>${VAR}</code>:
+    {% for svc, path in left_out %}<a href="/services/{{ svc }}" class="mono">{{ svc }}</a> <span class="mono faint">{{ path }}</span>{{ ', ' if not loop.last }}{% endfor %}</p>
+  {% endif %}
+</div>
+
+<div class="card">
+  <h2>Import</h2>
+  <form hx-post="/backup/import/preview" hx-encoding="multipart/form-data" hx-target="#import-area" class="row" style="flex-wrap:wrap">
+    <input type="file" name="file" accept=".json,application/json" aria-label="Export file" required>
+    <button class="btn">{{ icon('upload') }}Preview</button>
+    <span class="help">Nothing changes yet – you see what is new or different and pick what to take over.</span>
+  </form>
+  <div id="import-area"{% if pending %} hx-get="/backup/import/preview" hx-trigger="load"{% endif %}></div>
+</div>
+{% endblock %}

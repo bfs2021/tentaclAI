@@ -14,7 +14,7 @@ import tclib
 from . import activity, auth, connectors, dockerops, netguard, notify, scheduled, services_store, skills, updatecheck, usage
 from .config import SSH_DIR
 from .envfile import read_env
-from .routes import claude, jobs, network, settings, ssh, system, tentacles
+from .routes import backup, claude, jobs, network, settings, ssh, system, tentacles
 from .web import BASE, TC_VERSION
 
 
@@ -179,5 +179,5 @@ async def announce_setup():
         print("=" * 72, flush=True)
 
 
-for _r in (system, tentacles, ssh, network, settings, claude, jobs):  # one router per area of the UI
+for _r in (system, backup, tentacles, ssh, network, settings, claude, jobs):  # one router per area of the UI
     app.include_router(_r.router)

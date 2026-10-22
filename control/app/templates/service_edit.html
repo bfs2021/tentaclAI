@@ -25,6 +25,7 @@
     <a class="btn primary" href="/terminal?p=onboard&alias={{ svc.name | urlencode }}" title="Claude tests and explores the service and agrees on purpose, scope and rules with you">{{ icon('sparkle') }}Onboard with Claude</a>
     <button class="btn" hx-post="/services/{{ svc.name }}/toggle">{{ 'Disable' if svc.enabled else 'Enable' }}</button>
     <button class="btn" type="button" aria-expanded="false" onclick="var f=document.getElementById('rename-form');f.hidden=!f.hidden;this.setAttribute('aria-expanded',String(!f.hidden));if(!f.hidden)f.querySelector('input').select()">Rename</button>
+    {% if tpl %}<button class="btn" type="button" aria-expanded="false" title="Download this service as a template – without its tokens, name and system" onclick="var f=document.getElementById('template-form');f.hidden=!f.hidden;this.setAttribute('aria-expanded',String(!f.hidden))">{{ icon('download') }}Template</button>{% endif %}
     <button class="btn danger" hx-post="/services/{{ svc.name }}/delete" hx-confirm="Delete service {{ svc.name }}? (tokens in .env are kept)">{{ icon('trash') }}Delete</button>
     {{ help_link('services') }}
   </div>
@@ -33,6 +34,19 @@
     <button class="btn primary">{{ icon('check') }}Rename</button>
     <span class="help">Claude then calls it <code>svc &lt;new name&gt;</code>; tokens, system and rules stay{% if 'git' in svc.kinds %}, the repo moves to <code>/workspace/repos/&lt;new name&gt;</code>{% endif %}.</span>
   </form>
+  {% if tpl %}
+  <form id="template-form" class="stack" method="get" action="/services/{{ svc.name }}/template" autocomplete="off" style="margin-top:10px" hidden>
+    <div class="row" style="flex-wrap:wrap">
+      <input type="text" name="title" value="{{ tpl._meta.title }}" aria-label="Template title" placeholder="Title" style="max-width:260px" maxlength="60">
+      <input type="text" name="category" value="{{ tpl._meta.category }}" aria-label="Category" placeholder="Category" list="tpl-categories" style="max-width:200px" maxlength="40">
+      <datalist id="tpl-categories">{% for c in categories %}<option value="{{ c }}">{% endfor %}</datalist>
+      <input type="text" name="setup" value="{{ tpl._meta.setup or '' }}" aria-label="Setup hint" placeholder="Setup hint, e.g. where to create the token" style="flex:1;min-width:240px">
+      <button class="btn primary">{{ icon('download') }}Download</button>
+    </div>
+    <span class="help">Tokens stay out: variables of this service become <code>EXAMPLE_…</code>, <code>svc {{ svc.name }}</code> becomes <code>svc NAME</code>, the internal domain <code>{{ '{{DOMAIN}}' }}</code>. Import it on another installation under Services → Add service.</span>
+    {% for w in tpl_warnings %}<span class="small"><span class="pill warn">check</span> {{ w }}</span>{% endfor %}
+  </form>
+  {% endif %}
 </div>
 
 {% if 'example.com' in raw %}

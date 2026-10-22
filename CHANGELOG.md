@@ -2,6 +2,21 @@
 
 All notable changes, newest first. Every release lists **upgrade steps** from the previous one.
 
+## Unreleased
+
+### Highlights
+- **Export / Import** (Settings → Export / Import): the configuration as one JSON file – services, systems, SSH hosts,
+  jobs, network rules, notifications, site rules and plain settings. No secrets: the file only names the variables the
+  other side needs. Import shows a preview (new / changed / same / invalid, with a diff), you pick the entries; an
+  overwritten file keeps a `.bak-…-import`, new jobs start paused, new channels disabled, missing variables can be
+  filled in right after.
+- **Service templates:** “Template” on a service page downloads it as a template (own variables → `EXAMPLE_…`, the
+  internal domain → `{{DOMAIN}}`, plain credentials left out); Services → *Import a template …* saves one to
+  `local/templates/`.
+
+### Upgrade
+- `git pull`, `docker compose build control`, `docker compose up -d control` – only tentacontrol is recreated.
+
 ## v0.16.0 – 2026-10-22
 
 ### Highlights

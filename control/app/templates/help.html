@@ -243,7 +243,7 @@
         <tr><td style="white-space:nowrap"><strong>{{ cat }}</strong></td><td>{% for t in items %}{{ t.title }}{{ ", " if not loop.last }}{% endfor %}</td></tr>
         {% endfor %}
       </table>
-      <p class="muted small">Own templates: put a JSON file into <code>services/_templates/</code> (with <code>"_meta": {"title", "category", "setup"}</code>).</p>
+      <p class="muted small">Own templates: import one under Services → <em>Import a template …</em> (saved in <code>local/templates/</code>; a service page’s “Template” button makes one) (with <code>"_meta": {"title", "category", "setup"}</code>).</p>
     </section>
 
     <section class="card" id="inventory">
@@ -354,6 +354,10 @@
       <p>Settings → <a href="/notifications">Notifications</a>: add channels (ntfy, webhook, e-mail – server, port, security, sender, recipients, optional login – or any <a href="https://github.com/caronc/apprise/wiki" target="_blank" rel="noopener">Apprise URL</a> – Telegram, Discord, Slack, Teams, e-mail, Home Assistant), send a test, and tick which event goes to which channel. Urgent events (approval needed, Remote Control down, signed out, container stopped) also come during quiet hours; the same event is sent at most once per dedupe interval. Channel URLs are stored in <code>.env</code> as <code>NOTIFY_URL_…</code>.</p>
           <h3 id="two-factor">Security</h3>
       <p>Settings → <a href="/security">Security</a> switches on <strong>two-factor sign-in</strong>: scan the QR code with an authenticator app (Google Authenticator, Aegis, 1Password, Bitwarden …), enter its code, keep the 10 recovery codes (each works once, for a lost phone). From then on tentacontrol asks for a code after the password; “Trust this browser” skips it for 30 days in that browser – the trusted browsers are listed there and can be revoked. Switching off needs the password and a code. No phone and no recovery code: <code>./tentaclai.sh reset-2fa</code> on the host. A sign-in with a recovery code sends a notification.</p>
+          <h3 id="backup">Export / Import</h3>
+      <p>Settings → <a href="/backup">Export / Import</a> saves the configuration as one JSON file – services, systems, SSH hosts, jobs, network rules, notifications (channels without their URLs, routes, quiet hours), the site rules <code>local/CLAUDE.md</code> and the plain settings (without host paths) – to keep it or to set up a second installation. <strong>No secrets:</strong> tokens, passwords, channel URLs and SSH keys stay in <code>.env</code> and <code>ssh/keys</code>; the file lists only the names of the variables the configuration needs. A plain value in a service's credential field (instead of a <code>${VAR}</code>) is left out and shown on the page. The file still holds host names and addresses – don't share it publicly.</p>
+      <p>Import is two steps: the uploaded file is compared with this installation (<em>new</em>, <em>changed</em> with a diff, <em>same</em>, <em>invalid</em> with the reason) and nothing changes until you pick entries and click <em>Import picked</em>. Every entry goes through the same checks as the editor; SSH hosts come over only as host, user, port, jump host, host key alias, sudo and access – no other ssh options. An overwritten file keeps a copy <code>*.bak-&lt;date&gt;-import</code>; new jobs start paused, new notification channels disabled; network entries are added to the lists, not replacing them. Site rules and settings are not picked by default. Afterwards the variables still empty can be filled in right there; imported SSH hosts need this installation's public key.</p>
+      <p><strong>Templates:</strong> “Template” on a service page downloads the service as a template – name, system and TLS exception left out, its own variables as <code>EXAMPLE_…</code>, <code>svc &lt;name&gt;</code> as <code>svc NAME</code>, the internal domain (<code>TC_DOMAIN</code>) as <code>{{ '{{DOMAIN}}' }}</code>; fixed addresses that remain are pointed out. Services → <em>Import a template …</em> saves one in <code>local/templates/</code> (marked <em>own</em> in the list); names of built-in templates and plain values in credential fields are refused.</p>
 </section>
 
     <section class="card" id="updates">
@@ -423,7 +427,6 @@ gh …                      GitHub CLI without credentials (public data)</pre>
       <h2>Roadmap</h2>
       <ul>
         <li><strong>Claude via API</strong> (n8n &amp; co.): start Claude jobs from outside – HTTP API with its own tokens and profiles (<em>read-only</em> / <em>standard</em>; the svc and gateway guard rails stay), wait for the result or poll a job id, structured answers via a JSON schema, an MCP endpoint (<code>ask_claude</code>) for n8n's MCP client; off by default.</li>
-        <li><strong>Export/import</strong>: configuration and templates, e.g. for a second installation or to share templates.</li>
         <li><strong>More sandbox</strong>: prompt-injection safeguards for content from services.</li>
       </ul>
     </section>

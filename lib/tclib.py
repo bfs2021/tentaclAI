@@ -86,6 +86,32 @@ def secret_variables(obj, inside=False):
     return found
 
 
+_SECRET_HEADER = ("auth", "key", "token", "secret", "password", "cookie")  # headers/env entries that hold a credential
+
+
+def literal_secrets(obj, inside=False, path=()):
+    """key paths (tuples) where a credential position holds a plain value instead of a ${VAR} – such a value would
+    leave the installation with an export or a template. Other headers/env entries (e.g. Accept) are not counted."""
+    found = []
+    if isinstance(obj, dict):
+        for k, v in obj.items():
+            key = str(k).lower()
+            if key.startswith("_") or key in _NOT_CREDENTIAL:
+                continue
+            if key in ("headers", "env") and isinstance(v, dict):
+                for hk, hv in v.items():
+                    if any(w in str(hk).lower() for w in _SECRET_HEADER):
+                        found += literal_secrets(hv, True, path + (k, hk))
+                continue
+            found += literal_secrets(v, inside or key == "auth" or any(w in key for w in _CREDENTIAL_WORDS), path + (k,))
+    elif isinstance(obj, list):
+        for i, v in enumerate(obj):
+            found += literal_secrets(v, inside, path + (i,))
+    elif isinstance(obj, str) and inside and obj.strip() and not VAR.search(obj):
+        found.append(path)
+    return found
+
+
 def missing(obj, env):
     return sorted(v for v in variables(obj) if not env.get(v))
 
@@ -438,8 +464,13 @@ def ssh_add(conf_d, fields, comment="added in tentacontrol"):
     path = os.path.join(conf_d, f"{fields['alias']}.conf")
     if os.path.exists(path):
         raise ValueError(f"{os.path.basename(path)} exists already")
+    extra = []
+    if fields.get("hostkeyalias"):  # e.g. from an import – the only unmanaged line that is taken over
+        if not HOST_RE.match(fields["hostkeyalias"]):
+            raise ValueError("HostKeyAlias: a DNS name")
+        extra.append(f"    HostKeyAlias {fields['hostkeyalias']}\n")
     os.makedirs(conf_d, exist_ok=True)
-    _write(path, [f"# {comment}\n"] + _block_lines(fields))
+    _write(path, [f"# {comment}\n"] + _block_lines(fields, extra))
 
 
 def _locate(conf_d, alias):

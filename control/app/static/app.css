@@ -477,3 +477,6 @@ input[type=checkbox]:not(.switch-cb) { accent-color: var(--accent-2); }
 /* a paused job steps back – its switch and Run now stay fully visible */
 .job-card.paused h2, .job-card.paused .small.muted, .job-card.paused .mem-entry, .job-card.paused .job-history { opacity: .55; }
 .job-card.paused .paused-note { color: var(--text); }
+/* Settings → Export / Import */
+.err-text { color: var(--err); }
+pre.diff { max-height: 320px; overflow: auto; white-space: pre; background: var(--panel-2); padding: 8px 10px; border-radius: 8px; margin: 6px 0 0; }

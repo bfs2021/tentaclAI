@@ -1,0 +1,32 @@
+{% from "_icons.html" import icon %}
+<div class="stack" style="margin-top:14px">
+  <h3 style="margin:0">Imported</h3>
+  <div class="table-wrap"><table>
+    <tbody>
+    {% for r in results %}
+      <tr><td class="faint small">{{ r.section }}</td><td class="mono">{{ r.label }}</td>
+        <td><span class="pill {{ 'ok' if r.ok else 'err' }}">{{ r.msg if r.ok else 'failed' }}</span>{% if not r.ok %} <span class="small">{{ r.msg }}</span>{% endif %}</td></tr>
+    {% endfor %}
+    </tbody>
+  </table></div>
+  {% if ssh %}<p class="small">SSH hosts came over without keys: put this installation's public key on them (<a href="/ssh">SSH</a>) and check the host keys there.</p>{% endif %}
+  {% if restart %}<p class="small">Some settings apply after “Apply now” at the top.</p>{% endif %}
+
+  {% if missing %}
+  <h3 style="margin:10px 0 0">Missing variables</h3>
+  <p class="help" style="margin-top:0">Tokens, passwords and channel URLs are not part of an export – enter them here (they go to <code>.env</code>), or later on the service pages.</p>
+  <form hx-post="/backup/variables" autocomplete="off" class="stack">
+    <div class="fields">
+      {% for v in missing %}
+      <div class="field">
+        <label for="mv-{{ v.name }}" class="mono small">{{ v.name }}</label>
+        <input id="mv-{{ v.name }}" type="{{ 'password' if v.secret else 'text' }}" name="k_{{ v.name }}" placeholder="empty"{{ ' autocomplete=new-password' if v.secret }}>
+      </div>
+      {% endfor %}
+    </div>
+    <div class="row"><button class="btn primary">{{ icon('check') }}Save</button><span class="help">Empty fields stay empty.</span></div>
+  </form>
+  {% else %}
+  <p class="small"><span class="pill ok">complete</span> Every variable the configuration uses is set.</p>
+  {% endif %}
+</div>

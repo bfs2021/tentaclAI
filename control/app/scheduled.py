@@ -346,8 +346,9 @@ def slug(name):
     return f"{s}-job" if s in RESERVED else s
 
 
-def validate(form):
-    """form values → the job's fields (raises ValueError) – the editor and `svc config put job` share these rules"""
+def validate(form, known=None):
+    """form values → the job's fields (raises ValueError) – the editor and `svc config put job` share these rules;
+    known: the tentacles @mentions may name (default: the existing ones)"""
     name = (form.get("name") or "").strip()
     prompt = (form.get("prompt") or "").replace("\r\n", "\n").strip()
     if not name or len(name) > 60:
@@ -377,7 +378,7 @@ def validate(form):
     propose = bool(form.get("propose"))
     if propose and profile != "read-only":
         raise ValueError("proposing actions needs the read-only profile – the run only analyses, you pick what runs")
-    errors, _ = check_mentions({"prompt": prompt, "profile": profile, "scope": scope})
+    errors, _ = check_mentions({"prompt": prompt, "profile": profile, "scope": scope}, known)
     if errors:
         raise ValueError("; ".join(errors))
     return {"name": name, "prompt": prompt, "profile": profile, "notify": rule, "model": model, "effort": effort,

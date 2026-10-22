@@ -31,7 +31,7 @@
           <div class="combo-opt" role="option" data-value="" data-label="Custom (own definition)" data-desc="">Custom <span class="faint">(own definition)</span></div>
           {% for cat, items in templates_list | groupby("category") %}
           <div class="combo-group">{{ cat }}</div>
-          {% for t in items %}<div class="combo-opt" role="option" data-value="{{ t.id }}" data-label="{{ t.title }}" data-kinds="{{ t.kinds | join(' ') }}" data-search="{{ cat }} {{ t.description }}" data-desc="{{ t.description }}{% if t.setup %} – {{ t.setup }}{% endif %}">{{ t.title }}<span class="combo-kinds">{{ t.kinds | join('+') }}</span></div>{% endfor %}
+          {% for t in items %}<div class="combo-opt" role="option" data-value="{{ t.id }}" data-label="{{ t.title }}" data-kinds="{{ t.kinds | join(' ') }}" data-search="{{ cat }} {{ t.description }}" data-desc="{{ t.description }}{% if t.setup %} – {{ t.setup }}{% endif %}">{{ t.title }}{% if t.own %} <span class="pill info">own</span>{% endif %}<span class="combo-kinds">{{ t.kinds | join('+') }}</span></div>{% endfor %}
           {% endfor %}
           <div class="combo-empty" hidden>No matching template</div>
         </div>
@@ -51,7 +51,14 @@
   {% if like %}
   <div class="help">Host, port, TLS, folders, access and system are copied; the new service gets its own variables – enter the password in its Edit page afterwards.</div>
   {% else %}
-  <div class="help" id="tpl-hint">{{ templates_list | length }} templates: docker hosts, smart home, automation, infrastructure, monitoring, network, security, apps, development, git repos, databases, web sources, files, mail.</div>
+  <div class="help" id="tpl-hint">{{ templates_list | length }} templates: docker hosts, smart home, automation, infrastructure, monitoring, network, security, apps, development, git repos, databases, web sources, files, mail.
+    <a href="#" onclick="var f=document.getElementById('tpl-import');f.hidden=!f.hidden;return false">Import a template …</a></div>
+  <form id="tpl-import" class="row" hx-post="/services/template-import" hx-encoding="multipart/form-data" autocomplete="off" style="margin-top:8px;flex-wrap:wrap" hidden>
+    <input type="file" name="file" accept=".json,application/json" aria-label="Template file" required>
+    <input type="text" name="name" placeholder="template name (default: file name)" aria-label="Template name" class="mono" pattern="[a-z0-9][a-z0-9_-]{0,40}" style="max-width:260px">
+    <button class="btn">{{ icon('upload') }}Import</button>
+    <span class="help">A template downloaded from a service page (“Template”) – saved in <code>local/templates/</code>.</span>
+  </form>
   {% endif %}
   <script>
     (function () {
