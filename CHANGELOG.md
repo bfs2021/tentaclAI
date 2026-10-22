@@ -2,7 +2,7 @@
 
 All notable changes, newest first. Every release lists **upgrade steps** from the previous one.
 
-## Unreleased
+## v0.17.0 – 2026-10-22
 
 ### Highlights
 - **Export / Import** (Settings → Export / Import): the configuration as one JSON file – services, systems, SSH hosts,
