@@ -16,11 +16,11 @@ All notable changes, newest first. Every release lists **upgrade steps** from th
 ### Changes
 - **tentaclAI Community / Enterprise:** tentacontrol loads extensions (`TC_EXTENSIONS`, default
   `tentaclai_enterprise`, skipped when not installed) – their routes and templates come first. tentaclAI Enterprise is a
-  separate package. In Community the sidebar shows *Modules* locked (a greyed-out list of the Enterprise modules
-  behind “Modules are only available with a valid Enterprise license”); extensions register their modules, and a
-  licensed module brings its own sidebar entry. Settings → *License* says what an Enterprise license adds and shows the *Installation ID* (derived
-  from the hardware – system UUID of the firmware, else the Docker engine ID – never stored). New dependency of
-  tentacontrol: `cryptography` (for extensions mounted into the image).
+  separate package. In Community the sidebar shows *Modules* locked (a greyed-out list of the Enterprise modules behind
+  “Modules are only available with a valid Enterprise license”); extensions register their modules, and a licensed
+  module brings its own sidebar entry. Settings → *License* says what an Enterprise license adds and shows the
+  *Installation ID* (derived from the hardware – system UUID of the firmware, else the Docker engine ID – never
+  stored). New dependency of tentacontrol: `cryptography` (for extensions mounted into the image).
 - Sidebar: new flagged entries (possible prompt injection) show as a yellow *⚠ count* next to *Activity*, and the
   Overview names them with a link – both until Activity is opened. Separate from the pulsing approval badge; the tab
   title and favicon stay for approvals.
@@ -37,6 +37,7 @@ All notable changes, newest first. Every release lists **upgrade steps** from th
   *expired*) are logged too, with the part `network` – until now they only showed under *Recent decisions*.
 - Activity → Recent decisions: *Always* shows as *allowed* and *Block* as *blocked* (orange) instead of *approved* /
   *denied*, so a lasting choice stands out from a one-off Allow or Deny.
+- README links the [intro video](https://www.bitbunker.at/tentaclai/).
 - Settings → General: the group of the prompt-injection switch is called *Prompt injection* (was *Security*, easy to
   mix up with the Security tab); Help names where the switch is.
 
