@@ -47,7 +47,7 @@
         <td class="mono small audit-action">{{ clip(e.action) }}</td>
         <td class="small muted audit-from">{% if e.from_link %}<a href="{{ e.from_link }}">{{ e.from_label }}</a>{% else %}{{ e.from_label or '–' }}{% endif %}</td>
         <td><span class="pill {{ {'auto':'info','approved':'ok','denied':'err','blocked':'warn','expired':'off','error':'err','flagged':'warn'}.get(e.decision, 'off') }}">{{ e.decision }}</span>{% if e.detail %}<div class="small faint audit-detail">{{ e.detail }}</div>{% endif %}</td>
-        <td class="small audit-result">{% if e.exit is defined %}{{ '✓' if e.exit == 0 else '✗ exit ' ~ e.exit }}{% if e.seconds is defined %} <span class="faint">{{ e.seconds }} s</span>{% endif %}{% else %}<span class="faint">not run</span>{% endif %}{% if e.error %}<div class="mono small audit-error">{{ clip(e.error, 60) }}</div>{% endif %}</td>
+        <td class="small audit-result">{% if e.exit is defined %}{{ '✓' if e.exit == 0 else '✗ exit ' ~ e.exit }}{% if e.seconds is defined %} <span class="faint">{{ e.seconds }} s</span>{% endif %}{% elif e.part == 'network' %}<span class="faint">–</span>{% else %}<span class="faint">not run</span>{% endif %}{% if e.error %}<div class="mono small audit-error">{{ clip(e.error, 60) }}</div>{% endif %}</td>
       </tr>
     {% endfor %}
     </tbody>

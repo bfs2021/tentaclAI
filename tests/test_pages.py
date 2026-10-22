@@ -200,6 +200,24 @@ def test_approval_shows_where_it_came_from(client, app_module):
         activity.decide(rid, False)
 
 
+def test_network_decision_lands_in_the_audit_log(client, app_module, tmp_path, monkeypatch):
+    """svc never sees the gateway's requests – tentacontrol logs the decision itself"""
+    import json
+    from app import activity, egress
+    monkeypatch.setattr(activity, "AUDIT_FILE", str(tmp_path / "audit.jsonl"))
+    monkeypatch.setattr(egress, "add", lambda kind, entry: None)
+    monkeypatch.setattr(activity, "GRANTS", {})  # the "+ 10 min" below must not outlive the test
+    rid = activity.create("evil.test:443", "network", "connect to evil.test:443")
+    client.post(f"/approvals/{rid}/block")
+    rid2 = activity.create("api.test:443", "network", "connect to api.test:443")
+    client.post(f"/approvals/{rid2}/net10")
+    e = [json.loads(line) for line in (tmp_path / "audit.jsonl").read_text().splitlines()]
+    assert [(x["service"], x["part"], x["decision"]) for x in e] == [("evil.test:443", "network", "blocked"), ("api.test:443", "network", "approved")]
+    assert "on the blocklist" in e[0]["detail"] and "+ 10 min" in e[1]["detail"]
+    html = client.get("/activity?since=all").text
+    assert "evil.test:443" in html and "not run" not in html
+
+
 def test_favicon_without_login(app_module):
     from fastapi.testclient import TestClient
     c = TestClient(app_module.app)

@@ -1,4 +1,4 @@
-"""Activity: pending approvals (access mode "confirm") and the audit log written by svc.
+"""Activity: pending approvals (access mode "confirm") and the audit log written by svc (network decisions: by tentacontrol).
 
 svc talks to the /internal/* endpoints with the token in data/control/svc-token; approvals live in memory –
 after a restart of tentacontrol, waiting requests end as "error" and svc does not execute them (fail closed).
@@ -45,12 +45,36 @@ def token_ok(value):
         return False
 
 
+def audit(service, part, mode, action, decision, detail=""):
+    """append one line to the audit log, in svc's format – for what only tentacontrol sees (network decisions); never raises"""
+    entry = {"ts": time.strftime("%Y-%m-%dT%H:%M:%S%z"), "service": service, "part": part, "mode": mode,
+             "action": action[:500], "decision": decision}
+    if detail:
+        entry["detail"] = detail[:300]
+    try:
+        import fcntl
+        if os.path.exists(AUDIT_FILE) and os.path.getsize(AUDIT_FILE) > 5 * 2**20:
+            os.replace(AUDIT_FILE, AUDIT_FILE + ".1")
+        with open(AUDIT_FILE, "a") as f:
+            fcntl.flock(f, fcntl.LOCK_EX)
+            f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+    except OSError:
+        pass
+
+
+def audit_network(a, decision, detail=""):
+    """a decided request of the egress gateway (unknown destination) – svc never sees these"""
+    if a.get("part") == "network":
+        audit(a["service"], "network", "confirm", a["action"], decision, detail or a.get("by", ""))
+
+
 def _expire():
     now = time.time()
     for a in APPROVALS.values():
         if a["status"] == "pending" and now - a["created"] > TIMEOUT:
             a.update(status="expired", decided=now)
             a["event"].set()
+            audit_network(a, "expired", "no decision in time")
             notify.emit("expired", f"Approval expired: {a['service']}", a["action"], key=f"expired:{a['id']}")
     for k in [k for k, a in APPROVALS.items() if a["status"] != "pending" and now - a.get("decided", now) > 3600]:
         APPROVALS.pop(k, None)
