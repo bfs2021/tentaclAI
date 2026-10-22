@@ -42,7 +42,7 @@
     {% for e in entries %}
       <tr>
         <td class="mono small nowrap">{{ e.ts[11:19] }}<div class="faint">{{ e.ts[:10] }}</div></td>
-        <td>{{ e.service }}</td>
+        <td class="nowrap">{{ e.service }}</td>
         <td><span class="tag">{{ e.part }}</span><div class="small faint" style="margin-top:3px">{{ e.mode }}</div></td>
         <td class="mono small audit-action">{{ clip(e.action) }}</td>
         <td class="small muted audit-from">{% if e.from_link %}<a href="{{ e.from_link }}">{{ e.from_label }}</a>{% else %}{{ e.from_label or '–' }}{% endif %}</td>
