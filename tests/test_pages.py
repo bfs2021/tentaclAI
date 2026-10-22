@@ -457,7 +457,8 @@ def test_mailbox_name_address_and_another_mailbox(client, app_module):
         services_store.save_raw("mail-root-bit", json.dumps(d))
         html = client.get("/services").text
         assert "root@bit.test" in html and "/services?like=mail-root-bit" in html
-        assert "Another mailbox on the server of" in client.get("/services?like=mail-root-bit").text
+        form = client.get("/services?like=mail-root-bit").text
+        assert "Another mailbox on the server of" in form and "joins system <strong>box</strong>" in form
         assert "Another mailbox" not in client.get("/services?like=demoapi").text.split('id="new-svc"')[1][:400]
         r = client.post("/services/new", data={"name": "mail-info-bit", "like": "mail-root-bit", "address": "info@bit.test"},
                         headers={"HX-Request": "true"})

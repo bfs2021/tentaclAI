@@ -19,7 +19,7 @@
     <input type="hidden" name="like" value="{{ like.name }}">
     <div style="flex:2;min-width:260px">
       <label>Another mailbox on the server of</label>
-      <div class="like-src"><strong>{{ like.name }}</strong>{% if like.mailbox %} <span class="muted">({{ like.mailbox }})</span>{% endif %} <a class="small" href="/services">cancel</a></div>
+      <div class="like-src"><strong>{{ like.name }}</strong>{% if like.mailbox %} <span class="muted">({{ like.mailbox }})</span>{% endif %}{% if like.system %} <span class="muted">→ joins system <strong>{{ like.system }}</strong></span>{% endif %} <a class="small" href="/services">cancel</a></div>
     </div>
     {% else %}
     <div style="flex:2;min-width:260px">
