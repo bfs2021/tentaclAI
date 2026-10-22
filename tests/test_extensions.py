@@ -9,9 +9,10 @@ def test_community_placeholders(client):
     assert 'id="instance-id"' in html or "has no ID" in html
     assert "Reports are only available with a valid Enterprise license" in client.get("/reports").text
     html = client.get("/modules").text
-    assert "Compliance reports" in html and "SIEM export" in html and "locked" in html and "To use Enterprise modules" in html
+    assert "Compliance reports" in html and "SIEM export" in html and "Modules are only available with a valid Enterprise license" in html
     nav = client.get("/settings").text
-    assert nav.count('title="Enterprise"') == 2  # Reports and Modules carry the lock
+    assert nav.count('title="Enterprise"') == 1 and 'href="/modules"' in nav  # Modules carries the lock
+    assert 'href="/reports"' not in nav  # Reports only shows once a license unlocks it
 
 
 def test_instance_id_comes_from_the_hardware(app_module, tmp_path, monkeypatch):

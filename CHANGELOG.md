@@ -16,8 +16,8 @@ All notable changes, newest first. Every release lists **upgrade steps** from th
 ### Changes
 - **tentaclAI Community / Enterprise:** tentacontrol loads extensions (`TC_EXTENSIONS`, default
   `tentaclai_enterprise`, skipped when not installed) – their routes and templates come first. tentaclAI Enterprise is a
-  separate package. In Community the sidebar shows *Reports* and *Modules* locked (Modules lists the Enterprise
-  modules), and Settings → *License* says what an Enterprise license adds and shows the *Installation ID* (derived
+  separate package. In Community the sidebar shows *Modules* locked (a greyed-out list of the Enterprise modules
+  behind “Modules are only available with a valid Enterprise license”); *Reports* appears once a license unlocks it. Settings → *License* says what an Enterprise license adds and shows the *Installation ID* (derived
   from the hardware – system UUID of the firmware, else the Docker engine ID – never stored). New dependency of
   tentacontrol: `cryptography` (for extensions mounted into the image).
 - Sidebar: new flagged entries (possible prompt injection) show as a yellow *⚠ count* next to *Activity*, and the

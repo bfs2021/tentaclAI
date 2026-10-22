@@ -1,18 +1,7 @@
 {% extends "base.html" %}
 {% from "_icons.html" import icon %}
 {% block title %}Modules{% endblock %}
-{% block content %}
-<div class="header">
-  <div><h1>Modules</h1><div class="sub">Enterprise modules extend tentaclAI beyond the open-source edition.</div></div>
-  <div class="row"><span class="pill {{ 'off' if edition == 'community' else 'ok' }}">{{ icon('lock') }}{{ 'Community' if edition == 'community' else 'Enterprise' }}</span></div>
-</div>
-
-{% if edition == 'community' %}
-<div class="card" style="margin-bottom:16px">
-  <p class="small" style="margin:0">To use Enterprise modules, you need tentaclAI Enterprise and a valid Enterprise license – see <a href="/license">License</a>.</p>
-</div>
-{% endif %}
-
+{% macro module_cards() %}
 <div class="grid">
   {% for key, title, text in modules %}
   {% set on = key in features %}
@@ -23,4 +12,24 @@
   </div>
   {% endfor %}
 </div>
+{% endmacro %}
+{% block content %}
+<div class="header">
+  <div><h1>Modules</h1><div class="sub">Enterprise modules extend tentaclAI beyond the open-source edition.</div></div>
+  <div class="row"><span class="pill {{ 'off' if edition == 'community' else 'ok' }}">{{ icon('lock') }}{{ 'Community' if edition == 'community' else 'Enterprise' }}</span></div>
+</div>
+
+{% if edition == 'community' %}
+<div class="locked">
+  <div class="locked-preview" aria-hidden="true">{{ module_cards() }}</div>
+  <div class="locked-note card">
+    <div class="locked-icon">{{ icon('lock') }}</div>
+    <h2>Modules are only available with a valid Enterprise license.</h2>
+    <p class="muted small">Compliance reports, the SIEM export of the audit log and more come with tentaclAI Enterprise.</p>
+    <a class="btn sm" href="/license" style="margin-top:6px">License</a>
+  </div>
+</div>
+{% else %}
+{{ module_cards() }}
+{% endif %}
 {% endblock %}
