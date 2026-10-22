@@ -326,6 +326,12 @@ def test_run_log_partial(client, app_module, monkeypatch, tmp_path):
     assert "No steps recorded" in client.get("/jobs/runs/zzz999/log").text
 
 
+def test_settings_show_default_job_helpers(client):
+    from app import scheduled
+    html = client.get("/settings").text
+    assert 'placeholder="default: ' + ", ".join(scheduled.HELPERS_DEFAULT) + '"' in html
+
+
 def test_settings_refuse_dangerous_job_helpers(client):
     r = client.post("/settings", data={"k_JOB_READONLY_HELPERS": "head, bash, curl"}, headers={"HX-Request": "true"})
     assert "Helpers refused" in r.headers.get("HX-Trigger", "") and "bash, curl" in r.headers.get("HX-Trigger", "")

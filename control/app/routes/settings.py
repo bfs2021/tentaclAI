@@ -130,7 +130,11 @@ async def settings_page(request: Request):
     known = {k for _, items in SETTINGS_GROUPS for k, *_ in items}
     service_vars = {v["name"] for s in services_store.load_all() for v in s["vars"]}
     other = sorted(k for k in env if k not in known and k not in service_vars)
-    return page(request, "settings.html", groups=SETTINGS_GROUPS, env=env, other=other, is_secret=services_store.secret_check())
+    from .. import scheduled
+    # shown greyed out in empty fields whose default lives in code
+    placeholders = {"JOB_READONLY_HELPERS": "default: " + ", ".join(scheduled.HELPERS_DEFAULT)}
+    return page(request, "settings.html", groups=SETTINGS_GROUPS, env=env, other=other, placeholders=placeholders,
+                is_secret=services_store.secret_check())
 
 
 READONLY = {k for _, items in SETTINGS_GROUPS for k, _, _, kind in items if kind == "readonly"}

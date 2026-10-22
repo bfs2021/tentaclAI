@@ -29,7 +29,7 @@
           <option value="false" {{ 'selected' if env.get(key) == 'false' }}>off</option>
         </select>
         {% else %}
-        <input id="f-{{ key }}" type="text" name="k_{{ key }}" value="{{ env.get(key, '') }}">
+        <input id="f-{{ key }}" type="text" name="k_{{ key }}" value="{{ env.get(key, '') }}" placeholder="{{ placeholders.get(key, '') }}">
         {% endif %}
         {% if help %}<div class="help">{{ help }}</div>{% endif %}
       </div>

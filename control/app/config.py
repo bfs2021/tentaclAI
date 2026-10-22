@@ -50,7 +50,7 @@ SETTINGS_GROUPS = [
     ]),
     ("Jobs", [
         ("JOB_READONLY_HELPERS", "Helpers in read-only jobs",
-         "commands besides svc a read-only job may run, comma-separated – text tools only (e.g. head, grep, jq); svc still guards every tentacle. Empty = the defaults (echo, head, tail, grep, jq, sort, uniq, wc, cut, tr, date, sleep). Shells, interpreters, awk/sed/find/xargs and network or write tools are refused.", "text"),
+         "commands besides svc a read-only job may run, comma-separated – text tools only (e.g. head, grep, jq); svc still guards every tentacle. Empty = the defaults (shown greyed out in the field). Shells, interpreters, awk/sed/find/xargs and network or write tools are refused.", "text"),
     ]),
     ("Prompt injection", [
         ("INJECTION_GUARD", "Prompt-injection safeguards",
