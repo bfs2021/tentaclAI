@@ -131,6 +131,14 @@ tr:last-child td { border-bottom: 0; }
 .toast.err { border-left-color: var(--err); } .toast.info { border-left-color: var(--info); } .toast.warn { border-left-color: var(--warn); }
 @keyframes slide { from { transform: translateY(8px); opacity: 0; } to { transform: none; opacity: 1; } }
 
+/* sortable table headers */
+.th-sort { all: unset; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; font: inherit; color: inherit; }
+.th-sort:hover { color: var(--text); }
+.th-sort:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+.sort-ind::after { content: "↕"; opacity: .35; font-size: 11px; }
+th[aria-sort="ascending"] .sort-ind::after { content: "↑"; opacity: 1; color: var(--accent); }
+th[aria-sort="descending"] .sort-ind::after { content: "↓"; opacity: 1; color: var(--accent); }
+
 /* terminal & logs */
 .term-wrap { background: #0b0e14; border: 1px solid var(--border); border-radius: var(--radius); padding: 10px; height: calc(100vh - 230px); min-height: 380px; }
 /* terminal page on wide screens: exactly one window high, the page itself never scrolls – a stray wheel

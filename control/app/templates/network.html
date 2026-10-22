@@ -45,10 +45,16 @@
     <input type="search" id="net-q" class="mono" placeholder="Filter by host …" style="max-width:260px">
   </div>
   <div class="table-wrap"><table id="net-seen">
-    <thead><tr><th>Destination</th><th title="why the destination is allowed or not">Rule</th><th title="what happened the last time">Last connection</th><th style="text-align:right">Connections</th><th>Last</th><th></th></tr></thead>
+    <thead><tr>{% for key, label, tip, num in (('host', 'Destination', '', false), ('rule', 'Rule', 'why the destination is allowed or not', false),
+        ('decision', 'Last connection', 'what happened the last time', false), ('count', 'Connections', '', true), ('last', 'Last', '', true)) %}
+      <th data-sort="{{ key }}"{% if num %} data-num{% endif %}{% if key == 'count' %} style="text-align:right"{% endif %}{% if key == 'last' %} aria-sort="descending"{% endif %}>
+        <button type="button" class="th-sort"{% if tip %} title="{{ tip }} – click to sort"{% else %} title="click to sort"{% endif %}>{{ label }}<span class="sort-ind" aria-hidden="true"></span></button></th>
+      {% endfor %}<th></th></tr></thead>
     <tbody>
     {% for r in rows %}
-      <tr data-kind="{{ 'allowed' if r.kind in ('default', 'allow') else r.kind }}" data-host="{{ r.host }}:{{ r.port }}">
+      <tr data-kind="{{ 'allowed' if r.kind in ('default', 'allow') else r.kind }}" data-host="{{ r.host }}:{{ r.port }}"
+          data-rule="{{ {'unknown': 0, 'blocked': 1, 'tentacle': 2, 'allow': 3, 'default': 4}.get(r.kind, 5) }}{{ r.label or '' }}" data-decision="{{ r.decision }}"
+          data-count="{{ r.count }}" data-last="{{ r.last or 0 }}">
         <td class="mono small">{{ r.host }}<span class="faint">:{{ r.port }}</span></td>
         <td>{% if r.kind == 'tentacle' %}<span class="pill ok" title="host of an active service or SSH host">Tentacle · {{ r.label }}</span>{% elif r.kind == 'default' %}<span class="pill info" title="shipped with tentaclAI">Built-in</span>{% elif r.kind == 'allow' %}<span class="pill info">Your allowlist</span>{% elif r.kind == 'blocked' %}<span class="pill err">Blocklist</span>{% else %}<span class="pill warn" title="in enforce mode this needs your approval">No rule</span>{% endif %}</td>
         <td class="small muted">{{ {'allowlist': 'allowed', 'tentacle': 'allowed', 'grant': 'allowed temporarily', 'unlisted': 'allowed – no rule (permissive)',
@@ -84,6 +90,27 @@
       });
     });
     q.addEventListener("input", apply);
+    // sort by a column header: numbers and times start with the biggest/newest, text from A; the choice is remembered
+    var tbody = document.querySelector("#net-seen tbody"), ths = document.querySelectorAll("#net-seen th[data-sort]");
+    function sortBy(key, dir) {
+      var th = document.querySelector('#net-seen th[data-sort="' + key + '"]');
+      if (!th) return;
+      var num = th.hasAttribute("data-num"), sign = dir === "ascending" ? 1 : -1;
+      Array.prototype.slice.call(rows).sort(function (a, b) {
+        var x = a.dataset[key], y = b.dataset[key];
+        var c = num ? (+x) - (+y) : x.localeCompare(y, undefined, {numeric: true});
+        return c * sign || a.dataset.host.localeCompare(b.dataset.host);
+      }).forEach(function (r) { tbody.appendChild(r); });
+      ths.forEach(function (h) { if (h === th) h.setAttribute("aria-sort", dir); else h.removeAttribute("aria-sort"); });
+      try { localStorage.setItem("net-sort", key + " " + dir); } catch (e) {}
+    }
+    ths.forEach(function (th) {
+      th.querySelector("button").addEventListener("click", function () {
+        var cur = th.getAttribute("aria-sort");
+        sortBy(th.dataset.sort, cur ? (cur === "ascending" ? "descending" : "ascending") : (th.hasAttribute("data-num") ? "descending" : "ascending"));
+      });
+    });
+    try { var saved = (localStorage.getItem("net-sort") || "").split(" "); if (saved[1]) sortBy(saved[0], saved[1]); } catch (e) {}
   })();
   </script>
   {% else %}<div class="empty small">Nothing recorded yet – the list fills as soon as the sandbox connects somewhere.</div>{% endif %}

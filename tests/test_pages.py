@@ -476,3 +476,15 @@ def test_mailbox_name_address_and_another_mailbox(client, app_module):
         for n in ("mail-root-bit", "mail-info-bit"):
             if os.path.exists(services_store.path_of(n)):
                 services_store.delete(n)
+
+
+def test_network_seen_table_is_sortable(client, monkeypatch):
+    from app import egress
+    rows = [{"host": "api.example.com", "port": 443, "kind": "tentacle", "label": "demo", "decision": "tentacle", "count": 7, "first": 1, "last": 200},
+            {"host": "odd.example.net", "port": 80, "kind": "unknown", "label": "", "decision": "unlisted", "count": 2, "first": 1, "last": 300}]
+    monkeypatch.setattr(egress, "seen_rows", lambda: [dict(r) for r in rows])
+    html = client.get("/network").text
+    for key in ("host", "rule", "decision", "count", "last"):
+        assert f'data-sort="{key}"' in html
+    assert 'aria-sort="descending"' in html  # newest first, as the server sorts
+    assert 'data-count="7" data-last="200"' in html and 'data-rule="0"' in html and 'data-rule="2demo"' in html

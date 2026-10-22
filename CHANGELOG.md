@@ -2,6 +2,15 @@
 
 All notable changes, newest first. Every release lists **upgrade steps** from the previous one.
 
+## Unreleased
+
+### Changes
+- Network → Seen: click a column header to sort (destination, rule, last result, connections, last) – again to reverse;
+  the choice is remembered in the browser.
+
+### Upgrade (from v0.15.0)
+`./tentaclai.sh update`, `docker compose up -d --build control` – only tentacontrol changed.
+
 ## v0.15.0 – 2026-10-22
 
 ### Highlights
