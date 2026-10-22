@@ -197,7 +197,7 @@ def _epoch(ts):
 
 
 def audit_entries(limit=300, service="", decision="", origin="", since="", q=""):
-    """newest first; origin is a group (session/job/host) or "job:<name>", since a key of SINCE, q a text search"""
+    """newest first; origin is a group (session/job/host) or "job:<name>", since a key of SINCE (anything else: no limit), q a text search"""
     try:
         lines = open(AUDIT_FILE).read().splitlines()
     except OSError:

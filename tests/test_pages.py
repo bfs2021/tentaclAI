@@ -496,7 +496,7 @@ def test_audit_long_action_collapses(client, app_module, tmp_path, monkeypatch):
              "action": "compose up -d " + "x" * 120, "decision": "auto"}]
     f.write_text("".join(json.dumps(r) + "\n" for r in rows))
     monkeypatch.setattr(activity, "AUDIT_FILE", str(f))
-    html = client.get("/activity").text
+    html = client.get("/activity?since=all").text
     assert html.count("<details><summary>") == 1 and "tentacontrol + 15 min" in html
 
 
@@ -514,12 +514,12 @@ def test_audit_filters_error_and_origin_link(client, app_module, tmp_path, monke
              "decision": "auto", "exit": 0, "from": {"by": "root"}}]
     f.write_text("".join(json.dumps(r) + "\n" for r in rows))
     monkeypatch.setattr(activity, "AUDIT_FILE", str(f))
-    html = client.get("/activity").text
+    html = client.get("/activity?since=all").text
     assert "no such service: web" in html and 'href="/terminal?p=claude"' in html and "compose old" in html
-    html = client.get("/activity?since=24h").text
-    assert "compose old" not in html and "POST /items" in html
+    html = client.get("/activity").text  # last 24 h by default
+    assert "compose old" not in html and "POST /items" in html and "audit-reset off" in html
     html = client.get("/activity?origin=session").text
-    assert "compose web" in html and "POST /items" not in html and "Reset" in html
+    assert "compose web" in html and "POST /items" not in html and "audit-reset\"" in html
     html = client.get("/activity?q=ITEMS").text
     assert "POST /items" in html and "compose web" not in html
     assert "Nothing matches" in client.get("/activity?q=nothing-like-this").text

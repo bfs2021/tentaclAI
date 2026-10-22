@@ -67,12 +67,12 @@ async def internal_approval_wait(request: Request, rid: str, wait: int = 25):
 
 
 @router.get("/activity", response_class=HTMLResponse)
-async def activity_page(request: Request, service: str = "", decision: str = "", origin: str = "", since: str = "", q: str = ""):
+async def activity_page(request: Request, service: str = "", decision: str = "", origin: str = "", since: str = "24h", q: str = ""):
     known = activity.audit_entries(limit=2000)
     return page(request, "activity.html",
                 entries=activity.audit_entries(service=service, decision=decision, origin=origin, since=since, q=q),
                 service=service, decision=decision, origin=origin, since=since, q=q,
-                filtered=any((service, decision, origin, since, q)),
+                filtered=any((service, decision, origin, q)) or since != "24h",
                 services_known=sorted({e.get("service", "") for e in known}),
                 jobs_known=sorted({e["from_label"][6:] for e in known if e["from_label"].startswith("Job · ")}))
 
