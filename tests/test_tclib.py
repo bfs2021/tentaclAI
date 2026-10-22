@@ -258,3 +258,11 @@ def test_guard_switch_and_managed_settings():
     hook = on["hooks"]["PostToolUse"][0]
     assert "WebFetch" in hook["matcher"] and "mcp__" in hook["matcher"] and hook["hooks"][0]["command"].endswith("tc-guard")
     assert "hooks" not in tclib.managed_settings([], False)
+
+
+def test_approval_handoff():
+    assert tclib.approval_handoff({}) == tclib.APPROVAL_HANDOFF
+    assert tclib.approval_handoff({"APPROVAL_HANDOFF": "off"}) == 0 and tclib.approval_handoff({"APPROVAL_HANDOFF": "0"}) == 0
+    assert tclib.approval_handoff({"APPROVAL_HANDOFF": "45"}) == 45
+    assert tclib.approval_handoff({"APPROVAL_HANDOFF": "1"}) == 5 and tclib.approval_handoff({"APPROVAL_HANDOFF": "9999"}) == 300
+    assert tclib.approval_handoff({"APPROVAL_HANDOFF": "soon"}) == tclib.APPROVAL_HANDOFF

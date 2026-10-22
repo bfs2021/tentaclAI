@@ -2192,28 +2192,41 @@ def _control(method, path, payload=None, timeout=40):
         return json.load(r)
 
 
-def request_approval(service, part, action):
-    """('approved'|'denied'|'expired'|'error', who/why) – waits for the user's decision in tentacontrol"""
+HANDOFF_EXIT = 75  # EX_TEMPFAIL: the approval is still pending, run the same command again to keep waiting
+
+
+def request_approval(service, part, action, interactive=False):
+    """('approved'|'denied'|'expired'|'error'|'handoff', who/why/link) – waits for the user's decision in tentacontrol.
+    A Claude session gets 'handoff' after APPROVAL_HANDOFF seconds: a running command shows nothing in the chat
+    (Remote Control in the browser), so Claude posts the link and runs the same command again – tentacontrol hands the
+    same request back to the same session (pending, or decided and not used yet)."""
     try:
         res = _control("POST", "/internal/approvals", {"service": service, "part": part, "action": action, "origin": origin()})
         rid = res["id"]
     except Exception as e:  # noqa: BLE001
         return "error", f"tentacontrol not reachable: {e}"
-    if res.get("status") == "approved":  # an active "Approve + 15 min" grant
-        return "approved", res.get("by", "grant")
-    where = (ENV.get("CONTROL_URL") or "").rstrip("/")
-    where = f"{where}/activity" if where else "tentacontrol → Activity"
-    print(f"svc: ⏳ approval needed – {where} (request #{rid}, up to {APPROVAL_TIMEOUT // 60} min): {action}",
-          file=sys.stderr, flush=True)
+    if res.get("status") != "pending":  # an active "Approve + 15 min" grant, or a decision made while svc was handed back
+        return res["status"], res.get("by", "")
+    base = (ENV.get("CONTROL_URL") or "").rstrip("/")
+    where = f"{base}/activity#a-{rid}" if base else f"tentacontrol → Activity (#{rid})"
+    handoff = 0 if interactive or job() or not origin().get("session") else tclib.approval_handoff(ENV)
+    if res.get("again"):
+        print(f"svc: ⏳ still waiting for approval #{rid} – {where}", file=sys.stderr, flush=True)
+    else:
+        print(f"svc: ⏳ approval needed – {where} (request #{rid}, up to {APPROVAL_TIMEOUT // 60} min): {action}",
+              file=sys.stderr, flush=True)
     start = time.time()
     end = start + APPROVAL_TIMEOUT + 30
     reminded = start
     while time.time() < end:
+        if handoff and not res.get("again") and time.time() - start >= handoff:
+            return "handoff", where
         if time.time() - reminded >= 60:  # visible in the live output of a running command
             reminded = time.time()
             print(f"svc: ⏳ still waiting for approval #{rid} ({int(reminded - start) // 60} min) – {where}", file=sys.stderr, flush=True)
         try:
-            st = _control("GET", f"/internal/approvals/{rid}?wait=25", timeout=40)
+            st = _control("GET", f"/internal/approvals/{rid}?wait={min(25, handoff) if handoff and not res.get('again') else 25}",
+                          timeout=40)
         except Exception as e:  # noqa: BLE001
             return "error", f"tentacontrol not reachable: {e}"
         if st.get("status") != "pending":
@@ -2355,7 +2368,12 @@ def guarded(service, part, mode, action, run, interactive=False):
         sys.exit(f"svc: {service} is read-only ({part}) – '{action[:80]}' is not allowed")
     decision, by = "auto", ""
     if mode == "confirm":
-        decision, by = request_approval(service, part, action)
+        decision, by = request_approval(service, part, action, interactive)
+        if decision == "handoff":
+            print(f"svc: ⏸ approval still pending – the user approves it at {by}\n"
+                  "Give the user this link in one line now, then run exactly the same command again "
+                  "(Bash timeout 600000 ms): it waits for the same request.", file=sys.stderr, flush=True)
+            sys.exit(HANDOFF_EXIT)
         if decision != "approved":
             audit(service, part, mode, action, decision, detail=by)
             sys.exit(f"svc: {service}: {action[:80]} – {decision}{(' (' + by + ')') if by else ''}. "

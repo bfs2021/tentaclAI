@@ -24,7 +24,8 @@ async def internal_approval_create(request: Request):
     data = await request.json()
     rid = activity.create(data.get("service", "?"), data.get("part", "?"), data.get("action", "?"), data.get("origin"))
     a = activity.APPROVALS[rid]
-    return JSONResponse({"id": rid, "status": a["status"], "by": a["by"]})
+    again = a.pop("again", False)
+    return JSONResponse({"id": rid, **activity.use(a), "again": again})
 
 
 @router.post("/internal/event")
@@ -103,6 +104,23 @@ async def approval_count():
     n = len(activity.pending())
     # never an empty answer: app.js keeps the old content then, and the badge would stay after the last decision
     return HTMLResponse(f'<span class="nav-badge">{n}</span>' if n else '<span class="nav-badge" hidden></span>')
+
+
+@router.get("/approvals/watch")
+async def approvals_watch(seen: str = "", wait: int = 25):
+    """for app.js: answers once the pending approvals differ from `seen` (or after `wait` s) – a long poll, so a hidden
+    tab learns of a request within a second although the browser slows down its timers (desktop notification, title)"""
+    def state():
+        p = activity.pending()
+        return p, activity.BOOT + ":" + ",".join(a["id"] for a in p)
+    end = time.time() + max(0, min(wait, 25))
+    p, sig = state()
+    while sig == seen and time.time() < end:
+        await asyncio.sleep(1)
+        p, sig = state()
+    return JSONResponse({"sig": sig, "boot": activity.BOOT,
+                         "pending": [{"id": a["id"], "service": a["service"], "part": a["part"], "action": a["action"][:200],
+                                      "from": a.get("from", "")} for a in p]})
 
 
 @router.post("/approvals/{rid}/{verdict}", response_class=HTMLResponse)

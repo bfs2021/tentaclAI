@@ -24,6 +24,7 @@ GRANT_SECONDS = 15 * 60
 NO_GRANT_PARTS = ("config",)  # service files / site rules: every write is approved on its own
 
 _ids = itertools.count(1)
+BOOT = secrets.token_hex(4)  # ids start at 1 again after a restart – the browser tells the two apart by this
 APPROVALS = {}  # id -> dict
 GRANTS = {}  # (service, part) -> {"until": ts, "by": who} – "Approve + 15 min"
 
@@ -114,16 +115,45 @@ def origin_label(o):
     return " · ".join(parts)
 
 
+def _again(service, part, action, origin):
+    """the same write of the same Claude session asked again after svc handed it back (approval_handoff): still
+    pending, or decided and not used yet – a decision is used once, by the first call that sees it"""
+    sid = origin.get("session")
+    if not sid or part == "network":
+        return None
+    now = time.time()
+    return next((a for a in sorted(APPROVALS.values(), key=lambda a: a["created"])
+                 if (a["service"], a["part"], a["action"]) == (service, part, action) and a["origin"].get("session") == sid
+                 and not a.get("used") and (a["status"] == "pending" or now - a.get("decided", now) < TIMEOUT)), None)
+
+
+def use(a):
+    """svc learns a decision once – a second call waiting on the same request gets an error and runs nothing
+    (network requests are shared on purpose: every connection to that target waits for the one decision)"""
+    if a["status"] == "pending" or a["part"] == "network":
+        return {"status": "pending", "by": a["by"]}
+    if a.get("used"):
+        return {"status": "error", "by": "this approval was already used by another call"}
+    a["used"] = True
+    return {"status": a["status"], "by": a["by"]}
+
+
 def create(service, part, action, origin=None):
-    """new request; approved at once while a grant for this service + part is active; one pending request per network target"""
+    """new request; approved at once while a grant for this service + part is active; one pending request per network
+    target; the same request again for a session that asks once more after svc handed it back"""
     _expire()
     if part == "network":
         same = next((a for a in APPROVALS.values() if a["status"] == "pending" and a["service"] == service and a["part"] == part), None)
         if same:
             return same["id"]
+    o = clean_origin(origin)
+    same = _again(str(service)[:60], str(part)[:20], str(action)[:500], o)
+    if same:
+        same["again"] = True
+        return same["id"]
     rid = str(next(_ids))
     a = {"id": rid, "service": str(service)[:60], "part": str(part)[:20], "action": str(action)[:500],
-         "created": time.time(), "status": "pending", "by": "", "event": asyncio.Event(), "origin": clean_origin(origin)}
+         "created": time.time(), "status": "pending", "by": "", "event": asyncio.Event(), "origin": o}
     a["from"] = origin_label(a["origin"])
     g = active_grant(a["service"], a["part"])
     if g:
@@ -179,7 +209,7 @@ async def wait(rid, seconds):
         except asyncio.TimeoutError:
             pass
     _expire()
-    return {"status": a["status"], "by": a["by"]}
+    return use(a)
 
 
 def pending():

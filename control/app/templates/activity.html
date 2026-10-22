@@ -8,7 +8,8 @@
   <div class="row">{{ help_link('activity') }}</div>
 </div>
 <div class="card" style="margin-bottom:18px">
-  <h2>Pending approvals</h2>
+  <div class="card-head"><h2>Pending approvals</h2>
+    <button class="btn sm ghost" type="button" data-desktop-notify hidden title="a notification from this browser when an approval waits – while tentacontrol is open in a tab, even in the background">{{ icon('bell') }}<span>Desktop notifications</span></button></div>
   <div hx-get="/partials/approvals" hx-trigger="load" hx-swap="outerHTML"><div class="skeleton"></div></div>
 </div>
 <div class="card">

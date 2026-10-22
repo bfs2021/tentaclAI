@@ -252,6 +252,54 @@ def test_approval_banner(client, app_module):
     assert activity.APPROVALS[rid]["status"] == "denied"
 
 
+def test_same_session_asks_again_for_the_same_request(client, app_module, monkeypatch):
+    """svc hands a pending approval back after APPROVAL_HANDOFF s – the same command again waits for the same request,
+    a decision made meanwhile is used once, another session or another action gets a request of its own"""
+    import asyncio
+    from app import activity
+    monkeypatch.setattr(activity, "APPROVALS", {})
+    me, other = {"session": "11111111-2222-3333-4444-555555555555"}, {"session": "66666666-7777-8888-9999-000000000000"}
+    rid = activity.create("demohost", "docker", "docker restart x", me)
+    assert activity.create("demohost", "docker", "docker restart x", me) == rid and activity.APPROVALS[rid].pop("again")
+    assert activity.create("demohost", "docker", "docker restart x", other) != rid
+    assert activity.create("demohost", "docker", "docker restart y", me) != rid
+    assert activity.create("demohost", "docker", "docker restart x", {}) != rid  # no session: never shared
+    activity.decide(rid, True)
+    again = activity.create("demohost", "docker", "docker restart x", me)  # decided while svc was handed back
+    assert again == rid and activity.use(activity.APPROVALS[rid])["status"] == "approved"
+    assert asyncio.run(activity.wait(rid, 1))["status"] == "error"  # used – a second call runs nothing
+    assert activity.create("demohost", "docker", "docker restart x", me) != rid  # the next identical write asks anew
+
+
+def test_internal_create_reports_a_request_asked_again(app_module, monkeypatch):
+    from fastapi.testclient import TestClient
+    from app import activity
+    monkeypatch.setattr(activity, "APPROVALS", {})
+    monkeypatch.setattr(activity, "token_ok", lambda v: v == "t")
+    c = TestClient(app_module.app, client=("172.30.0.5", 1))
+    body = {"service": "demohost", "part": "docker", "action": "docker restart z",
+            "origin": {"session": "11111111-2222-3333-4444-555555555555"}}
+    first = c.post("/internal/approvals", json=body, headers={"x-tc-token": "t"})
+    if first.status_code == 403:  # netguard: the test client's address isn't the sandbox here – the logic is covered above
+        return
+    first = first.json()
+    second = c.post("/internal/approvals", json=body, headers={"x-tc-token": "t"}).json()
+    assert first["status"] == "pending" and not first["again"] and second["id"] == first["id"] and second["again"]
+
+
+def test_approvals_watch(client, app_module, monkeypatch):
+    from app import activity
+    monkeypatch.setattr(activity, "APPROVALS", {})
+    d = client.get("/approvals/watch?wait=0").json()
+    assert d["sig"].startswith(activity.BOOT + ":") and d["boot"] == activity.BOOT
+    rid = activity.create("demohost", "docker", "docker restart x", {"tmux": "claude-rc"})
+    d2 = client.get("/approvals/watch?wait=5&seen=" + d["sig"]).json()  # changed: answers at once
+    assert d2["sig"] != d["sig"] and [a["id"] for a in d2["pending"]] == [rid] and d2["pending"][0]["from"] == "Remote Control"
+    activity.decide(rid, False)
+    assert 'id="a-' not in client.get("/partials/approvals").text
+    assert "data-desktop-notify" in client.get("/activity").text
+
+
 def test_netguard_does_not_cache_a_failed_lookup(app_module, monkeypatch):
     """a sandbox not yet in Docker's DNS must be recognised by its next request, not after the cache expires"""
     from app import netguard
@@ -350,7 +398,7 @@ def test_settings_show_default_job_helpers(client):
     from app import scheduled
     html = client.get("/settings").text
     assert 'placeholder="default: ' + ", ".join(scheduled.HELPERS_DEFAULT) + '"' in html
-    assert html.count('class="field wide"') == 2  # JOB_READONLY_HELPERS + INJECTION_GUARD: long help, whole row
+    assert html.count('class="field wide"') == 3  # APPROVAL_HANDOFF, JOB_READONLY_HELPERS, INJECTION_GUARD: long help, whole row
 
 
 def test_settings_refuse_dangerous_job_helpers(client):

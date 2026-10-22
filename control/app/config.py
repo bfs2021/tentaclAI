@@ -48,6 +48,10 @@ SETTINGS_GROUPS = [
         ("HOST_DOCS", "Host documentation", "optional: Markdown file about the host – Claude's instructions point to it, Claude reads it before working on the host", "text"),
         ("CA_CERT", "Own root CA", "optional: PEM file for internal https services", "text"),
     ]),
+    ("Approvals", [
+        ("APPROVAL_HANDOFF", "Show the approval link in the chat after (s)",
+         "a Claude session waits this long for an approval, then svc hands the request back and Claude posts its link in the chat (a running command shows nothing there, e.g. Remote Control in the browser) and waits again for the same request. Default 20, 0 = wait silently", "text"),
+    ]),
     ("Jobs", [
         ("JOB_READONLY_HELPERS", "Helpers in read-only jobs",
          "commands besides svc a read-only job may run, comma-separated – text tools only (e.g. head, grep, jq); svc still guards every tentacle. Empty = the defaults (shown greyed out in the field). Shells, interpreters, awk/sed/find/xargs and network or write tools are refused.", "text"),

@@ -64,6 +64,7 @@ TC_DIR=$T
 COMPOSE_FILE=compose.yaml:compose.test.yaml
 RC_ENABLED=false
 UPDATE_CHECK=false
+APPROVAL_HANDOFF=5
 EGRESS_MODE=enforce
 EGRESS_DIRECT_IP=block
 API_TOKEN=api-secret-123
@@ -235,6 +236,16 @@ wait_for 30 sh -c "curl -s -b '$J' http://$IP:8080/partials/approvals | grep -q 
 decide approve; wait
 check "config put job: saved paused after approval" "$(tail -1 "$T/put-job.out")" "✓ job tjob saved – paused: switch it on in tentacontrol → Jobs"
 check "svc jobs lists it" "$($C svc jobs 2>/dev/null | grep -c '^tjob ' || true)" "1"
+# a Claude session gets the request back with its link after APPROVAL_HANDOFF s (exit 75); the same command again waits for it
+CS="docker exec -u claude -e CLAUDE_CODE_SESSION_ID=0badcafe-0000-4000-8000-$(date +%s%N | tail -c 13) tctest-claude"  # own per run: a kept REUSE stack may hold the last run's request
+rc=0; $CS svc config put job tjob2 /tmp/job.json > "$T/handoff.out" 2>&1 || rc=$?; echo "exit=$rc" >> "$T/handoff.out"
+check "approval handed back to a Claude session (exit 75, link)" "$(grep -c -e '^exit=75$' -e 'approval still pending – the user approves it at .*#' "$T/handoff.out")" "2"
+HID="$(grep -o 'request #[0-9]*' "$T/handoff.out" | head -1 | cut -d'#' -f2)"
+$CS svc config put job tjob2 /tmp/job.json > "$T/handoff2.out" 2>&1 &
+wait_for 15 grep -q "still waiting for approval #$HID" "$T/handoff2.out" || true
+check "… the same command again waits for the same request" "$(grep -c "still waiting for approval #$HID" "$T/handoff2.out" || true)" "1"
+decide approve; wait
+check "… and runs once it is approved" "$(tail -1 "$T/handoff2.out")" "✓ job tjob2 saved – paused: switch it on in tentacontrol → Jobs"
 check "svc jobs <name> shows the definition" "$($C svc jobs tjob 2>/dev/null | grep -c '"prompt": "check @testapi"' || true)" "1"
 check "an invalid job is refused before any approval" "$($C svc config put job badjob /tmp/badjob.json 2>&1 | tail -1)" "svc: not a valid job – unknown profile"
 check "a running job can't create jobs" "$(J jobstd01 'svc config put job x /tmp/job.json')" "refused"

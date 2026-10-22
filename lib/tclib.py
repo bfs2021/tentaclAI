@@ -665,6 +665,23 @@ def write_model_commands(m, src="/etc/tentaclai/commands", dst=None):
         os.replace(out + ".tmp", out)
 
 
+# ---------------------------------------------------------------- approvals
+
+APPROVAL_HANDOFF = 20  # s; APPROVAL_HANDOFF in .env, 0/off = a Claude session waits for the decision in one go
+
+
+def approval_handoff(env):
+    """seconds a Claude session waits for an approval before svc hands the request back with its link (exit 75),
+    so Claude can show the link in the chat and then wait again – 0 = off"""
+    v = str(env.get("APPROVAL_HANDOFF", "")).strip().lower()
+    if v in ("0", "off", "false", "no"):
+        return 0
+    try:
+        return max(5, min(int(v), 300)) if v else APPROVAL_HANDOFF
+    except ValueError:
+        return APPROVAL_HANDOFF
+
+
 # ---------------------------------------------------------------- prompt-injection safeguards
 # Hardening and early warning, no guarantee: hidden text is removed, obvious attempts are flagged. The hard limits stay
 # svc's access modes, the egress gateway and Claude never holding a secret.

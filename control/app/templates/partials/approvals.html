@@ -3,7 +3,7 @@
   {% if pending %}
   <div class="approval-list">
     {% for a in pending %}
-    <div class="card approval">
+    <div class="card approval" id="a-{{ a.id }}">
       <div class="between" style="align-items:flex-start;gap:12px">
         <div style="min-width:0">
           <div class="row" style="gap:8px"><strong>{{ a.service }}</strong><span class="tag">{{ a.part }}</span>

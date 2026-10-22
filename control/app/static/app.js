@@ -126,3 +126,90 @@ document.addEventListener("click", function (e) {
   var f = open && box.querySelector("input:not([type=hidden]), select, textarea");
   if (f) f.focus();
 });
+
+// pending approvals while tentacontrol is open in some tab: count in the tab title and on the favicon, a desktop
+// notification when the tab isn't in front (e.g. working in claude.ai) – a long poll, not a timer: browsers slow down
+// timers of hidden tabs to once a minute, an answered request is handled at once
+(function () {
+  if (!document.querySelector(".sidebar")) return;
+  var PREF = "tc-desktop-notify", SEEN = "tc-approvals-notified";
+  var title = document.title, icon = document.querySelector("link[rel=icon]"), iconHref = icon && icon.href, iconImg = null;
+  function store(k, v) { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (e) { return null; } }
+  function supported() { return "Notification" in window && window.isSecureContext; }
+  function enabled() { return supported() && Notification.permission === "granted" && store(PREF) !== "off"; }
+
+  function badge(n) {
+    document.title = (n ? "(" + n + ") " : "") + title;
+    if (!icon) return;
+    if (!n) { icon.href = iconHref; return; }
+    function draw() {
+      var c = document.createElement("canvas"); c.width = c.height = 32;
+      var g = c.getContext("2d");
+      g.drawImage(iconImg, 0, 0, 32, 32);
+      g.beginPath(); g.arc(23, 9, 9, 0, 2 * Math.PI); g.fillStyle = "#e5484d"; g.fill();
+      g.fillStyle = "#fff"; g.font = "bold 13px sans-serif"; g.textAlign = "center"; g.textBaseline = "middle";
+      g.fillText(n > 9 ? "9+" : String(n), 23, 10);
+      icon.href = c.toDataURL("image/png");
+    }
+    if (iconImg && iconImg.complete) return draw();
+    iconImg = new Image(); iconImg.onload = draw; iconImg.src = iconHref;
+  }
+
+  var shown = {};  // id → Notification of this tab, closed once the request is decided (here, in the banner or elsewhere)
+  function notify(d) {
+    var seen = {};
+    try { seen = JSON.parse(store(SEEN) || "{}"); } catch (e) { seen = {}; }
+    if (seen.boot !== d.boot) seen = { boot: d.boot, ids: [] };
+    var ids = d.pending.map(function (a) { return a.id; });
+    var fresh = d.pending.filter(function (a) { return seen.ids.indexOf(a.id) < 0; });
+    seen.ids = ids;  // only what is still pending – a shared list, so a second open tab doesn't notify again
+    store(SEEN, JSON.stringify(seen));
+    Object.keys(shown).forEach(function (id) { if (ids.indexOf(id) < 0) { shown[id].close(); delete shown[id]; } });
+    if (!fresh.length || !enabled() || (document.hasFocus() && !document.hidden)) return;
+    fresh.forEach(function (a) {
+      var n = new Notification(a.part === "network" ? "Network: " + a.service : "Approval needed: " + a.service + " (" + a.part + ")",
+        { body: a.action + (a.from ? "\nfrom " + a.from : ""), tag: "tc-approval-" + d.boot + "-" + a.id, requireInteraction: true,
+          icon: "/static/apple-touch-icon.png" });
+      n.onclick = function () { window.focus(); n.close(); location.href = "/activity#a-" + a.id; };
+      shown[a.id] = n;
+    });
+  }
+
+  function poll(sig) {
+    fetch("/approvals/watch?wait=" + (sig ? 25 : 0) + "&seen=" + encodeURIComponent(sig || ""), { credentials: "same-origin" })
+      .then(function (r) { return /json/.test(r.headers.get("content-type") || "") ? r.json() : Promise.reject(r.status); })
+      .then(function (d) { badge(d.pending.length); notify(d); poll(d.sig); })
+      .catch(function () { setTimeout(function () { poll(""); }, 15000); });  // signed out or tentacontrol restarting
+  }
+  poll("");
+
+  // the switch on Activity: asks the browser once, then turns the notifications of this browser on and off
+  var btn = document.querySelector("[data-desktop-notify]");
+  function show() {
+    if (!btn) return;
+    btn.hidden = false;
+    var label = btn.querySelector("span");
+    if (!supported()) { label.textContent = "Desktop notifications: need https"; btn.disabled = true; return; }
+    var p = Notification.permission;
+    label.textContent = "Desktop notifications: " + (p === "denied" ? "blocked" : enabled() ? "on" : "off");
+    btn.classList.toggle("on", enabled());
+  }
+  if (btn) btn.addEventListener("click", function () {
+    var p = Notification.permission;
+    if (p === "denied") return window.tcToast("Blocked in this browser – allow notifications in the site settings of this page", "warn");
+    if (p === "default") return Notification.requestPermission().then(function () { store(PREF, "on"); show(); });
+    store(PREF, enabled() ? "off" : "on"); show();
+    if (enabled()) new Notification("tentaclAI", { body: "Desktop notifications are on for approvals.", icon: "/static/apple-touch-icon.png" });
+  });
+  show();
+})();
+
+// deep link to an approval (#a-ID, from a notification or svc): scroll to it and flash it once the list is loaded
+document.body.addEventListener("htmx:afterSwap", function () {
+  if (!location.hash.startsWith("#a-") || document.body.dataset.approvalShown === location.hash) return;
+  var el = document.getElementById(location.hash.slice(1));
+  if (!el) return;
+  document.body.dataset.approvalShown = location.hash;
+  el.scrollIntoView({ block: "center" });
+  el.classList.add("flash");
+});
