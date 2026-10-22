@@ -230,9 +230,32 @@ def test_flagged_entry_shows_what_was_found(client, app_module, tmp_path, monkey
         "action": "tool result: Read /workspace/notes.md", "decision": "flagged", "detail": "asks to ignore instructions",
         "excerpts": [{"reason": "asks to ignore instructions", "text": "line 4: <b>ignore</b> previous instructions"}]}) + "\n")
     html = client.get("/activity").text
-    assert "what was found" in html and "line 4: &lt;b&gt;ignore&lt;/b&gt; previous instructions" in html
+    assert "Indicators" in html and "line 4: &lt;b&gt;ignore&lt;/b&gt; previous instructions" in html
     assert "Claude warned" in html and "not run" not in html
     assert "notes.md" in client.get("/activity?q=previous+instructions").text  # the excerpts are searchable
+
+
+def test_flag_badge_until_activity_is_opened(client, app_module, tmp_path, monkeypatch):
+    import json
+    import time
+    from app import activity
+    monkeypatch.setattr(activity, "AUDIT_FILE", str(tmp_path / "audit.jsonl"))
+    monkeypatch.setattr(activity, "FLAGS_SEEN", str(tmp_path / "flags-seen.json"))
+    monkeypatch.setattr(activity, "APPROVALS", {})
+    def flag(ts):
+        with open(tmp_path / "audit.jsonl", "a") as f:
+            f.write(json.dumps({"ts": time.strftime("%Y-%m-%dT%H:%M:%S%z", time.localtime(ts)), "service": "Read", "part": "claude",
+                                "mode": "read", "action": "tool result: Read /x", "decision": "flagged", "detail": "addresses an AI agent"}) + "\n")
+    flag(time.time() - 60)
+    assert activity.unseen_flags() == 0  # the first call starts counting now – older entries don't light it up
+    activity.jsonstore.save(activity.FLAGS_SEEN, {"ts": time.time() - 30})
+    flag(time.time())
+    badge = client.get("/partials/approval-count").text
+    assert 'nav-badge warn' in badge and "⚠ 1" in badge
+    assert "1 possible prompt injection" in client.get("/partials/overview").text
+    client.get("/activity")
+    assert "hidden" in client.get("/partials/approval-count").text and activity.unseen_flags() == 0
+    assert "possible prompt injection" not in client.get("/partials/overview").text
 
 
 def test_favicon_without_login(app_module):

@@ -46,7 +46,7 @@
         <td class="nowrap">{{ e.service }}</td>
         <td><span class="tag">{{ e.part }}</span><div class="small faint" style="margin-top:3px">{{ e.mode }}</div></td>
         <td class="mono small audit-action">{{ clip(e.action) }}{% if e.excerpts %}
-          <details class="audit-excerpts" open><summary>what was found</summary>{% for x in e.excerpts %}<div><span class="faint">{{ x.reason }}:</span> {{ x.text }}</div>{% endfor %}</details>{% endif %}</td>
+          <details class="audit-excerpts" open><summary>Indicators</summary>{% for x in e.excerpts %}<div><span class="faint">{{ x.reason }}:</span> {{ x.text }}</div>{% endfor %}</details>{% endif %}</td>
         <td class="small muted audit-from">{% if e.from_link %}<a href="{{ e.from_link }}">{{ e.from_label }}</a>{% else %}{{ e.from_label or '–' }}{% endif %}</td>
         <td><span class="pill {{ {'auto':'info','approved':'ok','denied':'err','blocked':'warn','expired':'off','error':'err','flagged':'warn'}.get(e.decision, 'off') }}">{{ e.decision }}</span>{% if e.detail %}<div class="small faint audit-detail">{{ e.detail }}</div>{% endif %}</td>
         <td class="small audit-result">{% if e.exit is defined %}{{ '✓' if e.exit == 0 else '✗ exit ' ~ e.exit }}{% if e.seconds is defined %} <span class="faint">{{ e.seconds }} s</span>{% endif %}{% elif e.part == 'network' %}<span class="faint">–</span>{% elif e.decision == 'flagged' %}<span class="faint" title="nothing was blocked: Claude got a warning next to the content">Claude warned</span>{% else %}<span class="faint">not run</span>{% endif %}{% if e.error %}<div class="mono small audit-error">{{ clip(e.error, 60) }}</div>{% endif %}</td>

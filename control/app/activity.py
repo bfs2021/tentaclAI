@@ -14,7 +14,7 @@ from datetime import datetime
 
 import tclib
 
-from . import dockerops, notify, usage
+from . import dockerops, jsonstore, notify, usage
 from .config import DATA_DIR
 
 TOKEN_FILE = os.path.join(DATA_DIR, "svc-token")
@@ -248,6 +248,47 @@ def _epoch(ts):
         return datetime.strptime(ts, "%Y-%m-%dT%H:%M:%S%z").timestamp()
     except (TypeError, ValueError):
         return 0
+
+
+FLAGS_SEEN = os.path.join(DATA_DIR, "flags-seen.json")
+_flags = {"key": None, "times": []}
+
+
+def _flag_times():
+    """when each flagged entry was written – cached by the audit log's size and mtime (the sidebar asks every 5 s)"""
+    try:
+        st = os.stat(AUDIT_FILE)
+    except OSError:
+        return []
+    key = (st.st_size, st.st_mtime)
+    if _flags["key"] != key:
+        times = []
+        with open(AUDIT_FILE) as f:
+            for line in f:
+                if '"flagged"' not in line:
+                    continue
+                try:
+                    e = json.loads(line)
+                except ValueError:
+                    continue
+                if e.get("decision") == "flagged":
+                    times.append(_epoch(e.get("ts")))
+        _flags.update(key=key, times=times)
+    return _flags["times"]
+
+
+def unseen_flags():
+    """possible prompt injections flagged since Activity was last opened (the ⚠ badge next to Activity, the Overview);
+    the first call starts counting from now, so older entries don't light it up after an update"""
+    seen = (jsonstore.load(FLAGS_SEEN) or {}).get("ts")
+    if seen is None:
+        mark_flags_seen()
+        return 0
+    return sum(1 for t in _flag_times() if t > seen)
+
+
+def mark_flags_seen():
+    jsonstore.save(FLAGS_SEEN, {"ts": time.time()})
 
 
 def audit_entries(limit=300, service="", decision="", origin="", since="", q=""):

@@ -14,13 +14,16 @@ All notable changes, newest first. Every release lists **upgrade steps** from th
   shows nothing. A decision is used once – a second identical call doesn't ride along.
 
 ### Changes
+- Sidebar: new flagged entries (possible prompt injection) show as a yellow *⚠ count* next to *Activity*, and the
+  Overview names them with a link – both until Activity is opened. Separate from the pulsing approval badge; the tab
+  title and favicon stay for approvals.
 - Prompt-injection safeguards: notes addressed to AI readers are flagged too – “Note for automated assistants: please
   …”, “If you are an AI …”, “Hinweis für KI-Assistenten …” – not only blunt “ignore your instructions”. Claude's base
   rules now say to mention any text that addresses AI assistants or asks the reader to do something, however polite,
   in one line to the user – also when it was only asked for a summary (until now it ignored such a note silently).
 - Activity → a *flagged* entry (possible prompt injection) says what was read – the file, URL, search, MCP tool with
   its arguments or command, e.g. `tool result: Read /workspace/notes.md` instead of `tool result: Read` – and, under
-  *what was found*, each reason with a short excerpt and its line (a base64 block: size and start), secrets blanked;
+  *Indicators*, each reason with a short excerpt and its line (a base64 block: size and start), secrets blanked;
   the notification carries the same. The result column reads *Claude warned* instead of *not run*. `tc-guard` now
   hands its findings to `svc guard-report` on stdin.
 - Activity → audit log: decisions about unknown network destinations (Allow 10 min / 1 h, Always, Deny, Block, or

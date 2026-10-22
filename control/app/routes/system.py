@@ -160,6 +160,7 @@ async def overview(request: Request):
     rows = egress.seen_rows()
     ctx["net"] = {"mode": egress.mode(), "total": len(rows), "unknown": sum(1 for r in rows if r["kind"] == "unknown"),
                   "pending": sum(1 for a in activity.pending() if a["part"] == "network")}
+    ctx["flags"] = activity.unseen_flags()
     if ctx["rc"] and ctx["rc"]["url"]:
         ctx["rc"]["qr"] = segno.make(ctx["rc"]["url"], error="m").svg_inline(scale=4, border=2, dark="#111", light="#fff", omitsize=True)
     return templates.TemplateResponse(request, "partials/overview.html", ctx)

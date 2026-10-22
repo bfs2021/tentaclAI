@@ -69,6 +69,7 @@ async def internal_approval_wait(request: Request, rid: str, wait: int = 25):
 
 @router.get("/activity", response_class=HTMLResponse)
 async def activity_page(request: Request, service: str = "", decision: str = "", origin: str = "", since: str = "24h", q: str = ""):
+    activity.mark_flags_seen()  # opening Activity counts as having seen the flagged entries
     known = activity.audit_entries(limit=2000)
     return page(request, "activity.html",
                 entries=activity.audit_entries(service=service, decision=decision, origin=origin, since=since, q=q),
@@ -101,9 +102,11 @@ async def grant_revoke(request: Request, service: str = Form(...), part: str = F
 
 @router.get("/partials/approval-count", response_class=HTMLResponse)
 async def approval_count():
-    n = len(activity.pending())
+    n, f = len(activity.pending()), activity.unseen_flags()
+    badges = (f'<span class="nav-badge" title="{n} approval(s) waiting">{n}</span>' if n else "") + \
+        (f'<span class="nav-badge warn" title="{f} possible prompt injection(s) flagged since Activity was last opened">⚠ {f}</span>' if f else "")
     # never an empty answer: app.js keeps the old content then, and the badge would stay after the last decision
-    return HTMLResponse(f'<span class="nav-badge">{n}</span>' if n else '<span class="nav-badge" hidden></span>')
+    return HTMLResponse(badges or '<span class="nav-badge" hidden></span>')
 
 
 @router.get("/approvals/watch")
