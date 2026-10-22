@@ -12,10 +12,12 @@ All notable changes, newest first. Every release lists **upgrade steps** from th
 - Long sessions: Claude's status line shows how full the context window is (`ctx 42 %`, yellow from 60 %, red with
   `→ /compact` from 80 %), and a new base rule has Claude suggest `/compact` once in a long session, where a topic ends
   (not in jobs).
+- Dependencies: tentacontrol and the egress gateway run on Python 3.15, Apprise 2 is allowed; CI on
+  `actions/checkout` v7 and `actions/setup-python` v7, tests allow pytest 9.
 
 ### Upgrade (from v0.15.0)
-`./tentaclai.sh update`, `docker compose build`, `docker compose up -d` – both images changed (svc); recreating `tentaclai`
-ends running sessions and Remote Control.
+`./tentaclai.sh update`, `docker compose build`, `docker compose up -d` – all three images changed (svc, Python 3.15);
+recreating `tentaclai` ends running sessions and Remote Control.
 
 ## v0.15.0 – 2026-10-22
 
