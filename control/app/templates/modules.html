@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% from "_icons.html" import icon %}
+{% block title %}Modules{% endblock %}
+{% block content %}
+<div class="header">
+  <div><h1>Modules</h1><div class="sub">Enterprise modules extend tentaclAI beyond the open-source edition.</div></div>
+  <div class="row"><span class="pill {{ 'off' if edition == 'community' else 'ok' }}">{{ icon('lock') }}{{ 'Community' if edition == 'community' else 'Enterprise' }}</span></div>
+</div>
+
+{% if edition == 'community' %}
+<div class="card" style="margin-bottom:16px">
+  <p class="small" style="margin:0">To use Enterprise modules, you need tentaclAI Enterprise and a valid Enterprise license – see <a href="/license">License</a>.</p>
+</div>
+{% endif %}
+
+<div class="grid">
+  {% for key, title, text in modules %}
+  {% set on = key in features %}
+  <div class="card{{ '' if on else ' module-locked' }}">
+    <div class="card-head"><h2>{{ icon('grid') }}{{ title }}</h2>
+      {% if on %}<span class="pill ok">licensed</span>{% else %}<span class="pill off">{{ icon('lock') }}locked</span>{% endif %}</div>
+    <p class="small muted" style="margin:0">{{ text }}</p>
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}

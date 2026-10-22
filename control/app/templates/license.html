@@ -2,62 +2,22 @@
 {% from "_tabs.html" import settings_tabs %}
 {% from "_icons.html" import icon %}
 {% block title %}License{% endblock %}
-{% macro key_form(label) %}
-<form hx-post="/license" class="stack" style="gap:10px">
-  <div class="field" style="margin:0"><label for="license-key">License key</label>
-    <textarea id="license-key" name="key" rows="4" class="mono" placeholder="TCL1.…" spellcheck="false" autocomplete="off" required></textarea>
-    <div class="help">A key starts with <code>TCL1.</code> – paste it in one piece (line breaks don't matter). It is checked here, offline: nothing is sent anywhere.</div>
-  </div>
-  <div><button class="btn primary">{{ icon('check') }}{{ label }}</button></div>
-</form>
-{% endmacro %}
 {% block content %}
 {{ settings_tabs('license') }}
 <div class="header">
-  <div><h1>License</h1><div class="sub">tentaclAI is open source. An Enterprise license unlocks the features beyond it, such as compliance reports and the SIEM export.</div></div>
+  <div><h1>License</h1><div class="sub">tentaclAI is open source. tentaclAI Enterprise adds modules beyond it, such as compliance reports and the SIEM export.</div></div>
 </div>
 
 <div class="card" style="margin-bottom:16px">
+  <div class="card-head"><h2>Currently using tentaclAI Community</h2><span class="pill off">no license</span></div>
+  <p class="small">The free, open-source edition – everything except the Enterprise modules.</p>
+  <p class="muted small">To use Enterprise modules and get support, you need tentaclAI Enterprise and a valid Enterprise license. See <a href="/modules">Modules</a> for what they add.</p>
+</div>
+
+<div class="card">
   <div class="card-head"><h2>Installation ID</h2>
     {% if instance %}<button class="btn sm ghost" type="button" data-copy="#instance-id">{{ icon('copy') }}Copy</button>{% endif %}</div>
-  {% if instance %}
-  <div class="mono" id="instance-id" style="font-size:16px">{{ instance }}</div>
-  {% else %}
-  <p class="muted small">This installation has no ID – neither the firmware nor Docker report one. Keys bound to an installation can't be used here.</p>
-  {% endif %}
+  {% if instance %}<div class="mono" id="instance-id" style="font-size:16px">{{ instance }}</div>
+  {% else %}<p class="muted small">This installation has no ID – neither the firmware nor Docker report one.</p>{% endif %}
 </div>
-
-{% set l = lic.license %}
-{% if lic.state in ('valid', 'expired') %}
-<div class="card" style="margin-bottom:16px">
-  <div class="card-head"><h2>{{ icon('lock') }}{{ (l.edition or 'enterprise') | capitalize }} license</h2>
-    {% if lic.state == 'valid' %}<span class="pill ok">valid{% if lic.days_left is not none %} · {{ lic.days_left }} day{{ 's' if lic.days_left != 1 }} left{% endif %}</span>
-    {% else %}<span class="pill err">expired</span>{% endif %}</div>
-  <dl class="kv">
-    <dt>Licensed to</dt><dd>{{ l.licensee }}{% if l.email %} <span class="muted">· {{ l.email }}</span>{% endif %}</dd>
-    <dt>License ID</dt><dd class="mono">{{ l.id }}</dd>
-    <dt>Edition</dt><dd>{{ (l.edition or 'enterprise') | capitalize }}</dd>
-    <dt>Valid</dt><dd>{{ l.issued or '–' }} → {{ l.expires or 'no end date' }}</dd>
-    <dt>Seats</dt><dd>{{ l.seats if l.seats else 'not limited' }}</dd>
-    <dt>Installation</dt><dd>{% if l.instance %}<span class="mono">{{ l.instance }}</span> <span class="muted">(this one)</span>{% else %}any{% endif %}</dd>
-    <dt>Features</dt><dd>{% for f in l.features or [] %}<span class="tag">{{ features.get(f, f) }}</span> {% else %}–{% endfor %}</dd>
-  </dl>
-  {% if lic.state == 'valid' and lic.days_left is not none and lic.days_left <= 30 %}<p class="small" style="margin-top:12px"><span class="pill warn">ends soon</span> Renew the license before {{ l.expires }} – Enterprise features lock when it ends.</p>{% endif %}
-  {% if lic.state == 'expired' %}<p class="small" style="margin-top:12px">This license ended on {{ l.expires }} – Enterprise features are locked. Enter a new key below.</p>{% endif %}
-</div>
-<div class="card">
-  <details{{ ' open' if lic.state == 'expired' }}><summary><strong>Change license</strong> <span class="muted small">– enter a new key, e.g. after a renewal</span></summary>
-    <div style="margin-top:12px">{{ key_form('Replace license') }}</div>
-  </details>
-  <div style="margin-top:14px"><button class="btn sm danger" hx-post="/license/remove" hx-confirm="Remove the license? Enterprise features lock right away.">Remove license</button></div>
-</div>
-{% else %}
-<div class="card">
-  <div class="card-head"><h2>Currently using tentaclAI Community</h2><span class="pill off">no license</span></div>
-  {% if lic.state == 'invalid' %}<p class="small"><span class="pill err">invalid</span> The stored key can't be used: {{ lic.error }}.</p>{% endif %}
-  <p class="small">The free, open-source edition – everything except the Enterprise features.</p>
-  <p class="muted small">To use Enterprise features ({% for f in features.values() %}{{ f | lower }}{{ ', ' if not loop.last }}{% endfor %}) and get support, you need a valid Enterprise license. Enter its key here.</p>
-  {{ key_form('Activate license') }}
-</div>
-{% endif %}
 {% endblock %}

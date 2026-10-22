@@ -253,6 +253,18 @@ async def reports_page(request: Request):
     return page(request, "reports.html")
 
 
+# Enterprise modules (Modules page): (feature, title, what it does) – an extension's license unlocks them by feature name
+MODULES = [
+    ("reports", "Compliance reports", "Reports from the audit log – e.g. all writes to production in a quarter, approvals by approver – as PDF or CSV, as evidence for ISO 27001 or SOC 2."),
+    ("siem", "SIEM export", "Streams the audit log to your SIEM (syslog, Splunk, Elastic) as JSON lines."),
+]
+
+
+@router.get("/modules", response_class=HTMLResponse)
+async def modules_page(request: Request):
+    return page(request, "modules.html", modules=MODULES)
+
+
 @router.get("/help", response_class=HTMLResponse)
 async def help_page(request: Request):
     return page(request, "help.html", templates_list=services_store.list_templates())

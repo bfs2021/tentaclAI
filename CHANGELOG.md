@@ -14,12 +14,12 @@ All notable changes, newest first. Every release lists **upgrade steps** from th
   shows nothing. A decision is used once – a second identical call doesn't ride along.
 
 ### Changes
-- Settings → *License*: shows the installed Enterprise license (licensee, ID, edition, validity, seats, features) or
-  takes a key; replace or remove it there. Keys (`TCL1.<payload>.<signature>`) are Ed25519-signed and checked offline
-  – no license server. A key can be bound to one installation: the tab shows its *Installation ID*, derived from the hardware (system UUID of the firmware, else the Docker engine ID) and never stored. A valid license with the feature `reports` unlocks the Reports entry. New dependency of
-  tentacontrol: `cryptography`. Issuing keys: `scripts/license-key.py` (for the issuer, not for installations).
-- Sidebar: a *Reports* entry (locked) – a placeholder for compliance reports and the SIEM export of the audit log, which
-  need an Enterprise license; the page shows a greyed-out preview.
+- **tentaclAI Community / Enterprise:** tentacontrol loads extensions (`TC_EXTENSIONS`, default
+  `tentaclai_enterprise`, skipped when not installed) – their routes and templates come first. tentaclAI Enterprise is a
+  separate package. In Community the sidebar shows *Reports* and *Modules* locked (Modules lists the Enterprise
+  modules), and Settings → *License* says what an Enterprise license adds and shows the *Installation ID* (derived
+  from the hardware – system UUID of the firmware, else the Docker engine ID – never stored). New dependency of
+  tentacontrol: `cryptography` (for extensions mounted into the image).
 - Sidebar: new flagged entries (possible prompt injection) show as a yellow *⚠ count* next to *Activity*, and the
   Overview names them with a link – both until Activity is opened. Separate from the pulsing approval badge; the tab
   title and favicon stay for approvals.

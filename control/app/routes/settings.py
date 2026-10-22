@@ -6,7 +6,7 @@ import segno
 from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse
 
-from .. import auth, connectors, license, models, notify, services_store, skills, totp, usage
+from .. import auth, connectors, instance, models, notify, services_store, skills, totp, usage
 from ..config import RC_VARS, RESTART_VARS, SETTINGS_GROUPS, managed_elsewhere
 from ..envfile import read_env, update_env
 from ..config import site
@@ -257,22 +257,9 @@ async def security_disable(request: Request, password: str = Form(""), code: str
     return RedirectResponse("/security", status_code=303)
 
 
+
 @router.get("/license", response_class=HTMLResponse)
 async def license_page(request: Request):
-    iid, source = license.instance_id()
-    return page(request, "license.html", lic=license.status(), features=license.FEATURES, instance=iid, instance_source=source)
-
-
-@router.post("/license", response_class=HTMLResponse)
-async def license_install(request: Request, key: str = Form("")):
-    try:
-        st = license.install(key)
-    except ValueError as e:
-        return respond(request, f"License not installed: {e}", "err")
-    return respond(request, f"License {st['license']['id']} for {st['license']['licensee']} installed", refresh=True)
-
-
-@router.post("/license/remove", response_class=HTMLResponse)
-async def license_remove(request: Request):
-    license.remove()
-    return respond(request, "License removed", refresh=True)
+    """tentaclAI Community: what an Enterprise license would unlock – tentaclAI Enterprise replaces this page"""
+    iid, source = instance.instance_id()
+    return page(request, "license.html", instance=iid, instance_source=source)

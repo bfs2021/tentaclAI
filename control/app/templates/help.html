@@ -26,7 +26,7 @@
     <a href="#terminal">Terminal &amp; tmux</a><a href="#rc">Remote control</a><a href="#services">Services</a>
     <a href="#systems">Systems</a><a href="#topology">Topology</a><a href="#docker">Docker hosts</a><a href="#onboard">Onboarding a service</a><a href="#auth">Auth types</a>
     <a href="#git">Git repositories</a><a href="#db">Databases</a><a href="#web">Web sources</a><a href="#files">Files</a><a href="#mail">Mail</a><a href="#templates">Templates</a><a href="#inventory">System inventory</a>
-    <a href="#activity">Activity</a><a href="#jobs">Jobs</a><a href="#network">Network</a><a href="#ssh">SSH targets</a><a href="#claude">Claude</a><a href="#settings">Settings</a><a href="#license">License</a><a href="#updates">Updates</a><a href="#cli">Commands</a>
+    <a href="#activity">Activity</a><a href="#jobs">Jobs</a><a href="#network">Network</a><a href="#ssh">SSH targets</a><a href="#claude">Claude</a><a href="#settings">Settings</a><a href="#license">Enterprise</a><a href="#updates">Updates</a><a href="#cli">Commands</a>
     <a href="#security">Security</a><a href="#troubleshooting">Troubleshooting</a><a href="#roadmap">Roadmap</a>
   </nav>
   <div class="doc">
@@ -362,9 +362,10 @@
 </section>
 
     <section class="card" id="license">
-      <h2>License &amp; Enterprise</h2>
-      <p>tentaclAI is open source (MIT). Settings → <a href="/license">License</a> takes an <strong>Enterprise license key</strong>, which unlocks the features beyond it – for now the <a href="/reports">Reports</a> placeholder (compliance reports and the SIEM export of the audit log, in preparation). The page shows the installed license (licensee, ID, edition, validity, seats, features) and lets you replace or remove it. A key (<code>TCL1.…</code>) is signed: tentacontrol checks it offline with a public key built into tentaclAI – no license server, nothing is sent anywhere. An expired key keeps showing with its end date, the features lock.</p>
-      <p>The page also shows this installation's <strong>Installation ID</strong> (<code>TCI-…</code>). It is derived from the machine's hardware – a hash of the system UUID its firmware reports, or of the Docker engine's ID where there is none – worked out on every start and never stored, so it can't be set by hand or copied along with the data. A key issued for an ID works only on that installation; keys without one (e.g. trials) work anywhere. New hardware means a new ID and a new key.</p>
+      <h2>Community &amp; Enterprise</h2>
+      <p>This is <strong>tentaclAI Community</strong>, the free, open-source edition. <strong>tentaclAI Enterprise</strong> is a separate package that hooks into tentacontrol and adds Enterprise modules – listed under <a href="/modules">Modules</a>, e.g. compliance reports and the SIEM export of the audit log. In Community, <em>Reports</em> and <em>Modules</em> are shown locked, and Settings → <a href="/license">License</a> says what an Enterprise license adds.</p>
+      <p>The License tab also shows this installation's <strong>Installation ID</strong> (<code>TCI-…</code>) – needed to order a license bound to this installation. It is derived from the machine's hardware (a hash of the system UUID its firmware reports, or of the Docker engine's ID where there is none), worked out on every start and never stored, so it can't be set by hand or copied along with the data.</p>
+      <p>Extensions: tentacontrol loads the packages named in <code>TC_EXTENSIONS</code> (default <code>tentaclai_enterprise</code>) if they are installed; their pages and templates come before its own.</p>
     </section>
 
     <section class="card" id="updates">
