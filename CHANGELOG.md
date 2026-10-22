@@ -2,7 +2,7 @@
 
 All notable changes, newest first. Every release lists **upgrade steps** from the previous one.
 
-## Unreleased
+## v0.15.0 – 2026-10-22
 
 ### Highlights
 - **Jobs that propose:** with *Propose actions* (read-only profile) a run only analyses and returns proposed changes –
