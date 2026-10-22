@@ -2,6 +2,7 @@
 """Status line of Claude Code in tentaclAI (statusLine in ~/.claude/settings.json, refreshed every few seconds).
 
 Reads Claude's session JSON on stdin; prints one line: the caged octopus, model, directory and – most important –
+how full the context window is (ctx N %) and
 approvals waiting in tentacontrol, so they show up in the terminal while svc waits.
 """
 import json
@@ -9,7 +10,7 @@ import os
 import subprocess
 import sys
 
-R, DIM, BOLD, YEL, LAV = "\033[0m", "\033[2m", "\033[1m", "\033[33m", "\033[38;5;141m"
+R, DIM, BOLD, YEL, RED, LAV = "\033[0m", "\033[2m", "\033[1m", "\033[33m", "\033[31m", "\033[38;5;141m"
 
 try:
     s = json.load(sys.stdin)
@@ -22,6 +23,16 @@ parts = [f"{LAV}▥ tentaclAI{R} {DIM}· safely caged{R}"]
 if model:
     parts.append(f"{DIM}{model}{R}")
 parts.append(f"{DIM}{cwd.replace('/home/claude', '~')}{R}")
+
+# how full the context window is – from 60 % worth a /compact at the next topic change, from 80 % urgent
+used = (s.get("context_window") or {}).get("used_percentage")
+if isinstance(used, (int, float)):
+    if used >= 80:
+        parts.append(f"{RED}{BOLD}ctx {used:.0f} %{R}{RED} → /compact{R}")
+    elif used >= 60:
+        parts.append(f"{YEL}ctx {used:.0f} %{R}")
+    else:
+        parts.append(f"{DIM}ctx {used:.0f} %{R}")
 
 try:
     r = subprocess.run(["svc", "pending", "--json"], capture_output=True, text=True, timeout=4)

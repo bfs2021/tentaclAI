@@ -203,3 +203,13 @@ def test_mail_password_counts_as_credential():
 ])
 def test_imap_list_name(line, name):
     assert svc.imap_list_name(line) == name
+
+
+@pytest.mark.parametrize("used,shown", [(42.4, "ctx 42 %"), (63, "\033[33mctx 63 %"), (85, "→ /compact"), (None, None)])
+def test_statusline_shows_context_fill(used, shown):
+    import subprocess
+    import sys
+    r = subprocess.run([sys.executable, os.path.join(ROOT, "build", "tc-statusline")], capture_output=True, text=True,
+                       input=json.dumps({"context_window": {"used_percentage": used}}), env={"PATH": "/nonexistent"})
+    assert r.returncode == 0
+    assert (shown in r.stdout) if shown else "ctx" not in r.stdout

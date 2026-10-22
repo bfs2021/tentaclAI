@@ -9,6 +9,9 @@ All notable changes, newest first. Every release lists **upgrade steps** from th
   the choice is remembered in the browser.
 - `svc mail` takes the mailbox address instead of the service name (`svc mail info@example.com list`) – it must belong
   to exactly one service; `svc mail` and the catalog list the address of every mail service.
+- Long sessions: Claude's status line shows how full the context window is (`ctx 42 %`, yellow from 60 %, red with
+  `→ /compact` from 80 %), and a new base rule has Claude suggest `/compact` once in a long session, where a topic ends
+  (not in jobs).
 
 ### Upgrade (from v0.15.0)
 `./tentaclai.sh update`, `docker compose build`, `docker compose up -d` – both images changed (svc); recreating `tentaclai`
