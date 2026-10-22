@@ -487,3 +487,15 @@ input[type=checkbox]:not(.switch-cb) { accent-color: var(--accent-2); }
 /* Settings → Export / Import */
 .err-text { color: var(--err); }
 pre.diff { max-height: 320px; overflow: auto; white-space: pre; background: var(--panel-2); padding: 8px 10px; border-radius: 8px; margin: 6px 0 0; }
+
+/* Enterprise placeholder (Reports): a greyed-out preview behind a lock note */
+.nav-locked { opacity: .55; }
+.nav-locked .nav-count svg { width: 14px; height: 14px; }
+.locked { position: relative; }
+.locked-preview { filter: grayscale(1); opacity: .35; pointer-events: none; user-select: none; }
+.locked-bars { display: flex; align-items: flex-end; gap: 10px; height: 120px; }
+.locked-bars span { flex: 1; background: var(--muted); border-radius: 4px 4px 0 0; }
+.locked-note { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); max-width: 440px; width: calc(100% - 32px);
+  text-align: center; box-shadow: 0 10px 40px rgba(0,0,0,.35); }
+.locked-note h2 { margin: 8px 0; font-size: 17px; }
+.locked-icon svg { width: 34px; height: 34px; color: var(--muted); }

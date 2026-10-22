@@ -14,6 +14,8 @@ All notable changes, newest first. Every release lists **upgrade steps** from th
   shows nothing. A decision is used once – a second identical call doesn't ride along.
 
 ### Changes
+- Sidebar: a *Reports* entry (locked) – a placeholder for compliance reports and the SIEM export of the audit log, which
+  need an Enterprise license; the page shows a greyed-out preview.
 - Sidebar: new flagged entries (possible prompt injection) show as a yellow *⚠ count* next to *Activity*, and the
   Overview names them with a link – both until Activity is opened. Separate from the pulsing approval badge; the tab
   title and favicon stay for approvals.

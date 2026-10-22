@@ -247,6 +247,12 @@ async def ws_terminal(ws: WebSocket, p: str = "claude", alias: str = ""):
     await bridge(ws, cmd)
 
 
+@router.get("/reports", response_class=HTMLResponse)
+async def reports_page(request: Request):
+    """placeholder: reports are an Enterprise feature"""
+    return page(request, "reports.html")
+
+
 @router.get("/help", response_class=HTMLResponse)
 async def help_page(request: Request):
     return page(request, "help.html", templates_list=services_store.list_templates())
