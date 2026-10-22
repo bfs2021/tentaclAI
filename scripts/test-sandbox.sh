@@ -217,6 +217,7 @@ check "mail: reading doesn't mark it seen" "$($C svc mail testmail list --unseen
 check "mail: mark as seen (rw)" "$($C svc mail testmail flag "$MUID" seen 2>&1 | tail -1)" "✓ INBOX/$MUID: seen"
 docker exec tctest-api python -c "import imaplib; i = imaplib.IMAP4('tctest-mail', 3143); i.login('alice@example.com', 'x'); i.create('Done')" >/dev/null 2>&1 || true
 check "mail: move to another folder (rw)" "$($C svc mail testmail move "$MUID" Done 2>&1 | tail -1)" "✓ INBOX/$MUID → Done"
+check "mail: folders are plain names" "$($C svc mail testmail folders 2>/dev/null | grep -cx -e INBOX -e Done || true)" "2"
 check "mail: … and it is there" "$($C svc mail testmail list Done 2>/dev/null | grep -c "$MSUBJ" || true)" "1"
 check "mail: read-only job can't send" "$(J jobro01 'echo x | svc mail testmail send --to alice@example.com --subject ro')" "refused"
 # jobs from the terminal: svc proposes, the user approves, tentacontrol saves (paused)

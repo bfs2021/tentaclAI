@@ -13,6 +13,7 @@ All notable changes, newest first. Every release lists **upgrade steps** from th
 
 ### Fixes
 - `svc jobs`: long job names no longer run into the schedule column.
+- `svc mail … folders` returned mangled names (`/" Junk`) on servers that quote them (Dovecot) – the LIST answer is parsed properly now.
 
 ### Upgrade (from v0.14.0)
 `./tentaclai.sh update`, `docker compose build`, `docker compose up -d` – both images changed; recreating `tentaclai` ends

@@ -1136,6 +1136,19 @@ def imap_quote(s):
     return '"' + s + '"'
 
 
+def imap_list_name(line):
+    """the folder name of one LIST answer: (\\Flags) "/" "Name" – delimiter and name quoted or not, NIL delimiter"""
+    if isinstance(line, tuple):  # a literal: the name follows as its own item
+        return line[1].decode(errors="replace") if len(line) > 1 else ""
+    m = re.match(r'^\([^)]*\)\s+(?:"(?:[^"\\]|\\.)*"|NIL)\s+(.+)$', (line or b"").decode(errors="replace"))
+    if not m:
+        return ""
+    name = m.group(1).strip()
+    if len(name) >= 2 and name[0] == name[-1] == '"':
+        name = re.sub(r'\\(.)', r"\1", name[1:-1])
+    return name
+
+
 def imap_folder(cfg, folder):
     allowed = cfg.get("folders")
     if allowed and folder not in allowed:
@@ -1260,7 +1273,7 @@ def cmd_mail(services, args):
     try:
         if op == "folders":
             typ, data = i.list()
-            names = [re.sub(r'^.*? "?[^"]*"? ', "", (d or b"").decode(errors="replace")).strip('"') for d in data or []]
+            names = [n for n in (imap_list_name(d) for d in data or []) if n]
             allowed = cfg.get("folders")
             for n in names:
                 if not allowed or n in allowed:

@@ -175,3 +175,13 @@ def test_mail_ports_and_gateway_targets():
 def test_mail_password_counts_as_credential():
     import tclib
     assert tclib.secret_variables({"imap": {"user": "${MAIL_USER}", "password": "${MAIL_PW}"}}) == {"MAIL_PW"}
+
+
+@pytest.mark.parametrize("line,name", [
+    (b'(\\HasNoChildren \\Junk) "/" "Junk"', "Junk"), (b'(\\HasNoChildren) "/" INBOX', "INBOX"),
+    (b'(\\HasNoChildren) "." "Sent Items"', "Sent Items"), (b'() NIL "Archive"', "Archive"),
+    (b'(\\Noselect) "/" "a \\"quoted\\" one"', 'a "quoted" one'), (b"garbage", ""),
+    ((b'(\\HasNoChildren) "/" {9}', b"Ordner \xc3\xa4"), "Ordner ä"),
+])
+def test_imap_list_name(line, name):
+    assert svc.imap_list_name(line) == name
