@@ -67,7 +67,7 @@
       <button class="btn sm primary" hx-post="/jobs/{{ j.id }}/run" {{ 'disabled' if j.busy }}>{{ icon('play') }}Run now</button>
       {% if j.schedule.kind != 'manual' %}<span class="switch-row" title="{{ 'runs on its schedule – switch off to pause' if j.enabled else 'paused – switch on to run on its schedule again' }}"><span class="{{ 'on' if j.enabled }}">{{ 'On' if j.enabled else 'Paused' }}</span><button class="switch" role="switch" aria-checked="{{ 'true' if j.enabled else 'false' }}" aria-label="Run on schedule" hx-post="/jobs/{{ j.id }}/toggle"></button></span>{% endif %}
       <a class="btn sm" href="/jobs/{{ j.id }}">Edit</a>
-      <button class="btn sm" hx-post="/jobs/{{ j.id }}/clone" title="Copy this job (the copy starts paused)">{{ icon('copy') }}Clone</button>
+      <button class="btn sm" hx-post="/jobs/{{ j.id }}/clone" title="Clone – copy this job (the copy starts paused)" aria-label="Clone">{{ icon('copy') }}</button>
     </div>
   </div>
   {% if j.runs %}

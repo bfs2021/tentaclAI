@@ -6,7 +6,7 @@
 <div class="header">
   <div><div class="small"><a href="/jobs">← Jobs</a></div><h1>{{ job.name or 'New job' }}</h1>
     <div class="sub">What Claude should check or report, and when. The answer is a traffic light (ok / warn / alert) with a short summary.</div></div>
-  <div class="row">{% if jid %}<button class="btn" hx-post="/jobs/{{ jid }}/clone" title="Copy this job (the copy starts paused)">{{ icon('copy') }}Clone</button><button class="btn danger" hx-post="/jobs/{{ jid }}/delete" hx-confirm="Delete job {{ job.name }}? Its run history stays.">{{ icon('trash') }}Delete</button>{% endif %}{{ help_link('jobs') }}</div>
+  <div class="row">{% if jid %}<button class="btn" hx-post="/jobs/{{ jid }}/clone" title="Clone – copy this job (the copy starts paused)" aria-label="Clone">{{ icon('copy') }}</button><button class="btn danger" hx-post="/jobs/{{ jid }}/delete" hx-confirm="Delete job {{ job.name }}? Its run history stays.">{{ icon('trash') }}Delete</button>{% endif %}{{ help_link('jobs') }}</div>
 </div>
 {% if not jid %}
 <div class="row small" style="margin:-8px 0 16px;flex-wrap:wrap;justify-content:flex-start"><span class="muted">Templates:</span>
