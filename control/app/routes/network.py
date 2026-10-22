@@ -116,6 +116,8 @@ async def approval_decide(request: Request, rid: str, verdict: str):
     ok = activity.decide(rid, verdict not in ("deny", "block"), who=who, grant=verdict in ("approve15", "net10", "net60"),
                          seconds={"net10": 600, "net60": 3600}.get(verdict))
     if ok:
+        if verdict in ("always", "block"):  # the status stays approved / denied for the gateway; Recent decisions shows the lasting choice
+            a["shown"] = "allowed" if verdict == "always" else "blocked"
         activity.audit_network(a, {"block": "blocked", "deny": "denied"}.get(verdict, "approved"),
                                a["by"] + {"always": " · always allowed", "block": " · on the blocklist"}.get(verdict, ""))
     resp = await (approval_banner(request) if request.query_params.get("view") == "banner" else approvals_partial(request))

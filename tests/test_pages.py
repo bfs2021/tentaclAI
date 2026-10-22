@@ -216,6 +216,8 @@ def test_network_decision_lands_in_the_audit_log(client, app_module, tmp_path, m
     assert "on the blocklist" in e[0]["detail"] and "+ 10 min" in e[1]["detail"]
     html = client.get("/activity?since=all").text
     assert "evil.test:443" in html and "not run" not in html
+    recent = client.get("/partials/approvals").text  # Recent decisions names the lasting choice, the status stays for the gateway
+    assert "evil.test:443 blocked" in recent and activity.APPROVALS[rid]["status"] == "denied"
 
 
 def test_favicon_without_login(app_module):

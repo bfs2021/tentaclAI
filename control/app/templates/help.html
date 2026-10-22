@@ -300,7 +300,7 @@
       <h2>Network</h2>
       <p>All traffic of the sandbox leaves through the egress gateway; <a href="/network">Network</a> shows and controls it.</p>
       <h3 id="network-mode">Mode</h3>
-      <p>How the gateway treats a destination that no rule covers. <strong>permissive</strong> (default): allowed and recorded – use it to learn what the sandbox needs. <strong>enforce</strong>: held for up to 60 s while you decide in Activity (<em>Allow 10 min</em>, <em>Allow 1 h</em>, <em>Always</em>, <em>Deny</em>, <em>Block</em>); refused if nobody answers. <code>EGRESS_MODE</code> in <code>.env</code>.</p>
+      <p>How the gateway treats a destination that no rule covers. <strong>permissive</strong> (default): allowed and recorded – use it to learn what the sandbox needs. <strong>enforce</strong>: held for up to 60 s while you decide in Activity (<em>Allow 10 min</em>, <em>Allow 1 h</em>, <em>Always</em>, <em>Deny</em>, <em>Block</em>); refused if nobody answers. <em>Recent decisions</em> shows <em>Always</em> as <em>allowed</em> and <em>Block</em> as <em>blocked</em> – they last, unlike a plain Allow or Deny. <code>EGRESS_MODE</code> in <code>.env</code>.</p>
       <h3 id="network-ip">IP targets</h3>
       <p>Connections to a bare IP address instead of a name (<code>curl https://93.184.215.14</code>). Normal programs almost always use names, so in enforce mode such a connection without a rule is blocked (<strong>block</strong>, default) or asked about like any other unknown destination (<strong>ask</strong>). In permissive mode it is allowed like everything else. <code>EGRESS_DIRECT_IP</code> in <code>.env</code>.</p>
       <h3 id="network-rules">Rules</h3>

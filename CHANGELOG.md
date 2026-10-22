@@ -7,6 +7,8 @@ All notable changes, newest first. Every release lists **upgrade steps** from th
 ### Changes
 - Activity → audit log: decisions about unknown network destinations (Allow 10 min / 1 h, Always, Deny, Block, or
   *expired*) are logged too, with the part `network` – until now they only showed under *Recent decisions*.
+- Activity → Recent decisions: *Always* shows as *allowed* and *Block* as *blocked* (orange) instead of *approved* /
+  *denied*, so a lasting choice stands out from a one-off Allow or Deny.
 - Settings → General: the group of the prompt-injection switch is called *Prompt injection* (was *Security*, easy to
   mix up with the Security tab); Help names where the switch is.
 

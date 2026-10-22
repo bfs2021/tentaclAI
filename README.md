@@ -350,7 +350,7 @@ All traffic of the sandbox leaves through the egress gateway; tentacontrol → *
 | Mode | Unknown destination |
 |---|---|
 | `permissive` (default) | allowed and recorded – use it to learn what the sandbox needs |
-| `enforce` | held for up to 60 s while you decide in **Activity** (*Allow 10 min*, *Allow 1 h*, *Always*, *Deny*, *Block*); refused if nobody answers |
+| `enforce` | held for up to 60 s while you decide in **Activity** (*Allow 10 min*, *Allow 1 h*, *Always*, *Deny*, *Block*); refused if nobody answers. *Recent decisions* shows *Always* as *allowed* and *Block* as *blocked* |
 
 **IP targets** – connections to a bare IP address instead of a name (`curl https://93.184.215.14`). Normal programs
 almost always use names, so in `enforce` mode such a connection without a rule is blocked (`block`, default) or asked
