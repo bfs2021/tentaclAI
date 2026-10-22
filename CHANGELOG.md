@@ -11,6 +11,7 @@ All notable changes, newest first. Every release lists **upgrade steps** from th
   `ro` stays `ro`, `confirm` asks as usual, a limited job stays limited. Notifications say how many proposals wait;
   `svc jobs <name>` shows them too.
   Proposals that wait for a decision show right below the run, without unfolding it.
+  The badge next to *Jobs* counts them and pulses like the approval badge until they are run or expire.
 
 ### Fixes
 - `svc jobs`: long job names no longer run into the schedule column.

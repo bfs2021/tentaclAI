@@ -908,6 +908,13 @@ def state_token():
     return hashlib.sha1(raw.encode()).hexdigest()[:12]
 
 
+def pending_proposals():
+    """proposals waiting for the user's pick (not run, not expired) – the pulsing badge next to Jobs"""
+    now = time.time()
+    return sum(1 for r in history() if r.get("actions_until", 0) > now
+               for x in r.get("actions") or [] if x.get("state") == "proposed")
+
+
 def mark_seen():
     jsonstore.save(SEEN, {"ts": time.time()})
 

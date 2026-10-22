@@ -68,8 +68,11 @@ async def jobs_moved():
 
 @router.get("/partials/job-count", response_class=HTMLResponse)
 async def job_count():
+    p = scheduled.pending_proposals()
+    if p:  # a decision waits – pulsing like approvals
+        return HTMLResponse(f'<span class="nav-badge" title="{p} proposal(s) to pick">{p}</span>')
     n = scheduled.unseen()
-    return HTMLResponse(f'<span class="nav-badge warn">{n}</span>' if n else '<span class="nav-badge" hidden></span>')
+    return HTMLResponse(f'<span class="nav-badge warn" title="{n} finding(s) not looked at">{n}</span>' if n else '<span class="nav-badge" hidden></span>')
 
 
 @router.get("/partials/jobs-state", response_class=HTMLResponse)

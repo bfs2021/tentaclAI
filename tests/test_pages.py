@@ -376,3 +376,21 @@ def test_pending_proposals_show_outside_the_folded_run(client, app_module, monke
         jsonstore.save(scheduled.HISTORY, [dict(run, **changed)])
         html = client.get("/jobs").text
         assert '<div class="job-pending">' not in html  # expired or settled: inside the row again
+
+
+def test_job_badge_prefers_waiting_proposals(client, app_module, monkeypatch, tmp_path):
+    import time
+    from app import jsonstore, scheduled
+    for k, f in (("JOBS", "j.json"), ("HISTORY", "h.json"), ("SEEN", "s.json")):
+        monkeypatch.setattr(scheduled, k, str(tmp_path / f))
+    acts = [{"title": "a", "command": "svc m move 1 Junk", "state": "proposed"}, {"title": "b", "command": "svc m move 2 Junk", "state": "proposed"},
+            {"title": "c", "command": "svc m move 3 Junk", "state": "done"}]
+    jsonstore.save(scheduled.HISTORY, [{"id": "r1", "job": "x", "status": "done", "ended": time.time() - 100, "result": {"status": "warn"},
+                                        "actions": acts, "actions_until": time.time() + 600}])
+    b = client.get("/partials/job-count").text
+    assert ">2<" in b and "warn" not in b  # pulsing, the count of proposals
+    client.get("/jobs")  # looking doesn't decide anything
+    assert ">2<" in client.get("/partials/job-count").text
+    jsonstore.save(scheduled.HISTORY, [{"id": "r1", "job": "x", "status": "done", "ended": time.time() - 100, "result": {"status": "warn"},
+                                        "actions": acts, "actions_until": time.time() - 1}])
+    assert "hidden" in client.get("/partials/job-count").text  # expired, and the finding was seen
