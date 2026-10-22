@@ -2,7 +2,7 @@
 
 All notable changes, newest first. Every release lists **upgrade steps** from the previous one.
 
-## Unreleased
+## v0.16.0 – 2026-10-22
 
 ### Highlights
 - **Clearer access names:** `read` / `write` / `confirm` instead of `ro` / `rw` / `confirm` everywhere – UI, service
