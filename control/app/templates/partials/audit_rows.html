@@ -9,7 +9,7 @@
   <td class="small audit-from"><span class="actor actor-{{ e.actor }}">{{ who.get(e.actor, e.actor) }}</span>
     {% if e.from_label %}<div class="faint" title="reported by the calling session – a hint, not proof">{% if e.from_link %}<a href="{{ e.from_link }}">{{ e.from_label }}</a>{% else %}{{ e.from_label }}{% endif %}</div>{% endif %}
     {% if e.ip %}<div class="faint mono">{{ e.ip }}</div>{% endif %}</td>
-  <td class="audit-what"><div class="row" style="gap:6px;flex-wrap:nowrap;min-width:0"><span class="tag">{{ e.category }}</span><strong class="audit-svc">{{ e.service }}</strong>
+  <td class="audit-what"><div class="row" style="gap:6px;flex-wrap:nowrap;min-width:0"><span class="tag">{{ kinds.get(e.category, e.category) }}</span>{% if e.service %}<a class="audit-svc" href="{{ search(e.service) }}" title="search for {{ e.service }}"><strong>{{ e.service }}</strong></a>{% endif %}
     {% if e.part and e.part not in (e.category, 'claude') %}<span class="small faint nowrap">{{ e.part }}{% if e.mode %} · {{ e.mode }}{% endif %}</span>{% elif e.mode and e.mode != 'read' %}<span class="small faint nowrap">{{ e.mode }}</span>{% endif %}</div>
     <div class="mono small audit-action">{{ clip(e.action) }}</div>{% if e.excerpts %}
     <details class="audit-excerpts" open><summary>Indicators</summary>{% for x in e.excerpts %}<div><span class="faint">{{ x.reason }}:</span> {{ x.text }}</div>{% endfor %}</details>{% endif %}</td>

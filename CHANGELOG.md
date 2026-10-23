@@ -9,7 +9,7 @@ All notable changes, newest first. Every release lists **upgrade steps** from th
   every `svc` command including reads, network connections of the sandbox (counted per destination and 15 minutes,
   refused ones at once), scheduled job runs, your changes in tentacontrol, terminal sessions, sign-ins and failed
   attempts, tentacontrol's start. Compact rows (time · actor and source · event · decision · result), filters along the
-  columns (time – also own dates –, actor or source, type, target, decision), full-text search, *Load more*, and **CSV / JSONL export** of
+  columns (time – also own dates –, actor or source, type, decision), full-text search, *Load more*, and **CSV / JSONL export** of
   exactly what the filters match.
 - **Accounts with a username**: the first setup asks for username, email and an optional name; you sign in with
   username + password, and the username names you in the audit log (field `user`, also for failed sign-ins: the name

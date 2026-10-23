@@ -33,10 +33,6 @@
         <option value="">all</option>
         {% for c in categories %}<option value="{{ c }}" {{ 'selected' if c == f.category }}>{{ kinds.get(c, c) }}</option>{% endfor %}
       </select></label>
-    <label class="audit-f"><span>Target</span>
-      <input type="search" name="service" value="{{ f.service }}" placeholder="all" list="audit-targets" class="sys-select audit-target"
-             title="part of the target's name – a service, host, tool or page; Enter to filter" onchange="this.form.submit()">
-      <datalist id="audit-targets">{% for s in services_known %}<option value="{{ s }}">{% endfor %}</datalist></label>
     <label class="audit-f"><span>Decision</span>
       <select name="decision" class="sys-select" onchange="this.form.submit()">
         <option value="">all</option>

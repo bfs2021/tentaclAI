@@ -372,8 +372,8 @@ async def job_stream(job_id: str):
 
 
 AUDIT_FILTERS = ("category", "actor", "service", "decision")
-AUDIT_KINDS = {"service": "svc command", "tool": "Claude tool", "network": "network", "admin": "admin",
-               "auth": "sign-in", "job": "job run", "system": "system"}  # the What filter's labels
+AUDIT_KINDS = {"service": "svc", "tool": "tool", "network": "network", "admin": "admin", "auth": "sign-in", "job": "job",
+               "system": "system"}  # the Type of an entry – the same words in the filter and on the rows
 
 
 def _audit_query(request):
@@ -399,6 +399,11 @@ def _audit_who(f):
     return f["actor"]
 
 
+def _audit_search(f):
+    """link of a target in a row: the same filters, with the target as the search text"""
+    return lambda text: "/logs?" + _audit_qs({**f, "q": text, "service": ""})
+
+
 def _audit_qs(f):
     from urllib.parse import urlencode
     return urlencode({k: v for k, v in f.items() if v and not (k == "since" and v == "24h")})
@@ -413,8 +418,9 @@ async def logs_page(request: Request):
     services, jobs_known = await asyncio.to_thread(auditlog.known)
     filtered = any(f[k] for k in (*AUDIT_FILTERS, "q", "origin", "start", "end")) or f["since"] != "24h"
     return page(request, "logs.html", entries=entries, more=more, f=f, who=_audit_who(f), qs=_audit_qs(f), filtered=filtered,
+                search=_audit_search(f), kinds=AUDIT_KINDS,
                 services_known=services, jobs_known=jobs_known, categories=tclib.AUDIT_CATEGORIES,
-                actors=tclib.AUDIT_ACTORS, decisions=tclib.AUDIT_DECISIONS, kinds=AUDIT_KINDS, retention=tclib.audit_retention(read_env()))
+                actors=tclib.AUDIT_ACTORS, decisions=tclib.AUDIT_DECISIONS, retention=tclib.audit_retention(read_env()))
 
 
 @router.get("/logs/audit/more", response_class=HTMLResponse)
@@ -422,7 +428,8 @@ async def logs_audit_more(request: Request, after: str = ""):
     """the next page of entries ("Load more") – rows only"""
     f = _audit_query(request)
     entries, more = await asyncio.to_thread(auditlog.entries, after=after[:40], **f)
-    return templates.TemplateResponse(request, "partials/audit_rows.html", {"entries": entries, "more": more, "qs": _audit_qs(f)})
+    return templates.TemplateResponse(request, "partials/audit_rows.html", {"entries": entries, "more": more, "qs": _audit_qs(f),
+                                                                           "search": _audit_search(f), "kinds": AUDIT_KINDS})
 
 
 @router.get("/logs/audit/export")
