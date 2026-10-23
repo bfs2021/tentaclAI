@@ -35,6 +35,13 @@
     <a class="flow-box gen" href="/claude/memory"><b>Memory</b><small>what Claude noted itself – the index every session, entries when needed</small>{{ size(sizes.memory, 'entry' if sizes.memory == 1 else 'entries') }}</a>
     <a class="flow-box gen" href="/claude/settings"><b>settings.json</b><small>model, skills and other Claude Code settings – not text Claude reads</small></a>
   </div>
+  <div class="small knowledge-budget">
+    <strong>Knowledge budget</strong> –
+    site rules <span class="pill {{ 'warn' if know.local_over else 'ok' }}">{{ know.local_kb }} / {{ know.budget.local_kb }} KB</span>
+    {% if know.over %}· over {{ know.budget.notes }} notes: {% for o in know.over %}<span class="pill warn">{{ o.kind }} {{ o.name }} · {{ o.notes }}</span> {% endfor %}
+    {% else %}· every service and system within {{ know.budget.notes }} notes{% endif %}
+    <span class="muted">– the <a href="/jobs/new?template={{ cleanup_template }}">Knowledge cleanup</a> job proposes merges and cuts (Settings → General → Knowledge).</span>
+  </div>
   <div class="flow-legend small muted"><span class="lg-edit"></span>you edit · <span class="lg-gen"></span>generated or written by Claude · <span class="lg-img"></span>fixed (image, host)</div>
 </div>
 

@@ -7,7 +7,7 @@ import time
 from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse
 
-from .. import claude_files
+from .. import claude_files, knowledge, scheduled
 from ..web import page, respond, sync_services
 
 router = APIRouter()
@@ -25,7 +25,9 @@ async def instructions_page(request: Request):
     sizes = {"base": (st or {}).get("base_lines"), "local": _lines(local), "claude_md": _lines((st or {}).get("claude_md")),
              "host_docs": (st or {}).get("host_docs_lines"), "catalog": (st or {}).get("catalog_lines"),
              "memory": len([m for m in memory if m["name"] != "MEMORY.md"])}
-    return page(request, "claude_instructions.html", st=st, local=local, sizes=sizes, local_path=claude_files.LOCAL)
+    know = await asyncio.to_thread(knowledge.sizes)
+    return page(request, "claude_instructions.html", st=st, local=local, sizes=sizes, local_path=claude_files.LOCAL, know=know,
+                cleanup_template=next(i for i, t in enumerate(scheduled.TEMPLATES) if t["name"] == "Knowledge cleanup"))
 
 
 @router.post("/claude/instructions", response_class=HTMLResponse)

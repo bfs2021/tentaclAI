@@ -18,8 +18,13 @@
   {% if warnings %}<div class="card flat small">{% for w in warnings %}<div><span class="pill warn">note</span> {{ w }}</div>{% endfor %}</div>{% endif %}
   <div style="position:relative"><label for="prompt">Task</label>
     <textarea name="prompt" id="prompt" style="min-height:160px;font-family:inherit" required placeholder="e.g. Check the free disk space on @docktopus and warn above 80 %.">{{ job.prompt or '' }}</textarea>
-    <div class="help">Name tentacles with <code>@</code> (e.g. <code>@mailrelay</code>) – Claude gets their details, and the job can be limited to them. Say when it is ok, warn or alert – that decides whether you hear about it.</div></div>
+    <div class="help">Name tentacles with <code>@</code> (e.g. <code>@mailrelay</code>) – Claude gets their details, and the job can be limited to them. Say when it is ok, warn or alert – that decides whether you hear about it.</div>
+    {% if job.prompt_history %}<details class="small" style="margin-top:6px"><summary class="muted">Earlier versions ({{ job.prompt_history | length }})</summary>
+      {% for h in job.prompt_history %}<div class="ja-row"><button type="button" class="btn sm ghost" data-restore-prompt="{{ h.prompt }}" title="Put this version into the field – save to keep it">Restore</button>
+        <div style="min-width:0"><span class="faint">{{ fmt(h.ts) }}</span><div class="muted prompt-old">{{ h.prompt }}</div></div></div>{% endfor %}
+    </details>{% endif %}</div>
   <label class="check"><input type="checkbox" name="propose" value="1" {{ 'checked' if job.propose }}> Propose actions instead of changing anything (read-only profile) – the run suggests <code>svc</code> commands, you pick on this page which ones run</label>
+  <label class="check"><input type="checkbox" name="improve" value="1" {{ 'checked' if job.improve is not false }}> Suggest prompt improvements – when the task was unclear or lacked something the run had to find out, it proposes a better version; you take it with one click</label>
   <label class="check"><input type="checkbox" name="scope" value="1" {{ 'checked' if job.scope }}> Only the tentacles named in the task (<code>@name</code>) – <code>svc</code> refuses every other one, MCP servers are off</label>
 
   <div class="grid2">
@@ -107,5 +112,10 @@
   document.getElementById("profile").addEventListener("change", sync);
   sync();
 })();
+</script>
+<script>
+document.querySelectorAll("[data-restore-prompt]").forEach(function (b) {
+  b.addEventListener("click", function () { var t = document.getElementById("prompt"); t.value = b.dataset.restorePrompt; t.focus(); });
+});
 </script>
 {% endblock %}

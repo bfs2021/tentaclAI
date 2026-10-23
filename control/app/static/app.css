@@ -598,3 +598,6 @@ pre.diff { margin: 6px 0 0; padding: 8px 10px; background: var(--bg-2); border: 
 .approval-flags { margin: 8px 0 0; }
 .deny-form { gap: 6px; flex-wrap: nowrap; } .deny-reason { width: 220px; max-width: 100%; }
 .audit-reason { margin-top: 3px; white-space: normal; overflow-wrap: anywhere; }
+.learned-text { white-space: pre-wrap; overflow-wrap: anywhere; }
+.prompt-old { white-space: pre-wrap; max-height: 120px; overflow: auto; }
+.knowledge-budget { margin-top: 12px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }

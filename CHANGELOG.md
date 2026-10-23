@@ -16,9 +16,19 @@ All notable changes, newest first. Every release lists **upgrade steps** from th
   layout, so only real changes show); added text that reads like an instruction to an AI gets a ⚠ on the card and the
   banner, a notification and a "flagged" audit entry.
 
+- **Jobs learn**: a run may return what it learned (`knowledge`: add, fix or drop a note of a service, a system or the
+  site rules) and – *Suggest prompt improvements*, on by default, `improve` in a job definition – a better version of
+  its own task. Both show under the run: *Apply selected* writes the picked notes (backup; a note that changed since
+  the run is left alone; ⚠ for text that reads like an instruction to an AI; one audit entry per change), *Use this
+  task* takes the prompt – the editor keeps the last 5 versions (*Earlier versions*, Restore).
+- New job templates **Learning review** (weekly: the audit log of the last 7 days – repeated failures and exploration,
+  reasons of denials – turned into notes) and **Knowledge cleanup** (monthly: merges, cuts and moves notes, site rules
+  and Claude's memory). New settings `KNOWLEDGE_LOCAL_KB` (default 6) and `KNOWLEDGE_NOTES` (default 8);
+  Claude → Instructions shows the knowledge budget. `svc audit` prints the reason of a denial.
+
 ### Upgrade
 - `git pull`, `docker compose build`, `docker compose up -d` – both images change (`svc` and the instructions in
-  `tentaclai`, Approvals in `tentacontrol`); recreating `tentaclai` ends running sessions and Remote Control. Nothing
+  `tentaclai`, Approvals and Jobs in `tentacontrol`); recreating `tentaclai` ends running sessions and Remote Control. Nothing
   to migrate; `reason` is a new optional audit field.
 
 ## v0.20.0 – 2026-10-23

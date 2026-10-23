@@ -8,8 +8,8 @@ from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 
 import tclib
 
-from .. import scheduled
-from ..web import page, respond, templates
+from .. import auditlog, scheduled
+from ..web import page, respond, sync_services, templates
 
 router = APIRouter()
 
@@ -20,10 +20,10 @@ def _job_page(request, jid=None, job=None, error=None, status=200):
     known = scheduled.tentacles()
     warnings = scheduled.check_mentions(job, known)[1] if job and job.get("prompt") else []
     resp = page(request, "job_edit.html", jid=jid, job=job or {}, error=error, profiles=scheduled.PROFILES, labels=scheduled.PROFILE_LABELS,
-                notify_rules=scheduled.NOTIFY, days=scheduled.DAYS, templates=scheduled.TEMPLATES,
+                notify_rules=scheduled.NOTIFY, days=scheduled.DAYS, templates=scheduled.templates(),
                 rw=[x for x in scheduled.rw_tentacles()
                     if not (job or {}).get("scope") or x.removeprefix("ssh ") in scheduled.mentions(job.get("prompt"))],
-                efforts=tclib.EFFORTS, warnings=warnings,
+                efforts=tclib.EFFORTS, warnings=warnings, fmt=lambda ts: time.strftime("%Y-%m-%d %H:%M", time.localtime(ts)),
                 tentacle_list=[{"name": n, "kind": t["kind"], "parts": ", ".join(t["parts"]), "on": t["enabled"]}
                                for n, t in sorted(known.items())])
     resp.status_code = status
@@ -86,13 +86,14 @@ async def jobs_state(v: str = ""):
 @router.get("/jobs", response_class=HTMLResponse)
 async def jobs_page(request: Request):
     scheduled.mark_seen()
-    return page(request, "jobs.html", rows=scheduled.overview(), templates=scheduled.TEMPLATES, token=scheduled.state_token(), now=time.time(),
+    return page(request, "jobs.html", rows=scheduled.overview(), templates=scheduled.templates(), token=scheduled.state_token(), now=time.time(),
                 fmt=lambda ts: time.strftime("%Y-%m-%d %H:%M", time.localtime(ts)) if ts else "–")
 
 
 @router.get("/jobs/new", response_class=HTMLResponse)
 async def job_new(request: Request, template: int = -1):
-    job = dict(scheduled.TEMPLATES[template]) if 0 <= template < len(scheduled.TEMPLATES) else {}
+    presets = scheduled.templates()
+    job = dict(presets[template]) if 0 <= template < len(presets) else {}
     return _job_page(request, job=dict({"profile": "read-only", "notify": "findings", "max_minutes": 20,
                                         "schedule": {"kind": "daily", "time": "07:00"}}, **job))
 
@@ -172,6 +173,41 @@ async def run_discard(request: Request, rid: str, all: int = 0):
     except ValueError as e:
         return respond(request, f"Not discarded: {e}", "err")
     return respond(request, f"{n} proposal{'s' if n != 1 else ''} discarded", refresh=True)
+
+
+@router.post("/jobs/runs/{rid}/knowledge", response_class=HTMLResponse)
+async def run_knowledge(request: Request, rid: str, discard: int = 0):
+    """apply (or discard) what a run learned – each applied change gets its own audit entry"""
+    picks = (await request.form()).getlist("pick")
+    try:
+        if discard:
+            n = await asyncio.to_thread(scheduled.discard_knowledge, rid, picks)
+            return respond(request, f"{n} proposal{'s' if n != 1 else ''} discarded", refresh=True)
+        done = await asyncio.to_thread(scheduled.apply_knowledge, rid, picks)
+    except ValueError as e:
+        return respond(request, f"Not applied: {e}", "err")
+    for x, err in done:
+        target = "site rules" if x["target"] == "site" else f"{x['target']} {x['name']}"
+        auditlog.user(request, "admin", target, f"note {x['op']} (learned in job run {rid})", "failed" if err else "ok",
+                      part="knowledge", mode="POST", detail=(err or x.get("new") or x.get("old") or "")[:300])
+    request.state.audited = True  # the entries above say more than the middleware's
+    ok = sum(1 for _, err in done if not err)
+    if ok:
+        await sync_services()  # catalog and instructions show the notes
+    failed = [err for _, err in done if err]
+    return respond(request, f"{ok} applied" + (f", {len(failed)} not: {failed[0]}" if failed else ""),
+                   "warn" if failed else "ok", refresh=True)
+
+
+@router.post("/jobs/runs/{rid}/prompt", response_class=HTMLResponse)
+async def run_prompt(request: Request, rid: str, use: int = 1):
+    """take a run's suggested prompt for its job – or discard it"""
+    try:
+        jid = await asyncio.to_thread(scheduled.use_prompt, rid, bool(use))
+    except ValueError as e:
+        return respond(request, f"Not changed: {e}", "err")
+    return respond(request, f"Prompt of {jid} updated – the earlier one can be restored in the editor" if use else "Suggestion discarded",
+                   refresh=True)
 
 
 @router.get("/jobs/runs/{rid}/log", response_class=HTMLResponse)

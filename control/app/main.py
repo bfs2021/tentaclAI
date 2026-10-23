@@ -66,7 +66,8 @@ async def audit_admin(request: Request, call_next):
     """every change made in tentacontrol (POST/PUT/DELETE) lands in the audit log – what and on which object, never the form"""
     response = await call_next(request)
     path = request.url.path
-    if request.method in ("POST", "PUT", "PATCH", "DELETE") and not path.startswith(AUDIT_SKIP) and auth.logged_in(request):
+    if (request.method in ("POST", "PUT", "PATCH", "DELETE") and not path.startswith(AUDIT_SKIP) and auth.logged_in(request)
+            and not getattr(request.state, "audited", False)):  # a route that wrote its own entries
         endpoint = getattr(request.scope.get("endpoint"), "__name__", "") or path
         params = [str(v)[:80] for v in request.path_params.values()]
         area = path.strip("/").split("/")[0]

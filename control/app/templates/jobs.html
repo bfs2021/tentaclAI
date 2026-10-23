@@ -20,10 +20,44 @@
       </div>{% endif %}
     </form>
 {% endmacro %}
+{% macro learned(r) %}{% set open_items = r.knowledge | selectattr('state', 'equalto', 'proposed') | list %}
+    <form class="job-actions job-learned" hx-post="/jobs/runs/{{ r.id }}/knowledge" style="margin-top:8px">
+      <div class="small muted" style="margin-bottom:4px">Learned – pick what goes into the notes (with a backup; a note that changed since the run is left alone)</div>
+      {% for x in r.knowledge %}
+      <div class="ja-row">
+        {% if x.state == 'proposed' %}<input type="checkbox" name="pick" value="{{ loop.index0 }}" aria-label="pick">{% else %}<span class="pill {{ {'done': 'ok', 'failed': 'err', 'refused': 'err'}.get(x.state, 'off') }}">{{ x.state }}</span>{% endif %}
+        <div style="min-width:0">
+          <div><span class="tag">{{ 'site rules' if x.target == 'site' else x.target ~ ' ' ~ x.name }}</span> <span class="small muted">{{ x.op }}</span>
+            {% if x.flags %}<span class="pill warn" title="{{ x.flags | join('; ') }}">⚠ reads like an instruction to an AI</span>{% endif %}</div>
+          {% if x.old %}<div class="diff-del small learned-text">− {{ x.old }}</div>{% endif %}
+          {% if x.new %}<div class="diff-add small learned-text">+ {{ x.new }}</div>{% endif %}
+          <div class="small faint">{{ x.why }}{% if x.output and x.state != 'proposed' %} · {{ x.output }}{% endif %}</div>
+        </div>
+      </div>
+      {% endfor %}
+      {% if open_items %}
+      <div class="row" style="margin-top:6px;justify-content:flex-start">
+        <button class="btn sm primary">{{ icon('check') }}Apply selected</button>
+        <button class="btn sm" hx-post="/jobs/runs/{{ r.id }}/knowledge?discard=1">Discard selected</button>
+      </div>{% endif %}
+    </form>
+{% endmacro %}
+{% macro better_prompt(r) %}{% set p = r.prompt_suggestion %}
+    <div class="job-actions job-prompt" style="margin-top:8px">
+      <div class="small muted" style="margin-bottom:4px">A better task{% if p.state != 'proposed' %} – {{ p.state }}{% endif %}{% if p.why %}: {{ p.why }}{% endif %}</div>
+      <details class="small"><summary class="muted">the suggested task</summary><pre class="rc" style="max-height:240px;white-space:pre-wrap">{{ p.text }}</pre></details>
+      {% if p.state == 'proposed' %}<div class="row" style="margin-top:6px;justify-content:flex-start">
+        <button class="btn sm primary" hx-post="/jobs/runs/{{ r.id }}/prompt?use=1">{{ icon('check') }}Use this task</button>
+        <button class="btn sm" hx-post="/jobs/runs/{{ r.id }}/prompt?use=0">Discard</button>
+      </div>{% endif %}
+    </div>
+{% endmacro %}
 {% macro run_row(r) %}
 {% set res = r.get('result') or {} %}
 {# proposals waiting for a decision (or running) stay visible below the row – settled ones live inside it #}
 {% set pend = r.actions and (r.actions_until or 0) > now and (r.actions | selectattr('state', 'in', ['proposed', 'queued', 'running']) | list | length) > 0 %}
+{% set pend_learned = r.knowledge and (r.knowledge | selectattr('state', 'equalto', 'proposed') | list | length) > 0 %}
+{% set pend_prompt = r.prompt_suggestion and r.prompt_suggestion.state == 'proposed' %}
 <details class="mem-entry" id="run-{{ r.id }}">
   <summary>{{ light(r) }} <span>{% if r.status == 'running' %}<span class="muted">Claude is working – <span class="elapsed" data-since="{{ r.started or r.queued }}"></span></span>{% elif r.status == 'queued' %}<span class="muted">waiting for the run before it</span>{% else %}{{ res.get('title') or r.get('error') or '' }}{% endif %}</span><span class="faint small">{{ fmt(r.get('started') or r.queued) }}{% if r.seconds %} · {{ r.seconds }} s{% endif %}{% if r.cost %} · ${{ '%.2f' % r.cost }}{% endif %}{% if r.trigger == 'manual' %} · manual{% endif %}</span></summary>
   <div class="small" style="margin-top:8px">
@@ -32,6 +66,8 @@
     {% if r.get('error') and r.status != 'done' %}<p class="muted" style="margin:0">{{ r.error }}</p>{% endif %}
     {% if r.get('denials') %}<p class="muted" style="margin:6px 0 0">{{ r.denials }} tool call(s) refused by the {{ r.profile }} profile.</p>{% endif %}
     {% if r.actions and not pend %}{{ proposals(r) }}{% endif %}
+    {% if r.knowledge and not pend_learned %}{{ learned(r) }}{% endif %}
+    {% if r.prompt_suggestion and not pend_prompt %}{{ better_prompt(r) }}{% endif %}
     {% if r.status in ('running', 'queued') %}
     <div class="job-live" hx-get="/jobs/runs/{{ r.id }}/log" hx-trigger="load, every 2s" style="margin-top:8px"></div>
     {% if r.status == 'running' %}<button class="btn sm danger" hx-post="/jobs/runs/{{ r.id }}/cancel" hx-confirm="Stop this run?" style="margin-top:8px">Stop</button>{% endif %}
@@ -42,6 +78,8 @@
   </div>
 </details>
 {% if pend %}<div class="job-pending">{{ proposals(r) }}</div>{% endif %}
+{% if pend_learned %}<div class="job-pending">{{ learned(r) }}</div>{% endif %}
+{% if pend_prompt %}<div class="job-pending">{{ better_prompt(r) }}</div>{% endif %}
 {% endmacro %}
 {% block content %}
 <div class="header">
