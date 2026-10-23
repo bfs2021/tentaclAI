@@ -6,6 +6,8 @@
   --accent: #a78bfa; --accent-2: #7c5cf0; --accent-soft: rgba(167,139,250,.12);
   --ok: #34d399; --ok-soft: rgba(52,211,153,.12); --warn: #fbbf24; --warn-soft: rgba(251,191,36,.12);
   --err: #f87171; --err-soft: rgba(248,113,113,.12); --info: #60a5fa; --info-soft: rgba(96,165,250,.12);
+  /* audit types – kept clear of ok/warn/err, which the outcome uses: Claude's in cool hues, the user's in warm ones */
+  --t-tool: #a78bfa; --t-svc: #60a5fa; --t-network: #22d3ee; --t-job: #f472b6; --t-admin: #fb923c; --t-signin: #d4b483;
   --radius: 12px; --radius-sm: 8px; --shadow: 0 1px 2px rgba(0,0,0,.25), 0 8px 24px rgba(0,0,0,.18);
   --mono: ui-monospace, "SF Mono", "JetBrains Mono", "Cascadia Code", Menlo, Consolas, monospace;
   color-scheme: dark;
@@ -15,6 +17,7 @@
     --bg: #f6f7fb; --bg-2: #eef0f6; --panel: #ffffff; --panel-2: #f3f4f8; --border: #e2e5ee;
     --text: #1b1f2a; --muted: #5d6576; --faint: #9aa1b0;
     --accent: #6d4ae8; --accent-2: #5634d6; --accent-soft: rgba(109,74,232,.09);
+    --t-tool: #6d4ae8; --t-svc: #2563eb; --t-network: #0e7490; --t-job: #be185d; --t-admin: #c2410c; --t-signin: #8a6420;
     --shadow: 0 1px 2px rgba(16,24,40,.05), 0 6px 20px rgba(16,24,40,.06);
     color-scheme: light;
   }
@@ -396,6 +399,10 @@ details.facet > summary > span { flex: 1; }
 table.audit { table-layout: fixed; min-width: 640px; }
 table.audit td { vertical-align: top; overflow-wrap: anywhere; }
 table.audit .tag { white-space: nowrap; }
+.tag[data-type] { background: color-mix(in srgb, var(--c, var(--muted)) 13%, transparent); color: var(--c, var(--muted)); }
+.tag[data-type="tool"] { --c: var(--t-tool); } .tag[data-type="svc"] { --c: var(--t-svc); } .tag[data-type="network"] { --c: var(--t-network); }
+.tag[data-type="job"] { --c: var(--t-job); } .tag[data-type="admin"] { --c: var(--t-admin); } .tag[data-type="sign-in"] { --c: var(--t-signin); }
+.tag[data-type="system"] { background: var(--panel-2); }
 tr.audit-row { cursor: pointer; } tr.audit-row:hover td, tr.audit-row.open td { background: var(--panel-2); }
 tr.audit-row:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 .audit-action { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } tr.audit-row.open .audit-action { white-space: pre-wrap; }

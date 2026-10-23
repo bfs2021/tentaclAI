@@ -5,7 +5,7 @@
 <tr class="audit-row sev-{{ e.severity }}" data-audit-row tabindex="0" aria-expanded="false">
   <td class="mono small nowrap" title="{{ e.ts }}">{{ e.ts[11:19] }}<div class="faint">{{ e.ts[5:10] }}</div></td>
   <td class="small nowrap audit-actor">{% if v.actor == 'user' and v.user %}<span class="actor actor-user">{{ val('user', v.user) }}</span>{% else %}<span class="actor actor-{{ v.actor }}">{{ val('actor', v.actor) }}</span>{% endif %}</td>
-  <td><span class="tag">{{ val('type', v.type) }}</span></td>
+  <td><span class="tag" data-type="{{ v.type }}">{{ val('type', v.type) }}</span></td>
   <td class="audit-target small">{{ val('target', v.target) }}</td>
   <td class="mono small audit-action">{{ v.action }}{% if e.count and e.count > 1 %} <span class="faint">· {{ e.count }}×</span>{% endif %}</td>
   <td>{{ outcome(v, e) }}</td>
@@ -14,7 +14,7 @@
   <div class="audit-fields">
     {% for key, value in (('time', e.ts), ('actor', v.actor), ('user', v.user), ('source', v.source), ('type', v.type), ('target', v.target),
                           ('action', v.action), ('outcome', v.outcome), ('approver', v.approver), ('grant', v.grant), ('decision', v.decision)) if value %}
-    <div class="af"><span class="af-k">{{ key }}</span><span class="af-v{{ ' mono' if key in ('action', 'time') }}">{% if key == 'source' and e._link %}<a href="{{ e._link }}">{{ value }}</a>{% else %}{{ value }}{% endif %}</span>
+    <div class="af"><span class="af-k">{{ key }}</span><span class="af-v{{ ' mono' if key in ('action', 'time') }}">{% if key == 'source' and e._link %}<a href="{{ e._link }}">{{ value }}</a>{% elif key == 'type' %}<span class="tag" data-type="{{ value }}">{{ value }}</span>{% else %}{{ value }}{% endif %}</span>
       {% if key not in ('time', 'action') %}<span class="af-act"><a href="{{ links.toggle(key, value) }}">filter</a><a href="{{ links.exclude(key, value) }}">exclude</a></span>{% endif %}</div>
     {% endfor %}
     {% for key, value in (('part · mode', (e.part ~ (' · ' ~ e.mode if e.mode else '')) if e.part not in (e.category, 'claude') else e.mode),

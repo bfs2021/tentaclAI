@@ -13,7 +13,7 @@
     {% for v, n in vals[:50] %}
     {% set on = links.has(field, v) %}{% set off = links.has(field, v, True) %}
     <div class="facet-v{{ ' on' if on }}{{ ' off' if off }}{{ ' extra' if loop.index > 5 and not on and not off }}" data-v="{{ v | lower }}">
-      <a class="facet-check" href="{{ links.drop(field, v, True) if off else links.toggle(field, v) }}" title="{{ v }}"><span class="box"></span><span class="facet-name">{{ v }}</span><span class="facet-n">{{ '{:,}'.format(n) }}</span></a>
+      <a class="facet-check" href="{{ links.drop(field, v, True) if off else links.toggle(field, v) }}" title="{{ v }}"><span class="box"></span><span class="facet-name">{% if field == 'type' %}<span class="tag" data-type="{{ v }}">{{ v }}</span>{% else %}{{ v }}{% endif %}</span><span class="facet-n">{{ '{:,}'.format(n) }}</span></a>
       <span class="facet-act"><a href="{{ links.only(field, v) }}" title="only {{ v }}">only</a><a href="{{ links.exclude(field, v) }}" title="exclude {{ v }}">⊘</a></span>
     </div>
     {% endfor %}

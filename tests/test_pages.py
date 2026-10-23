@@ -655,6 +655,7 @@ def test_audit_search_facets_and_histogram(client, app_module, tmp_path, monkeyp
     html = client.get("/logs?range=all").text
     assert "no such service: web" in html and 'href="/terminal?p=claude"' in html and "compose old" in html
     assert ">failed</span>" in html and "3 events" in html and "<svg" in html  # outcome, count, histogram
+    assert '<span class="tag" data-type="svc">' in html  # each type its own colour (table, detail, facets)
     html = client.get("/logs").text  # last 24 h by default
     assert "compose old" not in html and "POST /items" in html and "2 events" in html
     html = client.get("/logs?q=outcome:failed").text

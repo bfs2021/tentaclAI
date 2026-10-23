@@ -38,6 +38,8 @@ All notable changes, newest first. Every release lists **upgrade steps** from th
   A Bash call that is one plain `svc` command is left to `svc`'s own entry; anything chained to it (`svc …; curl …`,
   pipes, `$(…)`) is logged and scanned as a whole. tentacontrol's background `svc test` runs for the status dots are not
   logged (the *Test connection* button is, as an admin action).
+- Logs → Audit: each type has its own colour (tool, svc, network, job, admin, sign-in; system stays grey) – in the table,
+  the detail row and the filters sidebar; green, amber and red stay with the outcome.
 - An entry's action no longer repeats its target: `connect` (not `connect n8n.example:443`, the count of a 15-minute
   window shows next to it, `connect · 24×`), `ssh tar …`, `test`, `sync`, `started 0.20.0`, `terminal opened`;
   reads through `svc` log the command line without `svc` and the tentacle. Older entries keep their text.
