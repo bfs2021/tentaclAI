@@ -351,7 +351,7 @@ dialog.modal { max-height: calc(100vh - 40px); overflow-y: auto; }
 .audit-chips .spacer { flex: 1; }
 .chip { display: inline-flex; align-items: center; gap: 5px; padding: 2px 9px; border-radius: 99px; font-size: 12.5px; background: var(--accent-soft);
   color: var(--text); border: 1px solid transparent; } .chip:hover { border-color: var(--accent); text-decoration: none; }
-.chip.neg { background: var(--err-soft); text-decoration: line-through; text-decoration-color: var(--err); }
+.chip.neg { background: var(--err-soft); } .chip.neg .chip-v { text-decoration: line-through; text-decoration-color: var(--err); }
 .audit-filters-toggle { display: none; }
 .audit-hist { margin: 4px 0 14px; position: relative; }
 .hist-legend { display: flex; gap: 12px; align-items: center; margin-bottom: 4px; } .hist-legend .spacer { flex: 1; }
@@ -418,7 +418,13 @@ tr.audit-more td { text-align: center; }
 .seg a.active { background: var(--panel); color: var(--text); font-weight: 600; box-shadow: 0 0 0 1px var(--border); }
 .seg a:hover { color: var(--text); text-decoration: none; }
 @media (max-width: 900px) {
-  .audit-layout { grid-template-columns: 1fr; }
+  .audit-layout { grid-template-columns: minmax(0, 1fr); }
+  .seg.audit-range { max-width: 100%; overflow-x: auto; flex-wrap: nowrap; scrollbar-width: none; }
+  .seg.audit-range > * { white-space: nowrap; flex: none; }
+  .audit-custom-form { position: fixed; left: 16px; right: 16px; top: auto; min-width: 0; }
+  .hist-legend .spacer, .hist-legend .spacer + span { display: none; }
+  .hist-legend { flex-wrap: wrap; gap: 4px 10px; }
+  .hist-axis span:nth-child(2), .hist-axis span:nth-child(4) { display: none; }
   .audit-side { display: none; position: static; max-height: none; }
   .audit-layout.show-side .audit-side { display: block; }
   .audit-filters-toggle { display: inline-flex; }

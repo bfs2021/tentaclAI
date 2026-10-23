@@ -669,7 +669,7 @@ def test_audit_search_facets_and_histogram(client, app_module, tmp_path, monkeyp
     assert "POST /items" in html and "compose web" not in html
     assert "compose old" in client.get("/logs?start=2020-01-01&end=2020-01-01").text
     html = client.get("/logs?service=demohost&decision=auto&since=all").text
-    assert "compose web" in html and "POST /items" not in html and "target:</span> demohost" in html
+    assert "compose web" in html and "POST /items" not in html and "target:</span> <span class=\"chip-v\">demohost" in html
     # values in rows and the histogram bars are links that narrow the search
     assert 'href="/logs?q=target%3Ademohost"' in client.get("/logs").text
     assert "range=custom&amp;from=" in client.get("/logs").text

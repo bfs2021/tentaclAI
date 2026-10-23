@@ -40,7 +40,7 @@
   <div class="audit-chips">
     <button type="button" class="btn sm ghost audit-filters-toggle" data-audit-filters>Filters{% if links.terms %} ({{ links.terms | length }}){% endif %}</button>
     {% for neg, k, v in links.terms %}
-    <a class="chip{{ ' neg' if neg }}" href="{{ links.without(loop.index0) }}" title="remove">{% if k %}<span class="faint">{{ '-' if neg }}{{ k }}:</span> {{ v }}{% else %}{{ '-' if neg }}“{{ v }}”{% endif %} <span aria-hidden="true">✕</span></a>
+    <a class="chip{{ ' neg' if neg }}" href="{{ links.without(loop.index0) }}" title="remove">{% if k %}<span class="faint">{{ '-' if neg }}{{ k }}:</span> <span class="chip-v">{{ v }}</span>{% else %}{{ '-' if neg }}<span class="chip-v">“{{ v }}”</span>{% endif %} <span aria-hidden="true">✕</span></a>
     {% endfor %}
     <span class="spacer"></span>
     <span class="small muted">{{ '{:,}'.format(ov.total) }}{{ '+' if ov.capped }} events</span>
