@@ -198,16 +198,17 @@ async def settings_save(request: Request):
     return respond(request, msg, refresh=True)
 
 
-# ---------------------------------------------------------------- security: two-factor sign-in (TOTP)
+# ---------------------------------------------------------------- security: the account, two-factor sign-in (TOTP)
 
-def _security(request, codes=None, error=None, status=200):
+def _security(request, codes=None, error=None, status=200, done=None):
     st = auth.twofactor_status()
     secret = auth.pending_secret() if not st["enabled"] else ""
     qr = ""
     if secret:
         link = totp.uri(secret, site().get("hostname") or "tentacontrol")
         qr = segno.make(link, error="m").svg_inline(scale=4, border=2, dark="#111", light="#fff", omitsize=True)
-    resp = page(request, "security.html", st=st, secret=secret, qr=qr, codes=codes, error=error, days=auth.TRUST_DAYS,
+    resp = page(request, "security.html", st=st, secret=secret, qr=qr, codes=codes, error=error, done=done, days=auth.TRUST_DAYS,
+                account=auth.current_user(request) or {}, pw_min=auth.PASSWORD_MIN,
                 fmt=lambda ts: time.strftime("%Y-%m-%d %H:%M", time.localtime(ts)) if ts else "–")
     resp.status_code = status
     return resp
@@ -216,6 +217,36 @@ def _security(request, codes=None, error=None, status=200):
 @router.get("/security", response_class=HTMLResponse)
 async def security_page(request: Request):
     return _security(request)
+
+
+@router.post("/security/account", response_class=HTMLResponse)
+async def security_account(request: Request, username: str = Form(""), email: str = Form(""), name: str = Form(""),
+                           current: str = Form("")):
+    """username, email, name – confirmed with the password"""
+    u = auth.current_user(request)
+    error = auth.profile_error(username, email, name, uid=u["id"])
+    if not error and not await asyncio.to_thread(auth.check_password, current, u["id"]):
+        await asyncio.sleep(auth.FAIL_DELAY)
+        error = "the current password is wrong"
+    if error:
+        return _security(request, error=error, status=400)
+    auth.update_profile(u["id"], username, email, name)
+    return _security(request, done="Account saved.")
+
+
+@router.post("/security/password", response_class=HTMLResponse)
+async def security_password(request: Request, current: str = Form(""), password: str = Form(""), password2: str = Form("")):
+    """a new password – browsers trusted for two-factor sign-in are revoked, as with ./tentaclai.sh passwd"""
+    u = auth.current_user(request)
+    error = auth.password_error(password, password2)
+    if not error and not await asyncio.to_thread(auth.check_password, current, u["id"]):
+        await asyncio.sleep(auth.FAIL_DELAY)
+        error = "the current password is wrong"
+    if error:
+        return _security(request, error=error, status=400)
+    await asyncio.to_thread(auth.set_password, password, u["id"])
+    auth.revoke_trust()
+    return _security(request, done="Password changed – browsers trusted for two-factor sign-in were revoked.")
 
 
 @router.post("/security/setup", response_class=HTMLResponse)
@@ -249,7 +280,7 @@ async def security_revoke(request: Request, tid: str = Form("")):
 
 @router.post("/security/disable", response_class=HTMLResponse)
 async def security_disable(request: Request, password: str = Form(""), code: str = Form("")):
-    ok = await asyncio.to_thread(auth.check_password, password) and await asyncio.to_thread(auth.check_second_factor, code)
+    ok = await asyncio.to_thread(auth.check_password, password, (auth.current_user(request) or {}).get("id")) and await asyncio.to_thread(auth.check_second_factor, code)
     if not ok:
         await asyncio.sleep(auth.FAIL_DELAY)
         return _security(request, error="Password and a current code (or a recovery code) are needed to switch it off.", status=400)

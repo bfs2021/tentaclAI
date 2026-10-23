@@ -6,7 +6,7 @@ import time
 from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse
 
-from .. import activity, auditlog, egress, notify
+from .. import activity, auditlog, auth, egress, notify
 from ..envfile import update_env
 from ..web import page, respond, templates, toast
 import tclib  # noqa: E402  shared with the sandbox tools
@@ -152,7 +152,7 @@ async def approvals_watch(seen: str = "", wait: int = 25):
 async def approval_decide(request: Request, rid: str, verdict: str):
     if verdict not in ("approve", "approve15", "deny", "net10", "net60", "always", "block"):
         return PlainTextResponse("", status_code=400)
-    who = "tentacontrol (" + (request.client.host if request.client else "?") + ")"
+    who = auth.username(request) or "tentacontrol"
     a = activity.APPROVALS.get(rid) or {}
     if verdict in ("always", "block") and a.get("part") == "network" and a.get("status") == "pending":
         egress.add("allow" if verdict == "always" else "block", a["service"])  # host:port

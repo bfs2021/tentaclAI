@@ -13,14 +13,20 @@
   <form class="card" method="post" action="/login">
     <div class="brand"><img class="logo" src="/static/logo.svg?v={{ asset_v }}" alt="" width="32" height="32"><div>tentacl<span class="ai-grad">AI</span><small>Long arms, one brain – safely caged</small></div></div>
     {% if error %}<div class="error">{{ error }}</div>{% endif %}
+    {% if ask_username %}
+    <div class="field">
+      <label for="un">Username</label>
+      <input id="un" type="text" name="username" value="{{ username }}" autocomplete="username" autocapitalize="none" {% if not username %}autofocus{% endif %} required>
+    </div>
+    {% endif %}
     <div class="field">
       <label for="pw">Password</label>
-      <input id="pw" type="password" name="password" autocomplete="current-password" autofocus required>
+      <input id="pw" type="password" name="password" autocomplete="current-password" {% if not ask_username or username %}autofocus{% endif %} required>
     </div>
     <button class="btn primary" style="width:100%;justify-content:center">Sign in</button>
     <details class="help forgot" style="margin-top:14px">
-      <summary>Forgot the password?</summary>
-      <p>Set a new one on the host: <code>./tentaclai.sh passwd</code> or <code>docker exec -it tentacontrol tentacontrol-passwd</code> – it also revokes the browsers trusted for two-factor sign-in.</p>
+      <summary>Forgot the password or username?</summary>
+      <p>Set a new one on the host: <code>./tentaclai.sh passwd</code> or <code>docker exec -it tentacontrol tentacontrol-passwd</code> – it shows the username and also revokes the browsers trusted for two-factor sign-in.</p>
     </details>
   </form>
 </div>

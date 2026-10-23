@@ -42,7 +42,11 @@ async def guard(request: Request, call_next):
         if not auth.logged_in(request):
             if request.headers.get("hx-request"):
                 return PlainTextResponse("", headers={"HX-Redirect": "/login"})
-            return RedirectResponse("/login" if auth.has_password() else "/setup", status_code=303)
+            return RedirectResponse("/login" if auth.has_account() else "/setup", status_code=303)
+        if auth.profile_missing() and not path.startswith(("/account/complete", "/logout")):
+            if request.headers.get("hx-request"):  # an account from before usernames: username + email first
+                return PlainTextResponse("", headers={"HX-Redirect": "/account/complete"})
+            return RedirectResponse("/account/complete", status_code=303)
         if request.method == "POST" and not auth.same_origin(request):
             return PlainTextResponse("invalid origin", status_code=403)
     response = await call_next(request)
@@ -90,6 +94,9 @@ async def secure_cookie(request: Request, call_next):
 
 async def migrate():
     """one-time adjustments of an existing installation"""
+    if auth.migrate():
+        print("migration: admin password → account (data/control/users.json) – set username and email at the next sign-in",
+              flush=True)
     services = services_store.migrate_access()
     hosts = tclib.ssh_migrate_access(os.path.join(SSH_DIR, "config.d"))
     if services or hosts:
@@ -198,11 +205,10 @@ async def start_update_check():
 
 
 async def announce_setup():
-    if not auth.has_password():
+    if not auth.has_account():
         print("=" * 72, flush=True)
-        print("tentacontrol: no password set yet. One-time setup link:", flush=True)
+        print("tentacontrol: no account yet. One-time setup link:", flush=True)
         print(f"  https://<host>/setup?token={auth.SETUP_TOKEN}", flush=True)
-        print("  (or: ./tentaclai.sh passwd)", flush=True)
         print("=" * 72, flush=True)
 
 

@@ -1,6 +1,7 @@
-"""Single admin password (bcrypt hash in /data/admin.hash), optional second factor (TOTP), signed session cookie, login
-throttling."""
+"""The admin account (username, email, name, bcrypt password hash in /data/users.json), optional second factor (TOTP),
+signed session cookie, login throttling."""
 import os
+import re
 import secrets
 import time
 
@@ -11,13 +12,18 @@ from itsdangerous import BadSignature, URLSafeTimedSerializer
 from . import jsonstore, totp
 from .config import DATA_DIR
 
-HASH_FILE = os.path.join(DATA_DIR, "admin.hash")
+USERS_FILE = os.path.join(DATA_DIR, "users.json")  # the accounts – Community has one, the admin
+HASH_FILE = os.path.join(DATA_DIR, "admin.hash")  # before accounts: the admin password only (migrated into users.json)
 SECRET_FILE = os.path.join(DATA_DIR, "session.secret")
+USERNAME_RE = re.compile(r"[a-z0-9][a-z0-9._-]{1,31}")
+EMAIL_RE = re.compile(r"[^@\s]{1,64}@[^@\s]+\.[^@\s]+")
+PASSWORD_MIN = 10
 
 # one-time setup token, only valid while no password exists (printed to the container log)
 SETUP_TOKEN = secrets.token_urlsafe(24)
 
 _failures: dict = {}
+_DUMMY_HASH = bcrypt.hashpw(b"no such user", bcrypt.gensalt(rounds=12))  # an unknown name costs as much as a wrong password
 
 
 def session_secret() -> str:
@@ -29,23 +35,145 @@ def session_secret() -> str:
         return f.read().strip()
 
 
-def has_password() -> bool:
-    return os.path.exists(HASH_FILE) and os.path.getsize(HASH_FILE) > 0
+# ---------------------------------------------------------------- accounts
+# data/control/users.json (0600): {"users": [{id, username, email, name, hash, role, created}]}. Community has exactly one
+# account (role admin); the list leaves room for more. The session holds the account's id – a renamed user stays signed in.
+
+def users():
+    return (jsonstore.load(USERS_FILE) or {}).get("users", [])
 
 
-def set_password(pw: str) -> None:
-    h = bcrypt.hashpw(pw.encode(), bcrypt.gensalt(rounds=12))
-    os.makedirs(DATA_DIR, exist_ok=True)
-    with open(os.open(HASH_FILE, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600), "wb") as f:
-        f.write(h)
+def _save(us):
+    jsonstore.save(USERS_FILE, {"users": us}, mode=0o600)
 
 
-def check_password(pw: str) -> bool:
+def admin():
+    us = users()
+    return next((u for u in us if u.get("role") == "admin"), us[0] if us else None)
+
+
+def get_user(username):
+    name = (username or "").strip().lower()
+    return next((u for u in users() if u.get("username") == name), None) if name else None
+
+
+def has_account() -> bool:
+    a = admin()
+    return bool(a and a.get("hash"))
+
+
+def profile_missing() -> bool:
+    """an account from before usernames (migrated admin.hash): username and email still to be set"""
+    a = admin()
+    return bool(a) and not (a.get("username") and a.get("email"))
+
+
+def profile_error(username, email, name, uid=None):
+    """what is wrong with these profile fields, or None"""
+    username = (username or "").strip().lower()
+    if not USERNAME_RE.fullmatch(username):
+        return "username: 2–32 characters, lower-case letters, digits, . _ - (starting with a letter or digit)"
+    other = get_user(username)
+    if other and other.get("id") != uid:
+        return "this username is taken"
+    if len(email or "") > 254 or not EMAIL_RE.fullmatch((email or "").strip()):
+        return "a valid email address is needed"
+    if len(name or "") > 80:
+        return "name: at most 80 characters"
+    return None
+
+
+def password_error(pw, pw2):
+    if len(pw) < PASSWORD_MIN:
+        return f"password: at least {PASSWORD_MIN} characters"
+    if pw != pw2:
+        return "passwords do not match"
+    return None
+
+
+def _hash_pw(pw):
+    return bcrypt.hashpw(pw.encode(), bcrypt.gensalt(rounds=12)).decode()
+
+
+def create_admin(username, email, name, pw):
+    u = {"id": secrets.token_hex(6), "username": username.strip().lower(), "email": email.strip(), "name": name.strip(),
+         "hash": _hash_pw(pw), "role": "admin", "created": time.time()}
+    _save([u])
+    return u
+
+
+def _update(uid, **fields):
+    us = users()
+    for u in us:
+        if u.get("id") == uid:
+            u.update(fields)
+            _save(us)
+            return u
+    return None
+
+
+def update_profile(uid, username, email, name):
+    return _update(uid, username=username.strip().lower(), email=email.strip(), name=(name or "").strip())
+
+
+def set_password(pw: str, uid=None) -> None:
+    """the password of this account (default: the admin)"""
+    a = admin()
+    _update(uid or (a or {}).get("id"), hash=_hash_pw(pw))
+
+
+def check_password(pw: str, uid=None) -> bool:
+    u = next((u for u in users() if u.get("id") == uid), None) if uid else admin()
     try:
-        with open(HASH_FILE, "rb") as f:
-            return bcrypt.checkpw(pw.encode(), f.read().strip())
-    except (FileNotFoundError, ValueError):
+        return bool(u) and bcrypt.checkpw(pw.encode(), u.get("hash", "").encode())
+    except ValueError:
         return False
+
+
+def check_login(username, pw):
+    """the account for this username + password, or None; while the admin has no username yet (migrated), the
+    password alone"""
+    a = admin()
+    u = a if a and not a.get("username") else get_user(username)
+    try:
+        ok = bcrypt.checkpw(pw.encode(), u["hash"].encode() if u else _DUMMY_HASH)
+    except (ValueError, KeyError):
+        ok = False
+    return u if ok and u else None
+
+
+def migrate():
+    """admin.hash (only a password) → users.json with an admin whose username and email are set after the next sign-in;
+    admin.hash stays as admin.hash.migrated. True when it migrated"""
+    if os.path.exists(USERS_FILE) or not os.path.exists(HASH_FILE) or not os.path.getsize(HASH_FILE):
+        return False
+    with open(HASH_FILE, "rb") as f:
+        h = f.read().strip().decode()
+    _save([{"id": secrets.token_hex(6), "username": "", "email": "", "name": "", "hash": h, "role": "admin",
+            "created": os.path.getmtime(HASH_FILE)}])
+    os.replace(HASH_FILE, HASH_FILE + ".migrated")
+    return True
+
+
+def sign_in(request: Request, user) -> None:
+    request.session.clear()
+    request.session["auth"] = True
+    request.session["uid"] = user["id"]
+
+
+def current_user(request: Request):
+    """the signed-in account (a session from before accounts: the admin)"""
+    if not request.session.get("auth"):
+        return None
+    uid = request.session.get("uid")
+    if uid is None:
+        return admin()
+    return next((u for u in users() if u.get("id") == uid), None)
+
+
+def username(request: Request) -> str:
+    u = current_user(request)
+    return (u or {}).get("username", "")
 
 
 def throttled(ip: str) -> int:
@@ -67,7 +195,7 @@ def clear_failures(ip: str) -> None:
 
 
 def logged_in(request: Request) -> bool:
-    return bool(request.session.get("auth")) and has_password()
+    return has_account() and current_user(request) is not None
 
 
 def same_origin(request: Request) -> bool:

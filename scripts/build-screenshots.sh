@@ -33,7 +33,7 @@ import { chromium } from 'playwright';
 const b = await chromium.launch(); const p = await b.newPage({ viewport: { width: 1440, height: 860 }, deviceScaleFactor: 2, colorScheme: 'dark' });
 const B='http://$IP:8080'; const errs=[]; p.on('pageerror', e=>errs.push(e.message));
 const fake = async () => p.evaluate(()=>{ const c=document.querySelector('.cstate'); if(c) c.innerHTML='<span class="dot ok"></span>tentaclAI running · 3 d'; });
-await p.goto(B+'/setup?token=$T'); await p.fill('#pw','demodemo1234'); await p.fill('#pw2','demodemo1234'); await p.click('button'); await p.waitForTimeout(800);
+await p.goto(B+'/setup?token=$T'); await p.fill('#un','demo'); await p.fill('#em','demo@example.org'); await p.fill('#pw','demodemo1234'); await p.fill('#pw2','demodemo1234'); await p.click('button'); await p.waitForTimeout(800);
 if ((await p.url()).includes('login')) { await p.fill('input[type=password]','demodemo1234'); await p.click('button'); await p.waitForTimeout(800); }
 await p.goto(B+'/topology'); await p.waitForTimeout(3500); await fake();
 for (let i = 0; i < 15; i++) {

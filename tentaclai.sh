@@ -10,7 +10,7 @@
 #   ./tentaclai.sh svc        apply services/*.json (MCP, repos, catalog) and show status
 #   ./tentaclai.sh inventory   guided system inventory → local/CLAUDE.md (Claude asks, you approve)
 #   ./tentaclai.sh scan       read-only inventory report (tc-scan)
-#   ./tentaclai.sh passwd     set/reset the tentacontrol web admin password
+#   ./tentaclai.sh passwd     reset the tentacontrol admin password and show the username (--username <name>: rename)
 #   ./tentaclai.sh reset-2fa  switch tentacontrol's two-factor sign-in off (lost phone and recovery codes)
 #   ./tentaclai.sh setup-url  show the one-time tentacontrol setup link (first start)
 #   ./tentaclai.sh update     to the latest release: what's new (changelog) + rebuild + recreate, asks before each step
@@ -192,7 +192,7 @@ cmd_update() {  # git pull + changelog of the new versions + rebuild + recreate 
 
 case "${1:-}" in
     init)      cmd_init "${2:-}"; exit 0 ;;
-    passwd)    exec docker exec -it tentacontrol tentacontrol-passwd ;;
+    passwd)    shift; exec docker exec -it tentacontrol tentacontrol-passwd "$@" ;;
     reset-2fa) exec docker exec -it tentacontrol tentacontrol-passwd --reset-2fa ;;
     setup-url)
         url="$(env_value CONTROL_URL)"

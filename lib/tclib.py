@@ -833,7 +833,7 @@ AUDIT_ACTORS = ("claude", "job", "user", "system")
 AUDIT_DECISIONS = ("read", "auto", "approved", "denied", "expired", "blocked", "error", "flagged", "allowed", "ok", "failed")
 SEVERITY = {"err": 3, "warning": 4, "notice": 5, "info": 6}
 AUDIT_ORIGIN = ("session", "entry", "tmux", "by", "job")  # origin_<key>: where a call came from (svc's origin())
-_AUDIT_LIMITS = {"action": 500, "detail": 300, "error": 1000, "service": 120, "part": 20, "mode": 20, "ip": 64}
+_AUDIT_LIMITS = {"action": 500, "detail": 300, "error": 1000, "service": 120, "part": 20, "mode": 20, "ip": 64, "user": 32}
 
 
 def audit_ts(t=None):
@@ -1038,7 +1038,7 @@ def audit_retention(env):
         return AUDIT_RETENTION_DAYS
 
 
-AUDIT_CSV = ("ts", "id", "severity", "category", "actor", "service", "part", "mode", "action", "decision", "exit",
+AUDIT_CSV = ("ts", "id", "severity", "category", "actor", "user", "service", "part", "mode", "action", "decision", "exit",
              "seconds", "count", "detail", "error", "ip", "origin_session", "origin_entry", "origin_tmux", "origin_job",
              "origin_by", "excerpts")
 

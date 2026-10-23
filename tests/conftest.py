@@ -116,10 +116,10 @@ def logged_in(app_module):
     """one login for all page tests (bcrypt is slow on purpose)"""
     from fastapi.testclient import TestClient
     from app import auth
-    if not auth.has_password():
-        auth.set_password("testpass123")
+    if not auth.has_account():
+        auth.create_admin("admin", "admin@example.org", "Test Admin", "testpass123")
     c = TestClient(app_module.app)  # no `with`: the background loops (notifications, usage) don't start
-    r = c.post("/login", data={"password": "testpass123"}, follow_redirects=False)
+    r = c.post("/login", data={"username": "admin", "password": "testpass123"}, follow_redirects=False)
     assert r.status_code in (200, 303), r.text
     return c
 

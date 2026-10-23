@@ -7,7 +7,7 @@ import time
 from fastapi.responses import PlainTextResponse
 from fastapi.templating import Jinja2Templates
 
-from . import dockerops, extensions, services_store, updatecheck
+from . import auth, dockerops, extensions, services_store, updatecheck
 from .config import DATA_DIR, RESTART_VARS, site
 from .envfile import read_env
 
@@ -32,7 +32,7 @@ def page(request, name, **ctx):
     unlocked = extensions.features()
     ctx.update(request=request, nav=name.split(".")[0], cstatus=st, restart_needed=restart_needed(st) or newer, newer_image=newer, site=site(),
                update=updatecheck.status(TC_VERSION), features=unlocked, edition=extensions.edition(),
-               module_nav=extensions.nav_entries(unlocked),
+               module_nav=extensions.nav_entries(unlocked), me=auth.current_user(request) or {},
                flash=request.session.pop("flash", None))
     return templates.TemplateResponse(request, name, ctx)
 

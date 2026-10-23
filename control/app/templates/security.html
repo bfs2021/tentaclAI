@@ -5,11 +5,39 @@
 {% block content %}
 {{ settings_tabs('security') }}
 <div class="header">
-  <div><h1>Security</h1><div class="sub">Two-factor sign-in: after the password, tentacontrol asks for a code from an authenticator app (Google Authenticator, Aegis, 1Password, Bitwarden …). Whoever signs in here controls the Docker host – a second factor keeps a leaked password from being enough.</div></div>
+  <div><h1>Security</h1><div class="sub">Your account and two-factor sign-in: after the password, tentacontrol asks for a code from an authenticator app (Google Authenticator, Aegis, 1Password, Bitwarden …). Whoever signs in here controls the Docker host – a second factor keeps a leaked password from being enough.</div></div>
   <div class="row">{{ help_link('two-factor') }}</div>
 </div>
 
 {% if error %}<div class="card flat" style="margin-bottom:16px"><span class="pill err">not done</span> {{ error }}</div>{% endif %}
+{% if done %}<div class="card flat" style="margin-bottom:16px"><span class="pill ok">done</span> {{ done }}</div>{% endif %}
+
+<div class="card" style="margin-bottom:16px">
+  <h2>Account</h2>
+  <p class="help" style="margin-top:-4px">You sign in with the username; it names you in the audit log and on approvals.</p>
+  <form method="post" action="/security/account" class="fields" autocomplete="off">
+    <div class="field"><label for="ac-un">Username</label>
+      <input id="ac-un" name="username" value="{{ account.username }}" autocomplete="username" autocapitalize="none" pattern="[A-Za-z0-9][A-Za-z0-9._\-]{1,31}" required></div>
+    <div class="field"><label for="ac-em">Email</label>
+      <input id="ac-em" type="email" name="email" value="{{ account.email }}" autocomplete="email" required></div>
+    <div class="field"><label for="ac-nm">Name <span class="faint">(optional)</span></label>
+      <input id="ac-nm" name="name" value="{{ account.name }}" autocomplete="name" maxlength="80"></div>
+    <div class="field"><label for="ac-pw">Current password</label>
+      <input id="ac-pw" type="password" name="current" autocomplete="current-password" required></div>
+    <div style="grid-column:1/-1"><button class="btn primary">{{ icon('check') }}Save</button></div>
+  </form>
+  <h3 style="margin-top:20px">Change password</h3>
+  <form method="post" action="/security/password" class="fields">
+    <div class="field"><label for="pw-cur">Current password</label>
+      <input id="pw-cur" type="password" name="current" autocomplete="current-password" required></div>
+    <div class="field"><label for="pw-new">New password</label>
+      <input id="pw-new" type="password" name="password" minlength="{{ pw_min }}" autocomplete="new-password" required>
+      <div class="help">at least {{ pw_min }} characters · revokes the browsers trusted for two-factor sign-in</div></div>
+    <div class="field"><label for="pw-new2">Repeat</label>
+      <input id="pw-new2" type="password" name="password2" minlength="{{ pw_min }}" autocomplete="new-password" required></div>
+    <div style="grid-column:1/-1"><button class="btn">{{ icon('key') }}Change password</button></div>
+  </form>
+</div>
 
 {% if codes %}
 <div class="card" style="margin-bottom:16px">

@@ -84,7 +84,7 @@ def test_trusted_browsers(tf):
 def _signin(app_module, password="testpass123"):
     from fastapi.testclient import TestClient
     c = TestClient(app_module.app)
-    r = c.post("/login", data={"password": password}, follow_redirects=False)
+    r = c.post("/login", data={"username": "admin", "password": password}, follow_redirects=False)
     return c, r
 
 
@@ -103,8 +103,8 @@ def test_signin_flow(tf, app_module):
     # a trusted browser skips the code – but never the password
     c2, r2 = _signin(app_module)
     c3 = type(c2)(app_module.app, cookies={auth.TRUST_COOKIE: trust})
-    assert c3.post("/login", data={"password": "testpass123"}, follow_redirects=False).headers["location"] == "/"
-    assert c3.post("/login", data={"password": "wrong-password"}, follow_redirects=False).status_code == 401
+    assert c3.post("/login", data={"username": "admin", "password": "testpass123"}, follow_redirects=False).headers["location"] == "/"
+    assert c3.post("/login", data={"username": "admin", "password": "wrong-password"}, follow_redirects=False).status_code == 401
     auth.clear_failures("testclient")
 
 

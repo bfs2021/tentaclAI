@@ -35,56 +35,87 @@ async def favicon(request: Request):
 
 @router.get("/setup", response_class=HTMLResponse)
 async def setup_form(request: Request, token: str = ""):
-    if auth.has_password():
+    if auth.has_account():
         return RedirectResponse("/login", status_code=303)
-    return templates.TemplateResponse(request, "setup.html", {"token": token, "error": None})
+    return templates.TemplateResponse(request, "setup.html", {"token": token, "error": None, "f": {}})
 
 
 @router.post("/setup")
-async def setup_save(request: Request, token: str = Form(""), password: str = Form(...), password2: str = Form(...)):
-    if auth.has_password():
+async def setup_save(request: Request, token: str = Form(""), username: str = Form(""), email: str = Form(""),
+                     name: str = Form(""), password: str = Form(...), password2: str = Form(...)):
+    if auth.has_account():
         return RedirectResponse("/login", status_code=303)
     error = None
     if token != auth.SETUP_TOKEN:
         error = "invalid setup token – see ./tentaclai.sh setup-url"
-    elif len(password) < 10:
-        error = "at least 10 characters"
-    elif password != password2:
-        error = "passwords do not match"
+    else:
+        error = auth.profile_error(username, email, name) or auth.password_error(password, password2)
     if error:
-        return templates.TemplateResponse(request, "setup.html", {"token": token, "error": error}, status_code=400)
-    auth.set_password(password)
-    request.session["auth"] = True
-    auditlog.user(request, "auth", "tentacontrol", "set up the admin password")
+        return templates.TemplateResponse(request, "setup.html", {"token": token, "error": error,
+                                          "f": {"username": username, "email": email, "name": name}}, status_code=400)
+    user = await asyncio.to_thread(auth.create_admin, username, email, name, password)
+    auth.sign_in(request, user)
+    auditlog.user(request, "auth", "tentacontrol", "set up the admin account")
     return RedirectResponse("/", status_code=303)
+
+
+def _login_page(request, error=None, status=200, username=""):
+    return templates.TemplateResponse(request, "login.html", {"error": error, "username": username,
+                                      "ask_username": not auth.profile_missing()}, status_code=status)
 
 
 @router.get("/login", response_class=HTMLResponse)
 async def login_form(request: Request):
-    if not auth.has_password():
+    if not auth.has_account():
         return RedirectResponse("/setup", status_code=303)
-    return templates.TemplateResponse(request, "login.html", {"error": None})
+    return _login_page(request)
 
 
 @router.post("/login")
-async def login(request: Request, password: str = Form(...)):
+async def login(request: Request, username: str = Form(""), password: str = Form(...)):
     ip = client_ip(request)
+    given = "".join(c for c in username.strip().lower() if (c.isascii() and c.isalnum()) or c in "._-")[:32]  # what was typed, for the log
     wait = auth.throttled(ip)
     if wait:
-        auditlog.user(request, "auth", "tentacontrol", "sign in", "blocked", detail="too many attempts")
-        return templates.TemplateResponse(request, "login.html", {"error": f"too many attempts – please wait {wait} s"}, status_code=429)
-    if not auth.check_password(password):
-        auditlog.user(request, "auth", "tentacontrol", "sign in", "failed", detail="wrong password")
+        auditlog.user(request, "auth", "tentacontrol", "sign in", "blocked", detail="too many attempts", user=given)
+        return _login_page(request, f"too many attempts – please wait {wait} s", 429, username)
+    user = await asyncio.to_thread(auth.check_login, username, password)
+    if not user:
+        auditlog.user(request, "auth", "tentacontrol", "sign in", "failed", detail="wrong username or password", user=given)
         auth.register_failure(ip)
         await asyncio.sleep(auth.FAIL_DELAY)
-        return templates.TemplateResponse(request, "login.html", {"error": "wrong password"}, status_code=401)
+        return _login_page(request, "wrong username or password", 401, username)
     auth.clear_failures(ip)
     request.session.clear()
     if auth.twofactor_enabled() and not auth.is_trusted(request.cookies.get(auth.TRUST_COOKIE)):
         request.session["pending_2fa"] = time.time()  # password done – the code comes next
+        request.session["pending_uid"] = user["id"]
         return RedirectResponse("/login/2fa", status_code=303)
-    request.session["auth"] = True
+    auth.sign_in(request, user)
     auditlog.user(request, "auth", "tentacontrol", "sign in", detail="password" + (" + trusted browser" if auth.twofactor_enabled() else ""))
+    return RedirectResponse("/", status_code=303)
+
+
+@router.get("/account/complete", response_class=HTMLResponse)
+async def account_complete_form(request: Request):
+    if not auth.profile_missing():
+        return RedirectResponse("/", status_code=303)
+    return templates.TemplateResponse(request, "account_complete.html", {"error": None, "f": {}})
+
+
+@router.post("/account/complete")
+async def account_complete(request: Request, username: str = Form(""), email: str = Form(""), name: str = Form("")):
+    """an account from before usernames: username and email once, right after the sign-in"""
+    u = auth.current_user(request)
+    if not u or not auth.profile_missing():
+        return RedirectResponse("/", status_code=303)
+    error = auth.profile_error(username, email, name, uid=u["id"])
+    if error:
+        return templates.TemplateResponse(request, "account_complete.html", {"error": error,
+                                          "f": {"username": username, "email": email, "name": name}}, status_code=400)
+    auth.update_profile(u["id"], username, email, name)
+    request.session["uid"] = u["id"]
+    auditlog.user(request, "admin", "account", "account profile completed", part="account", mode="POST")
     return RedirectResponse("/", status_code=303)
 
 
@@ -126,8 +157,8 @@ async def login_2fa(request: Request, code: str = Form(...), trust: str = Form("
         await asyncio.sleep(auth.FAIL_DELAY)
         return templates.TemplateResponse(request, "login_2fa.html", {**ctx, "error": "wrong code"}, status_code=401)
     auth.clear_failures(ip)
-    request.session.clear()
-    request.session["auth"] = True
+    user = next((u for u in auth.users() if u.get("id") == request.session.get("pending_uid")), None) or auth.admin()
+    auth.sign_in(request, user)
     auditlog.user(request, "auth", "tentacontrol", "sign in", detail=f"password + {kind}" + (" · browser trusted" if trust else ""))
     if kind == "recovery":
         left = auth.twofactor_status()["recovery_left"]
@@ -144,8 +175,9 @@ async def login_2fa(request: Request, code: str = Form(...), trust: str = Form("
 
 @router.post("/logout")
 async def logout(request: Request):
+    name = auth.username(request)
     request.session.clear()
-    auditlog.user(request, "auth", "tentacontrol", "sign out")
+    auditlog.user(request, "auth", "tentacontrol", "sign out", user=name)
     return RedirectResponse("/login", status_code=303)
 
 
@@ -234,7 +266,7 @@ async def terminal_page(request: Request, p: str = "claude", alias: str = ""):
 
 @router.websocket("/ws/terminal")
 async def ws_terminal(ws: WebSocket, p: str = "claude", alias: str = ""):
-    if not netguard.allowed("/ws/terminal", ws.client.host if ws.client else "") or not ws.session.get("auth") or not auth.same_origin(ws):
+    if not netguard.allowed("/ws/terminal", ws.client.host if ws.client else "") or not auth.logged_in(ws) or not auth.same_origin(ws):
         await ws.close(code=4401)
         return
     await ws.accept()
@@ -253,13 +285,12 @@ async def ws_terminal(ws: WebSocket, p: str = "claude", alias: str = ""):
         await ws.close()
         return
     t = time.time()
-    auditlog.write("admin", alias or p, f"terminal opened: {p}" + (f" {alias}" if alias else ""), actor="user", part="terminal",
-                   ip=ws.client.host if ws.client else "")
+    auditlog.user(ws, "admin", alias or p, f"terminal opened: {p}" + (f" {alias}" if alias else ""), part="terminal")
     try:
         await bridge(ws, cmd)
     finally:
-        auditlog.write("admin", alias or p, f"terminal closed: {p}" + (f" {alias}" if alias else ""), actor="user", part="terminal",
-                       ip=ws.client.host if ws.client else "", seconds=round(time.time() - t))
+        auditlog.user(ws, "admin", alias or p, f"terminal closed: {p}" + (f" {alias}" if alias else ""), part="terminal",
+                      seconds=round(time.time() - t))
 
 
 # what tentaclAI Community shows, locked, on Modules – with tentaclAI Enterprise its registered modules are listed instead

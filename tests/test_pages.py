@@ -2,7 +2,7 @@
 import pytest
 
 # every GET route without parameters is a page to render – new pages are covered without touching this file
-NOT_PAGES = ("/login", "/setup", "/logout", "/healthz", "/api/", "/internal/", "/logs/stream", "/builds/", "/static", "/vendor",
+NOT_PAGES = ("/login", "/setup", "/account/complete", "/logout", "/healthz", "/api/", "/internal/", "/logs/stream", "/builds/", "/static", "/vendor",
              "/topology/ssh-status", "/claude/jobs")  # (ssh-status runs real SSH checks)
 # pages with parameters or variants, rendered with the dummy stack's objects
 VARIANTS = ["/services/demoapi", "/services/demodb", "/services/demohost", "/services/demogit", "/services/demomail", "/systems/box", "/ssh/box/edit",
@@ -690,12 +690,16 @@ def test_admin_actions_and_sign_in_are_audited(client, app_module, tmp_path, mon
     monkeypatch.setattr(auditlog, "DATA_DIR", str(tmp_path))
     client.post("/skills/mode", data={"name": "dataviz", "mode": "off"}, headers={"HX-Request": "true"})
     e = tclib.audit_read(str(tmp_path))[0]
-    assert e[0]["category"] == "admin" and e[0]["action"] == "skills mode" and e[0]["actor"] == "user"
+    assert e[0]["category"] == "admin" and e[0]["action"] == "skills mode" and e[0]["actor"] == "user" and e[0]["user"] == "admin"
     assert e[0]["mode"] == "POST" and "POST /skills/mode" in e[0]["detail"] and "dataviz" not in str(e[0])  # never the form
     from fastapi.testclient import TestClient
-    TestClient(app_module.app).post("/login", data={"password": "certainly-wrong"})
+    TestClient(app_module.app).post("/login", data={"username": "Mallory!", "password": "certainly-wrong"})
     bad = tclib.audit_read(str(tmp_path), filters={"category": "auth"})[0]
-    assert bad and bad[0]["decision"] == "failed" and bad[0]["severity"] == 4
+    assert bad and bad[0]["decision"] == "failed" and bad[0]["severity"] == 4 and bad[0]["user"] == "mallory"  # as typed, cleaned
+    assert "certainly-wrong" not in str(bad)
+    from app import auth
+    auth.clear_failures("testclient")
+    assert "admin · tentacontrol" in client.get("/logs").text  # Who: the username
 
 
 def test_egress_audit_endpoint(client, app_module, tmp_path, monkeypatch):

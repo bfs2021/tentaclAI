@@ -27,15 +27,23 @@ def write(category, service, action, decision="ok", actor="", part="", mode="", 
         print(f"audit log not writable: {e}", flush=True)
 
 
-def user(request, category, service, action, decision="ok", **extra):
-    """an action of the signed-in user (or a sign-in attempt): actor user, with the client's address"""
-    write(category, service, action, decision, actor="user", ip=request.client.host if request.client else "", **extra)
+def user(request, category, service, action, decision="ok", user=None, **extra):
+    """an action of the signed-in user (or a sign-in attempt – then `user` is the name that was typed): actor user,
+    with the username and the client's address"""
+    if user is None:
+        from .auth import username
+        try:
+            user = username(request)
+        except AssertionError:  # no session (yet)
+            user = ""
+    write(category, service, action, decision, actor="user", user=user, ip=request.client.host if request.client else "", **extra)
 
 
 def _enrich(e):
     from .activity import origin_label, origin_link
     o = tclib.audit_origin(e)
-    e["from_label"] = origin_label(o) or ("tentacontrol" if e["actor"] == "user" else "")
+    e["from_label"] = origin_label(o) or ((f"{e['user']} · tentacontrol" if e.get("user") else "tentacontrol")
+                                          if e["actor"] == "user" else "")
     e["from_link"] = origin_link(o)
     return e
 

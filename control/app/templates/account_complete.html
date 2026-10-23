@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Account · tentaclAI</title>
+  <link rel="icon" type="image/png" sizes="32x32" href="/static/favicon-32.png?v={{ asset_v }}">
+  <link rel="stylesheet" href="/static/app.css?v={{ asset_v }}">
+</head>
+<body>
+<div class="auth">
+  <form class="card" method="post" action="/account/complete">
+    <div class="brand"><img class="logo" src="/static/logo.svg?v={{ asset_v }}" alt="" width="32" height="32"><div>Complete your account</div></div>
+    <p class="muted small">tentacontrol now has accounts: choose the username you sign in with from now on, and an email address. The password stays the same.</p>
+    {% if error %}<div class="error">{{ error }}</div>{% endif %}
+    <div class="field">
+      <label for="un">Username</label>
+      <input id="un" type="text" name="username" value="{{ f.username or '' }}" autocomplete="username" autocapitalize="none" pattern="[A-Za-z0-9][A-Za-z0-9._\-]{1,31}" autofocus required>
+      <div class="help">lower-case letters, digits, . _ - · shown in the audit log</div>
+    </div>
+    <div class="field">
+      <label for="em">Email</label>
+      <input id="em" type="email" name="email" value="{{ f.email or '' }}" autocomplete="email" required>
+    </div>
+    <div class="field">
+      <label for="nm">Name <span class="faint">(optional)</span></label>
+      <input id="nm" type="text" name="name" value="{{ f.name or '' }}" autocomplete="name" maxlength="80">
+    </div>
+    <button class="btn primary" style="width:100%;justify-content:center">Save</button>
+  </form>
+  <form method="post" action="/logout" style="text-align:center;margin-top:10px"><button class="btn ghost sm">Sign out</button></form>
+</div>
+</body>
+</html>

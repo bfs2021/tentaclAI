@@ -44,7 +44,7 @@
       <span class="dot {{ 'ok' if cstatus.running else ('err' if cstatus.exists else '') }}"></span>
       tentaclAI {{ cstatus.state }}{% if cstatus.running %} · {{ cstatus.uptime }}{% endif %}
     </div>
-    <form method="post" action="/logout"><button class="btn ghost sm" style="width:100%">{{ icon('logout') }}Sign out</button></form>
+    <form method="post" action="/logout"><button class="btn ghost sm" style="width:100%" title="Signed in as {{ me.username }}{% if me.email %} · {{ me.email }}{% endif %}">{{ icon('logout') }}Sign out{% if me.username %} <span class="faint">· {{ me.name or me.username }}</span>{% endif %}</button></form>
     <a class="version-tag" href="https://github.com/mwaldegg/tentaclai/releases" target="_blank" rel="noopener" title="Releases on GitHub">tentaclAI v{{ tc_version }}</a>
   </aside>
   <main class="main">

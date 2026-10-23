@@ -11,6 +11,9 @@ All notable changes, newest first. Every release lists **upgrade steps** from th
   attempts, tentacontrol's start. Compact rows (time · who/from · what · decision · result), filters for time (also
   own dates), who, origin, kind, target and decision, full-text search, *Load more*, and **CSV / JSONL export** of
   exactly what the filters match.
+- **Accounts with a username**: the first setup asks for username, email and an optional name; you sign in with
+  username + password, and the username names you in the audit log (field `user`, also for failed sign-ins: the name
+  that was typed) and on approvals. Settings → Security → *Account* changes username, email, name and the password.
 - **Logs → Containers**: the live log of all three containers (`tentaclai`, `tentaclai-egress`, `tentacontrol`) with a
   line filter and download.
 
@@ -26,6 +29,7 @@ All notable changes, newest first. Every release lists **upgrade steps** from th
   `audit.jsonl.1` at 5 MB); archives are kept `AUDIT_RETENTION_DAYS` (new, default 90, Settings → General).
 - The Claude Code hook `tc-guard` now runs for every tool (`matcher: "*"`) and also with `INJECTION_GUARD=false`
   (then `tc-guard --no-scan`: logging only). It reports through `svc tool-report` (`svc guard-report` still works).
+- `./tentaclai.sh passwd` shows the username; `./tentaclai.sh passwd --username <name>` renames the account.
 - `svc audit` takes filters: `[n] [--since 24h|7d] [--category c] [--service s] [--decision d] [--actor a] [text]`.
 
 ### Upgrade
@@ -34,6 +38,10 @@ All notable changes, newest first. Every release lists **upgrade steps** from th
 - Nothing to migrate by hand: tentacontrol moves an old `audit.jsonl.1` into `data/control/audit/` on start, and
   older entries keep working. Optional: `AUDIT_RETENTION_DAYS` in `.env` (default 90).
 - Bookmarks of `/activity?…` filters: the audit log is now `/logs?…`.
+- The admin password moves from `data/control/admin.hash` into `data/control/users.json` on tentacontrol's start (the
+  old file stays as `admin.hash.migrated`). Open sessions stay signed in; the next page asks once for a username and an
+  email. Until then the sign-in form asks for the password only. Roll back: stop tentacontrol, rename
+  `admin.hash.migrated` back to `admin.hash`, delete `users.json`.
 
 ## v0.19.0 – 2026-10-23
 

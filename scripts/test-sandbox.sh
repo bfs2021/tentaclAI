@@ -150,8 +150,8 @@ J="$T/cookies"; H='HX-Request: true'
 wait_for 60 sh -c "docker logs tctest-control 2>&1 | grep -q 'setup?token='" || stuck "tentacontrol printed no setup link"
 TOK=$(docker logs tctest-control 2>&1 | grep -o 'setup?token=[A-Za-z0-9_-]*' | tail -1 | cut -d= -f2)
 rm -f "$J"
-curl -s -c "$J" -b "$J" -o /dev/null -X POST "http://$IP:8080/setup" -d "token=$TOK&password=testpass123&password2=testpass123"
-curl -s -c "$J" -b "$J" -o /dev/null -X POST "http://$IP:8080/login" -d "password=testpass123"
+curl -s -c "$J" -b "$J" -o /dev/null -X POST "http://$IP:8080/setup" -d "token=$TOK&username=admin&email=admin@example.org&password=testpass123&password2=testpass123"
+curl -s -c "$J" -b "$J" -o /dev/null -X POST "http://$IP:8080/login" -d "username=admin&password=testpass123"
 pick() { curl -s -b "$J" "http://$IP:8080/partials/approvals" | grep -o "approvals/[0-9]*/$1" | tail -1 | grep -o '[0-9]*' | head -1; }
 decide() { curl -s -b "$J" -H "$H" -X POST -o /dev/null "http://$IP:8080/approvals/$(pick "$1")/$1"; }
 pending() { $C svc pending 2>/dev/null | grep -q "$1"; }                          # an approval for this destination waits

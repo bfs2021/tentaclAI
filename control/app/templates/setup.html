@@ -10,14 +10,27 @@
 <div class="auth">
   <form class="card" method="post" action="/setup">
     <div class="brand"><img class="logo" src="/static/logo.svg?v={{ asset_v }}" alt="" width="32" height="32"><div>Set up tentacl<span class="ai-grad">AI</span></div></div>
-    <p class="muted small">Choose the admin password. The setup token is in the container log:<br><code>./tentaclai.sh setup-url</code> or <code>docker logs tentacontrol</code></p>
+    <p class="muted small">Create the admin account. The setup token is in the container log:<br><code>./tentaclai.sh setup-url</code> or <code>docker logs tentacontrol</code></p>
     {% if error %}<div class="error">{{ error }}</div>{% endif %}
     <div class="field">
       <label for="tk">Setup token</label>
       <input id="tk" type="text" name="token" value="{{ token }}" autocomplete="off" required>
     </div>
     <div class="field">
-      <label for="pw">New password</label>
+      <label for="un">Username</label>
+      <input id="un" type="text" name="username" value="{{ f.username or '' }}" autocomplete="username" autocapitalize="none" pattern="[A-Za-z0-9][A-Za-z0-9._\-]{1,31}" required>
+      <div class="help">lower-case letters, digits, . _ - · shown in the audit log</div>
+    </div>
+    <div class="field">
+      <label for="em">Email</label>
+      <input id="em" type="email" name="email" value="{{ f.email or '' }}" autocomplete="email" required>
+    </div>
+    <div class="field">
+      <label for="nm">Name <span class="faint">(optional)</span></label>
+      <input id="nm" type="text" name="name" value="{{ f.name or '' }}" autocomplete="name" maxlength="80">
+    </div>
+    <div class="field">
+      <label for="pw">Password</label>
       <input id="pw" type="password" name="password" minlength="10" autocomplete="new-password" required>
       <div class="help">at least 10 characters</div>
     </div>
@@ -25,7 +38,7 @@
       <label for="pw2">Repeat</label>
       <input id="pw2" type="password" name="password2" minlength="10" autocomplete="new-password" required>
     </div>
-    <button class="btn primary" style="width:100%;justify-content:center">Set password</button>
+    <button class="btn primary" style="width:100%;justify-content:center">Create account</button>
   </form>
 </div>
 </body>
