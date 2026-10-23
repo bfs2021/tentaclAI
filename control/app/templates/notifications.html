@@ -89,7 +89,7 @@
 {% if cfg.channels %}
 <form hx-post="/notifications/routes" hx-swap="none" class="stack" style="gap:16px;margin-bottom:16px">
 <div class="card">
-  <div class="card-head"><h2>What goes where</h2></div>
+  <div class="card-head"><h2>Routing</h2></div>
   <div class="table-wrap"><table>
     <thead><tr><th>Event</th>{% for ch in cfg.channels %}<th class="ch-col" style="text-align:center">{{ ch.name }}</th>{% endfor %}</tr></thead>
     <tbody>

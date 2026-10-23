@@ -55,7 +55,7 @@ async def setup_save(request: Request, token: str = Form(""), username: str = Fo
                                           "f": {"username": username, "email": email, "name": name}}, status_code=400)
     user = await asyncio.to_thread(auth.create_admin, username, email, name, password)
     auth.sign_in(request, user)
-    auditlog.user(request, "auth", "tentacontrol", "set up the admin account")
+    auditlog.user(request, "auth", "tentacontrol", "set up admin account")
     return RedirectResponse("/", status_code=303)
 
 
@@ -372,7 +372,7 @@ async def job_stream(job_id: str):
 
 
 AUDIT_FILTERS = ("category", "actor", "service", "decision")
-AUDIT_KINDS = {"service": "svc command", "tool": "Claude tool", "network": "network", "admin": "change in tentacontrol",
+AUDIT_KINDS = {"service": "svc command", "tool": "Claude tool", "network": "network", "admin": "admin",
                "auth": "sign-in", "job": "job run", "system": "system"}  # the What filter's labels
 
 
@@ -382,7 +382,7 @@ def _audit_query(request):
     f = {k: p.get(k, "")[:120] for k in AUDIT_FILTERS}
     f.update(since=p.get("since", "24h"), start=p.get("start", "")[:10], end=p.get("end", "")[:10], q=p.get("q", "")[:200],
              origin=p.get("origin", "")[:80])
-    who = p.get("who", "")[:80]  # the page's one Who choice: an actor, origin:<group> or job:<name>
+    who = (p.get("actor") or p.get("who", ""))[:80]  # the page's one Actor choice: an actor, origin:<group> (Source) or job:<name>
     if who in tclib.AUDIT_ACTORS:
         f.update(actor=who, origin="")
     elif who.startswith("origin:"):
@@ -393,7 +393,7 @@ def _audit_query(request):
 
 
 def _audit_who(f):
-    """the Who choice that shows the actor / origin filter"""
+    """the Actor choice that shows the actor / origin filter"""
     if f["origin"]:
         return f["origin"] if f["origin"].startswith("job:") else "origin:" + f["origin"]
     return f["actor"]

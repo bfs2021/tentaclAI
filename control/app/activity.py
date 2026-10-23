@@ -88,7 +88,7 @@ def origin_label(o):
     elif o.get("entry"):
         parts.append({"cli": "Claude terminal", "sdk-cli": "Claude (headless / Remote Control)"}.get(o["entry"], f"Claude ({o['entry']})"))
     else:
-        parts.append("shell (no Claude session)")
+        parts.append("shell")
     if o.get("session"):
         title = (usage._local()["sessions"].get(o["session"]) or {}).get("title", "")
         parts.append(f"“{title}”" if title else o["session"][:8])

@@ -656,7 +656,7 @@ def test_audit_filters_error_and_origin_link(client, app_module, tmp_path, monke
     assert "POST /items" in html and "compose web" not in html
     html = client.get("/logs?start=2020-01-01&end=2020-01-01").text  # own dates
     assert "compose old" in html and "POST /items" not in html
-    html = client.get("/logs?who=origin:session").text  # the page's one Who select
+    html = client.get("/logs?actor=origin:session").text  # the page's one Actor select: a source
     assert "compose web" in html and "POST /items" not in html and 'value="origin:session" selected' in html
     html = client.get("/logs?who=system&since=all").text
     assert "POST /items" in html and "compose web" not in html and 'type="date"' not in html  # dates only for own dates

@@ -22,7 +22,7 @@
   {% set full = plan.limits | selectattr('percent', 'ge', 100) | list %}
   {% if full %}<div class="card flat" style="margin-top:14px"><span class="pill warn">limit reached</span> Requests now run on <strong>extra usage (credits)</strong> if it is turned on for your account, otherwise they wait until {{ full[0].resets }}. Claude Code doesn't report the credit balance here – see <a href="https://claude.ai/settings/usage" target="_blank" rel="noopener">claude.ai → Settings → Usage</a>.</div>{% endif %}
   {% if plan.get('periods') %}
-  <h3 style="margin:18px 0 2px;font-size:14px">What contributes</h3>
+  <h3 style="margin:18px 0 2px;font-size:14px">Breakdown</h3>
   {% if plan.note %}<p class="small faint" style="margin:0 0 8px">{{ plan.note }}</p>{% endif %}
   <div class="grid2">
   {% for p in plan.periods %}
@@ -67,7 +67,7 @@
 <div class="grid2">
   <div class="card"><div class="card-head"><h2>Sessions</h2><span class="small muted">this sandbox</span></div>
     {% if s.sessions %}<div class="table-wrap"><table>
-      <thead><tr><th>Session</th><th>Where</th><th style="text-align:right">Tokens</th><th>Last</th></tr></thead><tbody>
+      <thead><tr><th>Session</th><th>Type</th><th style="text-align:right">Tokens</th><th>Last active</th></tr></thead><tbody>
       {% for x in s.sessions %}<tr><td class="small">{{ x.title or x.id[:8] }}</td><td class="small muted">{{ x.kind }}<br><span class="mono">{{ x.path }}</span></td>
         <td style="text-align:right;font-variant-numeric:tabular-nums">{{ tok(x.tokens) }}</td><td class="small muted">{{ x['last'][:16] | replace('T', ' ') }}</td></tr>{% endfor %}
     </tbody></table></div>{% else %}<div class="empty small">No sessions yet.</div>{% endif %}

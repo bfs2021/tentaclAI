@@ -169,7 +169,7 @@ def job_allows(name):
 
 def require_allowed(name):
     if not job_allows(name):
-        audit(name, "job", "–", f"use {name}", "blocked", detail="not one of the job's tentacles")
+        audit(name, "job", "–", f"use {name}", "blocked", detail="tentacle not in job")
         sys.exit(f"svc: this job may only use the tentacles its task names ({', '.join(sorted(job()['allow'])) or 'none'}) – not {name}")
 
 

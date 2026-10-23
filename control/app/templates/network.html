@@ -31,7 +31,7 @@
 </nav>
 {% if tab == 'seen' %}
 <div class="card">
-  <div class="card-head"><h2>Seen destinations</h2>
+  <div class="card-head"><h2>Destinations</h2>
     <button class="btn sm ghost" hx-post="/network/clear" hx-confirm="Clear the list? Rules and approvals stay – the list fills again with new connections." style="margin-left:auto;margin-right:12px">{{ icon('trash') }}Clear</button>
     <span class="small muted">{{ counts.tentacle }} tentacles · {{ counts.default + counts.allow }} on a list · {{ counts.unknown }} without a rule · {{ counts.blocked }} blocked</span></div>
   {% if rows %}
@@ -56,7 +56,7 @@
           data-rule="{{ {'unknown': 0, 'blocked': 1, 'tentacle': 2, 'allow': 3, 'default': 4}.get(r.kind, 5) }}{{ r.label or '' }}" data-decision="{{ r.decision }}"
           data-count="{{ r.count }}" data-last="{{ r.last or 0 }}">
         <td class="mono small">{{ r.host }}<span class="faint">:{{ r.port }}</span></td>
-        <td>{% if r.kind == 'tentacle' %}<span class="pill ok" title="host of an active service or SSH host">Tentacle · {{ r.label }}</span>{% elif r.kind == 'default' %}<span class="pill info" title="shipped with tentaclAI">Built-in</span>{% elif r.kind == 'allow' %}<span class="pill info">Your allowlist</span>{% elif r.kind == 'blocked' %}<span class="pill err">Blocklist</span>{% else %}<span class="pill warn" title="in enforce mode this needs your approval">No rule</span>{% endif %}</td>
+        <td>{% if r.kind == 'tentacle' %}<span class="pill ok" title="host of an active service or SSH host">Tentacle · {{ r.label }}</span>{% elif r.kind == 'default' %}<span class="pill info" title="shipped with tentaclAI">Built-in</span>{% elif r.kind == 'allow' %}<span class="pill info">Allowlist</span>{% elif r.kind == 'blocked' %}<span class="pill err">Blocklist</span>{% else %}<span class="pill warn" title="in enforce mode this needs your approval">No rule</span>{% endif %}</td>
         <td class="small muted">{{ {'allowlist': 'allowed', 'tentacle': 'allowed', 'grant': 'allowed temporarily', 'unlisted': 'allowed – no rule (permissive)',
                                     'approved': 'approved', 'denied': 'denied', 'blocked': 'blocked', 'direct-ip': 'blocked – IP target'}.get(r.decision, r.decision) }}</td>
         <td style="text-align:right;font-variant-numeric:tabular-nums">{{ r.count }}</td>
@@ -118,7 +118,7 @@
 {% else %}
 {% set kind = tab %}
 <div class="card" style="margin-bottom:16px">
-  <div class="card-head"><h2>{{ 'Your allowlist' if kind == 'allow' else 'Blocklist' }}</h2></div>
+  <div class="card-head"><h2>{{ 'Allowlist' if kind == 'allow' else 'Blocklist' }}</h2></div>
   <form class="row" hx-post="/network/rule" style="margin-bottom:12px"><input type="hidden" name="kind" value="{{ kind }}">
     <input type="text" name="entry" class="mono" placeholder="host · *.domain · IP · 10.0.0.0/8 · …:port" required style="max-width:340px">
     <button class="btn sm primary">{{ icon('plus') }}Add</button></form>

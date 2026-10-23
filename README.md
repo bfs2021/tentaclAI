@@ -366,7 +366,7 @@ about like any other unknown destination (`ask`). `EGRESS_DIRECT_IP` in `.env`.
 
 1. **Built-in** – Anthropic (Claude Code, login, remote control), GitHub, PyPI, npm. Always allowed, can't be blocked.
 2. **Blocklist** – always refused, even for tentacles.
-3. **Your allowlist** – entries you added (Network tab, *Allow* on a seen destination, or *Always* in Activity).
+3. **Allowlist** – entries you added (Network tab, *Allow* on a destination, or *Always* in Activity).
 4. **Tentacles** – hosts of your active services and SSH hosts, derived live (nothing to maintain).
 5. **Temporary approvals** – *Allow 10 min* / *Allow 1 h*.
 
