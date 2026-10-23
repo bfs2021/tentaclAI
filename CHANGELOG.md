@@ -59,8 +59,13 @@ All notable changes, newest first. Every release lists **upgrade steps** from th
 
 ### Upgrade
 - `git pull`, `docker compose build`, `docker compose up -d` – both images change (`svc` and the instructions in
-  `tentaclai`, Approvals and Jobs in `tentacontrol`); recreating `tentaclai` ends running sessions and Remote Control. Nothing
-  to migrate; `reason` is a new optional audit field.
+  `tentaclai`, Approvals, Jobs, Skills and Export / Import in `tentacontrol`); recreating `tentaclai` ends running
+  sessions and Remote Control.
+- Nothing to migrate: `reason` (audit), `knowledge`/`improve`/`env` (jobs and runs) are new optional fields; new
+  optional `.env` settings `KNOWLEDGE_LOCAL_KB` (default 6) and `KNOWLEDGE_NOTES` (default 8).
+- The built-in jobs *Learning review* and *Knowledge cleanup* are created only by the first setup – on an existing
+  installation add them from the job templates if you want them. Site skills start empty (`local/skills/`, git-ignored
+  with the rest of `local/`).
 
 ## v0.20.0 – 2026-10-23
 
