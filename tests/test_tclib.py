@@ -324,10 +324,10 @@ def test_audit_entry_write_read_and_old_format(tmp_path):
     assert o["category"] == "tool" and o["actor"] == "system" and o["origin_session"].startswith("1b55") and "from" not in o
     assert o["mode"] == "read" and o["severity"] == 4 and o["id"] == tclib.audit_read(d)[0][1]["id"]
     assert tclib.audit_epoch(o["ts"]) and tclib.audit_epoch(e["ts"]) > tclib.audit_epoch(o["ts"])
-    assert [x["service"] for x in tclib.audit_read(d, filters={"category": "service"})[0]] == ["demodb"]
-    assert [x["service"] for x in tclib.audit_read(d, q="from x")[0]] == ["demodb"]
-    assert tclib.audit_read(d, q="tool result")[0][0]["service"] == "Read"
-    assert tclib.audit_read(d, q="1b55539f")[0] == []  # the origin is a filter, not searched text
+    assert [x["service"] for x in tclib.audit_read(d, query="type:svc")[0]] == ["demodb"]
+    assert [x["service"] for x in tclib.audit_read(d, query='"from x"')[0]] == ["demodb"]
+    assert tclib.audit_read(d, query='"tool result"')[0][0]["service"] == "Read"
+    assert tclib.audit_read(d, query="1b55539f")[0] == []  # the origin is a filter, not searched text
     assert [x["service"] for x in tclib.audit_read(d, after=e["id"])[0]] == ["Read"]  # "load more" after the first
     assert tclib.audit_read(d, limit=1) == ([got[0]], True)
 

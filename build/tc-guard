@@ -17,6 +17,7 @@ sys.path.insert(0, "/usr/local/lib/tentaclai")
 GUARD_LINE = "⚠ svc: possible prompt injection"  # svc already scanned and warned – don't say it twice
 SCAN = re.compile(r"WebFetch|WebSearch|Read|Bash|mcp__.*")  # tools whose results can carry someone else's text
 SKIP_READ = ("/etc/tentaclai/", "/home/claude/.claude/", "/workspace/CLAUDE.md", "/workspace/SERVICES.md")
+SVC_ONLY = re.compile(r"\s*(?:sudo\s+(?:-n\s+)?)?svc\s[^;&|`$<>()\n]*")  # one svc call, nothing chained or substituted
 
 
 def text_of(value, limit=400_000):
@@ -45,8 +46,8 @@ def main():
     tin = event.get("tool_input") or {}
     if not isinstance(tin, dict):
         tin = {}
-    if tool == "Bash" and str(tin.get("command", "")).lstrip().startswith(("svc ", "sudo svc ")):
-        return 0  # svc logs and scans what it does itself
+    if tool == "Bash" and SVC_ONLY.fullmatch(str(tin.get("command", ""))):
+        return 0  # svc logs and scans what it does itself – "svc x; curl …" is logged and scanned as a whole
     findings = []
     if "--no-scan" not in sys.argv[1:] and SCAN.fullmatch(tool) and not (
             tool == "Read" and str(tin.get("file_path", "")).startswith(SKIP_READ)):  # tentaclAI's own instructions name svc commands on purpose

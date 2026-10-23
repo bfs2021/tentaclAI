@@ -114,8 +114,7 @@ async def account_complete(request: Request, username: str = Form(""), email: st
         return templates.TemplateResponse(request, "account_complete.html", {"error": error,
                                           "f": {"username": username, "email": email, "name": name}}, status_code=400)
     auth.update_profile(u["id"], username, email, name)
-    request.session["uid"] = u["id"]
-    auditlog.user(request, "admin", "account", "account profile completed", part="account", mode="POST")
+    request.session["uid"] = u["id"]  # the admin middleware logs it ("account complete")
     return RedirectResponse("/", status_code=303)
 
 
@@ -484,8 +483,7 @@ async def logs_page(request: Request):
     auditlog.mark_flags_seen()  # opening the audit log counts as having seen the flagged entries
     f = _audit_params(request)
     args = {"q": f["q"], "rng": f["range"], "start": f["from"], "end": f["to"]}
-    (entries, more), ov = await asyncio.gather(asyncio.to_thread(auditlog.search, **args),
-                                               asyncio.to_thread(auditlog.overview, **args))
+    entries, more, ov = await asyncio.to_thread(auditlog.overview, **args)
     ctx = _audit_ctx(f)
     return page(request, "logs.html", entries=entries, more=more, ov=ov, hist=_audit_bars(ov, ctx["links"]),
                 ranges=AUDIT_RANGES, fields=tclib.AUDIT_FIELDS, retention=tclib.audit_retention(read_env()), **ctx)

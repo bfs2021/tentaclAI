@@ -99,9 +99,10 @@ def search(q="", rng="24h", start="", end="", after="", limit=None):
 
 
 def overview(q="", rng="24h", start="", end=""):
-    """facets, histogram and the number of matches – over up to SCAN entries of the time range"""
+    """the page in one pass over up to SCAN entries of the time range → (entries, more, overview): the first PAGE
+    matches for the table (as search), and facets, histogram and the number of matches"""
     t0, t1 = window(rng, start, end)
-    label, _ = _sources()
+    label, link = _sources()
     terms = tclib.audit_query(q)
     scan, capped = tclib.audit_read(DATA_DIR, limit=SCAN, since=t0, until=t1)
     for e in scan:
@@ -111,8 +112,9 @@ def overview(q="", rng="24h", start="", end=""):
     lo = tclib.audit_epoch(scan[-1]["ts"]) if scan and (capped or not t0) else (t0 or now - 3600)
     hi = min(t1, now) if t1 else now
     width = tclib.audit_bucket(max(60, hi - lo))
-    return {"facets": tclib.audit_facets(scan, terms), "total": len(hits), "capped": capped, "width": width,
-            "bars": tclib.audit_histogram(hits, lo, hi, width)}
+    ov = {"facets": tclib.audit_facets(scan, terms), "total": len(hits), "capped": capped, "width": width,
+          "bars": tclib.audit_histogram(hits, lo, hi, width)}
+    return _viewed(hits[:PAGE], label, link), len(hits) > PAGE or capped, ov
 
 
 APPROVALS_QUERY = "mode:confirm"  # requests that needed an approval: confirm tentacles and unknown network destinations

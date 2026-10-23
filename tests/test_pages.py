@@ -705,7 +705,7 @@ def test_audit_load_more_and_export(client, app_module, tmp_path, monkeypatch):
     assert [x["action"] for x in rows] == [f"echo step{i}" for i in (4, 3, 2, 1, 0)] and rows[0]["actor"] == "claude"
     r = client.get("/logs/audit/export?fmt=jsonl&q=step3")
     assert [json.loads(x)["action"] for x in r.text.splitlines()] == ["echo step3"]
-    exported = tclib.audit_read(str(tmp_path), filters={"category": "admin"})[0]
+    exported = tclib.audit_read(str(tmp_path), query="type:admin")[0]
     assert exported and exported[0]["action"] == "export as jsonl" and exported[0]["actor"] == "user"  # the export is audited
 
 
@@ -719,7 +719,7 @@ def test_admin_actions_and_sign_in_are_audited(client, app_module, tmp_path, mon
     assert e[0]["mode"] == "POST" and "POST /skills/mode" in e[0]["detail"] and "dataviz" not in str(e[0])  # never the form
     from fastapi.testclient import TestClient
     TestClient(app_module.app).post("/login", data={"username": "Mallory!", "password": "certainly-wrong"})
-    bad = tclib.audit_read(str(tmp_path), filters={"category": "auth"})[0]
+    bad = tclib.audit_read(str(tmp_path), query="type:auth")[0]
     assert bad and bad[0]["decision"] == "failed" and bad[0]["severity"] == 4 and bad[0]["user"] == "mallory"  # as typed, cleaned
     assert "certainly-wrong" not in str(bad)
     from app import auth
@@ -737,7 +737,7 @@ def test_egress_audit_endpoint(client, app_module, tmp_path, monkeypatch):
         {"host": "api.example.net", "port": 443, "decision": "allowed", "reason": "tentacle", "count": 7, "first": 1},
         {"host": "evil.test", "port": 22, "decision": "blocked", "reason": "blocked", "count": 1},
         {"host": "bad host!", "port": 1}]})
-    e = tclib.audit_read(str(tmp_path), filters={"category": "network"})[0]
+    e = tclib.audit_read(str(tmp_path), query="type:network")[0]
     assert [(x["service"], x["decision"], x.get("count")) for x in e] == [("evil.test:22", "blocked", 1), ("api.example.net:443", "allowed", 7)]
     assert {x["action"] for x in e} == {"connect"}  # the destination is the target, not repeated in the action
     html = client.get("/logs?range=all").text

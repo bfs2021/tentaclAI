@@ -830,7 +830,6 @@ AUDIT_ROTATE = 10 * 2**20
 AUDIT_RETENTION_DAYS = 90
 AUDIT_CATEGORIES = ("service", "tool", "network", "admin", "auth", "job", "system")
 AUDIT_ACTORS = ("claude", "job", "user", "system")
-AUDIT_DECISIONS = ("read", "auto", "approved", "denied", "expired", "blocked", "error", "flagged", "allowed", "ok", "failed")
 SEVERITY = {"err": 3, "warning": 4, "notice": 5, "info": 6}
 AUDIT_ORIGIN = ("session", "entry", "tmux", "by", "job")  # origin_<key>: where a call came from (svc's origin())
 _AUDIT_LIMITS = {"action": 500, "detail": 300, "error": 1000, "service": 120, "part": 20, "mode": 20, "ip": 64, "user": 32, "approver": 40, "grant": 40}
@@ -859,7 +858,7 @@ def audit_severity(e):
     d = e.get("decision", "")
     if e.get("category") == "auth" and d in ("failed", "blocked"):
         return SEVERITY["warning"]
-    if d in ("error", "failed") or (e.get("category") == "admin" and str(e.get("detail", "")).startswith("5")):
+    if d in ("error", "failed"):
         return SEVERITY["err"]
     if d in ("denied", "blocked", "flagged", "expired"):
         return SEVERITY["warning"]
@@ -966,27 +965,18 @@ def audit_lines(data_dir, cutoff=0):
         yield from reversed(lines)
 
 
-AUDIT_SEARCH = ("action", "service", "part", "detail", "error", "excerpts", "ip")
+AUDIT_SEARCH = ("action", "service", "part", "detail", "error", "excerpts", "ip")  # the stored fields words are searched in
 
 
-def audit_matches(e, filters):
-    """filters: {field: value} – exact match for category/actor/service/decision/part (value "" = any)"""
-    return all(not v or str(e.get(k, "")) == v for k, v in filters.items())
-
-
-def audit_read(data_dir, limit=200, since=0, until=0, filters=None, q="", after="", match=None, query=None, source=None):
+def audit_read(data_dir, limit=200, since=0, until=0, after="", query=None, source=None):
     """entries newest first: since/until in epoch seconds (0 = open), query a search (audit_query: field:value terms and
     words; each entry then carries its audit_view as "_view", source names the source as in audit_view), after the id
-    of the last entry already shown ("load more"); filters (exact stored fields) / q (one text) / match (a predicate)
-    for older callers → (entries, more): more is True when further entries match"""
-    q = q.strip().lower()
-    filters = {k: v for k, v in (filters or {}).items() if v}
+    of the last entry already shown ("load more") → (entries, more): more is True when further entries match"""
     terms = audit_query(query) if isinstance(query, str) else list(query or [])
     words = [v for neg, k, v in terms if k is None and not neg]
     out, skipping = [], bool(after)
     for line in audit_lines(data_dir, since):
-        low = line.lower() if q or words else ""
-        if (q and q not in low) or (words and not all(w in low for w in words)):
+        if words and not all(w in line.lower() for w in words):
             continue  # quick test on the raw line first; the fields are checked below
         try:
             e = json.loads(line)
@@ -1003,11 +993,7 @@ def audit_read(data_dir, limit=200, since=0, until=0, filters=None, q="", after=
         if skipping:
             skipping = e["id"] != after
             continue
-        if (until and t > until) or not audit_matches(e, filters):
-            continue
-        if q and not any(q in json.dumps(e.get(k, ""), ensure_ascii=False).lower() for k in AUDIT_SEARCH):
-            continue
-        if match and not match(e):
+        if until and t > until:
             continue
         if terms:
             e["_view"] = audit_view(e, source)
@@ -1081,7 +1067,7 @@ def audit_approval(e):
 def audit_view(e, source=None):
     """the fields of the page and the CSV: time, actor, user, source, type, target, action, outcome (+ approver, grant)"""
     approver, grant = audit_approval(e)
-    return {"approver": approver, "grant": grant,"time": e.get("ts", ""), "actor": e.get("actor", ""), "user": e.get("user", ""),
+    return {"approver": approver, "grant": grant, "time": e.get("ts", ""), "actor": e.get("actor", ""), "user": e.get("user", ""),
             "source": (source or audit_source)(e) or "", "type": AUDIT_TYPES.get(e.get("category"), e.get("category", "")),
             "target": str(e.get("service", "")), "action": str(e.get("action", "")), "outcome": audit_outcome(e),
             "decision": e.get("decision", ""), "mode": e.get("mode", ""), "ip": e.get("ip", "")}
@@ -1244,7 +1230,7 @@ def audit_export(entries, fmt="jsonl"):
         row = []
         view = e.get("_view") or audit_view(e)
         for k in AUDIT_CSV:
-            v = view.get(k, e.get(k, "")) if k in view else e.get(k, "")
+            v = view[k] if k in view else e.get(k, "")
             if k == "excerpts":
                 v = " | ".join(f"{x.get('reason', '')}: {x.get('text', '')}" for x in v or [])
             v = str(v)

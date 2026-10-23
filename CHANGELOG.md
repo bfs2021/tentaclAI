@@ -35,6 +35,9 @@ All notable changes, newest first. Every release lists **upgrade steps** from th
   `audit.jsonl.1` at 5 MB); archives are kept `AUDIT_RETENTION_DAYS` (new, default 90, Settings → General).
 - The Claude Code hook `tc-guard` now runs for every tool (`matcher: "*"`) and also with `INJECTION_GUARD=false`
   (then `tc-guard --no-scan`: logging only). It reports through `svc tool-report` (`svc guard-report` still works).
+  A Bash call that is one plain `svc` command is left to `svc`'s own entry; anything chained to it (`svc …; curl …`,
+  pipes, `$(…)`) is logged and scanned as a whole. tentacontrol's background `svc test` runs for the status dots are not
+  logged (the *Test connection* button is, as an admin action).
 - An entry's action no longer repeats its target: `connect` (not `connect n8n.example:443`, the count of a 15-minute
   window shows next to it, `connect · 24×`), `ssh tar …`, `test`, `sync`, `started 0.20.0`, `terminal opened`;
   reads through `svc` log the command line without `svc` and the tentacle. Older entries keep their text.

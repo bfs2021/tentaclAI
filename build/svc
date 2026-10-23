@@ -2926,7 +2926,8 @@ def main(argv):
 SERVICE_NAMES = set()
 NOT_LOGGED = {"-h", "--help", "help", "pending", "audit", "guard-report", "tool-report", "mcp-proxy", "git-credential",
               "git-push-hook", "rc-env"}  # svc's own plumbing and lookups – no audit entry
-ROOT_LOGGED = {"sync", "test", "git"}  # run by tentacontrol or the entrypoint: only these get an entry (pages poll the rest)
+ROOT_LOGGED = {"sync", "git"}  # run by tentacontrol or the entrypoint: only these get an entry (pages poll the rest – svc test
+# for the status dots too; the Test button is an admin action of its own)
 
 
 def read_entry(argv, rc, seconds):
