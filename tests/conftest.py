@@ -102,7 +102,7 @@ def pytest_sessionfinish(session, exitstatus):
 def app_module():
     from app import dockerops
     dockerops.run = fake_run
-    dockerops.container = lambda: None
+    dockerops.container = lambda name=None: None
     from app import main
     return main
 

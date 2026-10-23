@@ -1,62 +1,16 @@
 {% extends "base.html" %}
 {% from "_icons.html" import icon, help_link %}
 {% block title %}Activity{% endblock %}
-{% macro clip(text, n=80) %}{% if text | length > n or '\n' in text %}<details><summary>{{ text }}</summary></details>{% else %}{{ text }}{% endif %}{% endmacro %}
 {% block content %}
 <div class="header">
-  <div><h1>Activity</h1><div class="sub">Write actions through <code>svc</code>: approvals for services with access <code>confirm</code>, and the audit log of everything that changed something.</div></div>
+  <div><h1>Activity</h1><div class="sub">Approvals: writes through <code>svc</code> for tentacles with access <code>confirm</code>, and unknown network destinations in <em>enforce</em> mode.</div></div>
   <div class="row">{{ help_link('activity') }}</div>
 </div>
-<div class="card" style="margin-bottom:18px">
+<div class="card" style="margin-bottom:14px">
   <div class="card-head"><h2>Pending approvals</h2>
     <button class="btn sm ghost" type="button" data-desktop-notify hidden title="a notification from this browser when an approval waits – while tentacontrol is open in a tab, even in the background">{{ icon('bell') }}<span>Desktop notifications</span></button></div>
   <div hx-get="/partials/approvals" hx-trigger="load" hx-swap="outerHTML"><div class="skeleton"></div></div>
 </div>
-<div class="card">
-  <div class="card-head" style="flex-wrap:wrap"><h2>Audit log</h2>
-    <form class="row audit-filters" method="get" action="/activity" style="gap:6px">
-      <input type="search" name="q" value="{{ q }}" placeholder="Search actions…" class="sys-select" aria-label="Search">
-      <select name="since" class="sys-select" onchange="this.form.submit()">
-        {% for k, label in (('24h', 'last 24 h'), ('7d', 'last 7 days'), ('30d', 'last 30 days'), ('all', 'any time')) %}<option value="{{ k }}" {{ 'selected' if k == since }}>{{ label }}</option>{% endfor %}
-      </select>
-      <select name="origin" class="sys-select" onchange="this.form.submit()">
-        <option value="">all origins</option>
-        {% for k, label in (('session', 'Claude sessions'), ('job', 'jobs'), ('host', 'tentacontrol / host')) %}<option value="{{ k }}" {{ 'selected' if k == origin }}>{{ label }}</option>{% endfor %}
-        {% for j in jobs_known %}<option value="job:{{ j }}" {{ 'selected' if 'job:' ~ j == origin }}>Job · {{ j }}</option>{% endfor %}
-      </select>
-      <select name="service" class="sys-select" onchange="this.form.submit()">
-        <option value="">all services</option>
-        {% for s in services_known %}<option value="{{ s }}" {{ 'selected' if s == service }}>{{ s }}</option>{% endfor %}
-      </select>
-      <select name="decision" class="sys-select" onchange="this.form.submit()">
-        <option value="">all decisions</option>
-        {% for d in ('auto', 'approved', 'denied', 'expired', 'blocked', 'error', 'flagged') %}<option value="{{ d }}" {{ 'selected' if d == decision }}>{{ d }}</option>{% endfor %}
-      </select>
-      <a class="btn ghost audit-reset{{ '' if filtered else ' off' }}" href="/activity" title="Reset filters" aria-label="Reset filters"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg></a>
-    </form>
-  </div>
-  {% if entries %}
-  <div class="table-wrap"><table class="audit">
-    <colgroup><col style="width:88px"><col style="width:10%"><col style="width:84px"><col><col style="width:14%"><col style="width:13%"><col style="width:17%"></colgroup>
-    <thead><tr><th>Time</th><th>Service</th><th title="part of the service · its access mode">Part</th><th>Action</th><th>From</th><th>Decision</th><th>Result</th></tr></thead>
-    <tbody>
-    {% for e in entries %}
-      <tr>
-        <td class="mono small nowrap">{{ e.ts[11:19] }}<div class="faint">{{ e.ts[:10] }}</div></td>
-        <td class="nowrap">{{ e.service }}</td>
-        <td><span class="tag">{{ e.part }}</span><div class="small faint" style="margin-top:3px">{{ e.mode }}</div></td>
-        <td class="mono small audit-action">{{ clip(e.action) }}{% if e.excerpts %}
-          <details class="audit-excerpts" open><summary>Indicators</summary>{% for x in e.excerpts %}<div><span class="faint">{{ x.reason }}:</span> {{ x.text }}</div>{% endfor %}</details>{% endif %}</td>
-        <td class="small muted audit-from">{% if e.from_link %}<a href="{{ e.from_link }}">{{ e.from_label }}</a>{% else %}{{ e.from_label or '–' }}{% endif %}</td>
-        <td><span class="pill {{ {'auto':'info','approved':'ok','denied':'err','blocked':'warn','expired':'off','error':'err','flagged':'warn'}.get(e.decision, 'off') }}">{{ e.decision }}</span>{% if e.detail %}<div class="small faint audit-detail">{{ e.detail }}</div>{% endif %}</td>
-        <td class="small audit-result">{% if e.exit is defined %}{{ '✓' if e.exit == 0 else '✗ exit ' ~ e.exit }}{% if e.seconds is defined %} <span class="faint">{{ e.seconds }} s</span>{% endif %}{% elif e.part == 'network' %}<span class="faint">–</span>{% elif e.decision == 'flagged' %}<span class="faint" title="nothing was blocked: Claude got a warning next to the content">Claude warned</span>{% else %}<span class="faint">not run</span>{% endif %}{% if e.error %}<div class="mono small audit-error">{{ clip(e.error, 60) }}</div>{% endif %}</td>
-      </tr>
-    {% endfor %}
-    </tbody>
-  </table></div>
-  <p class="help">Newest first, up to 300 entries matching the filters (<code>data/control/audit.jsonl</code>, rotated at 5 MB). Secrets are never logged – API requests show method and path, bodies only as “(with body)”. In the sandbox: <code>svc audit</code>.</p>
-  {% else %}
-  <div class="empty small">{{ 'Nothing matches these filters.' if filtered else 'No write actions logged yet.' }}</div>
-  {% endif %}
-</div>
+<p class="help">What was approved, denied, run or blocked – and everything else Claude, jobs and you did – is in <a href="/logs">Logs → Audit</a>
+  (<a href="/logs?decision=approved&amp;since=7d">approved</a> · <a href="/logs?decision=denied&amp;since=7d">denied</a> · <a href="/logs?decision=flagged&amp;since=7d">flagged</a>).</p>
 {% endblock %}

@@ -3,8 +3,8 @@
 {% set warn = services | selectattr("state", "equalto", "warn") | list %}
 {% if flags %}
 <div class="banner flag-banner">
-  <div><strong>⚠ {{ flags }} possible prompt injection{{ 's' if flags != 1 }}</strong> <span class="muted">flagged since you last opened Activity – Claude was warned, nothing was blocked.</span></div>
-  <a class="btn sm" href="/activity?decision=flagged&amp;since=7d">Show</a>
+  <div><strong>⚠ {{ flags }} possible prompt injection{{ 's' if flags != 1 }}</strong> <span class="muted">flagged since you last opened Logs → Audit – Claude was warned, nothing was blocked.</span></div>
+  <a class="btn sm" href="/logs?decision=flagged&amp;since=7d">Show</a>
 </div>
 {% endif %}
 <div class="grid">

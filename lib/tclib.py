@@ -791,20 +791,309 @@ def tool_target(tool, tin):
         args = ", ".join(f"{k}={json.dumps(v, ensure_ascii=False)[:60]}" for k, v in list(tin.items())[:4])
         v = f"{server} · {name}({args})"
     else:
-        v = tin.get({"Read": "file_path", "WebFetch": "url", "WebSearch": "query", "Bash": "command"}.get(tool, ""), "")
+        key = {"Read": "file_path", "Write": "file_path", "Edit": "file_path", "MultiEdit": "file_path", "NotebookEdit": "notebook_path",
+               "WebFetch": "url", "WebSearch": "query", "Bash": "command", "Grep": "pattern", "Glob": "pattern",
+               "Task": "description", "Agent": "description", "Skill": "skill"}.get(tool)
+        if key:
+            v = tin.get(key, "")
+            if tool in ("Grep", "Glob") and tin.get("path"):
+                v = f"{v} in {tin['path']}"
+        else:  # any other tool: its first short text argument
+            v = next((x for x in tin.values() if isinstance(x, str) and x.strip()), "")
     v = re.sub(r"\s+", " ", str(v or "")).strip()
     return v[:200] + ("…" if len(v) > 200 else "")
 
 
-def guard_hook_settings():
-    """the PostToolUse hook in Claude Code's managed settings: tc-guard scans tool results for injection attempts"""
-    return {"PostToolUse": [{"matcher": "WebFetch|WebSearch|Read|Bash|mcp__.*",
-                             "hooks": [{"type": "command", "command": "/usr/local/bin/tc-guard", "timeout": 10}]}]}
+def guard_hook_settings(scan=True):
+    """the PostToolUse hook in Claude Code's managed settings: tc-guard logs every tool call in the audit log and
+    (scan) checks tool results for injection attempts"""
+    return {"PostToolUse": [{"matcher": "*", "hooks": [{"type": "command", "timeout": 10,
+                                                        "command": "/usr/local/bin/tc-guard" + ("" if scan else " --no-scan")}]}]}
 
 
 def managed_settings(denied, guard=True):
-    """/etc/claude-code/managed-settings.json in the sandbox (root-owned): blocked claude.ai connectors and the guard hook"""
-    s = {"deniedMcpServers": [{"serverName": n} for n in sorted(denied)]}
-    if guard:
-        s["hooks"] = guard_hook_settings()
-    return s
+    """/etc/claude-code/managed-settings.json in the sandbox (root-owned): blocked claude.ai connectors and the hook
+    (always there – it writes the audit log; guard only decides whether it scans)"""
+    return {"deniedMcpServers": [{"serverName": n} for n in sorted(denied)], "hooks": guard_hook_settings(guard)}
+
+
+# ---------------------------------------------------------------- audit log
+# One format and one implementation for everyone who writes or reads it: svc (sandbox, root), tentacontrol (user
+# actions, network, jobs, system) and – through tentacontrol – the egress gateway. JSON lines, flat fields, RFC 3339
+# times, an id and an RFC 5424 severity per entry, so a SIEM (or a syslog sender) can take it as it is.
+# The active file is <data>/audit.jsonl; at AUDIT_ROTATE it moves to <data>/audit/<UTC time>.jsonl, archives are
+# kept AUDIT_RETENTION_DAYS (.env) and removed by tentacontrol.
+
+AUDIT_FILE = "audit.jsonl"
+AUDIT_ARCHIVE = "audit"
+AUDIT_ROTATE = 10 * 2**20
+AUDIT_RETENTION_DAYS = 90
+AUDIT_CATEGORIES = ("service", "tool", "network", "admin", "auth", "job", "system")
+AUDIT_ACTORS = ("claude", "job", "user", "system")
+AUDIT_DECISIONS = ("read", "auto", "approved", "denied", "expired", "blocked", "error", "flagged", "allowed", "ok", "failed")
+SEVERITY = {"err": 3, "warning": 4, "notice": 5, "info": 6}
+AUDIT_ORIGIN = ("session", "entry", "tmux", "by", "job")  # origin_<key>: where a call came from (svc's origin())
+_AUDIT_LIMITS = {"action": 500, "detail": 300, "error": 1000, "service": 120, "part": 20, "mode": 20, "ip": 64}
+
+
+def audit_ts(t=None):
+    """RFC 3339 with milliseconds and a colon in the offset (2026-10-23T00:42:04.123+02:00) – valid in syslog"""
+    from datetime import datetime
+    d = datetime.fromtimestamp(time.time() if t is None else t).astimezone()
+    return d.isoformat(timespec="milliseconds")
+
+
+def audit_epoch(ts):
+    """seconds of an entry's ts – also the older form without milliseconds and with +0200; 0 if unreadable"""
+    from datetime import datetime
+    try:
+        return datetime.fromisoformat(str(ts)).timestamp()
+    except ValueError:
+        try:
+            return datetime.strptime(str(ts), "%Y-%m-%dT%H:%M:%S%z").timestamp()
+        except ValueError:
+            return 0
+
+
+def audit_severity(e):
+    d = e.get("decision", "")
+    if e.get("category") == "auth" and d in ("failed", "blocked"):
+        return SEVERITY["warning"]
+    if d in ("error", "failed") or (e.get("category") == "admin" and str(e.get("detail", "")).startswith("5")):
+        return SEVERITY["err"]
+    if d in ("denied", "blocked", "flagged", "expired"):
+        return SEVERITY["warning"]
+    if d in ("approved", "auto") or e.get("category") in ("admin", "auth"):
+        return SEVERITY["notice"]
+    return SEVERITY["info"]
+
+
+def audit_origin(e):
+    """the origin of an entry as a dict ({"session": …, "tmux": …}) – from origin_* or the older nested "from" """
+    o = {k: e[f"origin_{k}"] for k in AUDIT_ORIGIN if e.get(f"origin_{k}")}
+    if not o and isinstance(e.get("from"), dict):
+        o = {k: str(v) for k, v in e["from"].items() if k in AUDIT_ORIGIN and v}
+    return o
+
+
+def audit_normalize(e, raw=""):
+    """fill in what older entries lack (id, category, actor, severity, flat origin, access names) – in place, returns e"""
+    import hashlib
+    if not e.get("id"):
+        e["id"] = hashlib.sha1((raw or json.dumps(e, sort_keys=True)).encode()).hexdigest()[:16]
+    if isinstance(e.get("from"), dict):
+        for k, v in audit_origin(e).items():
+            e.setdefault(f"origin_{k}", v)
+        e.pop("from")
+    if e.get("category") not in AUDIT_CATEGORIES:
+        e["category"] = {"network": "network", "claude": "tool"}.get(e.get("part"), "service")
+    if e.get("actor") not in AUDIT_ACTORS:
+        e["actor"] = ("user" if e["category"] in ("admin", "auth") else "system" if e.get("origin_by") == "root"
+                      else "job" if e.get("origin_job") else "claude")
+    if e.get("mode") in ACCESS_ALIASES:  # entries written before v0.16
+        e["mode"] = ACCESS_ALIASES[e["mode"]]
+    if not isinstance(e.get("severity"), int):
+        e["severity"] = audit_severity(e)
+    return e
+
+
+def audit_entry(category, service, action, decision, actor="", part="", mode="", origin=None, **extra):
+    """a new entry with every field set and cut to size (extra: exit, seconds, detail, error, excerpts, count, ip)"""
+    e = {"ts": audit_ts(), "id": os.urandom(8).hex(), "category": category, "actor": actor, "service": str(service),
+         "part": str(part or category), "mode": str(mode or ""), "action": re.sub(r"[\r\n]+", " ", str(action)), "decision": decision}
+    for k, v in (origin or {}).items():
+        if k in AUDIT_ORIGIN and v:
+            e[f"origin_{k}"] = str(v)[:80]
+    for k, v in extra.items():
+        if v is not None and v != "" and v != []:
+            e[k] = v
+    for k, n in _AUDIT_LIMITS.items():
+        if isinstance(e.get(k), str):
+            e[k] = e[k][:n]
+    if e.get("excerpts"):
+        e["excerpts"] = [{"reason": str(x.get("reason", ""))[:80], "text": str(x.get("text", ""))[:300]} for x in e["excerpts"][:5]]
+    return audit_normalize(e)
+
+
+def audit_write(data_dir, entry):
+    """append one entry (from audit_entry) to <data_dir>/audit.jsonl, rotating at AUDIT_ROTATE – raises OSError only"""
+    import fcntl
+    path = os.path.join(data_dir, AUDIT_FILE)
+    os.makedirs(data_dir, exist_ok=True)
+    line = json.dumps(entry, ensure_ascii=False) + "\n"
+    old = os.umask(0o077)
+    try:
+        with open(path + ".lock", "a") as lock:  # one lock for every writer (svc and tentacontrol share the directory)
+            fcntl.flock(lock, fcntl.LOCK_EX)
+            if os.path.exists(path) and os.path.getsize(path) > AUDIT_ROTATE:
+                arch = os.path.join(data_dir, AUDIT_ARCHIVE)
+                os.makedirs(arch, exist_ok=True)
+                os.replace(path, os.path.join(arch, time.strftime("%Y%m%dT%H%M%SZ", time.gmtime()) + ".jsonl"))
+            with open(path, "a") as f:
+                f.write(line)
+    finally:
+        os.umask(old)
+
+
+def _audit_files(data_dir, cutoff=0):
+    """newest first: the active file, then archives whose last entry (= the rotation time in the name) is after cutoff"""
+    import calendar
+    files = [os.path.join(data_dir, AUDIT_FILE)]
+    arch = os.path.join(data_dir, AUDIT_ARCHIVE)
+    try:
+        names = sorted((n for n in os.listdir(arch) if n.endswith(".jsonl")), reverse=True)
+    except OSError:
+        names = []
+    for n in names:
+        try:
+            end = calendar.timegm(time.strptime(n[:16], "%Y%m%dT%H%M%SZ"))
+        except ValueError:
+            end = 0
+        files.append(os.path.join(arch, n))
+        if end and end < cutoff:
+            break  # everything in older archives is older still
+    return files
+
+
+def audit_lines(data_dir, cutoff=0):
+    """raw lines, newest first, across the active file and the archives"""
+    for path in _audit_files(data_dir, cutoff):
+        try:
+            with open(path, encoding="utf-8", errors="replace") as f:
+                lines = f.read().splitlines()
+        except OSError:
+            continue
+        yield from reversed(lines)
+
+
+AUDIT_SEARCH = ("action", "service", "part", "detail", "error", "excerpts", "ip")
+
+
+def audit_matches(e, filters):
+    """filters: {field: value} – exact match for category/actor/service/decision/part (value "" = any)"""
+    return all(not v or str(e.get(k, "")) == v for k, v in filters.items())
+
+
+def audit_read(data_dir, limit=200, since=0, until=0, filters=None, q="", after="", match=None):
+    """entries newest first: since/until in epoch seconds (0 = open), filters as in audit_matches, q a case-insensitive
+    text search, after the id of the last entry already shown ("load more"), match an extra predicate
+    → (entries, more): more is True when further entries match"""
+    q = q.strip().lower()
+    filters = {k: v for k, v in (filters or {}).items() if v}
+    out, skipping = [], bool(after)
+    for line in audit_lines(data_dir, since):
+        if q and q not in line.lower():
+            continue  # quick test on the raw line first; the fields are checked below
+        try:
+            e = json.loads(line)
+        except ValueError:
+            continue
+        if not isinstance(e, dict):
+            continue
+        audit_normalize(e, line)
+        t = audit_epoch(e.get("ts"))
+        if since and t < since:
+            if t:
+                break  # the log is in time order – everything further back is older
+            continue
+        if skipping:
+            skipping = e["id"] != after
+            continue
+        if (until and t > until) or not audit_matches(e, filters):
+            continue
+        if q and not any(q in json.dumps(e.get(k, ""), ensure_ascii=False).lower() for k in AUDIT_SEARCH):
+            continue
+        if match and not match(e):
+            continue
+        if len(out) >= limit:
+            return out, True
+        out.append(e)
+    return out, False
+
+
+def audit_prune(data_dir, days=AUDIT_RETENTION_DAYS, now=None):
+    """remove archives whose newest entry is older than days; also moves a pre-v0.20 audit.jsonl.1 into the archive
+    → number of files removed"""
+    arch = os.path.join(data_dir, AUDIT_ARCHIVE)
+    old = os.path.join(data_dir, AUDIT_FILE + ".1")
+    if os.path.exists(old):
+        os.makedirs(arch, exist_ok=True)
+        os.replace(old, os.path.join(arch, time.strftime("%Y%m%dT%H%M%SZ", time.gmtime(os.path.getmtime(old))) + ".jsonl"))
+    cutoff = (now or time.time()) - max(1, int(days)) * 86400
+    removed = 0
+    for path in _audit_files(data_dir)[1:]:
+        try:
+            if os.path.getmtime(path) < cutoff:
+                os.remove(path)
+                removed += 1
+        except OSError:
+            pass
+    return removed
+
+
+def audit_retention(env):
+    try:
+        return max(1, int(env.get("AUDIT_RETENTION_DAYS") or AUDIT_RETENTION_DAYS))
+    except ValueError:
+        return AUDIT_RETENTION_DAYS
+
+
+AUDIT_CSV = ("ts", "id", "severity", "category", "actor", "service", "part", "mode", "action", "decision", "exit",
+             "seconds", "count", "detail", "error", "ip", "origin_session", "origin_entry", "origin_tmux", "origin_job",
+             "origin_by", "excerpts")
+
+
+def audit_export(entries, fmt="jsonl"):
+    """export lines: jsonl (one entry per line, as stored) or csv (AUDIT_CSV, header first, excerpts as one cell)"""
+    if fmt == "jsonl":
+        for e in entries:
+            yield json.dumps(e, ensure_ascii=False) + "\n"
+        return
+    import csv
+    import io
+    buf = io.StringIO()
+    w = csv.writer(buf)
+    w.writerow(AUDIT_CSV)
+    yield buf.getvalue()
+    buf.seek(0)
+    buf.truncate()
+    for e in entries:
+        row = []
+        for k in AUDIT_CSV:
+            v = e.get(k, "")
+            if k == "excerpts":
+                v = " | ".join(f"{x.get('reason', '')}: {x.get('text', '')}" for x in v or [])
+            v = str(v)
+            row.append("'" + v if v[:1] in ("=", "+", "-", "@") and k not in ("exit", "seconds") else v)  # no formulas
+        w.writerow(row)
+        yield buf.getvalue()
+        buf.seek(0)
+        buf.truncate()
+
+
+SYSLOG_FACILITY = 13  # "log audit"
+SYSLOG_SDID = "tentaclai@32473"  # 32473: the example enterprise number of RFC 5612 – replace with a registered one
+_SD_ESCAPE = re.compile(r'(["\\\]])')
+
+
+def audit_syslog(e, hostname="-", facility=SYSLOG_FACILITY, sdid=SYSLOG_SDID):
+    """one entry as an RFC 5424 message: <PRI>1 TIMESTAMP HOST tentaclai - MSGID [SD] MSG (UTF-8, BOM before MSG).
+    Not sent anywhere in Community – the format is here so a sender only needs the transport (RFC 5425, TLS)."""
+    def sdname(k):
+        return re.sub(r"[^A-Za-z0-9_.-]", "_", k)[:32]
+    host = re.sub(r"[^!-~]", "", hostname or "-")[:255] or "-"
+    params = []
+    for k in AUDIT_CSV:
+        if k in ("ts", "excerpts") or e.get(k) in (None, ""):
+            continue
+        value = _SD_ESCAPE.sub(r"\\\1", str(e[k]))
+        params.append(f'{sdname(k)}="{value}"')
+    msgid = re.sub(r"[^!-~]", "", str(e.get("category") or "-"))[:32] or "-"
+    msg = f"{e.get('decision', '')}: {e.get('service', '')} {e.get('action', '')}".strip()
+    for x in e.get("excerpts") or []:
+        msg += f" | {x.get('reason', '')}: {x.get('text', '')}"
+    ts = e.get("ts") or "-"
+    if "T" in ts and re.search(r"[+-]\d{4}$", ts):
+        ts = ts[:-2] + ":" + ts[-2:]  # an older entry: +0200 → +02:00
+    pri = facility * 8 + int(e.get("severity", SEVERITY["info"]))
+    return f"<{pri}>1 {ts} {host} tentaclai - {msgid} [{sdid} {' '.join(params)}] ﻿{msg}"

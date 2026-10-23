@@ -20,9 +20,10 @@ def client():
     return _client
 
 
-def container():
+def container(name=None):
+    """the sandbox container – or another one by name (Logs → Containers)"""
     try:
-        return client().containers.get(CLAUDE_CONTAINER)
+        return client().containers.get(name or CLAUDE_CONTAINER)
     except NotFound:
         return None
 
@@ -237,8 +238,8 @@ def local_ts(text):
     return LOG_TS.sub(conv, text)
 
 
-def logs(tail=300):
-    c = container()
+def logs(tail=300, name=None):
+    c = container(name)
     if c is None:
         return ""
     return local_ts(c.logs(tail=tail, timestamps=True).decode(errors="replace"))

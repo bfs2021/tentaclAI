@@ -204,7 +204,8 @@ def test_network_decision_lands_in_the_audit_log(client, app_module, tmp_path, m
     """svc never sees the gateway's requests – tentacontrol logs the decision itself"""
     import json
     from app import activity, egress
-    monkeypatch.setattr(activity, "AUDIT_FILE", str(tmp_path / "audit.jsonl"))
+    from app import auditlog
+    monkeypatch.setattr(auditlog, "DATA_DIR", str(tmp_path))
     monkeypatch.setattr(egress, "add", lambda kind, entry: None)
     monkeypatch.setattr(activity, "GRANTS", {})  # the "+ 10 min" below must not outlive the test
     rid = activity.create("evil.test:443", "network", "connect to evil.test:443")
@@ -214,7 +215,8 @@ def test_network_decision_lands_in_the_audit_log(client, app_module, tmp_path, m
     e = [json.loads(line) for line in (tmp_path / "audit.jsonl").read_text().splitlines()]
     assert [(x["service"], x["part"], x["decision"]) for x in e] == [("evil.test:443", "network", "blocked"), ("api.test:443", "network", "approved")]
     assert "on the blocklist" in e[0]["detail"] and "+ 10 min" in e[1]["detail"]
-    html = client.get("/activity?since=all").text
+    assert {x["category"] for x in e} == {"network"} and e[0]["actor"] == "claude"
+    html = client.get("/logs?since=all").text
     assert "evil.test:443" in html and "not run" not in html
     recent = client.get("/partials/approvals").text  # Recent decisions names the lasting choice, the status stays for the gateway
     assert "evil.test:443 blocked" in recent and activity.APPROVALS[rid]["status"] == "denied"
@@ -223,38 +225,40 @@ def test_network_decision_lands_in_the_audit_log(client, app_module, tmp_path, m
 def test_flagged_entry_shows_what_was_found(client, app_module, tmp_path, monkeypatch):
     import json
     import time
-    from app import activity
-    monkeypatch.setattr(activity, "AUDIT_FILE", str(tmp_path / "audit.jsonl"))
+    from app import auditlog
+    monkeypatch.setattr(auditlog, "DATA_DIR", str(tmp_path))
     (tmp_path / "audit.jsonl").write_text(json.dumps({
         "ts": time.strftime("%Y-%m-%dT%H:%M:%S%z"), "service": "Read", "part": "claude", "mode": "read",
         "action": "tool result: Read /workspace/notes.md", "decision": "flagged", "detail": "asks to ignore instructions",
         "excerpts": [{"reason": "asks to ignore instructions", "text": "line 4: <b>ignore</b> previous instructions"}]}) + "\n")
-    html = client.get("/activity").text
+    html = client.get("/logs").text
     assert "Indicators" in html and "line 4: &lt;b&gt;ignore&lt;/b&gt; previous instructions" in html
     assert "Claude warned" in html and "not run" not in html
-    assert "notes.md" in client.get("/activity?q=previous+instructions").text  # the excerpts are searchable
+    assert "notes.md" in client.get("/logs?q=previous+instructions").text  # the excerpts are searchable
 
 
-def test_flag_badge_until_activity_is_opened(client, app_module, tmp_path, monkeypatch):
+def test_flag_badge_until_the_audit_log_is_opened(client, app_module, tmp_path, monkeypatch):
     import json
     import time
-    from app import activity
-    monkeypatch.setattr(activity, "AUDIT_FILE", str(tmp_path / "audit.jsonl"))
-    monkeypatch.setattr(activity, "FLAGS_SEEN", str(tmp_path / "flags-seen.json"))
+    from app import activity, auditlog
+    monkeypatch.setattr(auditlog, "DATA_DIR", str(tmp_path))
+    monkeypatch.setattr(auditlog, "FLAGS_SEEN", str(tmp_path / "flags-seen.json"))
+    monkeypatch.setattr(auditlog, "_flags", {"ino": None, "pos": 0, "times": []})
     monkeypatch.setattr(activity, "APPROVALS", {})
     def flag(ts):
         with open(tmp_path / "audit.jsonl", "a") as f:
             f.write(json.dumps({"ts": time.strftime("%Y-%m-%dT%H:%M:%S%z", time.localtime(ts)), "service": "Read", "part": "claude",
                                 "mode": "read", "action": "tool result: Read /x", "decision": "flagged", "detail": "addresses an AI agent"}) + "\n")
     flag(time.time() - 60)
-    assert activity.unseen_flags() == 0  # the first call starts counting now – older entries don't light it up
-    activity.jsonstore.save(activity.FLAGS_SEEN, {"ts": time.time() - 30})
+    assert auditlog.unseen_flags() == 0  # the first call starts counting now – older entries don't light it up
+    auditlog.jsonstore.save(auditlog.FLAGS_SEEN, {"ts": time.time() - 30})
     flag(time.time())
-    badge = client.get("/partials/approval-count").text
+    badge = client.get("/partials/logs-count").text
     assert 'nav-badge warn' in badge and "⚠ 1" in badge
+    assert "hidden" in client.get("/partials/approval-count").text  # the Activity badge is for approvals only
     assert "1 possible prompt injection" in client.get("/partials/overview").text
-    client.get("/activity")
-    assert "hidden" in client.get("/partials/approval-count").text and activity.unseen_flags() == 0
+    client.get("/logs")
+    assert "hidden" in client.get("/partials/logs-count").text and auditlog.unseen_flags() == 0
     assert "possible prompt injection" not in client.get("/partials/overview").text
 
 
@@ -613,22 +617,22 @@ def test_network_seen_table_is_sortable(client, monkeypatch):
 
 def test_audit_long_action_collapses(client, app_module, tmp_path, monkeypatch):
     import json
-    from app import activity
+    from app import auditlog
     f = tmp_path / "audit.jsonl"
     rows = [{"ts": "2026-10-22T10:00:00+0000", "service": "demohost", "part": "docker", "mode": "confirm",
              "action": "docker ps", "decision": "approved", "detail": "tentacontrol + 15 min"},
             {"ts": "2026-10-22T10:01:00+0000", "service": "demohost", "part": "docker", "mode": "confirm",
              "action": "compose up -d " + "x" * 120, "decision": "auto"}]
     f.write_text("".join(json.dumps(r) + "\n" for r in rows))
-    monkeypatch.setattr(activity, "AUDIT_FILE", str(f))
-    html = client.get("/activity?since=all").text
+    monkeypatch.setattr(auditlog, "DATA_DIR", str(tmp_path))
+    html = client.get("/logs?since=all").text
     assert html.count("<details><summary>") == 1 and "tentacontrol + 15 min" in html
 
 
 def test_audit_filters_error_and_origin_link(client, app_module, tmp_path, monkeypatch):
     import json
     import time
-    from app import activity
+    from app import auditlog
     now = time.strftime("%Y-%m-%dT%H:%M:%S%z")
     f = tmp_path / "audit.jsonl"
     rows = [{"ts": "2020-01-01T10:00:00+0000", "service": "demohost", "part": "docker", "mode": "write",
@@ -638,16 +642,79 @@ def test_audit_filters_error_and_origin_link(client, app_module, tmp_path, monke
             {"ts": now, "service": "demoapi", "part": "api", "mode": "write", "action": "POST /items",
              "decision": "auto", "exit": 0, "from": {"by": "root"}}]
     f.write_text("".join(json.dumps(r) + "\n" for r in rows))
-    monkeypatch.setattr(activity, "AUDIT_FILE", str(f))
-    html = client.get("/activity?since=all").text
+    monkeypatch.setattr(auditlog, "DATA_DIR", str(tmp_path))
+    html = client.get("/logs?since=all").text
     assert "no such service: web" in html and 'href="/terminal?p=claude"' in html and "compose old" in html
-    html = client.get("/activity").text  # last 24 h by default
+    html = client.get("/logs").text  # last 24 h by default
     assert "compose old" not in html and "POST /items" in html and "audit-reset off" in html
-    html = client.get("/activity?origin=session").text
+    html = client.get("/logs?origin=session").text
     assert "compose web" in html and "POST /items" not in html and "audit-reset\"" in html
-    html = client.get("/activity?q=ITEMS").text
+    html = client.get("/logs?q=ITEMS").text
     assert "POST /items" in html and "compose web" not in html
-    assert "Nothing matches" in client.get("/activity?q=nothing-like-this").text
+    assert "Nothing matches" in client.get("/logs?q=nothing-like-this").text
+    html = client.get("/logs?actor=system&since=all").text  # by root = system
+    assert "POST /items" in html and "compose web" not in html
+    html = client.get("/logs?start=2020-01-01&end=2020-01-01").text  # own dates
+    assert "compose old" in html and "POST /items" not in html
+
+
+def test_audit_load_more_and_export(client, app_module, tmp_path, monkeypatch):
+    import csv
+    import io
+    import json
+    import tclib
+    from app import auditlog
+    monkeypatch.setattr(auditlog, "DATA_DIR", str(tmp_path))
+    monkeypatch.setattr(auditlog, "PAGE", 3)
+    for i in range(5):
+        tclib.audit_write(str(tmp_path), tclib.audit_entry("tool", "Bash", f"echo step{i}", "ok", part="claude",
+                                                           origin={"tmux": "claude-workspace"}))
+    html = client.get("/logs").text
+    assert "echo step4" in html and "echo step2" in html and "echo step1" not in html and "Load more" in html
+    last = tclib.audit_read(str(tmp_path), limit=3)[0][-1]["id"]
+    more = client.get(f"/logs/audit/more?after={last}").text
+    assert "echo step1" in more and "echo step0" in more and "Load more" not in more and "<html" not in more
+    r = client.get("/logs/audit/export?fmt=csv&q=step")
+    assert r.status_code == 200 and "attachment" in r.headers["content-disposition"]
+    rows = list(csv.DictReader(io.StringIO(r.text)))
+    assert [x["action"] for x in rows] == [f"echo step{i}" for i in (4, 3, 2, 1, 0)] and rows[0]["actor"] == "claude"
+    r = client.get("/logs/audit/export?fmt=jsonl&q=step3")
+    assert [json.loads(x)["action"] for x in r.text.splitlines()] == ["echo step3"]
+    exported = tclib.audit_read(str(tmp_path), filters={"category": "admin"})[0]
+    assert exported and exported[0]["action"] == "export as jsonl" and exported[0]["actor"] == "user"  # the export is audited
+
+
+def test_admin_actions_and_sign_in_are_audited(client, app_module, tmp_path, monkeypatch):
+    import tclib
+    from app import auditlog
+    monkeypatch.setattr(auditlog, "DATA_DIR", str(tmp_path))
+    client.post("/skills/mode", data={"name": "dataviz", "mode": "off"}, headers={"HX-Request": "true"})
+    e = tclib.audit_read(str(tmp_path))[0]
+    assert e[0]["category"] == "admin" and e[0]["action"] == "skills mode" and e[0]["actor"] == "user"
+    assert e[0]["mode"] == "POST" and "POST /skills/mode" in e[0]["detail"] and "dataviz" not in str(e[0])  # never the form
+    from fastapi.testclient import TestClient
+    TestClient(app_module.app).post("/login", data={"password": "certainly-wrong"})
+    bad = tclib.audit_read(str(tmp_path), filters={"category": "auth"})[0]
+    assert bad and bad[0]["decision"] == "failed" and bad[0]["severity"] == 4
+
+
+def test_egress_audit_endpoint(client, app_module, tmp_path, monkeypatch):
+    import tclib
+    from app import auditlog, netguard
+    monkeypatch.setattr(auditlog, "DATA_DIR", str(tmp_path))
+    monkeypatch.setattr(netguard, "allowed", lambda path, ip: True)
+    client.post("/internal/egress/audit", json={"entries": [
+        {"host": "api.example.net", "port": 443, "decision": "allowed", "reason": "tentacle", "count": 7, "first": 1},
+        {"host": "evil.test", "port": 22, "decision": "blocked", "reason": "blocked", "count": 1},
+        {"host": "bad host!", "port": 1}]})
+    e = tclib.audit_read(str(tmp_path), filters={"category": "network"})[0]
+    assert [(x["service"], x["decision"], x.get("count")) for x in e] == [("evil.test:22", "blocked", 1), ("api.example.net:443", "allowed", 7)]
+
+
+def test_log_containers_tabs(client):
+    html = client.get("/logs/containers?c=egress").text
+    assert "tentaclai-egress" in html and "/logs/stream?c=egress" in html and 'href="/logs/containers?c=control"' in html
+    assert "/logs/stream?c=tentaclai" in client.get("/logs/containers?c=nonsense").text
 
 
 def test_settings_other_vars_managed_elsewhere_and_remove(client):

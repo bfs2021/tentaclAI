@@ -17,7 +17,9 @@ tentaclAI = sandbox + service gateway for Claude Code. Three containers (`compos
   In both networks; network rules in `data/control/egress-rules.json` (`control/app/egress.py`). `main.py` holds the
   app, middleware and background loops; pages and endpoints live in `routes/` (one router per area: `system`,
   `tentacles`, `ssh`, `network`, `settings`, `backup`, `claude`, `jobs`), shared helpers (`page`, `respond`, the *Apply now* hint) in `web.py`,
-  small JSON state files go through `jsonstore.py`. Scheduled jobs: `scheduled.py` (runner, scheduler, step logs –
+  small JSON state files go through `jsonstore.py`. The audit log: format, files, rotation, search, export and the RFC 5424
+  formatter are `tclib.audit_*` (shared with `svc`); tentacontrol's side (its own entries, Logs → Audit, the ⚠ badge,
+  retention) is `auditlog.py` – never write or parse `audit.jsonl` anywhere else. Scheduled jobs: `scheduled.py` (runner, scheduler, step logs –
   not `jobs.py`, which runs tentacontrol's own build jobs); `svc` recognises a job run by the `tc-job=<run>` marker in
   an ancestor's command line plus root's `data/control/job-runs.json`.
 

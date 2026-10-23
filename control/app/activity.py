@@ -1,24 +1,21 @@
-"""Activity: pending approvals (access mode "confirm") and the audit log written by svc (network decisions: by tentacontrol).
+"""Activity: pending approvals (access mode "confirm") and grants; origin labels for approvals and the audit log
+(Logs → Audit, auditlog.py – network decisions are written from here, svc never sees them).
 
 svc talks to the /internal/* endpoints with the token in data/control/svc-token; approvals live in memory –
 after a restart of tentacontrol, waiting requests end as "error" and svc does not execute them (fail closed).
 """
 import asyncio
 import itertools
-import json
 import os
 import re
 import secrets
 import time
-from datetime import datetime
 
-import tclib
 
-from . import dockerops, jsonstore, notify, usage
+from . import auditlog, dockerops, notify, usage
 from .config import DATA_DIR
 
 TOKEN_FILE = os.path.join(DATA_DIR, "svc-token")
-AUDIT_FILE = os.path.join(DATA_DIR, "audit.jsonl")
 TIMEOUT = 600
 GRANT_SECONDS = 15 * 60
 NO_GRANT_PARTS = ("config",)  # service files / site rules: every write is approved on its own
@@ -46,27 +43,10 @@ def token_ok(value):
         return False
 
 
-def audit(service, part, mode, action, decision, detail=""):
-    """append one line to the audit log, in svc's format – for what only tentacontrol sees (network decisions); never raises"""
-    entry = {"ts": time.strftime("%Y-%m-%dT%H:%M:%S%z"), "service": service, "part": part, "mode": mode,
-             "action": action[:500], "decision": decision}
-    if detail:
-        entry["detail"] = detail[:300]
-    try:
-        import fcntl
-        if os.path.exists(AUDIT_FILE) and os.path.getsize(AUDIT_FILE) > 5 * 2**20:
-            os.replace(AUDIT_FILE, AUDIT_FILE + ".1")
-        with open(AUDIT_FILE, "a") as f:
-            fcntl.flock(f, fcntl.LOCK_EX)
-            f.write(json.dumps(entry, ensure_ascii=False) + "\n")
-    except OSError:
-        pass
-
-
 def audit_network(a, decision, detail=""):
     """a decided request of the egress gateway (unknown destination) – svc never sees these"""
     if a.get("part") == "network":
-        audit(a["service"], "network", "confirm", a["action"], decision, detail or a.get("by", ""))
+        auditlog.write("network", a["service"], a["action"], decision, actor="claude", mode="confirm", detail=detail or a.get("by", ""))
 
 
 def _expire():
@@ -222,9 +202,6 @@ def recent_decisions(limit=10):
     return sorted(done, key=lambda a: a.get("decided", 0), reverse=True)[:limit]
 
 
-SINCE = {"24h": 86400, "7d": 7 * 86400, "30d": 30 * 86400}  # time filter of the audit log
-
-
 def origin_group(o):
     """host (tentacontrol / host) · job · session – for the audit log's From filter"""
     o = clean_origin(o)
@@ -241,83 +218,3 @@ def origin_link(o):
     if o.get("job"):
         return f"/jobs#run-{o['job']}"
     return {"claude-workspace": "/terminal?p=claude", "claude-rc": "/terminal?p=rc"}.get(o.get("tmux", ""), "")
-
-
-def _epoch(ts):
-    try:
-        return datetime.strptime(ts, "%Y-%m-%dT%H:%M:%S%z").timestamp()
-    except (TypeError, ValueError):
-        return 0
-
-
-FLAGS_SEEN = os.path.join(DATA_DIR, "flags-seen.json")
-_flags = {"key": None, "times": []}
-
-
-def _flag_times():
-    """when each flagged entry was written – cached by the audit log's size and mtime (the sidebar asks every 5 s)"""
-    try:
-        st = os.stat(AUDIT_FILE)
-    except OSError:
-        return []
-    key = (st.st_size, st.st_mtime)
-    if _flags["key"] != key:
-        times = []
-        with open(AUDIT_FILE) as f:
-            for line in f:
-                if '"flagged"' not in line:
-                    continue
-                try:
-                    e = json.loads(line)
-                except ValueError:
-                    continue
-                if e.get("decision") == "flagged":
-                    times.append(_epoch(e.get("ts")))
-        _flags.update(key=key, times=times)
-    return _flags["times"]
-
-
-def unseen_flags():
-    """possible prompt injections flagged since Activity was last opened (the ⚠ badge next to Activity, the Overview);
-    the first call starts counting from now, so older entries don't light it up after an update"""
-    seen = (jsonstore.load(FLAGS_SEEN) or {}).get("ts")
-    if seen is None:
-        mark_flags_seen()
-        return 0
-    return sum(1 for t in _flag_times() if t > seen)
-
-
-def mark_flags_seen():
-    jsonstore.save(FLAGS_SEEN, {"ts": time.time()})
-
-
-def audit_entries(limit=300, service="", decision="", origin="", since="", q=""):
-    """newest first; origin is a group (session/job/host) or "job:<name>", since a key of SINCE (anything else: no limit), q a text search"""
-    try:
-        lines = open(AUDIT_FILE).read().splitlines()
-    except OSError:
-        return []
-    cutoff = time.time() - SINCE[since] if since in SINCE else 0
-    q = q.strip().lower()
-    out = []
-    for line in reversed(lines):
-        try:
-            e = json.loads(line)
-        except ValueError:
-            continue
-        if cutoff and _epoch(e.get("ts")) < cutoff:
-            break  # the file is in time order – everything further back is older
-        if (service and e.get("service") != service) or (decision and e.get("decision") != decision):
-            continue
-        if q and not any(q in str(e.get(k, "")).lower() for k in ("action", "service", "detail", "error", "excerpts")):
-            continue
-        e["from_label"] = origin_label(e.get("from"))
-        if origin and (e["from_label"] != f"Job · {origin[4:]}" if origin.startswith("job:") else origin_group(e.get("from")) != origin):
-            continue
-        e["from_link"] = origin_link(e.get("from"))
-        if e.get("mode") in tclib.ACCESS_ALIASES:  # entries written before v0.16
-            e["mode"] = tclib.ACCESS_ALIASES[e["mode"]]
-        out.append(e)
-        if len(out) >= limit:
-            break
-    return out

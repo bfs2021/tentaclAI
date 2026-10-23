@@ -343,8 +343,19 @@ table.audit details[open] summary { white-space: pre-wrap; }
 .audit-excerpts { margin-top: 4px; white-space: normal; word-break: break-word; }
 .audit-excerpts summary { cursor: pointer; color: var(--muted); font-family: inherit; }
 .audit-excerpts div { margin-top: 3px; padding-left: 8px; border-left: 2px solid var(--warn); }
-.audit-filters { justify-content: flex-end; }
+.audit-filters { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 14px; }
+.audit-filters .spacer { flex: 1; }
 .audit-filters input[type=search] { width: 180px; height: 30px; min-height: 30px; padding: 2px 10px; }
+.audit-filters input[type=date] { width: 132px; height: 30px; min-height: 30px; padding: 2px 6px; }
+.audit-what .audit-svc { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.audit-action { margin-top: 3px; }
+.actor { font-weight: 600; }
+.actor-claude { color: var(--accent); } .actor-job { color: var(--info, var(--accent)); } .actor-user { color: var(--ok); } .actor-system { color: var(--muted); }
+table.audit tr.sev-4 td:first-child { box-shadow: inset 3px 0 0 var(--warn); }
+table.audit tr.sev-3 td:first-child { box-shadow: inset 3px 0 0 var(--err); }
+tr.audit-more td { text-align: center; }
+.seg a.active { background: var(--panel); color: var(--text); font-weight: 600; box-shadow: 0 0 0 1px var(--border); }
+.seg a:hover { color: var(--text); text-decoration: none; }
 .audit-reset { width: 30px; height: 30px; padding: 0; justify-content: center; }
 .audit-reset.off { opacity: .35; pointer-events: none; }
 .nowrap { white-space: nowrap; }

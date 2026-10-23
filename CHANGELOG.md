@@ -2,6 +2,39 @@
 
 All notable changes, newest first. Every release lists **upgrade steps** from the previous one.
 
+## Unreleased
+
+### Highlights
+- **One audit log for everything** – tentacontrol → *Logs → Audit*: Claude's tool calls (through the Claude Code hook),
+  every `svc` command including reads, network connections of the sandbox (counted per destination and 15 minutes,
+  refused ones at once), scheduled job runs, your changes in tentacontrol, terminal sessions, sign-ins and failed
+  attempts, tentacontrol's start. Compact rows (time · who/from · what · decision · result), filters for time (also
+  own dates), who, origin, kind, target and decision, full-text search, *Load more*, and **CSV / JSONL export** of
+  exactly what the filters match.
+- **Logs → Containers**: the live log of all three containers (`tentaclai`, `tentaclai-egress`, `tentacontrol`) with a
+  line filter and download.
+
+### Changes
+- *Activity* is for approvals only (pending approvals, active grants, recent decisions); the audit table moved to
+  *Logs → Audit*, and the ⚠ badge for flagged entries now sits next to *Logs*.
+- One implementation (`tclib.audit_*`) writes, reads, searches and exports the log for `svc` and tentacontrol – the
+  two copies are gone. Entry format: flat fields with `id`, `category`, `actor`, RFC 5424 `severity`, RFC 3339 `ts`
+  (milliseconds, `+02:00`) and `origin_session/entry/tmux/job/by` instead of the nested `from`; older entries are read
+  as before. `tclib.audit_syslog()` formats an entry as an RFC 5424 message (not sent anywhere – for a later SIEM
+  module).
+- Rotation: `data/control/audit.jsonl` moves to `data/control/audit/<UTC time>.jsonl` at 10 MB (was: one
+  `audit.jsonl.1` at 5 MB); archives are kept `AUDIT_RETENTION_DAYS` (new, default 90, Settings → General).
+- The Claude Code hook `tc-guard` now runs for every tool (`matcher: "*"`) and also with `INJECTION_GUARD=false`
+  (then `tc-guard --no-scan`: logging only). It reports through `svc tool-report` (`svc guard-report` still works).
+- `svc audit` takes filters: `[n] [--since 24h|7d] [--category c] [--service s] [--decision d] [--actor a] [text]`.
+
+### Upgrade
+- `git pull` in the stack directory, then `docker compose build` and `docker compose up -d` – all three images change
+  (svc and the hook, the gateway, tentacontrol). Recreating `tentaclai` ends running sessions and Remote Control.
+- Nothing to migrate by hand: tentacontrol moves an old `audit.jsonl.1` into `data/control/audit/` on start, and
+  older entries keep working. Optional: `AUDIT_RETENTION_DAYS` in `.env` (default 90).
+- Bookmarks of `/activity?…` filters: the audit log is now `/logs?…`.
+
 ## v0.19.0 – 2026-10-23
 
 ### Highlights

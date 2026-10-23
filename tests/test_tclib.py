@@ -256,8 +256,9 @@ def test_guard_switch_and_managed_settings():
     on = tclib.managed_settings(["claude.ai Gmail"], True)
     assert on["deniedMcpServers"] == [{"serverName": "claude.ai Gmail"}]
     hook = on["hooks"]["PostToolUse"][0]
-    assert "WebFetch" in hook["matcher"] and "mcp__" in hook["matcher"] and hook["hooks"][0]["command"].endswith("tc-guard")
-    assert "hooks" not in tclib.managed_settings([], False)
+    assert hook["matcher"] == "*" and hook["hooks"][0]["command"].endswith("tc-guard")  # every tool call is audited
+    off = tclib.managed_settings([], False)["hooks"]["PostToolUse"][0]["hooks"][0]["command"]
+    assert off.endswith("tc-guard --no-scan")  # guard off: still logged, no longer scanned
 
 
 def test_approval_handoff():
@@ -285,7 +286,9 @@ def test_tool_target():
     assert tclib.tool_target("WebSearch", {"query": "q"}) == "q"
     assert tclib.tool_target("Bash", {"command": "cat a\n  | head"}) == "cat a | head"
     assert tclib.tool_target("mcp__homeassistant__HassTurnOn", {"name": "Küche"}) == 'homeassistant · HassTurnOn(name="Küche")'
-    assert tclib.tool_target("Grep", {"pattern": "x"}) == "" and tclib.tool_target("Read", None) == ""
+    assert tclib.tool_target("Grep", {"pattern": "x", "path": "/w"}) == "x in /w" and tclib.tool_target("Read", None) == ""
+    assert tclib.tool_target("Edit", {"file_path": "/w/a.py", "old_string": "a"}) == "/w/a.py"
+    assert tclib.tool_target("TodoWrite", {"todos": [], "note": "plan"}) == "plan"  # any other tool: its first text
     assert len(tclib.tool_target("Bash", {"command": "x" * 500})) == 201
 
 
@@ -302,3 +305,73 @@ def test_notes_addressed_to_ai_readers():
               "Our AI assistant integration reads tickets.", "Instructions for automated deployment: run make deploy.",
               "Hinweis für automatisierte Backups: läuft um 3 Uhr."):
         assert tclib.injection_signals(t) == [], t
+
+
+def test_audit_entry_write_read_and_old_format(tmp_path):
+    import json
+    d = str(tmp_path)
+    old = {"ts": "2026-10-20T10:00:00+0200", "service": "Read", "part": "claude", "mode": "ro", "action": "tool result: Read /x",
+           "decision": "flagged", "from": {"session": "1b55539f-f3f0-40e9-b8bf-860eb1259780", "by": "root"}}
+    (tmp_path / "audit.jsonl").write_text(json.dumps(old) + "\n")
+    e = tclib.audit_entry("service", "demodb", "SELECT 1\nFROM x", "read", part="db", mode="read", origin={"job": "abc123def", "bogus": "x"},
+                          exit=0, seconds=0.2, detail="")
+    assert e["action"] == "SELECT 1 FROM x" and e["actor"] == "job" and e["origin_job"] == "abc123def" and "origin_bogus" not in e
+    assert e["severity"] == 6 and "detail" not in e and len(e["id"]) == 16 and e["ts"][-6] in "+-" and e["ts"][-3] == ":"
+    tclib.audit_write(d, e)
+    got, more = tclib.audit_read(d)
+    assert [x["service"] for x in got] == ["demodb", "Read"] and not more
+    o = got[1]  # normalised: flat origin, category, actor, access name, severity, a stable id
+    assert o["category"] == "tool" and o["actor"] == "system" and o["origin_session"].startswith("1b55") and "from" not in o
+    assert o["mode"] == "read" and o["severity"] == 4 and o["id"] == tclib.audit_read(d)[0][1]["id"]
+    assert tclib.audit_epoch(o["ts"]) and tclib.audit_epoch(e["ts"]) > tclib.audit_epoch(o["ts"])
+    assert [x["service"] for x in tclib.audit_read(d, filters={"category": "service"})[0]] == ["demodb"]
+    assert [x["service"] for x in tclib.audit_read(d, q="from x")[0]] == ["demodb"]
+    assert tclib.audit_read(d, q="tool result")[0][0]["service"] == "Read"
+    assert tclib.audit_read(d, q="1b55539f")[0] == []  # the origin is a filter, not searched text
+    assert [x["service"] for x in tclib.audit_read(d, after=e["id"])[0]] == ["Read"]  # "load more" after the first
+    assert tclib.audit_read(d, limit=1) == ([got[0]], True)
+
+
+def test_audit_rotation_archives_and_prune(tmp_path, monkeypatch):
+    import os
+    import time
+    d = str(tmp_path)
+    monkeypatch.setattr(tclib, "AUDIT_ROTATE", 300)
+    for i in range(6):
+        tclib.audit_write(d, tclib.audit_entry("tool", "Bash", f"echo {i}", "ok"))
+        time.sleep(1.01) if i == 2 else None  # two rotations get different names
+    arch = sorted(os.listdir(tmp_path / "audit"))
+    assert arch and all(n.endswith(".jsonl") for n in arch)
+    assert [x["action"] for x in tclib.audit_read(d)[0]] == [f"echo {i}" for i in range(5, -1, -1)]  # across all files
+    assert [x["action"] for x in tclib.audit_read(d, since=time.time() - 3600)[0]][-1] == "echo 0"
+    (tmp_path / "audit.jsonl.1").write_text("{}\n")  # the pre-v0.20 rotation
+    os.utime(tmp_path / "audit.jsonl.1", (1, 1))
+    for n in os.listdir(tmp_path / "audit"):
+        os.utime(tmp_path / "audit" / n, (1, 1))
+    assert tclib.audit_prune(d, 90) == len(arch) + 1 and not (tmp_path / "audit.jsonl.1").exists()
+    assert (tmp_path / "audit.jsonl").exists()  # the active file stays
+    assert tclib.audit_retention({}) == 90 and tclib.audit_retention({"AUDIT_RETENTION_DAYS": "7"}) == 7
+    assert tclib.audit_retention({"AUDIT_RETENTION_DAYS": "x"}) == 90
+
+
+def test_audit_export_csv_and_jsonl():
+    import csv
+    import io
+    import json
+    e = tclib.audit_entry("tool", "Read", "=HYPERLINK(\"x\")", "flagged", excerpts=[{"reason": "r", "text": "t"}], exit=0)
+    rows = list(csv.DictReader(io.StringIO("".join(tclib.audit_export([e], "csv")))))
+    assert rows[0]["action"].startswith("'=") and rows[0]["excerpts"] == "r: t" and rows[0]["exit"] == "0"  # no formulas
+    assert "".join(tclib.audit_export([], "csv")).startswith("ts,id,severity")
+    assert json.loads("".join(tclib.audit_export([e], "jsonl"))) == e
+
+
+def test_audit_syslog_rfc5424():
+    import re
+    e = tclib.audit_entry("service", "demo]db", 'say "hi" \\ there', "denied", part="db", mode="confirm", origin={"tmux": "claude-workspace"})
+    m = tclib.audit_syslog(e, "docktopus")
+    head = re.match(r'<(\d+)>1 (\S+) docktopus tentaclai - service \[tentaclai@32473 ', m)
+    assert head and int(head.group(1)) == 13 * 8 + 4 and head.group(2) == e["ts"]
+    assert r'service="demo\]db"' in m and r'action="say \"hi\" \\ there"' in m and 'origin_tmux="claude-workspace"' in m
+    assert m.split("] ", 1)[1].startswith("﻿denied: demo]db")
+    old = tclib.audit_normalize({"ts": "2026-10-20T10:00:00+0200", "service": "x", "part": "api", "action": "a", "decision": "auto"})
+    assert " 2026-10-20T10:00:00+02:00 " in tclib.audit_syslog(old)

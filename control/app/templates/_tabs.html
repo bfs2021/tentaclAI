@@ -19,3 +19,9 @@
   <a href="/claude/settings" class="{{ 'active' if active == 'settings' }}">{{ icon('settings') }}settings.json</a>
 </nav>
 {%- endmacro %}
+{% macro logs_tabs(active) -%}
+<nav class="conn-tabs" aria-label="Logs">
+  <a href="/logs" class="{{ 'active' if active == 'audit' }}">{{ icon('activity') }}Audit</a>
+  <a href="/logs/containers" class="{{ 'active' if active == 'containers' }}">{{ icon('logs') }}Containers</a>
+</nav>
+{%- endmacro %}

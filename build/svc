@@ -26,7 +26,8 @@ resolved from the stack's .env (read fresh on every call) and the container envi
   svc compose <name> <stack> <args...>
                                    docker compose in <stacks_dir>/<stack> of that host, e.g. svc compose gate pangolin ps
   (access "read": only read-only docker/compose commands are allowed)
-  svc audit [n]                    last n write actions (audit log: auto / approved / denied / blocked)
+  svc audit [n] [--since 24h] [--category c] [--service s] [--decision d] [text]
+                                   the audit log (tool calls, svc reads/writes, network, jobs, tentacontrol)
   (access "confirm": writes wait for the user's approval in tentacontrol → Activity)
   svc test <name>                  connection test of every part (api, mcp, git, docker, db, web, files)
   svc db [name] "<SQL>" | tables | describe <t> | shell    databases (postgres, mysql/mariadb); [--csv]
@@ -2143,7 +2144,8 @@ def cmd_rc_env():
 # Claude runs as an unprivileged user and reaches services only through svc (sudo), so the modes are enforced here.
 
 CONTROL_INTERNAL = os.environ.get("TC_CONTROL_INTERNAL", "http://tentacontrol:8080")
-AUDIT_FILE = os.path.join(TC_DIR, "data", "control", "audit.jsonl")
+AUDIT_DIR = os.path.join(TC_DIR, "data", "control")
+AUDITED = False  # set by audit(): a call that logged itself needs no "read" entry from main()
 TOKEN_FILE = os.path.join(TC_DIR, "data", "control", "svc-token")
 APPROVAL_TIMEOUT = 600
 def access_mode(part, default="read"):
@@ -2153,30 +2155,17 @@ def access_mode(part, default="read"):
     return tclib.access(part.get("access"), default)
 
 
-def audit(service, part, mode, action, decision, rc=None, duration=None, detail="", error="", excerpts=None):
-    """append one line to the audit log – never lets the command fail"""
-    entry = {"ts": time.strftime("%Y-%m-%dT%H:%M:%S%z"), "service": service, "part": part, "mode": mode,
-             "action": action[:500], "decision": decision}
-    if excerpts:
-        entry["excerpts"] = [{"reason": r[:80], "text": x[:300]} for r, x in excerpts[:5]]
-    if rc is not None:
-        entry["exit"] = rc
-    if duration is not None:
-        entry["seconds"] = round(duration, 1)
-    if detail:
-        entry["detail"] = detail[:300]
-    if error:
-        entry["error"] = error
-    if origin():
-        entry["from"] = origin()
+def audit(service, part, mode, action, decision, rc=None, duration=None, detail="", error="", excerpts=None, category=None):
+    """append one line to the audit log (format: tclib.audit_entry) – never lets the command fail; part "claude" is
+    one of Claude's own tools (tc-guard), everything else a tentacle"""
+    global AUDITED
+    AUDITED = True
+    category = category or ("tool" if part == "claude" else "service")
+    entry = tclib.audit_entry(category, service, action, decision, part=part, mode=mode, origin=origin(),
+                              exit=rc, seconds=None if duration is None else round(duration, 1), detail=detail, error=error,
+                              excerpts=[{"reason": r, "text": x} for r, x in (excerpts or [])])
     try:
-        import fcntl
-        os.makedirs(os.path.dirname(AUDIT_FILE), exist_ok=True)
-        if os.path.exists(AUDIT_FILE) and os.path.getsize(AUDIT_FILE) > 5 * 2**20:
-            os.replace(AUDIT_FILE, AUDIT_FILE + ".1")
-        with open(AUDIT_FILE, "a") as f:
-            fcntl.flock(f, fcntl.LOCK_EX)
-            f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+        tclib.audit_write(AUDIT_DIR, entry)
     except OSError as e:
         print(f"svc: audit log not writable ({e})", file=sys.stderr)
 
@@ -2268,7 +2257,7 @@ def guard_note(source, name, part, action, findings):
     now = time.time()
     seen = {k: t for k, t in seen.items() if isinstance(t, (int, float)) and now - t < GUARD_QUIET}
     if key in seen:
-        return
+        return False
     seen[key] = now
     try:
         os.makedirs(os.path.dirname(GUARD_STATE), mode=0o700, exist_ok=True)
@@ -2281,6 +2270,7 @@ def guard_note(source, name, part, action, findings):
     audit(name, part, "read", f"{source}: {action}", "flagged", detail="; ".join(reasons), excerpts=excerpts)
     report("injection", f"Possible prompt injection: {name} ({source})",
            "\n".join([action] + [f"– {r}: {x}" for r, x in excerpts] + [r for r, x in findings if not x])[:500])
+    return True
 
 
 def guard(source, name, part, action, text):
@@ -2316,22 +2306,25 @@ def scanned(source, name, part, action, cmd, **kw):
     return rc
 
 
-def cmd_guard_report(args):
-    """tc-guard (Claude Code's PostToolUse hook, runs as claude) reports a finding on stdin – audit + notification only.
-    {"tool", "target", "findings": [[reason, excerpt], …]}. Claude could call this itself: only known reasons count,
-    target and excerpts are cut short and cleaned – at worst an extra "flagged" entry, never anything run."""
+def cmd_tool_report(args):
+    """tc-guard (Claude Code's PostToolUse hook, runs as claude) reports a tool call on stdin – audit (+ notification for
+    a finding) only. {"tool", "target", "findings": [[reason, excerpt], …]}. Claude could call this itself: the tool name
+    is reduced to safe characters, only known reasons count, target and excerpts are cut short and cleaned – at worst an
+    extra entry, never anything run. A finding gives one "flagged" entry, any other call one "ok" entry."""
     try:
         d = json.loads(sys.stdin.read(65536))
     except ValueError:
-        sys.exit("usage: svc guard-report < {\"tool\": …, \"target\": …, \"findings\": [[reason, excerpt], …]}")
+        sys.exit("usage: svc tool-report < {\"tool\": …, \"target\": …, \"findings\": [[reason, excerpt], …]}")
+    if not isinstance(d, dict):
+        return 1
     tool = re.sub(r"[^A-Za-z0-9_.:-]", "", str(d.get("tool", "")))[:60] or "tool"
     known = {r for r, _ in tclib.INJECTION_PATTERNS} | {"long base64 block"}
     findings = [(str(f[0])[:80], str(f[1])) for f in (d.get("findings") or [])
                 if isinstance(f, list) and len(f) == 2 and isinstance(f[0], str) and (f[0] in known or str(f[0]).startswith("hidden text ("))][:5]
-    if not findings or not guard_on():
-        return 0
     target = guard_text(d.get("target", ""), 200)
-    guard_note("tool result", tool, "claude", f"{tool} {target}".strip(), findings)
+    if findings and guard_on() and guard_note("tool result", tool, "claude", f"{tool} {target}".strip(), findings):
+        return 0
+    audit(tool, "claude", "", target or tool, "ok")
     return 0
 
 
@@ -2409,19 +2402,30 @@ def guarded(service, part, mode, action, run, interactive=False):
 
 
 def cmd_audit(args):
-    n = int(args[0]) if args and args[0].isdigit() else 20
-    try:
-        lines = open(AUDIT_FILE).read().splitlines()[-n:]
-    except OSError:
-        print("No audit entries yet.")
+    """svc audit [n] [--since 24h|7d|30d] [--category c] [--service s] [--decision d] [search text]"""
+    n, since, filters, words = 20, 0, {}, []
+    it = iter(args)
+    for a in it:
+        if a.isdigit():
+            n = min(int(a), 5000)
+        elif a == "--since":
+            v = next(it, "")
+            m = re.fullmatch(r"(\d+)([hd])", v)
+            if not m:
+                sys.exit("svc audit: --since takes e.g. 24h or 7d")
+            since = time.time() - int(m.group(1)) * (3600 if m.group(2) == "h" else 86400)
+        elif a in ("--category", "--service", "--decision", "--actor"):
+            filters[a[2:]] = next(it, "")
+        else:
+            words.append(a)
+    entries, _ = tclib.audit_read(AUDIT_DIR, limit=n, since=since, filters=filters, q=" ".join(words))
+    if not entries:
+        print("No matching audit entries.")
         return 0
-    for line in lines:
-        try:
-            e = json.loads(line)
-        except ValueError:
-            continue
+    for e in reversed(entries):
         rc = f" exit {e['exit']}" if "exit" in e else ""
-        print(f"{e['ts'][:19]}  {e['decision']:<8} {e['service']:<14} {e['part']:<7} {e['action'][:90]}{rc}")
+        n = f" ×{e['count']}" if "count" in e else ""
+        print(f"{e['ts'][:19]}  {e['category']:<7} {e['decision']:<8} {e['service'][:14]:<14} {e['action'][:90]}{rc}{n}")
         if e.get("error"):
             print(f"{'':<21}↳ {e['error'].replace(chr(10), ' · ')[:160]}")
     return 0
@@ -2852,6 +2856,7 @@ def main(argv):
         os.chdir("/")  # nothing running as root reads files from Claude's current directory
     load_env_file()
     services = load()
+    SERVICE_NAMES.update(services)
     if len(argv) < 2 or argv[1] in ("-h", "--help", "help"):
         print(__doc__.strip())
         return 0
@@ -2894,8 +2899,8 @@ def main(argv):
         return cmd_db(services, argv[2:])
     if cmd == "jobs":
         return cmd_jobs(argv[2:])
-    if cmd == "guard-report":
-        return cmd_guard_report(argv[2:])
+    if cmd in ("tool-report", "guard-report"):  # guard-report: the name before v0.20 (findings only)
+        return cmd_tool_report(argv[2:])
     if cmd == "mail":
         return cmd_mail(services, argv[2:])
     if cmd == "web":
@@ -2912,5 +2917,40 @@ def main(argv):
     return 1
 
 
+SERVICE_NAMES = set()
+NOT_LOGGED = {"-h", "--help", "help", "pending", "audit", "guard-report", "tool-report", "mcp-proxy", "git-credential",
+              "git-push-hook", "rc-env"}  # svc's own plumbing and lookups – no audit entry
+ROOT_LOGGED = {"sync", "test", "git"}  # run by tentacontrol or the entrypoint: only these get an entry (pages poll the rest)
+
+
+def read_entry(argv, rc, seconds):
+    """the audit entry of a call that wrote none itself (a read): "read", with the command line, exit code and time"""
+    if AUDITED or len(argv) < 2 or argv[1] in NOT_LOGGED or (privileged() and not via_sudo() and argv[1] not in ROOT_LOGGED):
+        return
+    if argv[1] == "ssh":
+        name = argv[2] if len(argv) > 2 else ""
+    else:
+        name = argv[1] if argv[1] in SERVICE_NAMES else next((a for a in argv[2:] if a in SERVICE_NAMES), "")
+    part = argv[1] if argv[1] in tclib.PARTS or argv[1] in ("ssh", "test", "sync", "jobs", "config") else \
+        "api" if name == argv[1] else argv[1][:20]
+    action = _redact_text(" ".join(["svc"] + argv[1:]))[:500]
+    audit(name or "svc", part, "read", action, "read", rc=rc, duration=seconds)
+
+
+def run(argv):
+    t, rc = time.time(), 1
+    try:
+        rc = main(argv) or 0
+    except SystemExit as e:
+        rc = e.code if isinstance(e.code, int) else (0 if e.code is None else 1)
+        raise
+    finally:
+        try:
+            read_entry(argv, rc, time.time() - t)
+        except Exception:  # noqa: BLE001 – the audit never fails a command
+            pass
+    return rc
+
+
 if __name__ == "__main__":
-    sys.exit(main(sys.argv) or 0)
+    sys.exit(run(sys.argv))

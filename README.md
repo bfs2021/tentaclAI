@@ -272,8 +272,9 @@ verification for that part only – the connection stays encrypted. For `mcp` it
 every write wait for your approval in tentacontrol → **Activity** (denied or no answer within 10 minutes = not executed).
 The names before v0.16, `ro` and `rw`, still work as `read` and `write`; tentacontrol rewrites them on start (with a
 backup) and only writes the new ones. An unknown value counts as `read`.
-Every write through `svc` – and every blocked attempt – lands in the **audit log** (Activity, or `svc audit` in the sandbox);
-secrets are never logged.
+Everything lands in the **audit log** (tentacontrol → Logs → Audit, or `svc audit` in the sandbox): Claude's tool calls,
+every `svc` command (reads and writes, approvals, blocked attempts), network connections, jobs, your changes and
+sign-ins in tentacontrol – filterable, searchable, exportable as CSV or JSON lines; secrets are never logged.
 
 A part stays inactive while one of its `${VAR}`s is empty; `"enabled": false` parks the whole service.
 

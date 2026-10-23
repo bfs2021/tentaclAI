@@ -1,11 +1,12 @@
-"""Activity (approvals, grants, audit), svc's and the gateway's internal endpoints, and the Network page."""
+"""Activity (approvals, grants), svc's and the gateway's internal endpoints, and the Network page."""
 import asyncio
+import re
 import time
 
 from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse
 
-from .. import activity, egress, notify
+from .. import activity, auditlog, egress, notify
 from ..envfile import update_env
 from ..web import page, respond, templates, toast
 import tclib  # noqa: E402  shared with the sandbox tools
@@ -51,6 +52,27 @@ async def internal_egress_event(request: Request):
     return JSONResponse({"ok": True})
 
 
+@router.post("/internal/egress/audit")
+async def internal_egress_audit(request: Request):
+    """the gateway's connections, counted per destination and window – one audit entry each"""
+    if _from_proxy(request):
+        return JSONResponse({"error": "forbidden"}, status_code=403)
+    d = await request.json()
+    for e in (d.get("entries") or [])[:1000]:
+        host, reason = str(e.get("host", ""))[:200], re.sub(r"[^a-z-]", "", str(e.get("reason", "")))[:20]
+        try:
+            port, count, first = int(e.get("port", 0)), int(e.get("count", 1)), int(e.get("first", 0))
+        except (TypeError, ValueError):
+            continue
+        if not tclib.HOST_RE.fullmatch(host.strip("[]").replace(":", ".")) or not 0 < port < 65536:
+            continue
+        since = time.strftime("%H:%M", time.localtime(first)) if first else ""
+        auditlog.write("network", f"{host}:{port}", f"connect {host}:{port}",
+                       "blocked" if e.get("decision") == "blocked" else "allowed", actor="claude", count=max(1, count),
+                       detail=f"{reason} · {count}× since {since}" if since else reason)
+    return JSONResponse({"ok": True})
+
+
 @router.get("/internal/approvals")
 async def internal_approval_list(request: Request):
     """pending requests and active grants – for `svc pending` (the status line in Claude's terminal)"""
@@ -68,15 +90,9 @@ async def internal_approval_wait(request: Request, rid: str, wait: int = 25):
 
 
 @router.get("/activity", response_class=HTMLResponse)
-async def activity_page(request: Request, service: str = "", decision: str = "", origin: str = "", since: str = "24h", q: str = ""):
-    activity.mark_flags_seen()  # opening Activity counts as having seen the flagged entries
-    known = activity.audit_entries(limit=2000)
-    return page(request, "activity.html",
-                entries=activity.audit_entries(service=service, decision=decision, origin=origin, since=since, q=q),
-                service=service, decision=decision, origin=origin, since=since, q=q,
-                filtered=any((service, decision, origin, q)) or since != "24h",
-                services_known=sorted({e.get("service", "") for e in known}),
-                jobs_known=sorted({e["from_label"][6:] for e in known if e["from_label"].startswith("Job · ")}))
+async def activity_page(request: Request):
+    """approvals only – what was decided and done is in Logs → Audit"""
+    return page(request, "activity.html")
 
 
 @router.get("/partials/approvals", response_class=HTMLResponse)
@@ -102,11 +118,17 @@ async def grant_revoke(request: Request, service: str = Form(...), part: str = F
 
 @router.get("/partials/approval-count", response_class=HTMLResponse)
 async def approval_count():
-    n, f = len(activity.pending()), activity.unseen_flags()
-    badges = (f'<span class="nav-badge" title="{n} approval(s) waiting">{n}</span>' if n else "") + \
-        (f'<span class="nav-badge warn" title="{f} possible prompt injection(s) flagged since Activity was last opened">⚠ {f}</span>' if f else "")
+    n = len(activity.pending())
     # never an empty answer: app.js keeps the old content then, and the badge would stay after the last decision
-    return HTMLResponse(badges or '<span class="nav-badge" hidden></span>')
+    return HTMLResponse(f'<span class="nav-badge" title="{n} approval(s) waiting">{n}</span>' if n else '<span class="nav-badge" hidden></span>')
+
+
+@router.get("/partials/logs-count", response_class=HTMLResponse)
+async def logs_count():
+    """the ⚠ badge next to Logs: possible prompt injections flagged since Logs → Audit was last opened"""
+    f = auditlog.unseen_flags()
+    return HTMLResponse(f'<span class="nav-badge warn" title="{f} possible prompt injection(s) flagged since the audit log was last opened">⚠ {f}</span>'
+                        if f else '<span class="nav-badge" hidden></span>')
 
 
 @router.get("/approvals/watch")

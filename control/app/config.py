@@ -9,6 +9,12 @@ HOME_DIR = os.path.join(STACK_DIR, "data", "claude")  # Claude's home (user clau
 DATA_DIR = os.environ.get("DATA_DIR", "/data")
 CLAUDE_CONTAINER = os.environ.get("CLAUDE_CONTAINER", "tentaclai")
 CLAUDE_SERVICE = os.environ.get("CLAUDE_SERVICE", "claude")
+# Logs → Containers: key → (container name, what it is)
+LOG_CONTAINERS = {
+    "tentaclai": (CLAUDE_CONTAINER, "sandbox: Claude Code, svc, Remote Control"),
+    "egress": (os.environ.get("EGRESS_CONTAINER", "tentaclai-egress"), "egress gateway: connections, policy"),
+    "control": (os.environ.get("CONTROL_CONTAINER", "tentacontrol"), "tentacontrol: this web admin, jobs, notifications"),
+}
 COMPOSE = ["docker", "compose", "--project-directory", STACK_DIR]
 
 # .env keys that hold secrets: never sent to the browser
@@ -59,6 +65,10 @@ SETTINGS_GROUPS = [
     ("Prompt injection", [
         ("INJECTION_GUARD", "Prompt-injection safeguards",
          "on (default): svc marks mail and web pages as untrusted, removes hidden text and flags content that looks like it tries to instruct Claude (warning for Claude, Activity, notification); a hook does the same for WebFetch, WebSearch and MCP tools. A heuristic – it warns, it doesn't block", "bool"),
+    ]),
+    ("Audit log", [
+        ("AUDIT_RETENTION_DAYS", "Keep the audit log (days)",
+         "how long archived audit files are kept (default 90)", "text"),
     ]),
     ("Updates", [
         ("UPDATE_CHECK", "Check for new releases", "asks the GitHub API every 6 hours (no token, no data sent) – off: no requests", "bool"),

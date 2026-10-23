@@ -8,8 +8,8 @@ import segno
 from fastapi import APIRouter, Form, Request, WebSocket
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, PlainTextResponse, RedirectResponse, StreamingResponse
 
-from .. import activity, auth, dockerops, egress, extensions, jobs, netguard, notify, services_store, sshhosts, updatecheck, usage
-from ..config import CLAUDE_SERVICE, COMPOSE
+from .. import activity, auditlog, auth, dockerops, egress, extensions, jobs, netguard, notify, services_store, sshhosts, updatecheck, usage
+from ..config import CLAUDE_SERVICE, COMPOSE, LOG_CONTAINERS
 from ..envfile import read_env, update_env
 from ..terminal import PROFILES, bridge, onboard_cmd
 from ..web import BASE, TC_VERSION, client_ip, page, respond, templates, toast
@@ -55,6 +55,7 @@ async def setup_save(request: Request, token: str = Form(""), password: str = Fo
         return templates.TemplateResponse(request, "setup.html", {"token": token, "error": error}, status_code=400)
     auth.set_password(password)
     request.session["auth"] = True
+    auditlog.user(request, "auth", "tentacontrol", "set up the admin password")
     return RedirectResponse("/", status_code=303)
 
 
@@ -70,8 +71,10 @@ async def login(request: Request, password: str = Form(...)):
     ip = client_ip(request)
     wait = auth.throttled(ip)
     if wait:
+        auditlog.user(request, "auth", "tentacontrol", "sign in", "blocked", detail="too many attempts")
         return templates.TemplateResponse(request, "login.html", {"error": f"too many attempts – please wait {wait} s"}, status_code=429)
     if not auth.check_password(password):
+        auditlog.user(request, "auth", "tentacontrol", "sign in", "failed", detail="wrong password")
         auth.register_failure(ip)
         await asyncio.sleep(auth.FAIL_DELAY)
         return templates.TemplateResponse(request, "login.html", {"error": "wrong password"}, status_code=401)
@@ -81,6 +84,7 @@ async def login(request: Request, password: str = Form(...)):
         request.session["pending_2fa"] = time.time()  # password done – the code comes next
         return RedirectResponse("/login/2fa", status_code=303)
     request.session["auth"] = True
+    auditlog.user(request, "auth", "tentacontrol", "sign in", detail="password" + (" + trusted browser" if auth.twofactor_enabled() else ""))
     return RedirectResponse("/", status_code=303)
 
 
@@ -113,15 +117,18 @@ async def login_2fa(request: Request, code: str = Form(...), trust: str = Form("
     ctx = {"days": auth.TRUST_DAYS}
     wait = auth.throttled(ip)
     if wait:
+        auditlog.user(request, "auth", "tentacontrol", "sign in: second factor", "blocked", detail="too many attempts")
         return templates.TemplateResponse(request, "login_2fa.html", {**ctx, "error": f"too many attempts – please wait {wait} s"}, status_code=429)
     kind = await asyncio.to_thread(auth.check_second_factor, code)
     if kind is None:
+        auditlog.user(request, "auth", "tentacontrol", "sign in: second factor", "failed", detail="wrong code")
         auth.register_failure(ip)
         await asyncio.sleep(auth.FAIL_DELAY)
         return templates.TemplateResponse(request, "login_2fa.html", {**ctx, "error": "wrong code"}, status_code=401)
     auth.clear_failures(ip)
     request.session.clear()
     request.session["auth"] = True
+    auditlog.user(request, "auth", "tentacontrol", "sign in", detail=f"password + {kind}" + (" · browser trusted" if trust else ""))
     if kind == "recovery":
         left = auth.twofactor_status()["recovery_left"]
         notify.emit("signin", "tentacontrol: sign-in with a recovery code", f"{left} recovery codes left.", key=f"signin:{time.time()}")
@@ -138,6 +145,7 @@ async def login_2fa(request: Request, code: str = Form(...), trust: str = Form("
 @router.post("/logout")
 async def logout(request: Request):
     request.session.clear()
+    auditlog.user(request, "auth", "tentacontrol", "sign out")
     return RedirectResponse("/login", status_code=303)
 
 
@@ -160,7 +168,7 @@ async def overview(request: Request):
     rows = egress.seen_rows()
     ctx["net"] = {"mode": egress.mode(), "total": len(rows), "unknown": sum(1 for r in rows if r["kind"] == "unknown"),
                   "pending": sum(1 for a in activity.pending() if a["part"] == "network")}
-    ctx["flags"] = activity.unseen_flags()
+    ctx["flags"] = auditlog.unseen_flags()
     if ctx["rc"] and ctx["rc"]["url"]:
         ctx["rc"]["qr"] = segno.make(ctx["rc"]["url"], error="m").svg_inline(scale=4, border=2, dark="#111", light="#fff", omitsize=True)
     return templates.TemplateResponse(request, "partials/overview.html", ctx)
@@ -244,7 +252,14 @@ async def ws_terminal(ws: WebSocket, p: str = "claude", alias: str = ""):
         await ws.send_text(json.dumps({"type": "error", "msg": str(e)}))
         await ws.close()
         return
-    await bridge(ws, cmd)
+    t = time.time()
+    auditlog.write("admin", alias or p, f"terminal opened: {p}" + (f" {alias}" if alias else ""), actor="user", part="terminal",
+                   ip=ws.client.host if ws.client else "")
+    try:
+        await bridge(ws, cmd)
+    finally:
+        auditlog.write("admin", alias or p, f"terminal closed: {p}" + (f" {alias}" if alias else ""), actor="user", part="terminal",
+                       ip=ws.client.host if ws.client else "", seconds=round(time.time() - t))
 
 
 # what tentaclAI Community shows, locked, on Modules – with tentaclAI Enterprise its registered modules are listed instead
@@ -325,22 +340,89 @@ async def job_stream(job_id: str):
     return StreamingResponse(gen(), media_type="text/event-stream", headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
 
+AUDIT_FILTERS = ("category", "actor", "service", "decision")
+
+
+def _audit_query(request):
+    """the filters of Logs → Audit from the query string (defaults: last 24 h, everything)"""
+    p = request.query_params
+    f = {k: p.get(k, "")[:120] for k in AUDIT_FILTERS}
+    f.update(since=p.get("since", "24h"), start=p.get("start", "")[:10], end=p.get("end", "")[:10], q=p.get("q", "")[:200],
+             origin=p.get("origin", "")[:80])
+    return f
+
+
+def _audit_qs(f):
+    from urllib.parse import urlencode
+    return urlencode({k: v for k, v in f.items() if v and not (k == "since" and v == "24h")})
+
+
 @router.get("/logs", response_class=HTMLResponse)
 async def logs_page(request: Request):
-    return page(request, "logs.html", logs=dockerops.logs(300))
+    """Logs → Audit: everything Claude, jobs, the user and tentaclAI did – filter, search, export"""
+    auditlog.mark_flags_seen()  # opening the audit log counts as having seen the flagged entries
+    f = _audit_query(request)
+    entries, more = await asyncio.to_thread(auditlog.entries, **f)
+    services, jobs_known = await asyncio.to_thread(auditlog.known)
+    filtered = any(f[k] for k in (*AUDIT_FILTERS, "q", "origin", "start", "end")) or f["since"] != "24h"
+    return page(request, "logs.html", entries=entries, more=more, f=f, qs=_audit_qs(f), filtered=filtered,
+                services_known=services, jobs_known=jobs_known, categories=tclib.AUDIT_CATEGORIES,
+                actors=tclib.AUDIT_ACTORS, decisions=tclib.AUDIT_DECISIONS, retention=tclib.audit_retention(read_env()))
+
+
+@router.get("/logs/audit/more", response_class=HTMLResponse)
+async def logs_audit_more(request: Request, after: str = ""):
+    """the next page of entries ("Load more") – rows only"""
+    f = _audit_query(request)
+    entries, more = await asyncio.to_thread(auditlog.entries, after=after[:40], **f)
+    return templates.TemplateResponse(request, "partials/audit_rows.html", {"entries": entries, "more": more, "qs": _audit_qs(f)})
+
+
+@router.get("/logs/audit/export")
+async def logs_audit_export(request: Request, fmt: str = "csv"):
+    """every entry matching the filters, as CSV or JSON lines – the export itself is an audit entry too"""
+    fmt = "jsonl" if fmt == "jsonl" else "csv"
+    f = _audit_query(request)
+    lines = await asyncio.to_thread(lambda: list(auditlog.export(fmt, **f)))
+    auditlog.user(request, "admin", "audit log", f"export as {fmt}", part="logs", mode="GET",
+                  detail=f"{max(0, len(lines) - (fmt == 'csv'))} entries · " + (_audit_qs(f)[:280] or "no filter"))
+    name = f"tentaclai-audit-{time.strftime('%Y%m%d-%H%M')}.{fmt}"
+    return StreamingResponse(iter(lines), media_type="text/csv; charset=utf-8" if fmt == "csv" else "application/x-ndjson",
+                             headers={"Content-Disposition": f'attachment; filename="{name}"'})
+
+
+def _log_container(key):
+    return key if key in LOG_CONTAINERS else "tentaclai"
+
+
+@router.get("/logs/containers", response_class=HTMLResponse)
+async def logs_containers(request: Request, c: str = "tentaclai"):
+    """Logs → Containers: the log of each of tentaclAI's three containers, live"""
+    c = _log_container(c)
+    name, what = LOG_CONTAINERS[c]
+    states = {k: dockerops.container_running(n) for k, (n, _) in LOG_CONTAINERS.items()}
+    return page(request, "logs_containers.html", c=c, cname=name, what=what, containers=LOG_CONTAINERS, states=states,
+                logs=await asyncio.to_thread(dockerops.logs, 300, name))
+
+
+@router.get("/logs/containers/download")
+async def logs_containers_download(c: str = "tentaclai", tail: int = 5000):
+    name = LOG_CONTAINERS[_log_container(c)][0]
+    text = await asyncio.to_thread(dockerops.logs, max(1, min(tail, 100_000)), name)
+    return PlainTextResponse(text, headers={"Content-Disposition": f'attachment; filename="{name}-{time.strftime("%Y%m%d-%H%M")}.log"'})
 
 
 @router.get("/logs/stream")
-async def logs_stream():
-    c = dockerops.container()
-    if c is None:
+async def logs_stream(c: str = "tentaclai"):
+    cont = dockerops.container(LOG_CONTAINERS[_log_container(c)][0])
+    if cont is None:
         return PlainTextResponse("", status_code=404)
     loop = asyncio.get_running_loop()
     queue: asyncio.Queue = asyncio.Queue()
 
     def follow():
         try:
-            for chunk in c.logs(stream=True, follow=True, since=int(time.time()), timestamps=True):
+            for chunk in cont.logs(stream=True, follow=True, since=int(time.time()), timestamps=True):
                 loop.call_soon_threadsafe(queue.put_nowait, dockerops.local_ts(chunk.decode(errors="replace")))
         except Exception:  # noqa: BLE001
             pass

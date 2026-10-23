@@ -11,7 +11,7 @@ from starlette.middleware.sessions import SessionMiddleware
 
 import tclib
 
-from . import activity, auth, connectors, dockerops, extensions, netguard, notify, scheduled, services_store, skills, updatecheck, usage
+from . import activity, auditlog, auth, connectors, dockerops, extensions, netguard, notify, scheduled, services_store, skills, updatecheck, usage
 from .config import SSH_DIR
 from .envfile import read_env
 from .routes import backup, claude, jobs, network, settings, ssh, system, tentacles
@@ -21,7 +21,7 @@ from .web import BASE, TC_VERSION, templates
 @contextlib.asynccontextmanager
 async def lifespan(_app):
     """startup: activity token, background loops (notifications, usage, update check, scheduled jobs), setup hint"""
-    for start in (migrate, prepare_activity, start_notifications, start_update_check, start_scheduled_jobs, announce_setup):
+    for start in (migrate, prepare_activity, start_audit, start_notifications, start_update_check, start_scheduled_jobs, announce_setup):
         await start()
     yield
 
@@ -52,6 +52,27 @@ async def guard(request: Request, call_next):
     return response
 
 
+AUDIT_SKIP = ("/internal/", "/login", "/setup", "/logout", "/approvals/", "/topology/layout", "/usage/refresh")  # logged elsewhere / layout only
+AUDIT_AREA = {"ssh": "SSH hosts", "rc": "Remote Control", "container": "sandbox", "grants": "Activity", "updates": "updates",
+              "security": "sign-in security", "claude": "Claude"}
+
+
+@app.middleware("http")
+async def audit_admin(request: Request, call_next):
+    """every change made in tentacontrol (POST/PUT/DELETE) lands in the audit log – what and on which object, never the form"""
+    response = await call_next(request)
+    path = request.url.path
+    if request.method in ("POST", "PUT", "PATCH", "DELETE") and not path.startswith(AUDIT_SKIP) and auth.logged_in(request):
+        endpoint = getattr(request.scope.get("endpoint"), "__name__", "") or path
+        params = [str(v)[:80] for v in request.path_params.values()]
+        area = path.strip("/").split("/")[0]
+        auditlog.user(request, "admin", params[0] if params else AUDIT_AREA.get(area, area or "tentacontrol"),
+                      endpoint.replace("_", " ") + (f": {' · '.join(params)}" if params else ""),
+                      "ok" if response.status_code < 400 else "failed", part=area[:20], mode=request.method,
+                      detail=f"{request.method} {path} → {response.status_code}")
+    return response
+
+
 app.add_middleware(SessionMiddleware, secret_key=auth.session_secret(), session_cookie="tentacontrol",
                    max_age=12 * 3600, same_site="strict", https_only=False)
 
@@ -78,6 +99,12 @@ async def migrate():
 
 async def prepare_activity():
     activity.ensure_token()
+
+
+async def start_audit():
+    """the audit log: tentacontrol's start as an entry, archives past the retention removed every 6 h"""
+    auditlog.write("system", "tentacontrol", f"tentacontrol {TC_VERSION} started", actor="system")
+    asyncio.get_running_loop().create_task(auditlog.prune_loop())
 
 
 async def discover_claude():

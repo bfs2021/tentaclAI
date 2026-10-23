@@ -4,7 +4,8 @@
 Forward proxy for CONNECT (any TCP port – HTTPS, ssh, databases; TLS is not opened) and plain HTTP requests.
 Policy (from tentacontrol, refreshed every 15 s): built-in list → blocklist → own allowlist → tentacles → grants →
 EGRESS_MODE permissive (allow, record as "unlisted") or enforce (hold the connection and ask in Activity).
-Every destination is counted in $DATA_DIR/egress-seen.json (host:port → first, last, count, last decision).
+Every destination is counted in $DATA_DIR/egress-seen.json (host:port → first, last, count, last decision) and – except
+the built-in list – reported to tentacontrol's audit log, one entry per destination and 15 minutes (refused ones at once).
 """
 import asyncio
 import json
@@ -142,6 +143,46 @@ def record(host, port, decision):
     dirty = True
 
 
+AUDIT_WINDOW = 900  # s: allowed connections to one destination become one audit entry per 15 min (with a count)
+AUDIT_MAX = 1000  # destinations kept while tentacontrol can't be reached
+audit_buf = {}  # (host, port, decision, reason) → {"count", "first", "last"}
+
+
+def audit_note(host, port, why):
+    """count a connection for the audit log – built-in destinations (Claude's API, package mirrors) only show on the
+    Network page; approved/denied ones are logged by tentacontrol when the user decides"""
+    if why in ("approved", "denied") or any(tclib.egress_match(p, host, port) for p in DEFAULT):
+        return
+    now = int(time.time())
+    key = (host, port, "blocked" if why in ("blocked", "direct-ip") else "allowed", why)
+    if key not in audit_buf and len(audit_buf) >= AUDIT_MAX:
+        return
+    e = audit_buf.setdefault(key, {"count": 0, "first": now})
+    e.update(count=e["count"] + 1, last=now)
+
+
+def audit_due(now=None):
+    """the entries to send now: refused destinations at once (next flush), allowed ones once their window is over"""
+    now = now or time.time()
+    return [k for k, e in audit_buf.items() if k[2] == "blocked" or now - e["first"] >= AUDIT_WINDOW]
+
+
+async def audit_flush():
+    while True:
+        await asyncio.sleep(30)
+        due = audit_due()
+        if not due:
+            continue
+        batch = [{"host": k[0], "port": k[1], "decision": k[2], "reason": k[3], **audit_buf[k]} for k in due]
+        try:
+            await asyncio.to_thread(control, "/internal/egress/audit", {"entries": batch}, 10)
+        except Exception as e:  # noqa: BLE001 – kept and sent with the next flush
+            print(f"audit report failed: {e}", flush=True)
+            continue
+        for k in due:
+            audit_buf.pop(k, None)
+
+
 SEEN_MAX, SEEN_DAYS = 2000, 90  # the list of destinations stays small – the gateway has 128 MB
 
 
@@ -229,6 +270,7 @@ async def handle(cr, cw):
         ok = await ask(host, port)
         why = "approved" if ok else "denied"
     record(host, port, why)
+    audit_note(host, port, why)
     if not ok and why in ("blocked", "direct-ip", "denied"):
         asyncio.get_running_loop().run_in_executor(None, report, host, port, why)
     if not ok:
@@ -257,6 +299,7 @@ async def main():
     server = await asyncio.start_server(handle, "0.0.0.0", LISTEN, limit=65536)
     print(f"tentaclAI egress gateway on :{LISTEN}", flush=True)
     asyncio.create_task(flush())
+    asyncio.create_task(audit_flush())
     asyncio.create_task(refresher())
     async with server:
         await server.serve_forever()

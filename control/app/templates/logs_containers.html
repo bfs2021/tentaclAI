@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% from "_icons.html" import icon, help_link %}
+{% from "_tabs.html" import logs_tabs %}
+{% block title %}Logs · Containers{% endblock %}
+{% block content %}
+<div class="header">
+  <div><h1>Logs</h1><div class="sub">The output of tentaclAI's containers – startup, svc sync, the gateway, tentacontrol itself, errors – live.</div></div>
+  <div class="row">{{ help_link('troubleshooting') }}</div>
+</div>
+{{ logs_tabs('containers') }}
+<div class="between" style="margin-bottom:12px;flex-wrap:wrap;gap:8px">
+  <nav class="seg" aria-label="Container">
+    {% for k, (name, desc) in containers.items() %}<a href="/logs/containers?c={{ k }}" class="{{ 'active' if k == c }}" title="{{ desc }}"><span class="dot {{ 'ok' if states[k] else 'err' }}"></span>{{ name }}</a>{% endfor %}
+  </nav>
+  <div class="row" style="gap:6px">
+    <input type="search" id="filter" placeholder="Filter lines…" class="sys-select" aria-label="Filter lines">
+    <span id="live" class="pill info">connecting …</span>
+    <button class="btn sm" type="button" id="clear">Clear</button>
+    <a class="btn sm" href="/logs/containers/download?c={{ c }}" title="the last 5000 lines">{{ icon('download') }}Download</a>
+  </div>
+</div>
+<div class="small faint" style="margin-bottom:8px">{{ cname }} – {{ what }}</div>
+<pre class="console" id="out">{{ logs }}</pre>
+{% endblock %}
+{% block scripts %}
+<script>
+(function () {
+  var out = document.getElementById("out"), live = document.getElementById("live"), filter = document.getElementById("filter");
+  var lines = out.textContent.split("\n");
+  function show() {
+    var q = filter.value.toLowerCase(), atBottom = out.scrollTop + out.clientHeight >= out.scrollHeight - 30;
+    out.textContent = (q ? lines.filter(function (l) { return l.toLowerCase().indexOf(q) >= 0; }) : lines).join("\n");
+    if (atBottom || !q) out.scrollTop = out.scrollHeight;
+  }
+  filter.addEventListener("input", show);
+  out.scrollTop = out.scrollHeight;
+  var es = new EventSource("/logs/stream?c={{ c }}");
+  es.onopen = function () { live.className = "pill ok"; live.textContent = "live"; };
+  es.onmessage = function (e) {
+    var line = JSON.parse(e.data), q = filter.value.toLowerCase();
+    lines.push(line);
+    if (lines.length > 20000) lines.splice(0, lines.length - 20000);
+    if (q && line.toLowerCase().indexOf(q) < 0) return;
+    var atBottom = out.scrollTop + out.clientHeight >= out.scrollHeight - 30;
+    out.textContent += line + "\n";
+    if (atBottom) out.scrollTop = out.scrollHeight;
+  };
+  es.onerror = function () { live.className = "pill warn"; live.textContent = "disconnected"; };
+  document.getElementById("clear").addEventListener("click", function () { lines = []; out.textContent = ""; });
+})();
+</script>
+{% endblock %}

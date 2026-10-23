@@ -22,7 +22,7 @@ import uuid
 
 import tclib
 
-from . import dockerops, jsonstore, models, notify
+from . import auditlog, dockerops, jsonstore, models, notify
 from .config import CLAUDE_CONTAINER, DATA_DIR
 
 JOBS = os.path.join(DATA_DIR, "jobs.json")
@@ -749,6 +749,9 @@ def execute(run_id, jid):
         return
     started = time.time()
     _update_run(run_id, status="running", started=started)
+    trigger = next((r.get("trigger", "") for r in history() if r.get("id") == run_id), "")
+    auditlog.write("job", job["name"], "run started", "ok", actor="job", mode=job.get("profile", "read-only"),
+                   origin={"job": run_id}, detail=trigger)
     _current[run_id] = jid
     _register(run_id, job)
     try:
@@ -764,6 +767,9 @@ def execute(run_id, jid):
     else:
         status, fields = parse_output(out) if code is not None else ("failed", {"error": out[:500]})
     run = dict(fields, status=status, ended=time.time(), seconds=round(time.time() - started))
+    auditlog.write("job", job["name"], f"run {status}", "ok" if status == "done" else "failed",
+                   actor="job", mode=job.get("profile", "read-only"), origin={"job": run_id}, seconds=run["seconds"],
+                   detail=((run.get("result") or {}).get("title") or run.get("error") or status)[:300])
     if run.get("actions"):
         run["actions_until"] = time.time() + ACTION_TTL
     _update_run(run_id, **run)
