@@ -345,6 +345,9 @@ table.audit details[open] summary { white-space: pre-wrap; }
 .audit-excerpts div { margin-top: 3px; padding-left: 8px; border-left: 2px solid var(--warn); }
 .audit-filters { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 14px; }
 .audit-filters .spacer { flex: 1; }
+.audit-f { display: inline-flex; align-items: center; gap: 6px; margin: 0; }
+.audit-f > span { font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.audit-f select { max-width: 200px; }
 .audit-filters input[type=search] { width: 180px; height: 30px; min-height: 30px; padding: 2px 10px; }
 .audit-filters input[type=date] { width: 132px; height: 30px; min-height: 30px; padding: 2px 6px; }
 .audit-what .audit-svc { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }

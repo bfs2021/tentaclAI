@@ -11,33 +11,38 @@
 <div class="card">
   <form class="audit-filters" method="get" action="/logs">
     <input type="search" name="q" value="{{ f.q }}" placeholder="Search…" class="sys-select audit-q" aria-label="Search">
-    <select name="since" class="sys-select" onchange="this.form.submit()" aria-label="Time">
-      {% for k, label in (('1h', 'last hour'), ('24h', 'last 24 h'), ('7d', 'last 7 days'), ('30d', 'last 30 days'), ('all', 'any time')) %}<option value="{{ k }}" {{ 'selected' if k == f.since and not (f.start or f.end) }}>{{ label }}</option>{% endfor %}
-      {% if f.start or f.end %}<option value="" selected>own dates</option>{% endif %}
-    </select>
-    <span class="row audit-dates" style="gap:4px"><input type="date" name="start" value="{{ f.start }}" class="sys-select" aria-label="From" onchange="this.form.submit()"><span class="faint">–</span><input type="date" name="end" value="{{ f.end }}" class="sys-select" aria-label="Until" onchange="this.form.submit()"></span>
-    <select name="actor" class="sys-select" onchange="this.form.submit()" aria-label="Who">
-      <option value="">everyone</option>
-      {% for a in actors %}<option value="{{ a }}" {{ 'selected' if a == f.actor }}>{{ {'claude': 'Claude', 'job': 'jobs', 'user': 'user', 'system': 'system'}[a] }}</option>{% endfor %}
-    </select>
-    <select name="origin" class="sys-select" onchange="this.form.submit()" aria-label="From">
-      <option value="">all origins</option>
-      {% for k, label in (('session', 'Claude sessions'), ('job', 'jobs'), ('host', 'tentacontrol / host')) %}<option value="{{ k }}" {{ 'selected' if k == f.origin }}>{{ label }}</option>{% endfor %}
-      {% for j in jobs_known %}<option value="job:{{ j }}" {{ 'selected' if 'job:' ~ j == f.origin }}>Job · {{ j }}</option>{% endfor %}
-    </select>
-    <select name="category" class="sys-select" onchange="this.form.submit()" aria-label="Kind">
-      <option value="">all kinds</option>
-      {% for c in categories %}<option value="{{ c }}" {{ 'selected' if c == f.category }}>{{ c }}</option>{% endfor %}
-    </select>
-    <select name="service" class="sys-select" onchange="this.form.submit()" aria-label="Service">
-      <option value="">all targets</option>
-      {% for s in services_known %}<option value="{{ s }}" {{ 'selected' if s == f.service }}>{{ s }}</option>{% endfor %}
-      {% if f.service and f.service not in services_known %}<option value="{{ f.service }}" selected>{{ f.service }}</option>{% endif %}
-    </select>
-    <select name="decision" class="sys-select" onchange="this.form.submit()" aria-label="Decision">
-      <option value="">all decisions</option>
-      {% for d in decisions %}<option value="{{ d }}" {{ 'selected' if d == f.decision }}>{{ d }}</option>{% endfor %}
-    </select>
+    {% set own = f.since == 'custom' or f.start or f.end %}
+    <label class="audit-f"><span>Time</span>
+      <select name="since" class="sys-select" onchange="this.form.submit()">
+        {% for k, label in (('1h', 'last hour'), ('24h', 'last 24 h'), ('7d', 'last 7 days'), ('30d', 'last 30 days'), ('all', 'any time'), ('custom', 'own dates …')) %}<option value="{{ k }}" {{ 'selected' if (k == 'custom' and own) or (k == f.since and not own) }}>{{ label }}</option>{% endfor %}
+      </select></label>
+    {% if own %}<span class="row audit-dates" style="gap:4px"><input type="date" name="start" value="{{ f.start }}" class="sys-select" aria-label="From" onchange="this.form.submit()"><span class="faint">–</span><input type="date" name="end" value="{{ f.end }}" class="sys-select" aria-label="Until" onchange="this.form.submit()"></span>{% endif %}
+    <label class="audit-f"><span>Who</span>
+      <select name="who" class="sys-select" onchange="this.form.submit()">
+        <option value="">anyone</option>
+        {% for a in actors %}<option value="{{ a }}" {{ 'selected' if a == who }}>{{ {'claude': 'Claude', 'job': 'jobs', 'user': 'you (tentacontrol)', 'system': 'system'}[a] }}</option>{% endfor %}
+        <optgroup label="Started from">
+          {% for k, label in (('session', 'a Claude session'), ('job', 'a job'), ('host', 'tentacontrol / host')) %}<option value="origin:{{ k }}" {{ 'selected' if 'origin:' ~ k == who }}>{{ label }}</option>{% endfor %}
+        </optgroup>
+        {% if jobs_known %}<optgroup label="Job">
+          {% for j in jobs_known %}<option value="job:{{ j }}" {{ 'selected' if 'job:' ~ j == who }}>{{ j }}</option>{% endfor %}
+        </optgroup>{% endif %}
+      </select></label>
+    <label class="audit-f"><span>What</span>
+      <select name="category" class="sys-select" onchange="this.form.submit()" aria-label="Kind">
+        <option value="">any kind</option>
+        {% for c in categories %}<option value="{{ c }}" {{ 'selected' if c == f.category }}>{{ kinds.get(c, c) }}</option>{% endfor %}
+      </select>
+      <select name="service" class="sys-select" onchange="this.form.submit()" aria-label="Target">
+        <option value="">any target</option>
+        {% for s in services_known %}<option value="{{ s }}" {{ 'selected' if s == f.service }}>{{ s }}</option>{% endfor %}
+        {% if f.service and f.service not in services_known %}<option value="{{ f.service }}" selected>{{ f.service }}</option>{% endif %}
+      </select></label>
+    <label class="audit-f"><span>Decision</span>
+      <select name="decision" class="sys-select" onchange="this.form.submit()">
+        <option value="">any</option>
+        {% for d in decisions %}<option value="{{ d }}" {{ 'selected' if d == f.decision }}>{{ d }}</option>{% endfor %}
+      </select></label>
     <a class="btn ghost audit-reset{{ '' if filtered else ' off' }}" href="/logs" title="Reset filters" aria-label="Reset filters"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg></a>
     <span class="spacer"></span>
     <a class="btn sm" href="/logs/audit/export?{{ qs ~ '&' if qs }}fmt=csv" title="every entry matching the filters, as CSV">{{ icon('download') }}CSV</a>

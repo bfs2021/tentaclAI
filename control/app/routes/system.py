@@ -372,6 +372,8 @@ async def job_stream(job_id: str):
 
 
 AUDIT_FILTERS = ("category", "actor", "service", "decision")
+AUDIT_KINDS = {"service": "svc command", "tool": "Claude tool", "network": "network", "admin": "change in tentacontrol",
+               "auth": "sign-in", "job": "job run", "system": "system"}  # the What filter's labels
 
 
 def _audit_query(request):
@@ -380,7 +382,21 @@ def _audit_query(request):
     f = {k: p.get(k, "")[:120] for k in AUDIT_FILTERS}
     f.update(since=p.get("since", "24h"), start=p.get("start", "")[:10], end=p.get("end", "")[:10], q=p.get("q", "")[:200],
              origin=p.get("origin", "")[:80])
+    who = p.get("who", "")[:80]  # the page's one Who choice: an actor, origin:<group> or job:<name>
+    if who in tclib.AUDIT_ACTORS:
+        f.update(actor=who, origin="")
+    elif who.startswith("origin:"):
+        f.update(actor="", origin=who[7:])
+    elif who.startswith("job:"):
+        f.update(actor="", origin=who)
     return f
+
+
+def _audit_who(f):
+    """the Who choice that shows the actor / origin filter"""
+    if f["origin"]:
+        return f["origin"] if f["origin"].startswith("job:") else "origin:" + f["origin"]
+    return f["actor"]
 
 
 def _audit_qs(f):
@@ -396,9 +412,9 @@ async def logs_page(request: Request):
     entries, more = await asyncio.to_thread(auditlog.entries, **f)
     services, jobs_known = await asyncio.to_thread(auditlog.known)
     filtered = any(f[k] for k in (*AUDIT_FILTERS, "q", "origin", "start", "end")) or f["since"] != "24h"
-    return page(request, "logs.html", entries=entries, more=more, f=f, qs=_audit_qs(f), filtered=filtered,
+    return page(request, "logs.html", entries=entries, more=more, f=f, who=_audit_who(f), qs=_audit_qs(f), filtered=filtered,
                 services_known=services, jobs_known=jobs_known, categories=tclib.AUDIT_CATEGORIES,
-                actors=tclib.AUDIT_ACTORS, decisions=tclib.AUDIT_DECISIONS, retention=tclib.audit_retention(read_env()))
+                actors=tclib.AUDIT_ACTORS, decisions=tclib.AUDIT_DECISIONS, kinds=AUDIT_KINDS, retention=tclib.audit_retention(read_env()))
 
 
 @router.get("/logs/audit/more", response_class=HTMLResponse)
