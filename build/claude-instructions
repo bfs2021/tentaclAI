@@ -17,14 +17,13 @@ site = tclib.read_env(os.path.join(tc_dir, ".env"))  # runs as root (entrypoint,
 
 
 def docker_hosts():
-    env = tclib.read_env(os.path.join(tc_dir, ".env"))
     rows = []
     for name, svc in tclib.load_services(os.path.join(tc_dir, "services"), tclib.load_systems(tc_dir)).items():
         d = svc.get("docker")
         if not d or not tclib.enabled(svc):
             continue
         target = f"ssh `{d.get('ssh_host')}`"
-        rows.append(f"| `{svc.get('name') or name}` | {target} | **{tclib.access(d.get('access'))}** | `{tclib.render(str(d.get('stacks_dir', '–')), env)}` | {svc.get('description', '')} |")
+        rows.append(f"| `{svc.get('name') or name}` | {target} | **{tclib.access(d.get('access'))}** | `{tclib.render(str(d.get('stacks_dir', '–')), site)}` | {svc.get('description', '')} |")
     if not rows:
         return "### Docker hosts\n\nNone configured – this sandbox has no Docker access."
     return "### Docker hosts\n\n| Host | Via | Access | Stacks dir | Description |\n|---|---|---|---|---|\n" + "\n".join(rows)
@@ -37,7 +36,7 @@ def ssh_hosts():
     rows = [f"| `{h['alias']}` | **{tclib.ssh_access('/root/.ssh/config.d', h['alias'])}** | {h['user'] or '–'} | {h['hostname'] or '–'} | "
             f"{('`' + h['sudo'] + ' <cmd>`') if h['sudo'] else '–'} |" for h in hosts]
     return ("### SSH hosts\n\n`svc ssh <host> <command>`. Access: `confirm` = every command waits for approval, `write` = allowed "
-            "(still ask before changes), `read` = no ssh commands. Plain status commands (`uptime`, `df -h`, `free`, `ps`, `ls`, "
+            "(still ask before changes), `read` = only the status commands below. Plain status commands (`uptime`, `df -h`, `free`, `ps`, `ls`, "
             "`docker ps|logs|inspect`, `systemctl status`, `journalctl -u …`, `ip a`, `ss -tlnp` – one command, no `;`/`|`/`$`/redirects) "
             "run without approval everywhere – prefer them, and `svc files` for file contents. With a sudo prefix: "
             "`svc ssh <host> <prefix> <cmd>` (never type a password); `svc docker`/`svc compose` add it themselves.\n\n"
