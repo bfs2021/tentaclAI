@@ -277,7 +277,8 @@ The names before v0.16, `ro` and `rw`, still work as `read` and `write`; tentaco
 backup) and only writes the new ones. An unknown value counts as `read`.
 Everything lands in the **audit log** (tentacontrol → Logs → Audit, or `svc audit` in the sandbox): Claude's tool calls,
 every `svc` command (reads and writes, approvals, blocked attempts), network connections, jobs, your changes and
-sign-ins in tentacontrol – filterable, searchable, exportable as CSV or JSON lines; secrets are never logged.
+sign-ins in tentacontrol – with a search line (`actor:claude outcome:denied docker`), filters with counts per field,
+a histogram over time, details per entry and CSV / JSON-lines export; secrets are never logged.
 
 A part stays inactive while one of its `${VAR}`s is empty; `"enabled": false` parks the whole service.
 

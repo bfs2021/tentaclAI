@@ -974,15 +974,19 @@ def audit_matches(e, filters):
     return all(not v or str(e.get(k, "")) == v for k, v in filters.items())
 
 
-def audit_read(data_dir, limit=200, since=0, until=0, filters=None, q="", after="", match=None):
-    """entries newest first: since/until in epoch seconds (0 = open), filters as in audit_matches, q a case-insensitive
-    text search, after the id of the last entry already shown ("load more"), match an extra predicate
-    → (entries, more): more is True when further entries match"""
+def audit_read(data_dir, limit=200, since=0, until=0, filters=None, q="", after="", match=None, query=None, source=None):
+    """entries newest first: since/until in epoch seconds (0 = open), query a search (audit_query: field:value terms and
+    words; each entry then carries its audit_view as "_view", source names the source as in audit_view), after the id
+    of the last entry already shown ("load more"); filters (exact stored fields) / q (one text) / match (a predicate)
+    for older callers → (entries, more): more is True when further entries match"""
     q = q.strip().lower()
     filters = {k: v for k, v in (filters or {}).items() if v}
+    terms = audit_query(query) if isinstance(query, str) else list(query or [])
+    words = [v for neg, k, v in terms if k is None and not neg]
     out, skipping = [], bool(after)
     for line in audit_lines(data_dir, since):
-        if q and q not in line.lower():
+        low = line.lower() if q or words else ""
+        if (q and q not in low) or (words and not all(w in low for w in words)):
             continue  # quick test on the raw line first; the fields are checked below
         try:
             e = json.loads(line)
@@ -1005,10 +1009,162 @@ def audit_read(data_dir, limit=200, since=0, until=0, filters=None, q="", after=
             continue
         if match and not match(e):
             continue
+        if terms:
+            e["_view"] = audit_view(e, source)
+            if audit_fails(e, e["_view"], terms):
+                continue
         if len(out) >= limit:
             return out, True
         out.append(e)
     return out, False
+
+
+# ---- the view: one name per field for the page, the search, the facets and the export (the stored fields stay as they are)
+
+AUDIT_TYPES = {"service": "svc", "tool": "tool", "network": "network", "admin": "admin", "auth": "sign-in", "job": "job",
+               "system": "system"}  # category → the word shown as type
+AUDIT_OUTCOMES = ("ok", "approved", "flagged", "denied", "blocked", "expired", "failed")
+AUDIT_FIELDS = ("outcome", "actor", "type", "target", "source", "user")  # the facets, in this order
+AUDIT_KEYS = {"actor": "actor", "user": "user", "source": "source", "type": "type", "target": "target",
+              "action": "action", "outcome": "outcome", "decision": "decision", "ip": "ip",
+              "category": "type", "service": "target"}  # search keys (category/service: the stored names)
+_AUDIT_TOKEN = re.compile(r'(-?)([A-Za-z_]+):"([^"]*)"|(-?)([A-Za-z_]+):(\S+)|(-?)"([^"]*)"|(-?)(\S+)')
+
+
+def audit_outcome(e):
+    """one word for decision and result: failed (error or exit ≠ 0), ok (read, automatic, allowed), or the decision"""
+    d = e.get("decision", "")
+    if d in ("denied", "blocked", "expired"):
+        return d
+    if d in ("error", "failed") or e.get("error") or (isinstance(e.get("exit"), int) and e["exit"] != 0):
+        return "failed"
+    return d if d in ("approved", "flagged") else "ok"
+
+
+def audit_source(e):
+    """where an entry came from, from its stored fields (tentacontrol names sessions and jobs more readably)"""
+    o = audit_origin(e)
+    if o.get("job"):
+        return f"job {o['job']}"
+    if o.get("by") == "root":
+        return "tentacontrol / host"
+    for k in ("tmux", "entry"):
+        if o.get(k):
+            return o[k]
+    if o.get("session"):
+        return f"session {o['session'][:8]}"
+    return e.get("ip", "")
+
+
+def audit_view(e, source=None):
+    """the fields of the page and the CSV: time, actor, user, source, type, target, action, outcome"""
+    return {"time": e.get("ts", ""), "actor": e.get("actor", ""), "user": e.get("user", ""),
+            "source": (source or audit_source)(e) or "", "type": AUDIT_TYPES.get(e.get("category"), e.get("category", "")),
+            "target": str(e.get("service", "")), "action": str(e.get("action", "")), "outcome": audit_outcome(e),
+            "decision": e.get("decision", ""), "ip": e.get("ip", "")}
+
+
+def audit_query(text):
+    """a search → terms (negated, key, value): key:value, key:"with spaces", -key:value (not), words and "phrases"
+    (key None). Unknown keys stay words; type takes the stored category too (type:auth = type:sign-in)."""
+    terms = []
+    for m in _AUDIT_TOKEN.finditer(text or ""):
+        g = m.groups()
+        if g[1] or g[4]:
+            neg, key, val = (g[0], g[1], g[2]) if g[1] else (g[3], g[4], g[5])
+            k = AUDIT_KEYS.get(key.lower())
+            if k is None:
+                terms.append((False, None, m.group(0).lower()))
+                continue
+            val = val.strip().lower()
+            if k == "type":
+                val = AUDIT_TYPES.get(val, val)
+            if val:
+                terms.append((bool(neg), k, val))
+        else:
+            neg, val = (g[6], g[7]) if g[7] is not None else (g[8], g[9])
+            if val and val != "-":
+                terms.append((bool(neg), None, val.lower()))
+    return terms
+
+
+def audit_query_str(terms):
+    """terms back to a search text"""
+    out = []
+    for neg, k, v in terms:
+        q = f'"{v}"' if (" " in v or not v) else v
+        out.append(("-" if neg else "") + (f"{k}:{q}" if k else q))
+    return " ".join(out)
+
+
+def _audit_value_match(pattern, value):
+    import fnmatch
+    value = str(value).lower()
+    return fnmatch.fnmatchcase(value, pattern) if "*" in pattern else value == pattern
+
+
+def audit_fails(e, view, terms):
+    """the keys whose terms an entry doesn't meet (None for the words) – empty: it matches. Terms with the same key are
+    OR, different keys AND, negated ones NOT."""
+    inc, fails = {}, set()
+    for neg, k, v in terms:
+        if k is None:
+            text = (" ".join(json.dumps(e.get(x, ""), ensure_ascii=False) for x in AUDIT_SEARCH) + " "
+                    + " ".join(str(view.get(x, "")) for x in ("user", "source", "target", "action"))).lower()
+            if (v in text) == neg:
+                fails.add(None)
+        elif neg:
+            if _audit_value_match(v, view.get(k, "")):
+                fails.add(k)
+        else:
+            inc.setdefault(k, []).append(v)
+    for k, vals in inc.items():
+        if not any(_audit_value_match(v, view.get(k, "")) for v in vals):
+            fails.add(k)
+    return fails
+
+
+def audit_facets(entries, terms, fields=AUDIT_FIELDS):
+    """{field: [(value, count), …]} – each field counted under all the *other* terms, so the values of a chosen field
+    keep their numbers; entries carry their "_view" (audit_read with a query, or audit_view)"""
+    out = {f: {} for f in fields}
+    for e in entries:
+        v = e.get("_view") or audit_view(e)
+        fails = audit_fails(e, v, terms)
+        if len(fails) > 1 or None in fails:
+            continue
+        for f in fields:
+            if fails and f not in fails:
+                continue
+            val = v.get(f, "")
+            if val:
+                out[f][val] = out[f].get(val, 0) + 1
+    return {f: sorted(c.items(), key=lambda x: (-x[1], x[0])) for f, c in out.items()}
+
+
+AUDIT_BUCKETS = (30, 60, 300, 900, 1800, 3600, 3 * 3600, 6 * 3600, 12 * 3600, 86400)
+
+
+def audit_bucket(span):
+    """bucket width for a time span: about 48 bars"""
+    return next((b for b in AUDIT_BUCKETS if span / b <= 60), AUDIT_BUCKETS[-1])
+
+
+def audit_histogram(entries, since, until, width=None):
+    """[(start, {"ok": n, "denied": n, "failed": n, "flagged": n}), …] oldest first, for entries that match (their
+    "_view" outcome); denied also counts blocked and expired"""
+    width = width or audit_bucket(until - since)
+    start = since - since % width
+    n = max(1, int((until - start) // width) + 1)
+    bars = [(start + i * width, {"ok": 0, "denied": 0, "failed": 0, "flagged": 0}) for i in range(n)]
+    for e in entries:
+        t = audit_epoch(e.get("ts"))
+        i = int((t - start) // width)
+        if 0 <= i < n:
+            o = (e.get("_view") or audit_view(e))["outcome"]
+            cls = {"approved": "ok", "blocked": "denied", "expired": "denied"}.get(o, o)
+            bars[i][1][cls if cls in bars[i][1] else "ok"] += 1
+    return bars
 
 
 def audit_prune(data_dir, days=AUDIT_RETENTION_DAYS, now=None):
@@ -1038,16 +1194,19 @@ def audit_retention(env):
         return AUDIT_RETENTION_DAYS
 
 
-AUDIT_CSV = ("ts", "id", "severity", "category", "actor", "user", "service", "part", "mode", "action", "decision", "exit",
-             "seconds", "count", "detail", "error", "ip", "origin_session", "origin_entry", "origin_tmux", "origin_job",
-             "origin_by", "excerpts")
+AUDIT_STORED = ("ts", "id", "severity", "category", "actor", "user", "service", "part", "mode", "action", "decision",
+                "exit", "seconds", "count", "detail", "error", "ip", "origin_session", "origin_entry", "origin_tmux",
+                "origin_job", "origin_by", "excerpts")  # the flat stored fields (syslog structured data)
+AUDIT_CSV = ("time", "actor", "user", "source", "type", "target", "action", "outcome", "decision", "part", "mode", "exit",
+             "seconds", "count", "detail", "error", "ip", "id", "severity", "excerpts")  # the view's names, then details
 
 
 def audit_export(entries, fmt="jsonl"):
-    """export lines: jsonl (one entry per line, as stored) or csv (AUDIT_CSV, header first, excerpts as one cell)"""
+    """export lines: jsonl (one entry per line, as stored) or csv (AUDIT_CSV – the names of the page – header first,
+    excerpts as one cell)"""
     if fmt == "jsonl":
         for e in entries:
-            yield json.dumps(e, ensure_ascii=False) + "\n"
+            yield json.dumps({k: v for k, v in e.items() if not k.startswith("_")}, ensure_ascii=False) + "\n"
         return
     import csv
     import io
@@ -1059,8 +1218,9 @@ def audit_export(entries, fmt="jsonl"):
     buf.truncate()
     for e in entries:
         row = []
+        view = e.get("_view") or audit_view(e)
         for k in AUDIT_CSV:
-            v = e.get(k, "")
+            v = view.get(k, e.get(k, "")) if k in view else e.get(k, "")
             if k == "excerpts":
                 v = " | ".join(f"{x.get('reason', '')}: {x.get('text', '')}" for x in v or [])
             v = str(v)
@@ -1083,7 +1243,7 @@ def audit_syslog(e, hostname="-", facility=SYSLOG_FACILITY, sdid=SYSLOG_SDID):
         return re.sub(r"[^A-Za-z0-9_.-]", "_", k)[:32]
     host = re.sub(r"[^!-~]", "", hostname or "-")[:255] or "-"
     params = []
-    for k in AUDIT_CSV:
+    for k in AUDIT_STORED:
         if k in ("ts", "excerpts") or e.get(k) in (None, ""):
             continue
         value = _SD_ESCAPE.sub(r"\\\1", str(e[k]))

@@ -8,50 +8,61 @@
   <div class="row">{{ help_link('audit') }}</div>
 </div>
 {{ logs_tabs('audit') }}
-<div class="card">
-  <form class="audit-filters" method="get" action="/logs">
-    <input type="search" name="q" value="{{ f.q }}" placeholder="Search…" class="sys-select audit-q" aria-label="Search">
-    {% set own = f.since == 'custom' or f.start or f.end %}
-    <label class="audit-f"><span>Time</span>
-      <select name="since" class="sys-select" onchange="this.form.submit()">
-        {% for k, label in (('1h', 'last hour'), ('24h', 'last 24 h'), ('7d', 'last 7 days'), ('30d', 'last 30 days'), ('all', 'any time'), ('custom', 'own dates …')) %}<option value="{{ k }}" {{ 'selected' if (k == 'custom' and own) or (k == f.since and not own) }}>{{ label }}</option>{% endfor %}
-      </select></label>
-    {% if own %}<span class="row audit-dates" style="gap:4px"><input type="date" name="start" value="{{ f.start }}" class="sys-select" aria-label="From" onchange="this.form.submit()"><span class="faint">–</span><input type="date" name="end" value="{{ f.end }}" class="sys-select" aria-label="Until" onchange="this.form.submit()"></span>{% endif %}
-    <label class="audit-f"><span>Actor</span>
-      <select name="actor" class="sys-select" onchange="this.form.submit()">
-        <option value="">all</option>
-        {% for a in actors %}<option value="{{ a }}" {{ 'selected' if a == who }}>{{ {'claude': 'Claude', 'job': 'job', 'user': 'user', 'system': 'system'}[a] }}</option>{% endfor %}
-        <optgroup label="Source">
-          {% for k, label in (('session', 'Claude session'), ('job', 'job'), ('host', 'tentacontrol / host')) %}<option value="origin:{{ k }}" {{ 'selected' if 'origin:' ~ k == who }}>{{ label }}</option>{% endfor %}
-        </optgroup>
-        {% if jobs_known %}<optgroup label="Job">
-          {% for j in jobs_known %}<option value="job:{{ j }}" {{ 'selected' if 'job:' ~ j == who }}>{{ j }}</option>{% endfor %}
-        </optgroup>{% endif %}
-      </select></label>
-    <label class="audit-f"><span>Type</span>
-      <select name="category" class="sys-select" onchange="this.form.submit()">
-        <option value="">all</option>
-        {% for c in categories %}<option value="{{ c }}" {{ 'selected' if c == f.category }}>{{ kinds.get(c, c) }}</option>{% endfor %}
-      </select></label>
-    <label class="audit-f"><span>Decision</span>
-      <select name="decision" class="sys-select" onchange="this.form.submit()">
-        <option value="">all</option>
-        {% for d in decisions %}<option value="{{ d }}" {{ 'selected' if d == f.decision }}>{{ d }}</option>{% endfor %}
-      </select></label>
-    <a class="btn ghost audit-reset{{ '' if filtered else ' off' }}" href="/logs" title="Reset filters" aria-label="Reset filters"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg></a>
+<div class="card audit-card">
+  <div class="audit-bar">
+    <form method="get" action="/logs" class="audit-search-form">
+      <input type="search" name="q" value="{{ f.q }}" class="audit-search mono" autocomplete="off" spellcheck="false"
+             placeholder="Search … e.g. actor:claude outcome:denied docker" aria-label="Search">
+      <input type="hidden" name="range" value="{{ f.range }}">
+      {% if f.range == 'custom' %}<input type="hidden" name="from" value="{{ f['from'] }}"><input type="hidden" name="to" value="{{ f.to }}">{% endif %}
+    </form>
+    <div class="seg audit-range" role="group" aria-label="Time range">
+      {% for k, label in ranges %}<a href="{{ links.rng(k) }}" class="{{ 'active' if f.range == k }}">{{ label }}</a>{% endfor %}
+      <details class="audit-custom"{% if f.range == 'custom' %} open{% endif %}>
+        <summary class="{{ 'active' if f.range == 'custom' }}">custom</summary>
+        <form method="get" action="/logs" class="audit-custom-form">
+          <input type="hidden" name="q" value="{{ f.q }}"><input type="hidden" name="range" value="custom">
+          <label>from <input type="datetime-local" name="from" value="{{ f['from'] }}" class="sys-select"></label>
+          <label>to <input type="datetime-local" name="to" value="{{ f.to }}" class="sys-select"></label>
+          <button class="btn sm primary">Apply</button>
+        </form>
+      </details>
+    </div>
+    <details class="audit-export">
+      <summary class="btn sm">{{ icon('download') }}Export</summary>
+      <div class="audit-menu">
+        <a href="/logs/audit/export?{{ qs ~ '&' if qs }}fmt=csv">CSV <span class="faint">– columns as shown</span></a>
+        <a href="/logs/audit/export?{{ qs ~ '&' if qs }}fmt=jsonl">JSONL <span class="faint">– as stored</span></a>
+      </div>
+    </details>
+  </div>
+
+  <div class="audit-chips">
+    <button type="button" class="btn sm ghost audit-filters-toggle" data-audit-filters>Filters{% if links.terms %} ({{ links.terms | length }}){% endif %}</button>
+    {% for neg, k, v in links.terms %}
+    <a class="chip{{ ' neg' if neg }}" href="{{ links.without(loop.index0) }}" title="remove">{% if k %}<span class="faint">{{ '-' if neg }}{{ k }}:</span> {{ v }}{% else %}{{ '-' if neg }}“{{ v }}”{% endif %} <span aria-hidden="true">✕</span></a>
+    {% endfor %}
     <span class="spacer"></span>
-    <a class="btn sm" href="/logs/audit/export?{{ qs ~ '&' if qs }}fmt=csv" title="every entry matching the filters, as CSV">{{ icon('download') }}CSV</a>
-    <a class="btn sm" href="/logs/audit/export?{{ qs ~ '&' if qs }}fmt=jsonl" title="every entry matching the filters, as JSON lines (the stored format)">{{ icon('download') }}JSONL</a>
-  </form>
-  {% if entries %}
-  <div class="table-wrap"><table class="audit">
-    <colgroup><col style="width:84px"><col style="width:17%"><col><col style="width:15%"><col style="width:13%"></colgroup>
-    <thead><tr><th>Time</th><th>Actor</th><th>Event</th><th>Decision</th><th>Result</th></tr></thead>
-    <tbody>{% include "partials/audit_rows.html" %}</tbody>
-  </table></div>
-  <p class="help">Newest first. Secrets are never logged – API requests show method and path, bodies only as “(with body)”, forms in tentacontrol only which page and object. Allowed connections are counted per destination and 15 minutes; the built-in destinations only show on the Network page. Kept {{ retention }} days (<code>AUDIT_RETENTION_DAYS</code>). In the sandbox: <code>svc audit</code>.</p>
-  {% else %}
-  <div class="empty small">{{ 'Nothing matches these filters.' if filtered else 'Nothing logged in the last 24 hours.' }}</div>
-  {% endif %}
+    <span class="small muted">{{ '{:,}'.format(ov.total) }}{{ '+' if ov.capped }} events</span>
+  </div>
+
+  {% include "partials/audit_histogram.html" %}
+
+  <div class="audit-layout">
+    <aside class="audit-side">{% include "partials/audit_facets.html" %}</aside>
+    <div class="audit-main">
+      {% if entries %}
+      <div class="table-wrap"><table class="audit">
+        <colgroup><col style="width:84px"><col style="width:13%"><col style="width:86px"><col style="width:17%"><col><col style="width:96px"></colgroup>
+        <thead><tr><th>Time</th><th>Actor</th><th>Type</th><th>Target</th><th>Action</th><th>Outcome</th></tr></thead>
+        <tbody>{% include "partials/audit_rows.html" %}</tbody>
+      </table></div>
+      {% else %}
+      <div class="empty small">{{ 'Nothing matches this search.' if links.terms else 'Nothing logged in this time range.' }}</div>
+      {% endif %}
+      <p class="help">Newest first; click a row for every field. Search: words, <code>field:value</code>, <code>-field:value</code> (not), <code>field:"with spaces"</code>, <code>*</code> as wildcard – fields <code>actor user source type target action outcome</code>. Secrets are never logged – API requests show method and path, bodies only as “(with body)”, forms in tentacontrol only which page and object. Allowed connections are counted per destination and 15 minutes; the built-in destinations only show on the Network page. Kept {{ retention }} days (<code>AUDIT_RETENTION_DAYS</code>). In the sandbox: <code>svc audit</code>.</p>
+    </div>
+  </div>
 </div>
 {% endblock %}
+{% block scripts %}<script src="/static/audit.js?v={{ asset_v }}" defer></script>{% endblock %}

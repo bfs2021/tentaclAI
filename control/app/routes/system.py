@@ -371,73 +371,140 @@ async def job_stream(job_id: str):
     return StreamingResponse(gen(), media_type="text/event-stream", headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
 
-AUDIT_FILTERS = ("category", "actor", "service", "decision")
-AUDIT_KINDS = {"service": "svc", "tool": "tool", "network": "network", "admin": "admin", "auth": "sign-in", "job": "job",
-               "system": "system"}  # the Type of an entry – the same words in the filter and on the rows
+AUDIT_RANGES = (("15m", "15 min"), ("1h", "1 h"), ("24h", "24 h"), ("7d", "7 days"), ("30d", "30 days"), ("all", "all"))
+_AUDIT_OLD = (("actor", "actor"), ("category", "type"), ("service", "target"), ("decision", "decision"))  # older links
 
 
-def _audit_query(request):
-    """the filters of Logs → Audit from the query string (defaults: last 24 h, everything)"""
+def _audit_params(request):
+    """the search of Logs → Audit: q (tclib.audit_query), range, from/to – older links (?decision=…&since=7d, ?actor=…,
+    ?service=…, start/end) are turned into the same"""
     p = request.query_params
-    f = {k: p.get(k, "")[:120] for k in AUDIT_FILTERS}
-    f.update(since=p.get("since", "24h"), start=p.get("start", "")[:10], end=p.get("end", "")[:10], q=p.get("q", "")[:200],
-             origin=p.get("origin", "")[:80])
-    who = (p.get("actor") or p.get("who", ""))[:80]  # the page's one Actor choice: an actor, origin:<group> (Source) or job:<name>
-    if who in tclib.AUDIT_ACTORS:
-        f.update(actor=who, origin="")
-    elif who.startswith("origin:"):
-        f.update(actor="", origin=who[7:])
-    elif who.startswith("job:"):
-        f.update(actor="", origin=who)
-    return f
+    q = p.get("q", "")[:500]
+    for key, field in _AUDIT_OLD:
+        v = p.get(key, "").strip()[:120].replace('"', "")
+        if v and ":" not in v:
+            if key == "decision" and v in tclib.AUDIT_OUTCOMES:
+                field = "outcome"
+            q = (q + " " + tclib.audit_query_str([(False, field, v.lower())])).strip()
+    start, end = (p.get("from") or p.get("start", ""))[:16], (p.get("to") or p.get("end", ""))[:16]
+    rng = p.get("range") or p.get("since") or "24h"
+    if start or end:
+        rng = "custom"
+    elif rng not in dict(AUDIT_RANGES) and rng != "custom":
+        rng = "24h"
+    return {"q": q, "range": rng, "from": start, "to": end}
 
 
-def _audit_who(f):
-    """the Actor choice that shows the actor / origin filter"""
-    if f["origin"]:
-        return f["origin"] if f["origin"].startswith("job:") else "origin:" + f["origin"]
-    return f["actor"]
-
-
-def _audit_search(f):
-    """link of a target in a row: the same filters, with the target as the search text"""
-    return lambda text: "/logs?" + _audit_qs({**f, "q": text, "service": ""})
-
-
-def _audit_qs(f):
+def _audit_qs(f, **change):
     from urllib.parse import urlencode
-    return urlencode({k: v for k, v in f.items() if v and not (k == "since" and v == "24h")})
+    f = {**f, **change}
+    if f["range"] != "custom":
+        f.update({"from": "", "to": ""})
+    return urlencode({k: v for k, v in f.items() if v and not (k == "range" and v == "24h")})
+
+
+class _AuditLinks:
+    """links of the page: a changed search (facets, chips, values in rows and details), a time range (histogram)"""
+    def __init__(self, f):
+        self.f, self.terms = f, tclib.audit_query(f["q"])
+
+    def _with(self, terms):
+        return "/logs?" + _audit_qs(self.f, q=tclib.audit_query_str(terms))
+
+    def has(self, field, value, neg=False):
+        return (neg, field, str(value).lower()) in self.terms
+
+    def toggle(self, field, value):
+        """a facet value on (added) or off (removed)"""
+        t = (False, field, str(value).lower().replace('"', ""))
+        return self._with([x for x in self.terms if x != t] if t in self.terms else self.terms + [t])
+
+    def only(self, field, value):
+        v = str(value).lower().replace('"', "")
+        return self._with([x for x in self.terms if x[1] != field] + [(False, field, v)])
+
+    def exclude(self, field, value):
+        v = str(value).lower().replace('"', "")
+        return self._with([x for x in self.terms if not (x[1] == field and x[2] == v)] + [(True, field, v)])
+
+    def drop(self, field, value, neg=False):
+        return self._with([x for x in self.terms if x != (neg, field, str(value).lower())])
+
+    def without(self, i):
+        return self._with(self.terms[:i] + self.terms[i + 1:])
+
+    def clear(self, field):
+        return self._with([x for x in self.terms if x[1] != field])
+
+    def chosen(self, field):
+        return [x for x in self.terms if x[1] == field]
+
+    def span(self, t0, t1):
+        fmt = "%Y-%m-%dT%H:%M"
+        return "/logs?" + _audit_qs(self.f, range="custom", **{"from": time.strftime(fmt, time.localtime(t0)),
+                                                                 "to": time.strftime(fmt, time.localtime(t1 - 1))})
+
+    def reset(self):
+        return "/logs?" + _audit_qs(self.f, q="")
+
+    def rng(self, key):
+        return "/logs?" + _audit_qs(self.f, range=key)
+
+
+def _audit_bars(ov, links):
+    """the histogram as bars for the SVG: x, stacked heights, link, title; axis marks"""
+    bars, width = ov["bars"], ov["width"]
+    top = max([sum(c.values()) for _, c in bars] + [1])
+    out = []
+    for i, (t, c) in enumerate(bars):
+        y, parts = 100.0, []
+        for cls in ("ok", "flagged", "denied", "failed"):
+            h = c[cls] / top * 96
+            if h:
+                y -= h
+                parts.append((cls, round(y, 2), round(h, 2)))
+        fmt = "%H:%M" if width < 86400 else "%d.%m"
+        title = f"{time.strftime('%d.%m %H:%M', time.localtime(t))} – {time.strftime(fmt, time.localtime(t + width))}: " + \
+            (", ".join(f"{n} {k}" for k, n in c.items() if n) or "nothing")
+        out.append({"i": i, "parts": parts, "link": links.span(t, t + width), "title": title, "from": t, "to": t + width})
+    n = len(bars)
+    span = bars[-1][0] + width - bars[0][0] if bars else 0
+    fmt = "%H:%M" if span <= 86400 else "%d.%m %H:%M" if span <= 7 * 86400 else "%d.%m"
+    marks = [(round(i / 4 * n, 2), time.strftime(fmt, time.localtime(bars[0][0] + i / 4 * span))) for i in range(5)] if bars else []
+    return {"bars": out, "n": n, "marks": marks, "top": top}
+
+
+def _audit_ctx(f):
+    return {"f": f, "qs": _audit_qs(f), "links": _AuditLinks(f), "types": tclib.AUDIT_TYPES}
 
 
 @router.get("/logs", response_class=HTMLResponse)
 async def logs_page(request: Request):
-    """Logs → Audit: everything Claude, jobs, the user and tentaclAI did – filter, search, export"""
+    """Logs → Audit: everything Claude, jobs, the user and tentaclAI did – search, facets, histogram, export"""
     auditlog.mark_flags_seen()  # opening the audit log counts as having seen the flagged entries
-    f = _audit_query(request)
-    entries, more = await asyncio.to_thread(auditlog.entries, **f)
-    services, jobs_known = await asyncio.to_thread(auditlog.known)
-    filtered = any(f[k] for k in (*AUDIT_FILTERS, "q", "origin", "start", "end")) or f["since"] != "24h"
-    return page(request, "logs.html", entries=entries, more=more, f=f, who=_audit_who(f), qs=_audit_qs(f), filtered=filtered,
-                search=_audit_search(f), kinds=AUDIT_KINDS,
-                services_known=services, jobs_known=jobs_known, categories=tclib.AUDIT_CATEGORIES,
-                actors=tclib.AUDIT_ACTORS, decisions=tclib.AUDIT_DECISIONS, retention=tclib.audit_retention(read_env()))
+    f = _audit_params(request)
+    args = {"q": f["q"], "rng": f["range"], "start": f["from"], "end": f["to"]}
+    (entries, more), ov = await asyncio.gather(asyncio.to_thread(auditlog.search, **args),
+                                               asyncio.to_thread(auditlog.overview, **args))
+    ctx = _audit_ctx(f)
+    return page(request, "logs.html", entries=entries, more=more, ov=ov, hist=_audit_bars(ov, ctx["links"]),
+                ranges=AUDIT_RANGES, fields=tclib.AUDIT_FIELDS, retention=tclib.audit_retention(read_env()), **ctx)
 
 
 @router.get("/logs/audit/more", response_class=HTMLResponse)
 async def logs_audit_more(request: Request, after: str = ""):
     """the next page of entries ("Load more") – rows only"""
-    f = _audit_query(request)
-    entries, more = await asyncio.to_thread(auditlog.entries, after=after[:40], **f)
-    return templates.TemplateResponse(request, "partials/audit_rows.html", {"entries": entries, "more": more, "qs": _audit_qs(f),
-                                                                           "search": _audit_search(f), "kinds": AUDIT_KINDS})
+    f = _audit_params(request)
+    entries, more = await asyncio.to_thread(auditlog.search, f["q"], f["range"], f["from"], f["to"], after[:40])
+    return templates.TemplateResponse(request, "partials/audit_rows.html", {"entries": entries, "more": more, **_audit_ctx(f)})
 
 
 @router.get("/logs/audit/export")
 async def logs_audit_export(request: Request, fmt: str = "csv"):
-    """every entry matching the filters, as CSV or JSON lines – the export itself is an audit entry too"""
+    """every entry matching the search, as CSV or JSON lines – the export itself is an audit entry too"""
     fmt = "jsonl" if fmt == "jsonl" else "csv"
-    f = _audit_query(request)
-    lines = await asyncio.to_thread(lambda: list(auditlog.export(fmt, **f)))
+    f = _audit_params(request)
+    lines = await asyncio.to_thread(lambda: list(auditlog.export(fmt, f["q"], f["range"], f["from"], f["to"])))
     auditlog.user(request, "admin", "audit log", f"export as {fmt}", part="logs", mode="GET",
                   detail=f"{max(0, len(lines) - (fmt == 'csv'))} entries · " + (_audit_qs(f)[:280] or "no filter"))
     name = f"tentaclai-audit-{time.strftime('%Y%m%d-%H%M')}.{fmt}"

@@ -4,6 +4,7 @@ reading for Logs → Audit (with origin labels and links), export, the ⚠ badge
 Format, files, rotation and search are tclib's (`tclib.audit_*`) – the same code svc uses in the sandbox.
 """
 import asyncio
+import json
 import os
 import time
 
@@ -14,7 +15,6 @@ from .config import DATA_DIR
 from .envfile import read_env
 
 FLAGS_SEEN = os.path.join(DATA_DIR, "flags-seen.json")
-SINCE = {"1h": 3600, "24h": 86400, "7d": 7 * 86400, "30d": 30 * 86400}  # the time filter of Logs → Audit
 PAGE = 200
 
 
@@ -39,64 +39,90 @@ def user(request, category, service, action, decision="ok", user=None, **extra):
     write(category, service, action, decision, actor="user", user=user, ip=request.client.host if request.client else "", **extra)
 
 
-def _enrich(e):
+RANGES = {"15m": 900, "1h": 3600, "24h": 86400, "7d": 7 * 86400, "30d": 30 * 86400}  # the time picker of Logs → Audit
+SCAN = 20_000  # entries read for the facets and the histogram
+
+
+def _sources():
+    """source(e) → readable source ("Claude terminal · “title”", "Job · backup", the user's address …) and link(e) –
+    remembered per origin for one request (the labels read the session and job files)"""
     from .activity import origin_label, origin_link
-    o = tclib.audit_origin(e)
-    e["from_label"] = origin_label(o) or ((f"{e['user']} · tentacontrol" if e.get("user") else "tentacontrol")
-                                          if e["actor"] == "user" else "")
-    e["from_link"] = origin_link(o)
-    return e
+    seen = {}
+
+    def label(e):
+        o = tclib.audit_origin(e)
+        if not o:
+            return e.get("ip", "")
+        key = tuple(sorted(o.items()))
+        if key not in seen:
+            seen[key] = (origin_label(o) or tclib.audit_source(e), origin_link(o))
+        return seen[key][0]
+
+    def link(e):
+        o = tclib.audit_origin(e)
+        return seen.get(tuple(sorted(o.items())), ("", ""))[1] if o else ""
+    return label, link
 
 
-def _origin_match(origin, target=""):
-    """the Who filter's origin (session / job / host, or job:<name>) and the target filter (part of the target's name,
-    any case) as one predicate"""
-    from .activity import origin_group, origin_label
-    tests = []
-    if origin.startswith("job:"):
-        tests.append(lambda e: origin_label(tclib.audit_origin(e)) == f"Job · {origin[4:]}")
-    elif origin:
-        tests.append(lambda e: origin_group(tclib.audit_origin(e)) == origin)
-    if target.strip():
-        t = target.strip().lower()
-        tests.append(lambda e: t in str(e.get("service", "")).lower())
-    return (lambda e: all(test(e) for test in tests)) if tests else None
-
-
-def window(since="", start="", end=""):
-    """(since, until) in epoch seconds from the filter: a SINCE key, or own dates (YYYY-MM-DD, end inclusive)"""
-    def day(s, add=0):
+def _when(s, end=False):
+    """epoch of "YYYY-MM-DDTHH:MM" (or a date: its start, its end with end=True); 0 if empty or unreadable"""
+    for fmt, add in (("%Y-%m-%dT%H:%M", 60 if end else 0), ("%Y-%m-%d", 86400 if end else 0)):
         try:
-            return time.mktime(time.strptime(s, "%Y-%m-%d")) + add
+            return time.mktime(time.strptime(s, fmt)) + add
         except ValueError:
-            return 0
-    if start or end:
-        return day(start), day(end, 86400) if end else 0
-    return (time.time() - SINCE[since], 0) if since in SINCE else (0, 0)
+            continue
+    return 0
 
 
-def entries(limit=None, since="24h", start="", end="", q="", after="", origin="", service="", **filters):
-    """(entries, more) newest first for the page – filters: category, actor, decision; service: part of the target"""
-    t0, t1 = window(since, start, end)
-    found, more = tclib.audit_read(DATA_DIR, limit=limit or PAGE, since=t0, until=t1, filters=filters, q=q, after=after,
-                                   match=_origin_match(origin, service))
-    return [_enrich(e) for e in found], more
+def window(rng="24h", start="", end=""):
+    """(since, until) in epoch seconds: a RANGES key, "all", or custom start/end (local time, end inclusive)"""
+    if rng == "custom" or start or end:
+        return _when(start), _when(end, end=True)
+    return (time.time() - RANGES[rng], 0) if rng in RANGES else (0, 0)
 
 
-def export(fmt, since="24h", start="", end="", q="", origin="", service="", **filters):
+def _viewed(entries, label, link):
+    for e in entries:
+        if "_view" not in e:
+            e["_view"] = tclib.audit_view(e, label)
+        e["_link"] = link(e)
+        e["_raw"] = json.dumps({k: v for k, v in e.items() if not k.startswith("_")}, ensure_ascii=False, indent=1)
+    return entries
+
+
+def search(q="", rng="24h", start="", end="", after="", limit=None):
+    """(entries, more) newest first for the table; each entry carries _view (tclib.audit_view), _link and _raw"""
+    t0, t1 = window(rng, start, end)
+    label, link = _sources()
+    found, more = tclib.audit_read(DATA_DIR, limit=limit or PAGE, since=t0, until=t1, query=q, source=label, after=after)
+    return _viewed(found, label, link), more
+
+
+def overview(q="", rng="24h", start="", end=""):
+    """facets, histogram and the number of matches – over up to SCAN entries of the time range"""
+    t0, t1 = window(rng, start, end)
+    label, _ = _sources()
+    terms = tclib.audit_query(q)
+    scan, capped = tclib.audit_read(DATA_DIR, limit=SCAN, since=t0, until=t1)
+    for e in scan:
+        e["_view"] = tclib.audit_view(e, label)
+    hits = [e for e in scan if not tclib.audit_fails(e, e["_view"], terms)]
+    now = time.time()
+    lo = tclib.audit_epoch(scan[-1]["ts"]) if scan and (capped or not t0) else (t0 or now - 3600)
+    hi = min(t1, now) if t1 else now
+    width = tclib.audit_bucket(max(60, hi - lo))
+    return {"facets": tclib.audit_facets(scan, terms), "total": len(hits), "capped": capped, "width": width,
+            "bars": tclib.audit_histogram(hits, lo, hi, width)}
+
+
+def export(fmt, q="", rng="24h", start="", end=""):
     """every matching entry as export lines (tclib.audit_export) – no page limit"""
-    t0, t1 = window(since, start, end)
-    found, _ = tclib.audit_read(DATA_DIR, limit=500_000, since=t0, until=t1, filters=filters, q=q,
-                                match=_origin_match(origin, service))
+    t0, t1 = window(rng, start, end)
+    label, _ = _sources()
+    found, _ = tclib.audit_read(DATA_DIR, limit=500_000, since=t0, until=t1, query=q, source=label)
+    for e in found:
+        e.setdefault("_view", tclib.audit_view(e, label))
     return tclib.audit_export(found, fmt)
-
-
-def known(limit=3000):
-    """services and job names of recent entries – the choices of the filters"""
-    found, _ = tclib.audit_read(DATA_DIR, limit=limit, since=time.time() - SINCE["30d"])
-    from .activity import origin_label
-    jobs = {origin_label(tclib.audit_origin(e))[6:] for e in found if e.get("origin_job")}
-    return sorted({e.get("service", "") for e in found} - {""}), sorted(jobs - {""})
 
 
 # ---------------------------------------------------------------- flagged entries: the ⚠ badge next to Logs
@@ -114,7 +140,6 @@ def _flag_times():
     if _flags["ino"] != st.st_ino or st.st_size < _flags["pos"]:
         _flags.update(ino=st.st_ino, pos=0)  # rotated: the old file's flags stay counted
     if st.st_size > _flags["pos"]:
-        import json
         with open(path, "rb") as f:
             f.seek(_flags["pos"])
             chunk = f.read()

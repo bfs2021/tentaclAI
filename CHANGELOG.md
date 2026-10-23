@@ -8,9 +8,11 @@ All notable changes, newest first. Every release lists **upgrade steps** from th
 - **One audit log for everything** – tentacontrol → *Logs → Audit*: Claude's tool calls (through the Claude Code hook),
   every `svc` command including reads, network connections of the sandbox (counted per destination and 15 minutes,
   refused ones at once), scheduled job runs, your changes in tentacontrol, terminal sessions, sign-ins and failed
-  attempts, tentacontrol's start. Compact rows (time · actor and source · event · decision · result), filters along the
-  columns (time – also own dates –, actor or source, type, decision), full-text search, *Load more*, and **CSV / JSONL export** of
-  exactly what the filters match.
+  attempts, tentacontrol's start. Read it like other log tools: a search line with `field:value` terms
+  (`actor:claude outcome:denied docker`, `-type:network`, `target:mail*`), a time range picker, filters as chips,
+  a sidebar with the values of each field and their counts, a histogram of the events by outcome (click or drag to
+  zoom), one value per column (time · actor · type · target · action · outcome), every field of an entry on a click,
+  *Load more*, and **CSV / JSONL export** of exactly what matches.
 - **Accounts with a username**: the first setup asks for username, email and an optional name; you sign in with
   username + password, and the username names you in the audit log (field `user`, also for failed sign-ins: the name
   that was typed) and on approvals. Settings → *Account* (was *Security*) changes username, email, name and the password.
@@ -30,7 +32,8 @@ All notable changes, newest first. Every release lists **upgrade steps** from th
 - The Claude Code hook `tc-guard` now runs for every tool (`matcher: "*"`) and also with `INJECTION_GUARD=false`
   (then `tc-guard --no-scan`: logging only). It reports through `svc tool-report` (`svc guard-report` still works).
 - `./tentaclai.sh passwd` shows the username; `./tentaclai.sh passwd --username <name>` renames the account.
-- `svc audit` takes filters: `[n] [--since 24h|7d] [--category c] [--service s] [--decision d] [--actor a] [text]`.
+- `svc audit [n] [--since 24h|7d] [search]` takes the same search (`svc audit 50 type:network outcome:blocked`); the
+  older `--category/--service/--decision/--actor` still work.
 
 ### Upgrade
 - `git pull` in the stack directory, then `docker compose build` and `docker compose up -d` – all three images change

@@ -178,6 +178,7 @@ echo "{\"tool_name\": \"Edit\", \"tool_input\": {\"file_path\": \"$TURL\"}, \"to
 wait_for 15 sh -c "docker exec tctest-claude grep -q '$TURL' '$T/data/control/audit.jsonl'" || true
 check "every tool call lands in the audit log" "$(docker exec tctest-claude grep "$TURL" "$T/data/control/audit.jsonl" | grep -c '"category": "tool"' || true)" "1"
 check "Claude can't read the audit log" "$($C cat "$T/data/control/audit.jsonl" >/dev/null 2>&1 && echo yes || echo no)" "no"
+check "svc audit takes the search of Logs → Audit" "$(docker exec tctest-claude svc audit 50 type:tool -outcome:failed 2>/dev/null | grep -c ' tool ' | grep -qv '^0$' && echo yes || echo no)" "yes"
 check "sandbox skills switched off" "$($C python3 -c 'import json,os;print(json.load(open(os.path.expanduser("~/.claude/settings.json")))["skillOverrides"]["anthropic-skills:pptx"])' 2>/dev/null)" "off"
 check "sudo only for svc" "$($C sudo -n id >/dev/null 2>&1 && echo yes || echo no)" "no"
 check "SQL shell refused on a ro database" "$(echo 'select 1;' | $CI svc db testdb shell >/dev/null 2>&1 && echo yes || echo no)" "no"

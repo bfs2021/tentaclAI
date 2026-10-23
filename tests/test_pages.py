@@ -233,7 +233,7 @@ def test_flagged_entry_shows_what_was_found(client, app_module, tmp_path, monkey
         "excerpts": [{"reason": "asks to ignore instructions", "text": "line 4: <b>ignore</b> previous instructions"}]}) + "\n")
     html = client.get("/logs").text
     assert "Indicators" in html and "line 4: &lt;b&gt;ignore&lt;/b&gt; previous instructions" in html
-    assert "Claude warned" in html and "not run" not in html
+    assert '>flagged</span>' in html and "asks to ignore instructions" in html
     assert "notes.md" in client.get("/logs?q=previous+instructions").text  # the excerpts are searchable
 
 
@@ -615,7 +615,7 @@ def test_network_seen_table_is_sortable(client, monkeypatch):
     assert 'data-count="7" data-last="200"' in html and 'data-rule="0"' in html and 'data-rule="2demo"' in html
 
 
-def test_audit_long_action_collapses(client, app_module, tmp_path, monkeypatch):
+def test_audit_rows_have_details(client, app_module, tmp_path, monkeypatch):
     import json
     from app import auditlog
     f = tmp_path / "audit.jsonl"
@@ -625,11 +625,12 @@ def test_audit_long_action_collapses(client, app_module, tmp_path, monkeypatch):
              "action": "compose up -d " + "x" * 120, "decision": "auto"}]
     f.write_text("".join(json.dumps(r) + "\n" for r in rows))
     monkeypatch.setattr(auditlog, "DATA_DIR", str(tmp_path))
-    html = client.get("/logs?since=all").text
-    assert html.count("<details><summary>") == 1 and "tentacontrol + 15 min" in html
+    html = client.get("/logs?range=all").text
+    assert html.count("data-audit-row") == 2 and html.count('class="audit-detail" hidden') == 2
+    assert "tentacontrol + 15 min" in html and "docker · confirm" in html and '&#34;decision&#34;: &#34;approved&#34;' in html  # fields + JSON
 
 
-def test_audit_filters_error_and_origin_link(client, app_module, tmp_path, monkeypatch):
+def test_audit_search_facets_and_histogram(client, app_module, tmp_path, monkeypatch):
     import json
     import time
     from app import auditlog
@@ -643,27 +644,35 @@ def test_audit_filters_error_and_origin_link(client, app_module, tmp_path, monke
              "decision": "auto", "exit": 0, "from": {"by": "root"}}]
     f.write_text("".join(json.dumps(r) + "\n" for r in rows))
     monkeypatch.setattr(auditlog, "DATA_DIR", str(tmp_path))
-    html = client.get("/logs?since=all").text
+    html = client.get("/logs?range=all").text
     assert "no such service: web" in html and 'href="/terminal?p=claude"' in html and "compose old" in html
+    assert ">failed</span>" in html and "3 events" in html and "<svg" in html  # outcome, count, histogram
     html = client.get("/logs").text  # last 24 h by default
-    assert "compose old" not in html and "POST /items" in html and "audit-reset off" in html
-    html = client.get("/logs?origin=session").text
-    assert "compose web" in html and "POST /items" not in html and "audit-reset\"" in html
+    assert "compose old" not in html and "POST /items" in html and "2 events" in html
+    html = client.get("/logs?q=outcome:failed").text
+    assert "compose web" in html and "POST /items" not in html and 'class="chip"' in html
+    # facets: counted under the other terms – with outcome:failed chosen, ok still shows its number
+    assert 'class="facet-v on"' in html and '<span class="facet-name">ok</span><span class="facet-n">1</span>' in html
+    html = client.get("/logs?q=-target:demohost").text
+    assert "POST /items" in html and "compose web" not in html and 'class="chip neg"' in html
     html = client.get("/logs?q=ITEMS").text
     assert "POST /items" in html and "compose web" not in html
     assert "Nothing matches" in client.get("/logs?q=nothing-like-this").text
-    html = client.get("/logs?actor=system&since=all").text  # by root = system
+    html = client.get("/logs?q=source:\"tentacontrol / host\"&range=all").text  # by root
     assert "POST /items" in html and "compose web" not in html
-    html = client.get("/logs?start=2020-01-01&end=2020-01-01").text  # own dates
-    assert "compose old" in html and "POST /items" not in html
-    html = client.get("/logs?actor=origin:session").text  # the page's one Actor select: a source
-    assert "compose web" in html and "POST /items" not in html and 'value="origin:session" selected' in html
-    html = client.get("/logs?who=system&since=all").text
-    assert "POST /items" in html and "compose web" not in html and 'type="date"' not in html  # dates only for own dates
-    assert 'type="date"' in client.get("/logs?since=custom").text
-    html = client.get("/logs?service=DEMOH&since=all").text  # target (old links): part of the name, any case
-    assert "compose web" in html and "POST /items" not in html and 'name="service"' not in html
-    assert 'href="/logs?since=all&amp;q=demohost"' in html  # a target in a row searches for it
+    html = client.get("/logs?q=target:demo*").text  # wildcard
+    assert "POST /items" in html and "compose web" in html
+    html = client.get("/logs?range=custom&from=2020-01-01T00:00&to=2020-01-01T23:59").text
+    assert "compose old" in html and "POST /items" not in html and 'type="datetime-local"' in html
+    # older links keep working
+    html = client.get("/logs?actor=system&since=all").text
+    assert "POST /items" in html and "compose web" not in html
+    assert "compose old" in client.get("/logs?start=2020-01-01&end=2020-01-01").text
+    html = client.get("/logs?service=demohost&decision=auto&since=all").text
+    assert "compose web" in html and "POST /items" not in html and "target:</span> demohost" in html
+    # values in rows and the histogram bars are links that narrow the search
+    assert 'href="/logs?q=target%3Ademohost"' in client.get("/logs").text
+    assert "range=custom&amp;from=" in client.get("/logs").text
 
 
 def test_audit_load_more_and_export(client, app_module, tmp_path, monkeypatch):
@@ -707,7 +716,8 @@ def test_admin_actions_and_sign_in_are_audited(client, app_module, tmp_path, mon
     assert "certainly-wrong" not in str(bad)
     from app import auth
     auth.clear_failures("testclient")
-    assert "admin · tentacontrol" in client.get("/logs").text  # Who: the username
+    html = client.get("/logs").text
+    assert '<span class="actor actor-user"><a class="audit-val" href="/logs?q=user%3Aadmin"' in html  # the username
 
 
 def test_egress_audit_endpoint(client, app_module, tmp_path, monkeypatch):

@@ -1,22 +1,33 @@
-{# rows of Logs → Audit – the page and "Load more" (/logs/audit/more) render the same rows #}
-{% macro clip(text, n=80) %}{% if text | length > n or '\n' in text %}<details><summary>{{ text }}</summary></details>{% else %}{{ text }}{% endif %}{% endmacro %}
-{% set pills = {'read': 'off', 'auto': 'info', 'approved': 'ok', 'denied': 'err', 'blocked': 'warn', 'expired': 'off', 'error': 'err',
-                'flagged': 'warn', 'allowed': 'off', 'ok': 'ok', 'failed': 'err'} %}
-{% set who = {'claude': 'Claude', 'job': 'Job', 'user': 'User', 'system': 'System'} %}
-{% for e in entries %}
-<tr class="sev-{{ e.severity }}">
-  <td class="mono small nowrap" title="{{ e.ts }}">{{ e.ts[11:19] }}<div class="faint">{{ e.ts[:10] }}</div></td>
-  <td class="small audit-from"><span class="actor actor-{{ e.actor }}">{{ who.get(e.actor, e.actor) }}</span>
-    {% if e.from_label %}<div class="faint" title="reported by the calling session – a hint, not proof">{% if e.from_link %}<a href="{{ e.from_link }}">{{ e.from_label }}</a>{% else %}{{ e.from_label }}{% endif %}</div>{% endif %}
-    {% if e.ip %}<div class="faint mono">{{ e.ip }}</div>{% endif %}</td>
-  <td class="audit-what"><div class="row" style="gap:6px;flex-wrap:nowrap;min-width:0"><span class="tag">{{ kinds.get(e.category, e.category) }}</span>{% if e.service %}<a class="audit-svc" href="{{ search(e.service) }}" title="search for {{ e.service }}"><strong>{{ e.service }}</strong></a>{% endif %}
-    {% if e.part and e.part not in (e.category, 'claude') %}<span class="small faint nowrap">{{ e.part }}{% if e.mode %} · {{ e.mode }}{% endif %}</span>{% elif e.mode and e.mode != 'read' %}<span class="small faint nowrap">{{ e.mode }}</span>{% endif %}</div>
-    <div class="mono small audit-action">{{ clip(e.action) }}</div>{% if e.excerpts %}
-    <details class="audit-excerpts" open><summary>Indicators</summary>{% for x in e.excerpts %}<div><span class="faint">{{ x.reason }}:</span> {{ x.text }}</div>{% endfor %}</details>{% endif %}</td>
-  <td><span class="pill {{ pills.get(e.decision, 'off') }}">{{ e.decision }}</span>{% if e.detail %}<div class="small faint audit-detail">{{ clip(e.detail, 60) }}</div>{% endif %}</td>
-  <td class="small audit-result">{% if e.exit is defined %}{{ '✓' if e.exit == 0 else '✗ exit ' ~ e.exit }}{% if e.seconds is defined %} <span class="faint">{{ e.seconds }} s</span>{% endif %}{% elif e.count is defined %}{{ e.count }}×{% elif e.seconds is defined %}<span class="faint">{{ e.seconds }} s</span>{% elif e.decision == 'flagged' %}<span class="faint" title="nothing was blocked: Claude got a warning next to the content">Claude warned</span>{% elif e.category == 'service' and e.decision in ('denied', 'blocked', 'expired', 'error') %}<span class="faint">not run</span>{% else %}<span class="faint">–</span>{% endif %}{% if e.error %}<div class="mono small audit-error">{{ clip(e.error, 60) }}</div>{% endif %}</td>
+{# rows of Logs → Audit – the page and "Load more" (/logs/audit/more) render the same rows; each with a detail row #}
+{% set pills = {'ok': 'ok', 'approved': 'ok', 'flagged': 'warn', 'denied': 'err', 'blocked': 'warn', 'expired': 'off', 'failed': 'err'} %}
+{% macro val(field, value, label=None) %}{% if value %}<a class="audit-val" href="{{ links.toggle(field, value) }}" title="filter {{ field }}:{{ value }}">{{ label or value }}</a>{% endif %}{% endmacro %}
+{% for e in entries %}{% set v = e._view %}
+<tr class="audit-row sev-{{ e.severity }}" data-audit-row tabindex="0" aria-expanded="false">
+  <td class="mono small nowrap" title="{{ e.ts }}">{{ e.ts[11:19] }}<div class="faint">{{ e.ts[5:10] }}</div></td>
+  <td class="small nowrap audit-actor">{% if v.actor == 'user' and v.user %}<span class="actor actor-user">{{ val('user', v.user) }}</span>{% else %}<span class="actor actor-{{ v.actor }}">{{ val('actor', v.actor) }}</span>{% endif %}</td>
+  <td><span class="tag">{{ val('type', v.type) }}</span></td>
+  <td class="audit-target small">{{ val('target', v.target) }}</td>
+  <td class="mono small audit-action">{{ v.action }}</td>
+  <td><span class="pill {{ pills.get(v.outcome, 'off') }}"{% if e.error %} title="{{ e.error[:200] }}"{% endif %}>{{ v.outcome }}</span></td>
 </tr>
+<tr class="audit-detail" hidden><td colspan="6">
+  <div class="audit-fields">
+    {% for key, value in (('time', e.ts), ('actor', v.actor), ('user', v.user), ('source', v.source), ('type', v.type), ('target', v.target),
+                          ('action', v.action), ('outcome', v.outcome), ('decision', v.decision)) if value %}
+    <div class="af"><span class="af-k">{{ key }}</span><span class="af-v{{ ' mono' if key in ('action', 'time') }}">{% if key == 'source' and e._link %}<a href="{{ e._link }}">{{ value }}</a>{% else %}{{ value }}{% endif %}</span>
+      {% if key not in ('time', 'action') %}<span class="af-act"><a href="{{ links.toggle(key, value) }}">filter</a><a href="{{ links.exclude(key, value) }}">exclude</a></span>{% endif %}</div>
+    {% endfor %}
+    {% for key, value in (('part · mode', (e.part ~ (' · ' ~ e.mode if e.mode else '')) if e.part not in (e.category, 'claude') else e.mode),
+                          ('exit', e.exit), ('seconds', e.seconds), ('count', e.count), ('detail', e.detail), ('error', e.error), ('ip', e.ip),
+                          ('id', e.id), ('severity', e.severity)) if value is defined and value is not none and value != '' %}
+    <div class="af"><span class="af-k">{{ key }}</span><span class="af-v{{ ' mono' if key in ('error', 'id', 'ip', 'detail') }}">{{ value }}</span>
+      {% if key == 'ip' %}<span class="af-act"><a href="{{ links.toggle('ip', value) }}">filter</a><a href="{{ links.exclude('ip', value) }}">exclude</a></span>{% endif %}</div>
+    {% endfor %}
+  </div>
+  {% if e.excerpts %}<div class="audit-excerpts"><strong class="small">Indicators</strong>{% for x in e.excerpts %}<div><span class="faint">{{ x.reason }}:</span> {{ x.text }}</div>{% endfor %}</div>{% endif %}
+  <details class="audit-raw"><summary class="small">JSON</summary><button type="button" class="btn sm ghost" data-copy>Copy</button><pre class="mono small">{{ e._raw }}</pre></details>
+</td></tr>
 {% endfor %}
 {% if more and entries %}
-<tr class="audit-more"><td colspan="5"><button class="btn sm ghost" type="button" hx-get="/logs/audit/more?{{ qs ~ '&' if qs }}after={{ entries[-1].id }}" hx-target="closest tr" hx-swap="outerHTML">Load more</button></td></tr>
+<tr class="audit-more"><td colspan="6"><button class="btn sm ghost" type="button" hx-get="/logs/audit/more?{{ qs ~ '&' if qs }}after={{ entries[-1].id }}" hx-target="closest tr" hx-swap="outerHTML">Load more</button></td></tr>
 {% endif %}

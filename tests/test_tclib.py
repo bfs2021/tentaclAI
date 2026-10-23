@@ -361,8 +361,50 @@ def test_audit_export_csv_and_jsonl():
     e = tclib.audit_entry("tool", "Read", "=HYPERLINK(\"x\")", "flagged", excerpts=[{"reason": "r", "text": "t"}], exit=0)
     rows = list(csv.DictReader(io.StringIO("".join(tclib.audit_export([e], "csv")))))
     assert rows[0]["action"].startswith("'=") and rows[0]["excerpts"] == "r: t" and rows[0]["exit"] == "0"  # no formulas
-    assert "".join(tclib.audit_export([], "csv")).startswith("ts,id,severity")
+    assert "".join(tclib.audit_export([], "csv")).startswith("time,actor,user,source,type,target,action,outcome")
+    assert rows[0]["type"] == "tool" and rows[0]["target"] == "Read" and rows[0]["outcome"] == "flagged"
     assert json.loads("".join(tclib.audit_export([e], "jsonl"))) == e
+
+
+def test_audit_query():
+    q = tclib.audit_query('actor:Claude -type:auth target:"my host" docker -noise http://x unknown:y type:service')
+    assert q == [(False, "actor", "claude"), (True, "type", "sign-in"), (False, "target", "my host"), (False, None, "docker"),
+                 (True, None, "noise"), (False, None, "http://x"), (False, None, "unknown:y"), (False, "type", "svc")]
+    assert tclib.audit_query(tclib.audit_query_str(q)) == q  # back and forth
+    assert tclib.audit_query("category:auth service:gate") == [(False, "type", "sign-in"), (False, "target", "gate")]
+
+
+def test_audit_outcome_and_matching():
+    def e(**kw):
+        return tclib.audit_entry(kw.pop("category", "service"), kw.pop("service", "gate"), kw.pop("action", "docker ps"),
+                                 kw.pop("decision", "auto"), actor="claude", **kw)
+    assert tclib.audit_outcome(e(exit=0)) == "ok" and tclib.audit_outcome(e(exit=2)) == "failed"
+    assert tclib.audit_outcome(e(decision="approved", exit=0)) == "approved"
+    assert tclib.audit_outcome(e(decision="approved", error="boom")) == "failed"
+    assert tclib.audit_outcome(e(decision="denied")) == "denied" and tclib.audit_outcome(e(decision="read")) == "ok"
+    a, b, c = e(service="gate"), e(service="origin", exit=1), e(service="docktopus", decision="denied")
+    def hits(text):
+        terms = tclib.audit_query(text)
+        return [x["service"] for x in (a, b, c) if not tclib.audit_fails(x, tclib.audit_view(x), terms)]
+    assert hits("target:gate target:origin") == ["gate", "origin"]  # same field: or
+    assert hits("target:gate outcome:failed") == []  # different fields: and
+    assert hits("-outcome:ok") == ["origin", "docktopus"] and hits("target:d*") == ["docktopus"]
+    assert hits("DOCKER") == ["gate", "origin", "docktopus"] and hits("-docker") == []
+
+
+def test_audit_facets_and_histogram():
+    t0 = 1_800_000_000
+    es = []
+    for i, (svc, dec) in enumerate((("gate", "auto"), ("gate", "denied"), ("origin", "auto"), ("origin", "auto"))):
+        x = tclib.audit_entry("service", svc, "docker ps", dec, actor="claude")
+        x["ts"] = tclib.audit_ts(t0 + i * 600)
+        es.append(x)
+    f = tclib.audit_facets(es, tclib.audit_query("target:gate"))
+    assert f["target"] == [("origin", 2), ("gate", 2)] or f["target"] == [("gate", 2), ("origin", 2)]  # own field: all values
+    assert f["outcome"] == [("denied", 1), ("ok", 1)]  # other fields: under target:gate
+    bars = tclib.audit_histogram(es, t0, t0 + 1800, 900)
+    assert [sum(c.values()) for _, c in bars] == [2, 1, 1] and bars[0][1]["denied"] == 1
+    assert tclib.audit_bucket(86400) == 1800 and tclib.audit_bucket(3600) == 60
 
 
 def test_audit_syslog_rfc5424():

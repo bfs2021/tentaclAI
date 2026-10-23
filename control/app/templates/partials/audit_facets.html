@@ -1,0 +1,24 @@
+{# the sidebar of Logs → Audit: per field the values of the time range with their counts (under the other terms) #}
+<div class="audit-facets">
+  <div class="between facets-head"><strong class="small">Filters</strong>{% if links.terms %}<a class="small" href="{{ links.reset() }}">Reset</a>{% endif %}</div>
+  <input type="search" class="facet-filter" placeholder="filter values…" aria-label="Filter values" data-facet-filter>
+  {% for field in fields %}
+  {% set vals = ov.facets[field] %}{% set chosen = links.chosen(field) %}
+  <details class="facet" data-facet="{{ field }}"{% if field in ('outcome', 'actor', 'type', 'target') or chosen %} open{% endif %}>
+    <summary><span>{{ field }}</span>{% if chosen %}<a class="facet-clear" href="{{ links.clear(field) }}">clear</a>{% endif %}</summary>
+    {% set shown = vals | map('first') | map('lower') | list %}
+    {% for neg, k, v in chosen if v not in shown %}
+    <div class="facet-v {{ 'off' if neg else 'on' }}" data-v="{{ v }}"><a class="facet-check" href="{{ links.drop(field, v, neg) }}"><span class="box"></span><span class="facet-name">{{ v }}</span><span class="facet-n">0</span></a></div>
+    {% endfor %}
+    {% for v, n in vals[:50] %}
+    {% set on = links.has(field, v) %}{% set off = links.has(field, v, True) %}
+    <div class="facet-v{{ ' on' if on }}{{ ' off' if off }}{{ ' extra' if loop.index > 5 and not on and not off }}" data-v="{{ v | lower }}">
+      <a class="facet-check" href="{{ links.drop(field, v, True) if off else links.toggle(field, v) }}" title="{{ v }}"><span class="box"></span><span class="facet-name">{{ v }}</span><span class="facet-n">{{ '{:,}'.format(n) }}</span></a>
+      <span class="facet-act"><a href="{{ links.only(field, v) }}" title="only {{ v }}">only</a><a href="{{ links.exclude(field, v) }}" title="exclude {{ v }}">⊘</a></span>
+    </div>
+    {% endfor %}
+    {% if vals | length > 5 %}<button type="button" class="facet-more" data-facet-more>more… ({{ [vals | length, 50] | min - 5 }})</button>{% endif %}
+    {% if not vals and not chosen %}<div class="faint small facet-none">none</div>{% endif %}
+  </details>
+  {% endfor %}
+</div>

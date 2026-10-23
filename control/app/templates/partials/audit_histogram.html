@@ -1,0 +1,13 @@
+{# events over the time range, stacked by outcome – a bar (or a dragged span, audit.js) narrows the range #}
+{% if hist.n %}
+<div class="audit-hist">
+  <div class="hist-legend small faint">
+    <span><i class="hist-ok"></i>ok</span><span><i class="hist-flagged"></i>flagged</span><span><i class="hist-denied"></i>denied / blocked</span><span><i class="hist-failed"></i>failed</span>
+    <span class="spacer"></span><span>max {{ hist.top }} per bar · drag to zoom</span>
+  </div>
+  <svg class="hist-svg" viewBox="0 0 {{ hist.n }} 100" preserveAspectRatio="none" role="img" aria-label="Events over time" data-hist>
+    {% for b in hist.bars %}<a href="{{ b.link }}" data-i="{{ b.i }}" data-from="{{ b.from | int }}" data-to="{{ b.to | int }}"><title>{{ b.title }}</title><rect class="hist-hit" x="{{ b.i }}" y="0" width="1" height="100"></rect>{% for cls, y, h in b.parts %}<rect class="hist-{{ cls }}" x="{{ b.i + 0.12 }}" y="{{ y }}" width="0.76" height="{{ h }}"></rect>{% endfor %}</a>{% endfor %}
+  </svg>
+  <div class="hist-axis small faint">{% for x, label in hist.marks %}<span style="left:{{ (x / hist.n * 100) | round(2) }}%">{{ label }}</span>{% endfor %}</div>
+</div>
+{% endif %}
