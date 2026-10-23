@@ -29,7 +29,7 @@ All notable changes, newest first. Every release lists **upgrade steps** from th
   and Claude's memory). New settings `KNOWLEDGE_LOCAL_KB` (default 6) and `KNOWLEDGE_NOTES` (default 8);
   Claude → Instructions shows the knowledge budget. `svc audit` prints the reason of a denial.
 - **Built-in jobs on new installations**: the first setup creates *Learning review* and *Knowledge cleanup*, paused and
-  marked *built-in* – edit them freely, *Reset to default* in the editor; an untouched built-in task follows the
+  marked *built-in* – edit or pause them (they can't be deleted), *Reset to default* in the editor; an untouched built-in task follows the
   shipped one on later updates. Existing installations get no jobs on the update (add them from the templates).
 
 ### Fixes

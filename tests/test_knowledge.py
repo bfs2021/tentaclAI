@@ -201,3 +201,6 @@ def test_builtin_jobs(sj_module, client, monkeypatch, tmp_path):
     assert k["prompt"].startswith("Keep what Claude reads") and k["enabled"] and k["builtin"]
     with pytest.raises(ValueError, match="not a built-in"):
         sj.reset_builtin("nope")
+    with pytest.raises(ValueError, match="can't be deleted"):
+        sj.delete("learning-review")
+    assert "/jobs/learning-review/delete" not in client.get("/jobs/learning-review").text

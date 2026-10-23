@@ -597,6 +597,8 @@ def clone(jid):
 
 def delete(jid):
     jobs = load()
+    if (jobs.get(jid) or {}).get("builtin"):
+        raise ValueError("a built-in job can't be deleted – pause it instead")
     if jobs.pop(jid, None) is None:
         raise ValueError("unknown job")
     jsonstore.save(JOBS, jobs)
