@@ -131,7 +131,7 @@ def use(a):
     """svc learns a decision once – a second call waiting on the same request gets an error and runs nothing
     (network requests are shared on purpose: every connection to that target waits for the one decision)"""
     if a["status"] == "pending" or a["part"] == "network":
-        return {"status": "pending", "by": a["by"]}
+        return {"status": a["status"], "by": a["by"]}
     if a.get("used"):
         return {"status": "error", "by": "this approval was already used by another call"}
     a["used"] = True

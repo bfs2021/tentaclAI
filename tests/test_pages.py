@@ -309,6 +309,18 @@ def test_same_session_asks_again_for_the_same_request(client, app_module, monkey
     assert activity.create("demohost", "docker", "docker restart x", me) != rid  # the next identical write asks anew
 
 
+def test_network_decision_reaches_every_waiting_connection(app_module, monkeypatch):
+    """the gateway's connections to one target share a request – each of them learns the decision, again and again"""
+    import asyncio
+    from app import activity
+    monkeypatch.setattr(activity, "APPROVALS", {})
+    monkeypatch.setattr(activity, "GRANTS", {})
+    rid = activity.create("example.org:443", "network", "connect to example.org:443")
+    assert asyncio.run(activity.wait(rid, 1))["status"] == "pending"
+    activity.decide(rid, True, grant=True, seconds=600)
+    assert [asyncio.run(activity.wait(rid, 1))["status"] for _ in range(3)] == ["approved"] * 3
+
+
 def test_internal_create_reports_a_request_asked_again(app_module, monkeypatch):
     from fastapi.testclient import TestClient
     from app import activity
