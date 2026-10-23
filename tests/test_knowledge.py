@@ -155,7 +155,7 @@ def test_product_findings_are_reported_not_applied(kn):
         kn.apply(x)
     url = kn.issue_url(x, "0.20.0", repo="someone/fork")
     assert url.startswith("https://github.com/someone/fork/issues/new?title=svc%3A%20svc%20info%20has%20no%20--json")
-    assert "version%200.20.0" in url and "site%20details" in url
+    assert "tentaclAI%3A%200.20.0" in url and "site%20details" in url and "Claude%20Code%3A%20%3F" in url
     assert kn.issue_url(x, repo="bad repo!").startswith("https://github.com/mwaldegg/tentaclai/")
     assert kn.check({"target": "product", "op": "add", "why": "w"})["state"] == "refused"
 
@@ -212,3 +212,16 @@ def test_issue_title_first_sentence_cut_at_a_word():
     long = "svc ssh returns only the remote exit code for unquoted patterns with braces or pipes, without any hint at all"
     t = kn.issue_title(long)
     assert len(t) <= 82 and t.endswith(" …") and long.startswith(t[:-2]) and not t[:-2].endswith(",")
+
+
+def test_issue_body_has_repro_and_environment(kn):
+    from urllib.parse import unquote
+    x = kn.check({"target": "product", "name": "svc", "op": "add", "new": "svc mail list has no --help.", "why": "three tries",
+                  "repro": "svc mail <name> list --help", "actual": "svc: unknown option --help", "expected": "the options", "bogus": "x"})
+    assert x["repro"] == "svc mail <name> list --help" and "bogus" not in x
+    run = {"queued": 1761300000, "profile": "read-only", "env": {"claude_code": "2.1.0", "model": "claude-opus-5-5"}}
+    body = unquote(kn.issue_url(x, "0.21.0", repo="a/b", run=run, edition="community"))
+    for part in ("**Steps / command:** `svc mail <name> list --help`", "**Actual:** svc: unknown option --help",
+                 "**Expected:** the options", "- tentaclAI: 0.21.0 community", "- Claude Code: 2.1.0 · model claude-opus-5-5",
+                 "- Part: svc", "(profile read-only)"):
+        assert part in body, part

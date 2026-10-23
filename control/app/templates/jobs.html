@@ -50,9 +50,10 @@
         <div style="min-width:0">
           <div>{% if x.name %}<span class="tag">{{ x.name }}</span> {% endif %}<span class="learned-text">{{ x.new }}</span></div>
           <div class="small faint">{{ x.why }}</div>
+          {% if x.repro or x.actual or x.expected %}<div class="small muted">{% if x.repro %}<code>{{ x.repro }}</code> {% endif %}{% if x.actual %}→ {{ x.actual }} {% endif %}{% if x.expected %}· expected: {{ x.expected }}{% endif %}</div>{% endif %}
           {% if x.state == 'proposed' %}<form class="row" style="margin-top:4px;justify-content:flex-start" hx-post="/jobs/runs/{{ r.id }}/knowledge?reported=1">
             <input type="hidden" name="pick" value="{{ loop.index0 }}">
-            <a class="btn sm" href="{{ issue_url(x) }}" target="_blank" rel="noopener">Report on GitHub</a>
+            <a class="btn sm" href="{{ issue_url(x, r) }}" target="_blank" rel="noopener">Report on GitHub</a>
             <button class="btn sm ghost" title="mark it as reported">Done</button>
             <button class="btn sm ghost" hx-post="/jobs/runs/{{ r.id }}/knowledge?discard=1">Dismiss</button>
           </form>{% endif %}

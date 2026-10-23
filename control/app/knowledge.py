@@ -36,7 +36,10 @@ SCHEMA = {"type": "array", "maxItems": 10,
               "op": {"type": "string", "enum": list(OPS)},
               "old": {"type": "string", "description": "replace/remove: the exact current note (site: an exact passage)"},
               "new": {"type": "string", "description": "add/replace: the note, one line, short"},
-              "why": {"type": "string", "description": "one line: what in this run shows it"}}}}
+              "why": {"type": "string", "description": "one line: what in this run shows it"},
+              "repro": {"type": "string", "description": "product only: the command or step that shows it (<host> for names of this site)"},
+              "actual": {"type": "string", "description": "product only: what happened – the message or result, short"},
+              "expected": {"type": "string", "description": "product only: what should happen instead"}}}}
 
 
 def budget(env=None):
@@ -64,6 +67,7 @@ def check(item):
     if target == "product":  # nothing to apply – a finding for tentaclAI's developers, kept short and on one line
         x = {"target": target, "name": _line(item.get("name"), 40), "op": "add", "old": "", "new": _line(item.get("new"), NOTE_MAX),
              "why": _line(item.get("why"), 300), "state": "proposed"}
+        x.update({k: _line(item.get(k), 400) for k in ("repro", "actual", "expected") if _line(item.get(k), 400)})
         if not x["new"]:
             x.update(state="refused", output="nothing to report")
         return x
@@ -124,15 +128,26 @@ def _site(text, x):
     return re.sub(r"\n{3,}", "\n\n", out)
 
 
-def issue_url(x, version="", repo=None):
+def issue_url(x, version="", repo=None, run=None, edition=""):
     """a prefilled "new issue" link for a product finding – the user reviews it on GitHub before anything is sent"""
     from urllib.parse import quote
     repo = repo or (read_env().get("UPDATE_REPO") or "mwaldegg/tentaclai").strip()
     if not re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", repo):
         repo = "mwaldegg/tentaclai"
     part = f"{x['name']}: " if x.get("name") else ""
-    body = (f"{x['new']}\n\n**How it showed:** {x.get('why') or '–'}\n\n_Found by a tentaclAI job run "
-            f"(version {version or '?'}). Check for host names or other site details before you submit._")
+    run, env = run or {}, (run or {}).get("env") or {}
+    found = f"job run, {time.strftime('%Y-%m-%d', time.localtime(run['queued']))}" if run.get("queued") else "job run"
+    lines = [x["new"], ""]
+    for label, key in (("Steps / command", "repro"), ("Actual", "actual"), ("Expected", "expected")):
+        if x.get(key):
+            lines.append(f"**{label}:** {x[key]}" if key != "repro" else f"**{label}:** `{x[key]}`")
+    lines += [f"**How it showed:** {x.get('why') or '–'}", "", "**Environment**",
+              f"- tentaclAI: {version or '?'}{' ' + edition if edition else ''}",
+              f"- Claude Code: {env.get('claude_code') or '?'}" + (f" · model {env['model']}" if env.get("model") else ""),
+              f"- Part: {x.get('name') or '?'}",
+              f"- Found by: {found}" + (f" (profile {run['profile']})" if run.get("profile") else ""), "",
+              "_Check for host names or other site details before you submit._"]
+    body = "\n".join(lines)
     return f"https://github.com/{repo}/issues/new?title={quote(part + issue_title(x['new']))}&body={quote(body)}"
 
 

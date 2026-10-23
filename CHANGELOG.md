@@ -44,7 +44,9 @@ All notable changes, newest first. Every release lists **upgrade steps** from th
   how to quote it. (#15)
 - `svc mail <name> <command> --help` prints the options instead of "unknown option --help". (#14)
 - Findings for tentaclAI (*Report on GitHub*) are asked for in English and without host, service or user names – the
-  tracker is public; the issue title is the first sentence, cut at a word.
+  tracker is public; the issue title is the first sentence, cut at a word. A finding carries *steps / command*, *actual*
+  and *expected*, and the issue an *Environment* block: tentaclAI version and edition, Claude Code version and model
+  of the run (recorded from the run's start), the part, date and profile.
 - `svc config put service` wrote the file readable by root only, so Claude couldn't read it back; it is `0644` now (no
   secrets in service files). New `svc info <name> --json` prints the service file as stored – the starting point for
   a change (the rule pointed to `svc info`, which prints text). The SSH section of Claude's instructions says how to

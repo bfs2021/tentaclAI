@@ -8,7 +8,7 @@ from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 
 import tclib
 
-from .. import auditlog, knowledge, scheduled
+from .. import auditlog, extensions, knowledge, scheduled
 from ..web import TC_VERSION, page, respond, sync_services, templates
 
 router = APIRouter()
@@ -87,7 +87,7 @@ async def jobs_state(v: str = ""):
 async def jobs_page(request: Request):
     scheduled.mark_seen()
     return page(request, "jobs.html", rows=scheduled.overview(), templates=scheduled.templates(), token=scheduled.state_token(), now=time.time(),
-                issue_url=lambda x: knowledge.issue_url(x, TC_VERSION),
+                issue_url=lambda x, r=None: knowledge.issue_url(x, TC_VERSION, run=r, edition=extensions.edition()),
                 fmt=lambda ts: time.strftime("%Y-%m-%d %H:%M", time.localtime(ts)) if ts else "–")
 
 
