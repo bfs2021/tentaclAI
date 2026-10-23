@@ -167,3 +167,27 @@ def test_import_pages(bk, client):
     r = client.get("/backup/export?part=systems")
     assert r.status_code == 200 and "attachment" in r.headers["content-disposition"]
     assert set(json.loads(r.text)) >= {"format", "systems"} and "services" not in json.loads(r.text)
+
+
+def test_site_skills_export_preview_and_import(bk):
+    import shutil
+    from app import skills
+    base = os.path.join(STACK, "local", "skills")
+    text = "---\nname: renew-cert\ndescription: Renew the wildcard certificate\n---\n\n1. check the expiry\n"
+    try:
+        skills.save_site("renew-cert", text)
+        doc, _ = bk.export(["skills"])
+        assert doc["skills"] == {"renew-cert": text}
+        doc["skills"]["renew-cert"] = text + "2. reload the proxy\n"
+        doc["skills"]["new-one"] = text.replace("renew-cert", "new-one")
+        doc["skills"]["Bad"] = text
+        rows = {r["key"]: r for r in bk.preview(bk.parse(json.dumps(doc)))["skills"]}
+        assert rows["renew-cert"]["status"] == "changed" and "+2. reload the proxy" in rows["renew-cert"]["diff"]
+        assert rows["new-one"]["status"] == "new" and not rows["new-one"]["checked"]  # opt-in: steps Claude follows
+        assert rows["Bad"]["status"] == "invalid"
+        results, _ = bk.apply(doc, {"skills:renew-cert", "skills:new-one", "skills:Bad"})
+        assert sorted(r["label"] for r in results if r["ok"]) == ["new-one", "renew-cert"]
+        assert "reload the proxy" in skills.site_text("renew-cert") and glob.glob(os.path.join(base, "renew-cert", "SKILL.md.bak-*"))
+        assert oct(os.stat(os.path.join(base, "new-one", "SKILL.md")).st_mode)[-3:] == "644"
+    finally:
+        shutil.rmtree(base, ignore_errors=True)

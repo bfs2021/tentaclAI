@@ -36,6 +36,8 @@ All notable changes, newest first. Every release lists **upgrade steps** from th
   approval (checked frontmatter, diff, ⚠ check, backup), and `svc sync` copies it into Claude's `~/.claude/skills/`, so
   every session and job can use it. Settings → Skills lists them as *site skill* with their steps, mode and *Remove*
   (kept as `.bak-…`). *Learning review* names candidates, *Knowledge cleanup* reports outdated or overlapping ones.
+  Settings → Export / Import carries them too (part *Site skills*; on import only picked on request, with a diff and ⚠
+  for text that reads like an injection).
 
 ### Fixes
 - `svc ssh` with several arguments keeps a locally quoted word with spaces or `| & ; < > ( )` as one word on the remote

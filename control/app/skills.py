@@ -7,6 +7,7 @@ ones are remembered in data/control/skills.json; descriptions come from the skil
 Site skills (local/skills/<name>/SKILL.md, proposed by Claude with `svc config put skill`) are listed here too – `svc sync`
 copies them into Claude's home; removing one keeps it as local/skills/<name>.bak-… .
 """
+import glob
 import json
 import os
 import re
@@ -128,6 +129,28 @@ def site_text(name):
         raise ValueError("unknown site skill")
     with open(os.path.join(STACK_DIR, "local", "skills", name, "SKILL.md"), errors="replace") as f:
         return f.read()
+
+
+def save_site(name, text):
+    """write a site skill like `svc config put skill` (checked, readable for Claude, last 5 versions kept) – svc sync then
+    copies it into Claude's skills"""
+    text = text.replace("\r\n", "\n")
+    problem = tclib.site_skill_problem(name, text)
+    if problem:
+        raise ValueError(problem)
+    base = os.path.join(STACK_DIR, "local", "skills")
+    path = os.path.join(base, name, "SKILL.md")
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    for d in (base, os.path.dirname(path)):
+        os.chmod(d, 0o755)
+    if os.path.exists(path):
+        shutil.copy2(path, f"{path}.bak-{time.strftime('%Y-%m-%d-%H%M%S')}")
+        for old in sorted(glob.glob(path + ".bak-*"))[:-5]:
+            os.remove(old)
+    with open(path + ".tmp", "w") as f:
+        f.write(text)
+    os.chmod(path + ".tmp", 0o644)
+    os.replace(path + ".tmp", path)
 
 
 def remove_site(name):

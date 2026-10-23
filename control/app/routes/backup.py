@@ -71,7 +71,7 @@ async def backup_apply(request: Request):
     results, missing = await asyncio.to_thread(backup.apply, doc, picked)
     backup.drop_pending()
     touched = {r["id"].split(":", 1)[0] for r in results if r["ok"]}
-    if touched & {"ssh_hosts", "systems", "services", "instructions"}:
+    if touched & {"ssh_hosts", "systems", "services", "instructions", "skills"}:
         await sync_services()
     changed_settings = {r["id"].split(":", 1)[1] for r in results if r["ok"] and r["id"].startswith("settings:")}
     if RESTART_VARS & changed_settings:

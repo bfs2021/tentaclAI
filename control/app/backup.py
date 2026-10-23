@@ -1,5 +1,5 @@
-"""Export / import of the configuration: services, systems, SSH hosts, jobs, network rules, notifications, site rules and
-plain settings – as one JSON file. Secrets never leave .env: the file only names the ${VAR}s the next installation needs.
+"""Export / import of the configuration: services, systems, SSH hosts, jobs, network rules, notifications, site rules,
+site skills and plain settings – as one JSON file. Secrets never leave .env: the file only names the ${VAR}s the next installation needs.
 
 Import is two steps: preview() compares the file with this installation (nothing is written), apply() writes the
 entries picked in the preview through the same functions the UI uses – a file that gets overwritten keeps a .bak."""
@@ -12,8 +12,8 @@ import time
 
 import tclib
 
-from . import claude_files, egress, jsonstore, notify, scheduled, services_store, sshhosts, systems_store
-from .config import DATA_DIR, SERVICES_DIR, SETTINGS_GROUPS, SYSTEMS_DIR, is_secret
+from . import claude_files, egress, jsonstore, notify, scheduled, services_store, skills, sshhosts, systems_store
+from .config import DATA_DIR, SERVICES_DIR, SETTINGS_GROUPS, STACK_DIR, SYSTEMS_DIR, is_secret
 from .envfile import read_env, update_env
 
 FORMAT, VERSION = "tentaclai-export", 1
@@ -23,10 +23,11 @@ PENDING_TTL = 3600
 # section → label; also the order of import (SSH hosts and systems before the services that use them, jobs after them)
 SECTIONS = {
     "ssh_hosts": "SSH hosts", "systems": "Systems", "services": "Services", "jobs": "Jobs", "network": "Network rules",
-    "notifications": "Notifications", "instructions": "Site rules (local/CLAUDE.md)", "settings": "Settings",
+    "notifications": "Notifications", "instructions": "Site rules (local/CLAUDE.md)", "skills": "Site skills (local/skills)",
+    "settings": "Settings",
 }
 # picked in the preview only on request: they change how Claude works or what this installation is
-OPT_IN = {"instructions", "settings"}
+OPT_IN = {"instructions", "skills", "settings"}
 SSH_FIELDS = ("alias", "hostname", "user", "port", "proxyjump", "hostkeyalias", "sudo", "access")
 SKIP_GROUPS = {"Paths & mounts"}  # host specific
 CHANNEL_KINDS = {"ntfy", "webhook", "email", "apprise"}
@@ -103,6 +104,8 @@ def export(parts=None):
         doc["notifications"] = _notifications()
     if "instructions" in parts:
         doc["instructions"] = claude_files.read_local()
+    if "skills" in parts:
+        doc["skills"] = {name: skills.site_text(name) for name in tclib.site_skills(STACK_DIR)}
     if "settings" in parts:
         doc["settings"] = {k: env[k] for k in setting_keys() if env.get(k)}
     needed = set()
@@ -135,7 +138,7 @@ def parse(raw):
     if unknown:
         raise ValueError(f"unknown parts: {', '.join(sorted(unknown))}")
     types = {"services": dict, "systems": dict, "ssh_hosts": list, "jobs": dict, "network": dict, "notifications": dict,
-             "instructions": str, "settings": dict, "variables": list}
+             "instructions": str, "skills": dict, "settings": dict, "variables": list}
     for k, t in types.items():
         if k in doc and not isinstance(doc[k], t):
             raise ValueError(f"{k}: wrong type")
@@ -299,6 +302,13 @@ def preview(doc):
         err = "file too large" if len(text.encode()) > claude_files.MAX_SIZE else ""
         rows["instructions"].append(_row("instructions", "local", cur if cur or not text else None, text if not text or text.endswith("\n") else text + "\n",
                                          err, label="local/CLAUDE.md", note="instructions for Claude – read them before you import"))
+    for name, text in doc.get("skills", {}).items():
+        err = "a SKILL.md is text" if not isinstance(text, str) else tclib.site_skill_problem(name, text.replace("\r\n", "\n")) or ""
+        cur = skills.site_text(name) if name in tclib.site_skills(STACK_DIR) else None
+        flags = [r for r, _ in tclib.injection_findings(text)] if not err else []
+        note = "" if err else (tclib.skill_front(text).get("description", "")[:160] +
+                               (f" – ⚠ {', '.join(flags)}" if flags else "") + " – steps Claude follows: read them before you import")
+        rows["skills"].append(_row("skills", name, cur, text.replace("\r\n", "\n") if not err else text, err, note=note))
     if "settings" in doc:
         env = read_env()
         allowed = set(setting_keys())
@@ -381,6 +391,8 @@ def apply(doc, picked):
                 notify.save(c)
             elif sec == "instructions":
                 claude_files.save_local(doc["instructions"])  # keeps its own .bak
+            elif sec == "skills":
+                skills.save_site(key, doc["skills"][key])  # keeps its own .bak
             elif sec == "settings":
                 update_env({key: doc["settings"][key]})
             done(r, "added" if r["status"] == "new" else "updated")
