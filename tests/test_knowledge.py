@@ -204,3 +204,11 @@ def test_builtin_jobs(sj_module, client, monkeypatch, tmp_path):
     with pytest.raises(ValueError, match="can't be deleted"):
         sj.delete("learning-review")
     assert "/jobs/learning-review/delete" not in client.get("/jobs/learning-review").text
+
+
+def test_issue_title_first_sentence_cut_at_a_word():
+    from app import knowledge as kn
+    assert kn.issue_title("svc mail list has no --help. It guessed three times.") == "svc mail list has no --help"
+    long = "svc ssh returns only the remote exit code for unquoted patterns with braces or pipes, without any hint at all"
+    t = kn.issue_title(long)
+    assert len(t) <= 82 and t.endswith(" …") and long.startswith(t[:-2]) and not t[:-2].endswith(",")

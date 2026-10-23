@@ -29,7 +29,9 @@ SCHEMA = {"type": "array", "maxItems": 10,
               "target": {"type": "string", "enum": list(TARGETS),
                          "description": "service = one tentacle, system = a host and all its services, site = the whole "
                                         "installation (local/CLAUDE.md), product = a weakness of tentaclAI itself (a missing "
-                                        "svc option, a misleading message, a bug) – reported to its developers, not written"},
+                                        "svc option, a misleading message, a bug) – reported to its developers in a public "
+                                        "tracker, not written: then new and why in English, without host, service or "
+                                        "user names of this site"},
               "name": {"type": "string", "description": "service or system name; product: the part (svc, tentacontrol, …); not for site"},
               "op": {"type": "string", "enum": list(OPS)},
               "old": {"type": "string", "description": "replace/remove: the exact current note (site: an exact passage)"},
@@ -131,7 +133,15 @@ def issue_url(x, version="", repo=None):
     part = f"{x['name']}: " if x.get("name") else ""
     body = (f"{x['new']}\n\n**How it showed:** {x.get('why') or '–'}\n\n_Found by a tentaclAI job run "
             f"(version {version or '?'}). Check for host names or other site details before you submit._")
-    return f"https://github.com/{repo}/issues/new?title={quote(part + x['new'][:90])}&body={quote(body)}"
+    return f"https://github.com/{repo}/issues/new?title={quote(part + issue_title(x['new']))}&body={quote(body)}"
+
+
+def issue_title(text, limit=80):
+    """the first sentence, cut at a word – not mid-word with a dangling comma"""
+    first = re.split(r"(?<=[.!?])\s", text, maxsplit=1)[0].rstrip(".")
+    if len(first) <= limit:
+        return first
+    return first[:limit].rsplit(" ", 1)[0].rstrip(",;:–- ") + " …"
 
 
 def apply(x):

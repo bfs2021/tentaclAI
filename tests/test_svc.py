@@ -478,3 +478,33 @@ def test_info_json_prints_the_stored_file(monkeypatch, tmp_path, capsys):
     assert capsys.readouterr().out == '{"name": "demo", "api": {"base_url": "${DEMO_URL}"}}\n'  # placeholders, not values
     with pytest.raises(SystemExit):
         svc.cmd_info_json({}, "nope")
+
+
+def test_ssh_remote_keeps_locally_quoted_words():
+    assert svc.ssh_remote(["docker ps | head"]) == "docker ps | head"  # one string: the remote shell's command line
+    assert svc.ssh_remote(["docker", "ps", "--format", "{{.Names}} {{.Status}}"]) == "docker ps --format '{{.Names}} {{.Status}}'"
+    assert svc.ssh_remote(["grep", "-iE", "disable|dtoverlay", "/boot/config.txt"]) == "grep -iE 'disable|dtoverlay' /boot/config.txt"
+    assert svc.ssh_remote(["ls", "/var/log/*.log", "$HOME"]) == "ls /var/log/*.log $HOME"  # globs and variables stay remote
+    assert svc.ssh_remote([]) == ""
+
+
+def test_ssh_read_only_checks_the_real_remote_line(monkeypatch):
+    monkeypatch.setattr(svc, "ssh_sudo", lambda alias: "")
+    assert svc.ssh_read_only("box", ["uptime"])
+    assert not svc.ssh_read_only("box", ["ls", "a;b"])  # quoted over there, but still no free status command
+
+
+def test_ssh_hint_only_for_a_failed_pattern(capsys):
+    assert svc.ssh_hint(1, "box", ["grep -E a|b /x"]) == 1
+    assert "single quotes" in capsys.readouterr().err
+    assert svc.ssh_hint(1, "box", ["docker ps --format {{.Names}}"]) == 1
+    assert "svc docker box ps" in capsys.readouterr().err
+    for code, cmd in ((0, ["grep -E a|b /x"]), (1, ["grep -E 'a|b' /x"]), (1, ["test -f /x || echo no"]), (255, ["a|b"]), (1, ["grep", "a|b"])):
+        svc.ssh_hint(code, "box", cmd)
+        assert capsys.readouterr().err == "", cmd
+
+
+def test_mail_help_per_subcommand(capsys):
+    assert svc.cmd_mail({}, ["box", "list", "--help"]) == 0
+    out = capsys.readouterr().out
+    assert "--unseen" in out and "--limit N" in out and "default 20" in out

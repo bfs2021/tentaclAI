@@ -38,6 +38,13 @@ All notable changes, newest first. Every release lists **upgrade steps** from th
   (kept as `.bak-…`). *Learning review* names candidates, *Knowledge cleanup* reports outdated or overlapping ones.
 
 ### Fixes
+- `svc ssh` with several arguments keeps a locally quoted word with spaces or `| & ; < > ( )` as one word on the remote
+  side (`svc ssh host docker ps --format '{{.Names}} {{.Status}}'`, `grep -E 'a|b'` broke there); a single argument
+  stays the remote command line. When such a one-string command fails and holds an unquoted `|` or `{{…}}`, svc says
+  how to quote it. (#15)
+- `svc mail <name> <command> --help` prints the options instead of "unknown option --help". (#14)
+- Findings for tentaclAI (*Report on GitHub*) are asked for in English and without host, service or user names – the
+  tracker is public; the issue title is the first sentence, cut at a word.
 - `svc config put service` wrote the file readable by root only, so Claude couldn't read it back; it is `0644` now (no
   secrets in service files). New `svc info <name> --json` prints the service file as stored – the starting point for
   a change (the rule pointed to `svc info`, which prints text). The SSH section of Claude's instructions says how to

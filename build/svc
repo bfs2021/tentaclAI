@@ -1245,7 +1245,7 @@ def mail_opts(args, flags=(), values=()):
             opts[a[2:]] = args[i + 1]
             i += 1
         elif a.startswith("--"):
-            sys.exit(f"svc: unknown option {a}")
+            sys.exit(f"svc: unknown option {a} (svc mail <name> --help lists the options)")
         else:
             pos.append(a)
         i += 1
@@ -1284,6 +1284,9 @@ def cmd_mail(services, args):
                     c = render(s[part])
                     print(f"{n:<{w}}{tclib.mail_address(s, ENV) or '–':<{aw}}{part:<6}{tclib.access(c.get('access'), tclib.part_default(part)):<9}"
                           f"{str(c.get('host', '')) + ':' + str(tclib.mail_port(part, c)):<34}{status(s)}")
+        return 0
+    if "--help" in args or "-h" in args:
+        print(usage.replace("usage: ", "", 1) + "\n  list: newest first, --limit default 20 (max 200)")
         return 0
     if len(args) < 2:
         sys.exit(usage)
@@ -1870,7 +1873,7 @@ JOURNAL_WRITE = ("--vacuum", "--rotate", "--flush", "--sync", "--relinquish", "-
 
 def ssh_read_only(alias, cmd):
     """True for a plain status command from SSH_READ (optionally behind the host's sudo prefix)"""
-    text = " ".join(cmd)
+    text = ssh_remote(cmd)  # exactly what the remote shell gets
     if not cmd or any(c in SSH_SHELL_CHARS for c in text):
         return False
     try:
@@ -1911,7 +1914,7 @@ def cmd_ssh(name_args):
         sys.exit(f"svc: unknown SSH host '{alias}' (svc ssh)")
     require_allowed(alias)
     mode = "read" if job_read_only() else tclib.ssh_access(SSH_CONF_D, alias)
-    remote = " ".join(cmd)
+    remote = ssh_remote(cmd)
     tty = not cmd or sys.stdin.isatty() and sys.stdout.isatty()
     argv = ["ssh"] + (["-t"] if tty else ["-T"]) + ["--", alias] + ([remote] if remote else [])
     if ssh_read_only(alias, cmd):  # free status command – the ones that print secrets get them blanked
@@ -1920,10 +1923,34 @@ def cmd_ssh(name_args):
         if sudo and words[:len(sudo)] == sudo:
             words = words[len(sudo):]
         if sensitive_read(words):
-            return call_redacted(["ssh", "-T", "--", alias, remote])
-        return subprocess.call(argv)
+            return ssh_hint(call_redacted(["ssh", "-T", "--", alias, remote]), alias, cmd)
+        return ssh_hint(subprocess.call(argv), alias, cmd)
     return guarded(alias, "ssh", mode, f"ssh {remote}" if remote else "ssh (interactive shell)",
-                   lambda: subprocess.call(argv), interactive=tty)
+                   lambda: ssh_hint(subprocess.call(argv), alias, cmd), interactive=tty)
+
+
+SSH_WORD = re.compile(r"[\s|&;<>()]")
+
+
+def ssh_remote(cmd):
+    """the remote command line: one argument is a command line for the remote shell; of several, one holding spaces or
+    | & ; < > ( ) was quoted locally – it stays one word over there (ssh would join them and the remote shell split it
+    again: --format '{{.Names}} {{.Status}}' or 'a|b' broke)"""
+    if len(cmd) == 1:
+        return cmd[0]
+    return " ".join(shlex.quote(a) if SSH_WORD.search(a) else a for a in cmd)
+
+
+def ssh_hint(code, alias, cmd):
+    """after a failed command with one-string syntax: a pattern the remote shell read as syntax is the usual cause"""
+    if code in (0, 255) or len(cmd) != 1:
+        return code
+    bare = re.sub(r"'[^']*'|\"(?:[^\"\\]|\\.)*\"", "", cmd[0])
+    if "{{" in bare or re.search(r"(?<![|])\|(?![|])", bare):
+        print(f"svc: the remote command failed (exit {code}) – if `|` or `{{{{…}}}}` was meant as a pattern, the remote shell "
+              f"read it as syntax: put it in single quotes inside, e.g. svc ssh {alias} \"grep -E 'a|b' /path\"; "
+              f"containers: svc docker {alias} ps", file=sys.stderr)
+    return code
 
 
 def cmd_config(services, args):
