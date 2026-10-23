@@ -8,7 +8,7 @@ import segno
 from fastapi import APIRouter, Form, Request, WebSocket
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, PlainTextResponse, RedirectResponse, StreamingResponse
 
-from .. import activity, auditlog, auth, dockerops, egress, extensions, jobs, netguard, notify, services_store, sshhosts, updatecheck, usage
+from .. import activity, auditlog, auth, dockerops, egress, extensions, jobs, netguard, notify, scheduled, services_store, sshhosts, updatecheck, usage
 from ..config import CLAUDE_SERVICE, COMPOSE, LOG_CONTAINERS
 from ..envfile import read_env, update_env
 from ..terminal import PROFILES, bridge, onboard_cmd
@@ -56,6 +56,10 @@ async def setup_save(request: Request, token: str = Form(""), username: str = Fo
     user = await asyncio.to_thread(auth.create_admin, username, email, name, password)
     auth.sign_in(request, user)
     auditlog.user(request, "auth", "tentacontrol", "set up admin account")
+    try:  # a new installation: the built-in jobs (paused) – an existing one is never given jobs on an update
+        await asyncio.to_thread(scheduled.create_builtins)
+    except (ValueError, OSError) as e:
+        print(f"built-in jobs not created: {e}", flush=True)
     return RedirectResponse("/", status_code=303)
 
 

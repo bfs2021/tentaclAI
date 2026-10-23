@@ -138,6 +138,16 @@ async def job_toggle(request: Request, jid: str):
     return respond(request, f"{job['name']} {'paused' if job.get('enabled', True) else 'on'}", refresh=True)
 
 
+@router.post("/jobs/{jid}/reset", response_class=HTMLResponse)
+async def job_reset(request: Request, jid: str):
+    """a built-in job back to its shipped definition"""
+    try:
+        await asyncio.to_thread(scheduled.reset_builtin, jid)
+    except ValueError as e:
+        return respond(request, str(e), "err")
+    return respond(request, "Reset to the built-in definition", redirect=f"/jobs/{jid}")
+
+
 @router.post("/jobs/{jid}/clone", response_class=HTMLResponse)
 async def job_clone(request: Request, jid: str):
     try:

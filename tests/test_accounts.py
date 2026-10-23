@@ -32,7 +32,9 @@ def test_profile_rules(fresh):
     assert auth.password_error("longenough1", "longenough1") is None
 
 
-def test_setup_needs_username_and_email(fresh, app_module):
+def test_setup_needs_username_and_email(fresh, app_module, monkeypatch, tmp_path):
+    from app import scheduled
+    monkeypatch.setattr(scheduled, "JOBS", str(tmp_path / "jobs.json"))
     auth, c = fresh, _client(app_module)
     base = {"token": auth.SETUP_TOKEN, "password": "testpass123", "password2": "testpass123"}
     r = c.post("/setup", data={**base, "username": "mwa", "email": ""})
@@ -43,6 +45,7 @@ def test_setup_needs_username_and_email(fresh, app_module):
     assert r.status_code == 303 and auth.admin()["username"] == "mwa" and auth.admin()["name"] == ""
     assert "hash" in auth.admin() and "testpass123" not in open(auth.USERS_FILE).read()
     assert c.get("/settings").status_code == 200  # signed in right away
+    assert sorted(scheduled.load()) == ["knowledge-cleanup", "learning-review"]  # a new installation gets the built-in jobs
     assert c.post("/setup", data={**base, "username": "evil", "email": "e@example.org"}, follow_redirects=False).headers["location"] == "/login"
 
 

@@ -176,6 +176,58 @@ TEMPLATES = [
 ]
 
 
+BUILTIN = {"learning-review": "Learning review", "knowledge-cleanup": "Knowledge cleanup"}  # id → template
+
+
+def _builtin_definition(key):
+    """the shipped definition of a built-in job (from its template, with the current budget)"""
+    t = next(t for t in templates() if t["name"] == BUILTIN[key])
+    return {"name": t["name"], "prompt": t["prompt"], "schedule": t["schedule"], "profile": "read-only", "notify": "findings",
+            "improve": True}
+
+
+def create_builtins():
+    """a new installation (first setup) gets the built-in jobs – paused: every run uses the Claude plan"""
+    for key in BUILTIN:
+        if get(key) is None:
+            d = _builtin_definition(key)
+            save(form_from_definition(d), new_id=key, enabled=False)
+            _mark_builtin(key, d["prompt"])
+
+
+def _mark_builtin(key, prompt):
+    jobs = load()
+    jobs[key].update(builtin=True, builtin_prompt=prompt)
+    jsonstore.save(JOBS, jobs)
+
+
+def refresh_builtins():
+    """on start: a built-in job whose task the user never changed follows the shipped one (a release may improve it, the
+    budget may have changed); a changed task stays as the user wrote it → names of the jobs updated"""
+    updated = []
+    for key in BUILTIN:
+        job = get(key)
+        if not job or not job.get("builtin"):
+            continue
+        new = _builtin_definition(key)["prompt"]
+        if job["prompt"] == job.get("builtin_prompt") and job["prompt"] != new:
+            jobs = load()
+            jobs[key].update(prompt=new, builtin_prompt=new)
+            jsonstore.save(JOBS, jobs)
+            updated.append(key)
+    return updated
+
+
+def reset_builtin(jid):
+    """a built-in job back to its shipped definition – it keeps whether it is on or paused"""
+    job = get(jid)
+    if not job or not job.get("builtin") or jid not in BUILTIN:
+        raise ValueError("not a built-in job")
+    d = _builtin_definition(jid)
+    save(form_from_definition(d), jid)
+    _mark_builtin(jid, d["prompt"])
+
+
 def templates():
     """the presets of Add job – the cleanup job names the current knowledge budget"""
     b = knowledge.budget()
@@ -1103,7 +1155,7 @@ def overview():
     for jid, job in sorted(load().items(), key=lambda kv: kv[1]["name"].lower()):
         runs = [r for r in h if r.get("job") == jid]
         writes, asks = reach(job, known)
-        rows.append(dict(job, id=jid, when=describe(job["schedule"]), last_run=runs[-1] if runs else None, writes=writes, asks=asks,
+        rows.append(dict(job, id=jid, when=describe(job["schedule"]), changed=job.get("builtin") and job.get("prompt") != job.get("builtin_prompt"), last_run=runs[-1] if runs else None, writes=writes, asks=asks,
                          runs=list(reversed(runs[-10:])), busy=jid in _current.values() or any(r["status"] in ("queued", "running") for r in runs)
                          or any(x.get("state") in ("queued", "running") for r in runs for x in r.get("actions") or [])))
     return rows

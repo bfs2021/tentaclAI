@@ -21,7 +21,8 @@ from .web import BASE, TC_VERSION, templates
 @contextlib.asynccontextmanager
 async def lifespan(_app):
     """startup: activity token, background loops (notifications, usage, update check, scheduled jobs), setup hint"""
-    for start in (migrate, prepare_activity, start_audit, start_notifications, start_update_check, start_scheduled_jobs, announce_setup):
+    for start in (migrate, prepare_activity, start_audit, refresh_builtin_jobs, start_notifications, start_update_check,
+                  start_scheduled_jobs, announce_setup):
         await start()
     yield
 
@@ -103,6 +104,17 @@ async def migrate():
     if services or hosts:
         print(f"migration: access ro/rw → read/write in {', '.join(services + hosts)} (backups: *.bak-*-access)",
               flush=True)
+
+
+async def refresh_builtin_jobs():
+    """built-in jobs whose task the user never changed follow the shipped one"""
+    try:
+        updated = await asyncio.to_thread(scheduled.refresh_builtins)
+    except (ValueError, OSError) as e:
+        print(f"built-in jobs: {e}", flush=True)
+        return
+    if updated:
+        print(f"built-in jobs: task updated – {', '.join(updated)}", flush=True)
 
 
 async def prepare_activity():

@@ -172,3 +172,32 @@ def test_jobs_page_lists_findings_for_tentaclai(client, app_module, monkeypatch,
     assert "For tentaclAI" in html and "Report on GitHub" in html and "Apply selected" not in html
     client.post("/jobs/runs/r2/knowledge?reported=1", data={"pick": "0"})
     assert scheduled.history()[0]["knowledge"][0]["state"] == "reported" and scheduled.pending_proposals() == 0
+
+
+def test_builtin_jobs(sj_module, client, monkeypatch, tmp_path):
+    sj = sj_module
+    for k, f in (("HISTORY", "h.json"), ("JOBS", "j.json")):
+        monkeypatch.setattr(sj, k, str(tmp_path / f))
+    sj.create_builtins()
+    jobs = sj.load()
+    assert set(jobs) == {"learning-review", "knowledge-cleanup"} and not any(j["enabled"] for j in jobs.values())
+    assert all(j["builtin"] and j["prompt"] == j["builtin_prompt"] and j["profile"] == "read-only" for j in jobs.values())
+    html = client.get("/jobs").text
+    assert ">built-in</span>" in html and "Lets Claude learn from its work" in html
+    assert "Reset to default" in client.get("/jobs/learning-review").text
+    # a release improves the task: an untouched job follows, a changed one keeps the user's words
+    for key in ("learning-review", "knowledge-cleanup"):
+        j = sj.load()
+        j[key]["builtin_prompt"] = j[key]["prompt"] = "old shipped task"
+        sj.jsonstore.save(sj.JOBS, j)
+    j = sj.load()
+    j["knowledge-cleanup"]["prompt"] = "my own task"
+    sj.jsonstore.save(sj.JOBS, j)
+    assert sj.refresh_builtins() == ["learning-review"]
+    assert sj.get("learning-review")["prompt"].startswith("Turn last week") and sj.get("knowledge-cleanup")["prompt"] == "my own task"
+    sj.set_enabled("knowledge-cleanup", True)
+    sj.reset_builtin("knowledge-cleanup")
+    k = sj.get("knowledge-cleanup")
+    assert k["prompt"].startswith("Keep what Claude reads") and k["enabled"] and k["builtin"]
+    with pytest.raises(ValueError, match="not a built-in"):
+        sj.reset_builtin("nope")

@@ -28,6 +28,9 @@ All notable changes, newest first. Every release lists **upgrade steps** from th
   reasons of denials – turned into notes) and **Knowledge cleanup** (monthly: merges, cuts and moves notes, site rules
   and Claude's memory). New settings `KNOWLEDGE_LOCAL_KB` (default 6) and `KNOWLEDGE_NOTES` (default 8);
   Claude → Instructions shows the knowledge budget. `svc audit` prints the reason of a denial.
+- **Built-in jobs on new installations**: the first setup creates *Learning review* and *Knowledge cleanup*, paused and
+  marked *built-in* – edit them freely, *Reset to default* in the editor; an untouched built-in task follows the
+  shipped one on later updates. Existing installations get no jobs on the update (add them from the templates).
 
 ### Fixes
 - `svc config put service` wrote the file readable by root only, so Claude couldn't read it back; it is `0644` now (no
