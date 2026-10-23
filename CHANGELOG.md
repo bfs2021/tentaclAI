@@ -41,6 +41,9 @@ All notable changes, newest first. Every release lists **upgrade steps** from th
 - Claude's base rules: a tentacle only for its own task – Claude no longer uses a service or SSH host as a tool for
   something else (e.g. `ping` through `svc ssh` because the sandbox has none) without asking first, naming the tentacle
   and the command.
+- Claude's instructions reviewed: `/inventory` and `/onboard` point to *Approvals* (not *Activity*), `tentaclai-egress`
+  belongs to the stack Claude must never restart, "tentacles are always reachable" is no permission to use them, SSH
+  `read` allows the status commands, the svc commands are a list, the Docker hosts table names the SSH host.
 - Logs → Audit: each type has its own colour (tool, svc, network, job, admin, sign-in; system stays grey) – in the table,
   the detail row and the filters sidebar; green, amber and red stay with the outcome.
 - An entry's action no longer repeats its target: `connect` (not `connect n8n.example:443`, the count of a 15-minute
