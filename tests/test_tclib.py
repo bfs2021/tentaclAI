@@ -144,6 +144,32 @@ def test_apply_skill_overrides_keeps_foreign_entries():
     assert tclib.apply_skill_overrides(s2, {"run": "on"}) == {}
 
 
+SKILL = "---\nname: renew-cert\ndescription: Renew the wildcard certificate and reload the proxy\n---\n\n1. svc ssh box certbot renew\n"
+
+
+def test_site_skill_problem():
+    assert tclib.site_skill_problem("renew-cert", SKILL) is None
+    assert tclib.skill_front(SKILL)["description"].startswith("Renew the")
+    assert "names" in tclib.site_skill_problem("Renew_Cert", SKILL)
+    assert "names" in tclib.site_skill_problem("x.bak-1", SKILL)
+    assert "frontmatter" in tclib.site_skill_problem("renew-cert", "1. do it\n")
+    assert "must be renew-cert" in tclib.site_skill_problem("renew-cert", SKILL.replace("name: renew-cert", "name: other"))
+    assert "description" in tclib.site_skill_problem("renew-cert", SKILL.replace("Renew the wildcard certificate and reload the proxy", "x"))
+    assert "no steps" in tclib.site_skill_problem("renew-cert", SKILL.split("\n\n")[0] + "\n")
+    assert "at most" in tclib.site_skill_problem("renew-cert", SKILL + "x" * tclib.SITE_SKILL_MAX)
+
+
+def test_site_skills_lists_only_valid_dirs(tmp_path):
+    base = tmp_path / "local" / "skills"
+    for d in ("renew-cert", "renew-cert.bak-2026-10-24-120000", "empty"):
+        (base / d).mkdir(parents=True)
+    (base / "renew-cert" / "SKILL.md").write_text(SKILL)
+    (base / "renew-cert.bak-2026-10-24-120000" / "SKILL.md").write_text(SKILL)
+    found = tclib.site_skills(str(tmp_path))
+    assert list(found) == ["renew-cert"] and found["renew-cert"]["description"].startswith("Renew")
+    assert tclib.site_skills(str(tmp_path / "none")) == {}
+
+
 def test_models_defaults_and_validation():
     assert tclib.models({}) == tclib.MODELS_DEFAULT
     m = tclib.models({"main": "opus", "effort": "xhigh", "subagents": "", "commands": "opus; rm -rf /", "commands_effort": "max",

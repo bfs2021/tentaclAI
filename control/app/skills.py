@@ -4,16 +4,19 @@ Settings → Skills sets a mode per skill (on / only as /command / off), written
 ~/.claude/settings.json (by the entrypoint on every start, by apply() right away). Skills that make no sense in a
 headless sandbox start off (tclib.SKILLS_OFF_DEFAULT). Claude Code no longer lists a skill that is off, so the known
 ones are remembered in data/control/skills.json; descriptions come from the skill listing in recent session files.
+Site skills (local/skills/<name>/SKILL.md, proposed by Claude with `svc config put skill`) are listed here too – `svc sync`
+copies them into Claude's home; removing one keeps it as local/skills/<name>.bak-… .
 """
 import json
 import os
 import re
+import shutil
 import time
 
 import tclib
 
 from . import dockerops, jsonstore
-from .config import DATA_DIR
+from .config import DATA_DIR, STACK_DIR
 from .usage import session_files
 
 STATE = os.path.join(DATA_DIR, "skills.json")
@@ -111,7 +114,7 @@ def set_mode(name, mode):
     if mode not in tclib.SKILL_MODES:
         raise ValueError("unknown mode")
     s = load()
-    if name not in tclib.skill_overrides(s):
+    if name not in tclib.skill_overrides(s) and name not in tclib.site_skills(STACK_DIR):
         raise ValueError("unknown skill")
     if name in tclib.SKILLS_REQUIRED and mode == "off":
         raise ValueError(f"{name} is required by tentaclAI (its buttons start /{name}) – /command only is possible")
@@ -120,12 +123,36 @@ def set_mode(name, mode):
     return apply(s)
 
 
+def site_text(name):
+    if name not in tclib.site_skills(STACK_DIR):
+        raise ValueError("unknown site skill")
+    with open(os.path.join(STACK_DIR, "local", "skills", name, "SKILL.md"), errors="replace") as f:
+        return f.read()
+
+
+def remove_site(name):
+    """take a site skill out of local/skills (kept as <name>.bak-…, the last 5) – svc sync then removes Claude's copy"""
+    if name not in tclib.site_skills(STACK_DIR):
+        raise ValueError("unknown site skill")
+    base = os.path.join(STACK_DIR, "local", "skills")
+    bak = os.path.join(base, f"{name}.bak-{time.strftime('%Y-%m-%d-%H%M%S')}")
+    while os.path.exists(bak):  # removed twice in one second
+        bak += "-1"
+    os.rename(os.path.join(base, name), bak)
+    for old in sorted(d for d in os.listdir(base) if d.startswith(f"{name}.bak-"))[:-5]:
+        shutil.rmtree(os.path.join(base, old), ignore_errors=True)
+
+
 def listing():
     s = load()
+    site = tclib.site_skills(STACK_DIR)
     rows = []
-    for name, mode in tclib.skill_overrides(s).items():
+    for name, mode in dict(tclib.skill_overrides(s), **{n: tclib.skill_mode(s, n) for n in site}).items():
         k = s["known"].get(name, {})
+        if name in site:  # its own file says best what it is for
+            k = dict(k, description=site[name]["description"] or k.get("description"), source=k.get("source") or "site")
         rows.append(dict(k, name=name, mode=mode, default="off" if name in tclib.SKILLS_OFF_DEFAULT else "on",
-                         custom=name in s["modes"], seen=k.get("seen"), required=name in tclib.SKILLS_REQUIRED))
+                         custom=name in s["modes"], seen=k.get("seen") or (name in site), required=name in tclib.SKILLS_REQUIRED,
+                         site=name in site, text=site_text(name) if name in site else ""))
     order = {"on": 0, "user-invocable-only": 1, "off": 2}
     return sorted(rows, key=lambda r: (order[r["mode"]], r["name"]))

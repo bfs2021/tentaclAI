@@ -19,9 +19,9 @@ resolved from the stack's .env (read fresh on every call) and the container envi
   svc git push <name> [branch] [--force]   push a branch (credentials stay with svc)
   svc ssh <host> [command...]      command (or a shell) on an SSH host – per-host access, default confirm
   svc pending                      approvals waiting in tentacontrol → Approvals (and active grants)
-  svc config put service <name> <file> | put system <name> <file> | put local <file>
-                                   write a service file, a system file or the site rules (local/CLAUDE.md) – always
-                                   needs approval; the approval shows the changes
+  svc config put service <name> <file> | put system <name> <file> | put local <file> | put skill <name> <file>
+                                   write a service file, a system file, the site rules (local/CLAUDE.md) or a site
+                                   skill (local/skills/<name>/SKILL.md) – always needs approval; it shows the changes
   svc docker                       Docker hosts (via ssh, also this host): target, stacks dir, access
   svc docker <name> <args...>      docker CLI against that host, e.g. svc docker gate ps
   svc compose <name> <stack> <args...>
@@ -77,6 +77,7 @@ PROXY_VARS = ("http_proxy", "https_proxy", "HTTP_PROXY", "HTTPS_PROXY", "no_prox
 TC_DIR = os.environ.get("TC_DIR") or _read("/etc/tentaclai/tc-dir") or "/opt/tentaclai"
 SERVICES_DIR = os.environ.get("SVC_DIR", os.path.join(TC_DIR, "services"))
 SYSTEMS_DIR = os.path.join(TC_DIR, "systems")
+SKILLS_DIR = os.path.join(TC_DIR, "local", "skills")
 PARTS = tclib.PARTS
 SSH_CONF_D = os.path.expanduser("~/.ssh/config.d")
 # Values from the stack's .env win over the container environment, so new tokens work without recreating
@@ -84,6 +85,7 @@ ENV_FILE = os.environ.get("SVC_ENV_FILE", os.path.join(TC_DIR, ".env"))
 CATALOG = os.environ.get("SVC_CATALOG", "/workspace/SERVICES.md")
 REPO_ROOT = os.environ.get("SVC_REPO_ROOT", "/workspace/repos")
 STATE = os.path.expanduser("~/.config/tentaclai/mcp-managed.json")
+SKILLS_STATE = os.path.expanduser("~/.config/tentaclai/skills-managed.json")
 OAUTH_CACHE = os.path.expanduser("~/.cache/tentaclai/oauth")
 RO_DOCKER = {"ps", "inspect", "logs", "images", "info", "version", "stats", "top", "port", "diff", "history", "events",
              "network", "volume", "image", "container", "system", "context"}
@@ -1930,14 +1932,17 @@ def cmd_config(services, args):
     if len(args) >= 4 and args[0] == "put" and args[1] == "job":
         return config_put_job(args[2], args[3])
     kind = args[1] if len(args) >= 3 and args[0] == "put" else ""
-    if kind not in ("service", "system", "local") or (kind != "local" and len(args) < 4):
+    if kind not in ("service", "system", "local", "skill") or (kind != "local" and len(args) < 4):
         sys.exit("usage: svc config put service <name> <file>  |  put system <name> <file>  |  put local <file>  |  "
-                 "put job <name> <file>")
+                 "put skill <name> <file>  |  put job <name> <file>")
     if job_read_only():
         sys.exit("svc: a read-only job can't propose configuration changes")
     if kind == "local":
         name, src = "local", args[2]
         target = os.path.join(TC_DIR, "local", "CLAUDE.md")
+    elif kind == "skill":
+        name, src = args[2], args[3]
+        target = os.path.join(SKILLS_DIR, name, "SKILL.md")
     else:
         name, src = args[2], args[3]
         if not re.fullmatch(r"[a-z0-9][a-z0-9_-]{0,40}", name):
@@ -1961,17 +1966,23 @@ def cmd_config(services, args):
             sys.exit(f"svc: {problem}")
         text = json.dumps({"name": name, **{k: v for k, v in data.items() if k != "name"}}, ensure_ascii=False, indent=2) + "\n"
         action = f"{'change' if old is not None else 'create'} systems/{name}.json"
+    elif kind == "skill":
+        text = text.replace("\r\n", "\n")
+        problem = tclib.site_skill_problem(name, text)
+        if problem:
+            sys.exit(f"svc: {problem}")
+        action = f"{'change' if old is not None else 'create'} skill {name} ({len(text.splitlines())} lines)"
     else:
         action = f"{'change' if old is not None else 'create'} local/CLAUDE.md ({len(text.splitlines())} lines)"
     if old == text:
         print("unchanged")
         return 0
-    diff, added = config_diff(old, text, json_file=kind != "local")
+    diff, added = config_diff(old, text, json_file=kind in ("service", "system"))
     if old is not None:
         action += f", +{len(added)}/-{sum(1 for ln in diff.splitlines() if ln.startswith('-'))} lines"
     findings = tclib.injection_findings("\n".join(added)) if guard_on() else []
     if findings:  # what Claude wants to keep for every later session reads like an instruction to an AI
-        guard_note("configuration change", "system " + name if kind == "system" else name, "config", action, findings)
+        guard_note("configuration change", f"{kind} {name}" if kind in ("system", "skill") else name, "config", action, findings)
 
     def write():
         if old is not None:
@@ -1979,6 +1990,9 @@ def cmd_config(services, args):
             for bak in sorted(glob.glob(target + ".bak-*"))[:-5]:  # the last 5 versions are enough
                 os.remove(bak)
         os.makedirs(os.path.dirname(target), exist_ok=True)
+        if kind == "skill":  # readable for Claude like the other files here (svc's umask is 077)
+            for d in (SKILLS_DIR, os.path.dirname(target)):
+                os.chmod(d, 0o755)
         with open(target + ".tmp", "w") as f:
             f.write(text)
         os.chmod(target + ".tmp", 0o644)  # Claude reads them (local: @import) – svc's inherited umask is 077; no secrets in them
@@ -1986,10 +2000,12 @@ def cmd_config(services, args):
         print(f"✓ {os.path.relpath(target, TC_DIR)} written" + (" (previous version kept as .bak-…)" if old is not None else ""))
         if kind == "local":
             write_instructions()
+        elif kind == "skill":
+            sync_skills()
         else:
             cmd_sync(load())  # catalog and instructions show service and system notes
         return 0
-    return guarded("system " + name if kind == "system" else name, "config", "confirm", action, write,
+    return guarded(f"{kind} {name}" if kind in ("system", "skill") else name, "config", "confirm", action, write,
                    review={"diff": diff, "flags": [r for r, _ in findings]})
 
 
@@ -2804,8 +2820,37 @@ def cmd_sync(services):
     with open(STATE, "w") as f:
         json.dump(sorted(active), f)
     git_sync(services, fetch=False)
+    sync_skills()
     write_catalog(services)
     write_instructions()
+
+
+def sync_skills():
+    """site skills (local/skills/<name>/SKILL.md) → Claude's ~/.claude/skills/<name>/, written as Claude; a skill
+    Claude made itself under the same name stays untouched, one removed from local/skills disappears"""
+    try:
+        with open(SKILLS_STATE) as f:
+            managed = set(json.load(f))
+    except (FileNotFoundError, ValueError):
+        managed = set()
+    home = os.path.join(claude_home(), ".claude", "skills")
+    site, synced = tclib.site_skills(TC_DIR), set()
+    for name in site:
+        dest = os.path.join(home, name)
+        if name not in managed and subprocess.run(["test", "-e", dest], **as_user(CLAUDE_USER, cwd="/")).returncode == 0:
+            print(f"  – skill {name}: Claude has its own skill of that name – left as it is")
+            continue
+        with open(os.path.join(SKILLS_DIR, name, "SKILL.md"), errors="replace") as f:
+            w = write_as_claude(os.path.join(dest, "SKILL.md"), f.read())
+        if w.returncode == 0 or name in managed:  # a failed update still belongs to tentaclAI
+            synced.add(name)
+        print(f"  ✓ skill {name}" if w.returncode == 0 else f"  ✗ skill {name}: {w.stderr.strip()[:160]}")
+    for name in sorted(managed - set(site)):
+        subprocess.run(["rm", "-rf", "--", os.path.join(home, name)], **as_user(CLAUDE_USER, cwd="/"))
+        print(f"  – skill {name}: removed (no longer in local/skills)")
+    os.makedirs(os.path.dirname(SKILLS_STATE), exist_ok=True)
+    with open(SKILLS_STATE, "w") as f:
+        json.dump(sorted(synced), f)
 
 
 def write_as_claude(path, text):

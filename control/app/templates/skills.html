@@ -5,7 +5,7 @@
 {% block content %}
 {{ claude_tabs('skills') }}
 <div class="header">
-  <div><h1>Skills</h1><div class="sub">Skills of Claude Code and your claude.ai account. Every skill Claude is offered costs context in <em>every</em> request – switch off what Claude never needs in this sandbox. Written as <code>skillOverrides</code> into Claude's <code>settings.json</code>; changes apply to new Claude sessions.</div></div>
+  <div><h1>Skills</h1><div class="sub">Skills of Claude Code and your claude.ai account. Every skill Claude is offered costs context in <em>every</em> request – switch off what Claude never needs in this sandbox. Written as <code>skillOverrides</code> into Claude's <code>settings.json</code>; changes apply to new Claude sessions. <strong>Site skills</strong> are procedures of this installation that Claude proposed with <code>svc config put skill</code> and you approved.</div></div>
   <div class="row"><button class="btn ghost" hx-post="/skills/discover">{{ icon('refresh') }}Check</button>{{ help_link('skills') }}</div>
 </div>
 
@@ -21,8 +21,13 @@
     <td><strong class="mono small">{{ r.name }}</strong>
       {% if r.custom and r.mode != r.default %}<span class="pill info" title="default: {{ r.default }}">changed</span>{% endif %}
       {% if r.required %}<span class="pill" title="tentacontrol starts /{{ r.name }} – it can't be switched off">required by tentaclAI</span>{% endif %}
+      {% if r.site %}<span class="pill info" title="local/skills/{{ r.name }}/SKILL.md – a procedure of this installation, proposed by Claude and approved by you">site skill</span>{% endif %}
       {% if r.description %}<div class="small muted">{{ r.description }}</div>
-      {% elif not r.seen %}<div class="small faint">not seen yet – only listed with some accounts or Claude Code versions</div>{% endif %}</td>
+      {% elif not r.seen %}<div class="small faint">not seen yet – only listed with some accounts or Claude Code versions</div>{% endif %}
+      {% if r.site %}<details class="small" style="margin-top:4px"><summary style="cursor:pointer">Show steps</summary>
+        <pre class="rc" style="max-height:360px;white-space:pre-wrap">{{ r.text }}</pre>
+        <button class="btn ghost sm" hx-post="/skills/site/{{ r.name }}/remove" hx-confirm="Remove site skill {{ r.name }}? It is kept as local/skills/{{ r.name }}.bak-… and disappears from Claude's skills.">{{ icon('trash') }}Remove</button>
+      </details>{% endif %}</td>
     <td class="small muted">{{ r.source or '–' }}</td>
     <td class="small" style="text-align:right;font-variant-numeric:tabular-nums">{{ ('~%d' % r.tokens) if r.tokens else '–' }}</td>
     <td style="white-space:nowrap"><form class="inline" hx-post="/skills/mode"><input type="hidden" name="name" value="{{ r.name }}">

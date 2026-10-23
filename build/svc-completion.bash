@@ -69,7 +69,7 @@ _svc() {
         config)
             case "$cword" in
                 2) COMPREPLY=($(compgen -W "put" -- "$cur")) ;;
-                3) COMPREPLY=($(compgen -W "service local" -- "$cur")) ;;
+                3) COMPREPLY=($(compgen -W "service system local skill job" -- "$cur")) ;;
                 *) COMPREPLY=($(compgen -f -- "$cur")) ;;
             esac ;;
         *)  # svc <api service> METHOD path

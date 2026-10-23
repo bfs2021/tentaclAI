@@ -73,6 +73,31 @@ def test_skills_page_offers_no_off_for_required(client):
     assert 'value="off"' not in row and 'value="user-invocable-only"' in row
 
 
+def test_site_skill_listed_shown_and_removed(client, monkeypatch):
+    import os
+    from app import skills
+    from app.config import STACK_DIR
+    d = os.path.join(STACK_DIR, "local", "skills", "renew-cert")
+    os.makedirs(d, exist_ok=True)
+    with open(os.path.join(d, "SKILL.md"), "w") as f:
+        f.write("---\nname: renew-cert\ndescription: Renew the wildcard certificate\n---\n\n1. <check> the expiry\n")
+    html = client.get("/skills").text
+    assert "site skill" in html and "Renew the wildcard certificate" in html and "&lt;check&gt; the expiry" in html
+    assert client.post("/skills/mode", data={"name": "renew-cert", "mode": "user-invocable-only"}, headers={"HX-Request": "true"}).status_code == 200
+    assert skills.load()["modes"]["renew-cert"] == "user-invocable-only"
+    ran = []
+
+    async def fake_sync():
+        ran.append(1)
+        return 0, ""
+    monkeypatch.setattr("app.routes.settings.sync_services", fake_sync)
+    client.post("/skills/site/renew-cert/remove", headers={"HX-Request": "true"})
+    assert ran and not os.path.exists(d) and any(n.startswith("renew-cert.bak-") for n in os.listdir(os.path.dirname(d)))
+    assert "site skill" not in client.get("/skills").text
+    r = client.post("/skills/site/nope/remove", headers={"HX-Request": "true"})
+    assert "Not removed" in r.headers.get("HX-Trigger", "")
+
+
 def test_service_without_test_path_warns_and_suggests(client):
     html = client.get("/services/demoapi").text
     assert "no test path" in html and 'value="/items?limit=1"' in html  # suggestion from the template of the same name

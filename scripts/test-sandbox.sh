@@ -269,6 +269,17 @@ curl -s -b "$J" -H "$H" -X POST -o /dev/null --data-urlencode "reason=not this b
 check "… the reason of a denial reaches svc" "$(grep -c 'Reason given by the user: “not this box”' "$T/put-sys.out" || true)" "1"
 check "… and the audit log" "$(docker exec tctest-claude grep 'system tbox' "$T/data/control/audit.jsonl" 2>/dev/null | grep -c '"reason": "not this box"' || true)" "1"
 check "a running job can't create jobs" "$(J jobstd01 'svc config put job x /tmp/job.json')" "refused"
+# a site skill: checked before the approval, written root-owned to local/skills, copied as Claude into its skills
+$C sh -c 'printf -- "---\nname: tskill\ndescription: Test procedure for the sandbox checks\n---\n\n1. svc test testapi\n" > /tmp/skill.md; printf "no frontmatter\n" > /tmp/badskill.md'
+check "an invalid skill is refused before any approval" "$($C svc config put skill tskill /tmp/badskill.md 2>&1 | tail -1 | cut -c1-40)" "svc: a SKILL.md starts with a frontmatte"
+$C svc config put skill tskill /tmp/skill.md > "$T/put-skill.out" 2>&1 &
+wait_for 30 sh -c "curl -s -b '$J' http://$IP:8080/partials/approvals | grep -q 'skill tskill'" || true
+decide approve; wait
+check "config put skill: Claude gets its copy as its own file" "$(docker exec tctest-claude stat -c %U /home/claude/.claude/skills/tskill/SKILL.md 2>&1)" "claude"
+check "… the site file is root's and readable" "$(docker exec tctest-claude stat -c '%U %a' "$T/local/skills/tskill/SKILL.md" 2>&1)" "root 644"
+docker exec tctest-claude rm -rf "$T/local/skills/tskill"
+docker exec tctest-claude svc sync > /dev/null 2>&1 < /dev/null || true
+check "… removed from local/skills, Claude's copy goes with the next sync" "$(docker exec tctest-claude test -e /home/claude/.claude/skills/tskill && echo there || echo gone)" "gone"
 # job proposals: the user picks, tentacontrol runs exactly those through svc – a limited job stays limited
 docker exec tctest-control python3 -c "
 import json, time

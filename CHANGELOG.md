@@ -31,6 +31,11 @@ All notable changes, newest first. Every release lists **upgrade steps** from th
 - **Built-in jobs on new installations**: the first setup creates *Learning review* and *Knowledge cleanup*, paused and
   marked *built-in* – edit or pause them (they can't be deleted), *Reset to default* in the editor; an untouched built-in task follows the
   shipped one on later updates. Existing installations get no jobs on the update (add them from the templates).
+- **Site skills**: a procedure of several steps that comes up again (renew a certificate, onboard a host …) Claude
+  offers to keep as a skill – `svc config put skill <name> <file>` writes `local/skills/<name>/SKILL.md` after your
+  approval (checked frontmatter, diff, ⚠ check, backup), and `svc sync` copies it into Claude's `~/.claude/skills/`, so
+  every session and job can use it. Settings → Skills lists them as *site skill* with their steps, mode and *Remove*
+  (kept as `.bak-…`). *Learning review* names candidates, *Knowledge cleanup* reports outdated or overlapping ones.
 
 ### Fixes
 - `svc config put service` wrote the file readable by root only, so Claude couldn't read it back; it is `0644` now (no

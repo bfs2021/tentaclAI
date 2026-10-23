@@ -597,6 +597,64 @@ def apply_skill_overrides(settings, managed):
     return settings
 
 
+# Site skills: procedures of this installation, kept in local/skills/<name>/SKILL.md (root-owned, proposed with
+# `svc config put skill`, approved by the user) and copied by `svc sync` into Claude's ~/.claude/skills/<name>/.
+SITE_SKILL_NAME = re.compile(r"^[a-z0-9][a-z0-9-]{0,63}$")  # Claude Code's rule; a dot (.bak-…) is never a skill
+SITE_SKILL_MAX = 32 * 1024
+_FRONT = re.compile(r"\A---\n(.*?)\n---\n", re.S)
+
+
+def skill_front(text):
+    """the simple `key: value` lines of a SKILL.md frontmatter ({} without one)"""
+    m = _FRONT.match((text or "").replace("\r\n", "\n"))
+    out = {}
+    for line in (m.group(1).splitlines() if m else []):
+        k, sep, v = line.partition(":")
+        if sep and k.strip() and not k.startswith((" ", "\t")):
+            out[k.strip()] = v.strip().strip("\"'")
+    return out
+
+
+def site_skill_problem(name, text):
+    """why a site skill can't be written – None if it is fine"""
+    if not SITE_SKILL_NAME.match(name or ""):
+        return "skill names: a-z 0-9 - (max 64, starting with a letter or digit)"
+    if len((text or "").encode()) > SITE_SKILL_MAX:
+        return f"a skill is at most {SITE_SKILL_MAX // 1024} KB – keep the steps, link to docs for the rest"
+    front = skill_front(text)
+    if not front:
+        return "a SKILL.md starts with a frontmatter: ---, name: <name>, description: <when to use it>, ---"
+    if front.get("name", name) != name:
+        return f"the frontmatter says name: {front['name']} – it must be {name}"
+    if len(front.get("description", "")) < 10:
+        return "the frontmatter needs a description: when Claude should use the skill (one or two sentences)"
+    if not _FRONT.sub("", text.replace("\r\n", "\n"), 1).strip():
+        return "the skill has no steps below the frontmatter"
+    return None
+
+
+def site_skills(stack_dir):
+    """{name: {description, size, mtime}} of local/skills/*/SKILL.md"""
+    base = os.path.join(stack_dir, "local", "skills")
+    out = {}
+    try:
+        names = sorted(os.listdir(base))
+    except OSError:
+        return out
+    for name in names:
+        path = os.path.join(base, name, "SKILL.md")
+        if not SITE_SKILL_NAME.match(name) or not os.path.isfile(path):
+            continue
+        try:
+            with open(path, errors="replace") as f:
+                text = f.read(SITE_SKILL_MAX + 1)
+            st = os.stat(path)
+        except OSError:
+            continue
+        out[name] = {"description": skill_front(text).get("description", ""), "size": st.st_size, "mtime": st.st_mtime}
+    return out
+
+
 # ---------------------------------------------------------------- models (Settings → Models)
 # Model and effort per task, from data/control/models.json; "" = Claude Code decides. The default model reaches every
 # session (terminal and Remote Control) only through settings.json – `claude remote-control` has no --model.

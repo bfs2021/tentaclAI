@@ -10,7 +10,7 @@ from .. import auth, connectors, instance, models, notify, services_store, skill
 from ..config import RC_VARS, RESTART_VARS, SETTINGS_GROUPS, managed_elsewhere
 from ..envfile import read_env, update_env
 from ..config import site
-from ..web import mark_restart, not_applied, page, respond, toast
+from ..web import mark_restart, not_applied, page, respond, sync_services, toast
 import tclib  # noqa: E402  shared with the sandbox tools
 
 router = APIRouter()
@@ -100,6 +100,17 @@ async def skills_mode(request: Request, name: str = Form(...), mode: str = Form(
         return respond(request, f"Not saved: {e}", "err")
     return respond(request, f"{name}: {mode} – applies to new Claude sessions" if ok else not_applied(),
                    "ok" if ok else "warn", refresh=True)
+
+
+@router.post("/skills/site/{name}/remove", response_class=HTMLResponse)
+async def skills_site_remove(request: Request, name: str):
+    try:
+        await asyncio.to_thread(skills.remove_site, name)
+    except (ValueError, OSError) as e:
+        return respond(request, f"Not removed: {e}", "err")
+    code, _ = await sync_services()
+    return respond(request, f"Site skill {name} removed (kept as local/skills/{name}.bak-…)" if code == 0 else
+                   f"Site skill {name} removed – Claude's copy goes with the next svc sync", "ok" if code == 0 else "warn", refresh=True)
 
 
 @router.post("/skills/discover", response_class=HTMLResponse)
