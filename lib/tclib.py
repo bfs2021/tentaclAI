@@ -832,7 +832,7 @@ AUDIT_CATEGORIES = ("service", "tool", "network", "admin", "auth", "job", "syste
 AUDIT_ACTORS = ("claude", "job", "user", "system")
 SEVERITY = {"err": 3, "warning": 4, "notice": 5, "info": 6}
 AUDIT_ORIGIN = ("session", "entry", "tmux", "by", "job")  # origin_<key>: where a call came from (svc's origin())
-_AUDIT_LIMITS = {"action": 500, "detail": 300, "error": 1000, "service": 120, "part": 20, "mode": 20, "ip": 64, "user": 32, "approver": 40, "grant": 40}
+_AUDIT_LIMITS = {"action": 500, "detail": 300, "error": 1000, "service": 120, "part": 20, "mode": 20, "ip": 64, "user": 32, "approver": 40, "grant": 40, "reason": 200}
 
 
 def audit_ts(t=None):
@@ -965,7 +965,7 @@ def audit_lines(data_dir, cutoff=0):
         yield from reversed(lines)
 
 
-AUDIT_SEARCH = ("action", "service", "part", "detail", "error", "excerpts", "ip")  # the stored fields words are searched in
+AUDIT_SEARCH = ("action", "service", "part", "detail", "error", "excerpts", "ip", "reason")  # the stored fields words are searched in
 
 
 def audit_read(data_dir, limit=200, since=0, until=0, after="", query=None, source=None):
@@ -1013,6 +1013,7 @@ AUDIT_OUTCOMES = ("ok", "approved", "flagged", "denied", "blocked", "expired", "
 AUDIT_FIELDS = ("outcome", "actor", "type", "target", "source", "user", "approver")  # the facets, in this order
 AUDIT_KEYS = {"actor": "actor", "user": "user", "source": "source", "type": "type", "target": "target",
               "action": "action", "outcome": "outcome", "decision": "decision", "mode": "mode", "ip": "ip", "approver": "approver", "grant": "grant",
+              "reason": "reason",
               "category": "type", "service": "target"}  # search keys (category/service: the stored names)
 _AUDIT_TOKEN = re.compile(r'(-?)([A-Za-z_]+):"([^"]*)"|(-?)([A-Za-z_]+):(\S+)|(-?)"([^"]*)"|(-?)(\S+)')
 
@@ -1065,12 +1066,13 @@ def audit_approval(e):
 
 
 def audit_view(e, source=None):
-    """the fields of the page and the CSV: time, actor, user, source, type, target, action, outcome (+ approver, grant)"""
+    """the fields of the page and the CSV: time, actor, user, source, type, target, action, outcome (+ approver, grant,
+    the reason of a denial)"""
     approver, grant = audit_approval(e)
     return {"approver": approver, "grant": grant, "time": e.get("ts", ""), "actor": e.get("actor", ""), "user": e.get("user", ""),
             "source": (source or audit_source)(e) or "", "type": AUDIT_TYPES.get(e.get("category"), e.get("category", "")),
             "target": str(e.get("service", "")), "action": str(e.get("action", "")), "outcome": audit_outcome(e),
-            "decision": e.get("decision", ""), "mode": e.get("mode", ""), "ip": e.get("ip", "")}
+            "decision": e.get("decision", ""), "mode": e.get("mode", ""), "ip": e.get("ip", ""), "reason": e.get("reason", "")}
 
 
 def audit_query(text):
@@ -1204,9 +1206,9 @@ def audit_retention(env):
 
 
 AUDIT_STORED = ("ts", "id", "severity", "category", "actor", "user", "service", "part", "mode", "action", "decision",
-                "approver", "grant", "exit", "seconds", "count", "detail", "error", "ip", "origin_session", "origin_entry", "origin_tmux",
+                "approver", "grant", "reason", "exit", "seconds", "count", "detail", "error", "ip", "origin_session", "origin_entry", "origin_tmux",
                 "origin_job", "origin_by", "excerpts")  # the flat stored fields (syslog structured data)
-AUDIT_CSV = ("time", "actor", "user", "source", "type", "target", "action", "outcome", "approver", "grant", "decision",
+AUDIT_CSV = ("time", "actor", "user", "source", "type", "target", "action", "outcome", "approver", "grant", "reason", "decision",
              "part", "mode", "exit",
              "seconds", "count", "detail", "error", "ip", "id", "severity", "excerpts")  # the view's names, then details
 

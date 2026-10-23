@@ -260,6 +260,14 @@ decide approve; wait
 check "… and runs once it is approved" "$(tail -1 "$T/handoff2.out")" "✓ job tjob2 saved – paused: switch it on in tentacontrol → Jobs"
 check "svc jobs <name> shows the definition" "$($C svc jobs tjob 2>/dev/null | grep -c '"prompt": "check @testapi"' || true)" "1"
 check "an invalid job is refused before any approval" "$($C svc config put job badjob /tmp/badjob.json 2>&1 | tail -1)" "svc: not a valid job – unknown profile"
+# a system file: the approval shows the changes; the reason of a denial reaches Claude and the audit log
+$C sh -c 'printf "%s" "{\"description\": \"test box\", \"ssh_host\": \"testssh\", \"notes\": [\"Restart only at night\"]}" > /tmp/sys.json'
+$C svc config put system tbox /tmp/sys.json > "$T/put-sys.out" 2>&1 &
+wait_for 30 sh -c "curl -s -b '$J' http://$IP:8080/partials/approvals | grep -q 'Restart only at night'" || true
+check "config put system: the approval shows the changes" "$(curl -s -b "$J" "http://$IP:8080/partials/approvals" | grep -c 'diff-add">+.*Restart only at night' || true)" "1"
+curl -s -b "$J" -H "$H" -X POST -o /dev/null --data-urlencode "reason=not this box" "http://$IP:8080/approvals/$(pick deny)/deny"; wait
+check "… the reason of a denial reaches svc" "$(grep -c 'Reason given by the user: “not this box”' "$T/put-sys.out" || true)" "1"
+check "… and the audit log" "$(docker exec tctest-claude grep 'system tbox' "$T/data/control/audit.jsonl" 2>/dev/null | grep -c '"reason": "not this box"' || true)" "1"
 check "a running job can't create jobs" "$(J jobstd01 'svc config put job x /tmp/job.json')" "refused"
 # job proposals: the user picks, tentacontrol runs exactly those through svc – a limited job stays limited
 docker exec tctest-control python3 -c "

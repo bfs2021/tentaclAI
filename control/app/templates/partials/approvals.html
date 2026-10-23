@@ -1,5 +1,6 @@
 {% from "_icons.html" import icon %}
-<div id="approvals" hx-get="/partials/approvals" hx-trigger="every 3s" hx-swap="outerHTML">
+{# no refresh while a reason for a denial is being typed – it would be lost #}
+<div id="approvals" hx-get="/partials/approvals" hx-trigger="every 3s [!this.querySelector('.deny-reason:focus, .deny-reason:not(:placeholder-shown)')]" hx-swap="outerHTML">
   {% if pending %}
   <div class="approval-list">
     {% for a in pending %}
@@ -10,6 +11,13 @@
             <span class="small faint">#{{ a.id }} · {{ ((now - a.created) // 60) | int }} min ago · expires in {{ ((600 - (now - a.created)) // 60) | int }} min</span></div>
           {% if a.get('from') %}<div class="small muted" title="reported by the requesting session – a hint, not proof">from {{ a['from'] }}</div>{% endif %}
           <pre class="rc approval-action">{{ a.action }}</pre>
+          {% if a.get('flags') %}<div class="banner warn small approval-flags">⚠ The added text reads like an instruction to an AI (possible prompt injection): {{ a.flags | join('; ') }} – check where it came from before you approve.</div>{% endif %}
+          {% if a.get('diff') %}{% set lines = a.diff.splitlines() %}
+          <details class="approval-diff"{% if a.get('flags') or lines | length <= 12 %} open{% endif %}>
+            <summary class="small">Changes · <span class="diff-add">+{{ a.added }}</span> <span class="diff-del">−{{ a.removed }}</span></summary>
+            <pre class="mono small diff">{% for ln in lines %}<span class="{{ 'diff-add' if ln.startswith('+') else 'diff-del' if ln.startswith('-') else 'diff-hunk' if ln.startswith('@@') else '' }}">{{ ln }}</span>
+{% endfor %}</pre>
+          </details>{% endif %}
         </div>
       </div>
       <div class="row" style="margin-top:10px">
@@ -23,7 +31,11 @@
         <button class="btn primary" hx-post="/approvals/{{ a.id }}/approve" hx-target="#approvals" hx-swap="outerHTML">{{ icon('check') }}Approve</button>
         {% if a.part not in no_grant %}<button class="btn" hx-post="/approvals/{{ a.id }}/approve15" hx-target="#approvals" hx-swap="outerHTML"
           title="Approve this and every further write of {{ a.service }} ({{ a.part }}) for the next 15 minutes">Approve + 15 min</button>{% endif %}
-        <button class="btn danger" hx-post="/approvals/{{ a.id }}/deny" hx-target="#approvals" hx-swap="outerHTML">Deny</button>
+        <form class="row deny-form" hx-post="/approvals/{{ a.id }}/deny" hx-target="#approvals" hx-swap="outerHTML">
+          <input class="deny-reason" name="reason" maxlength="200" placeholder="Reason (optional)" aria-label="Reason for the denial"
+                 title="Claude sees it – a lasting rule (“never during the day”) it proposes as a note">
+          <button class="btn danger">Deny</button>
+        </form>
         {% endif %}
       </div>
     </div>

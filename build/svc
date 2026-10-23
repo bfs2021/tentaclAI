@@ -19,8 +19,9 @@ resolved from the stack's .env (read fresh on every call) and the container envi
   svc git push <name> [branch] [--force]   push a branch (credentials stay with svc)
   svc ssh <host> [command...]      command (or a shell) on an SSH host – per-host access, default confirm
   svc pending                      approvals waiting in tentacontrol → Approvals (and active grants)
-  svc config put service <name> <file> | put local <file>
-                                   write a service file / the site rules (local/CLAUDE.md) – always needs approval
+  svc config put service <name> <file> | put system <name> <file> | put local <file>
+                                   write a service file, a system file or the site rules (local/CLAUDE.md) – always
+                                   needs approval; the approval shows the changes
   svc docker                       Docker hosts (via ssh, also this host): target, stacks dir, access
   svc docker <name> <args...>      docker CLI against that host, e.g. svc docker gate ps
   svc compose <name> <stack> <args...>
@@ -1924,21 +1925,24 @@ def cmd_ssh(name_args):
 
 
 def cmd_config(services, args):
-    """Claude proposes a service file, the site rules or a job; the user approves every write (the stack dir is root's)"""
+    """Claude proposes a service or system file, the site rules or a job; the user approves every write (the stack dir
+    is root's) and sees the changes in the approval"""
     if len(args) >= 4 and args[0] == "put" and args[1] == "job":
         return config_put_job(args[2], args[3])
-    if len(args) < 3 or args[0] != "put" or args[1] not in ("service", "local") or (args[1] == "service" and len(args) < 4):
-        sys.exit("usage: svc config put service <name> <file>  |  svc config put local <file>  |  svc config put job <name> <file>")
+    kind = args[1] if len(args) >= 3 and args[0] == "put" else ""
+    if kind not in ("service", "system", "local") or (kind != "local" and len(args) < 4):
+        sys.exit("usage: svc config put service <name> <file>  |  put system <name> <file>  |  put local <file>  |  "
+                 "put job <name> <file>")
     if job_read_only():
         sys.exit("svc: a read-only job can't propose configuration changes")
-    if args[1] == "service":
-        name, src = args[2], args[3]
-        if not re.fullmatch(r"[a-z0-9][a-z0-9_-]{0,40}", name):
-            sys.exit("svc: service names: a-z 0-9 _ - (max 41)")
-        target = os.path.join(SERVICES_DIR, f"{name}.json")
-    else:
+    if kind == "local":
         name, src = "local", args[2]
         target = os.path.join(TC_DIR, "local", "CLAUDE.md")
+    else:
+        name, src = args[2], args[3]
+        if not re.fullmatch(r"[a-z0-9][a-z0-9_-]{0,40}", name):
+            sys.exit(f"svc: {kind} names: a-z 0-9 _ - (max 41)")
+        target = os.path.join(SERVICES_DIR if kind == "service" else SYSTEMS_DIR, f"{name}.json")
     r = subprocess.run(["cat", "--", src], capture_output=True, **as_user(CLAUDE_USER))  # read with Claude's rights
     if r.returncode != 0:
         sys.exit(f"svc: can't read {src}: {r.stderr.decode(errors='replace').strip()[:160]}")
@@ -1946,26 +1950,28 @@ def cmd_config(services, args):
     if len(text) > 512 * 1024:
         sys.exit("svc: file too large")
     old = open(target).read() if os.path.exists(target) else None
-    if args[1] == "service":
-        try:
-            data = json.loads(text)
-        except ValueError as e:
-            sys.exit(f"svc: invalid JSON: {e}")
-        if not isinstance(data, dict):
-            sys.exit("svc: a service file is a JSON object")
+    if kind == "service":
+        data = config_json(text, "service")
         access = ", ".join(f"{p} {data[p].get('access', '–')}" for p in PARTS if isinstance(data.get(p), dict)) or "no parts"
         action = f"{'change' if old is not None else 'create'} services/{name}.json ({access})"
+    elif kind == "system":
+        data = config_json(text, "system")
+        problem = system_problem(data)
+        if problem:
+            sys.exit(f"svc: {problem}")
+        text = json.dumps({"name": name, **{k: v for k, v in data.items() if k != "name"}}, ensure_ascii=False, indent=2) + "\n"
+        action = f"{'change' if old is not None else 'create'} systems/{name}.json"
     else:
         action = f"{'change' if old is not None else 'create'} local/CLAUDE.md ({len(text.splitlines())} lines)"
     if old == text:
         print("unchanged")
         return 0
+    diff, added = config_diff(old, text, json_file=kind != "local")
     if old is not None:
-        import difflib
-        diff = list(difflib.unified_diff(old.splitlines(), text.splitlines(), lineterm="", n=0))
-        added, removed = sum(1 for l in diff if l.startswith("+") and not l.startswith("+++")), \
-            sum(1 for l in diff if l.startswith("-") and not l.startswith("---"))
-        action += f", +{added}/-{removed} lines"
+        action += f", +{len(added)}/-{sum(1 for ln in diff.splitlines() if ln.startswith('-'))} lines"
+    findings = tclib.injection_findings("\n".join(added)) if guard_on() else []
+    if findings:  # what Claude wants to keep for every later session reads like an instruction to an AI
+        guard_note("configuration change", "system " + name if kind == "system" else name, "config", action, findings)
 
     def write():
         if old is not None:
@@ -1975,16 +1981,69 @@ def cmd_config(services, args):
         os.makedirs(os.path.dirname(target), exist_ok=True)
         with open(target + ".tmp", "w") as f:
             f.write(text)
-        if args[1] == "local":
-            os.chmod(target + ".tmp", 0o644)  # Claude imports it (@…) – with svc's inherited umask 077 the import fails silently
+        if kind in ("local", "system"):
+            os.chmod(target + ".tmp", 0o644)  # Claude reads them (local: @import) – svc's inherited umask is 077
         os.replace(target + ".tmp", target)
         print(f"✓ {os.path.relpath(target, TC_DIR)} written" + (" (previous version kept as .bak-…)" if old is not None else ""))
-        if args[1] == "service":
-            cmd_sync(load())
-        else:
+        if kind == "local":
             write_instructions()
+        else:
+            cmd_sync(load())  # catalog and instructions show service and system notes
         return 0
-    return guarded(name if args[1] == "service" else "local", "config", "confirm", action, write)
+    return guarded("system " + name if kind == "system" else name, "config", "confirm", action, write,
+                   review={"diff": diff, "flags": [r for r, _ in findings]})
+
+
+def config_json(text, kind):
+    try:
+        data = json.loads(text)
+    except ValueError as e:
+        sys.exit(f"svc: invalid JSON: {e}")
+    if not isinstance(data, dict):
+        sys.exit(f"svc: a {kind} file is a JSON object")
+    return data
+
+
+SYSTEM_KEYS = {"_help", "name", "description", "ssh_host", "notes"}
+
+
+def system_problem(data):
+    """why a system file can't be written – None if it is fine (members join through the services' "system" field)"""
+    extra = set(data) - SYSTEM_KEYS
+    if extra:
+        return f"unknown fields in a system: {', '.join(sorted(extra))} (allowed: description, ssh_host, notes)"
+    if not isinstance(data.get("description", ""), str) or not isinstance(data.get("ssh_host", ""), str):
+        return "description and ssh_host are text"
+    if not isinstance(data.get("notes", []), list) or not all(isinstance(n, str) for n in data.get("notes", [])):
+        return "notes is a list of texts"
+    if data.get("ssh_host") and not tclib.ssh_host(SSH_CONF_D, data["ssh_host"]):
+        return f"unknown SSH host '{data['ssh_host']}' (svc ssh lists them)"
+    return None
+
+
+REVIEW_DIFF = 4000  # characters of the diff shown with the approval
+
+
+def config_diff(old, new, json_file=False):
+    """(diff for the approval, added lines): JSON compared in one layout and without the commas at line ends – a file
+    written in another style, or a note appended to a list, shows only what really changed; secrets blanked, cut to
+    REVIEW_DIFF"""
+    import difflib
+
+    def lines(t):
+        if t is None:
+            return []
+        if json_file:
+            try:
+                return [ln.rstrip(",") for ln in json.dumps(json.loads(t), ensure_ascii=False, indent=2).splitlines()]
+            except ValueError:
+                pass
+        return t.splitlines()
+    a, b = lines(old), lines(new)
+    out = [ln for ln in difflib.unified_diff(a, b, lineterm="", n=1) if not ln.startswith(("---", "+++"))]
+    added = [ln[1:] for ln in out if ln.startswith("+")]
+    text = _redact_text("\n".join(out))
+    return (text[:REVIEW_DIFF] + "\n…" if len(text) > REVIEW_DIFF else text), added
 
 
 # ---------- scheduled jobs (tentacontrol runs them; svc shows them and proposes changes) ----------
@@ -2155,7 +2214,7 @@ def access_mode(part, default="read"):
 
 
 def audit(service, part, mode, action, decision, rc=None, duration=None, detail="", error="", excerpts=None, category=None,
-          approver="", grant=""):
+          approver="", grant="", reason=""):
     """append one line to the audit log (format: tclib.audit_entry) – never lets the command fail; part "claude" is
     one of Claude's own tools (tc-guard), everything else a tentacle"""
     global AUDITED
@@ -2163,7 +2222,8 @@ def audit(service, part, mode, action, decision, rc=None, duration=None, detail=
     category = category or ("tool" if part == "claude" else "service")
     entry = tclib.audit_entry(category, service, action, decision, part=part, mode=mode, origin=origin(),
                               exit=rc, seconds=None if duration is None else round(duration, 1), detail=detail, error=error,
-                              excerpts=[{"reason": r, "text": x} for r, x in (excerpts or [])], approver=approver, grant=grant)
+                              excerpts=[{"reason": r, "text": x} for r, x in (excerpts or [])], approver=approver, grant=grant,
+                              reason=reason)
     try:
         tclib.audit_write(AUDIT_DIR, entry)
     except OSError as e:
@@ -2186,14 +2246,15 @@ def _control(method, path, payload=None, timeout=40):
 HANDOFF_EXIT = 75  # EX_TEMPFAIL: the approval is still pending, run the same command again to keep waiting
 
 
-def request_approval(service, part, action, interactive=False):
+def request_approval(service, part, action, interactive=False, review=None):
     """('approved'|'denied'|'expired'|'error'|'handoff', who/why/link, {approver, grant}) – waits for the user's decision
     in tentacontrol.
     A Claude session gets 'handoff' after APPROVAL_HANDOFF seconds: a running command shows nothing in the chat
     (Remote Control in the browser), so Claude posts the link and runs the same command again – tentacontrol hands the
     same request back to the same session (pending, or decided and not used yet)."""
     try:
-        res = _control("POST", "/internal/approvals", {"service": service, "part": part, "action": action, "origin": origin()})
+        res = _control("POST", "/internal/approvals", {"service": service, "part": part, "action": action, "origin": origin(),
+                                                      **(review or {})})
         rid = res["id"]
     except Exception as e:  # noqa: BLE001
         return "error", f"tentacontrol not reachable: {e}", {}
@@ -2227,8 +2288,12 @@ def request_approval(service, part, action, interactive=False):
 
 
 def _who(res):
-    """approver and grant of tentacontrol's answer, for the audit entry (only well-formed values)"""
-    return {k: str(res.get(k, ""))[:40] for k in ("approver", "grant") if re.fullmatch(r"[\w .:@()+-]{0,40}", str(res.get(k, "")))}
+    """approver, grant and the reason of a denial from tentacontrol's answer, for the audit entry (only well-formed values)"""
+    who = {k: str(res.get(k, ""))[:40] for k in ("approver", "grant") if re.fullmatch(r"[\w .:@()+-]{0,40}", str(res.get(k, "")))}
+    reason = re.sub(r"[\x00-\x1f\x7f]+", " ", str(res.get("reason") or "")).strip()[:200]
+    if reason:
+        who["reason"] = reason
+    return who
 
 
 # ---------- prompt-injection safeguards (tclib.injection_signals) ----------
@@ -2380,16 +2445,17 @@ def error_tail(text, lines=2, limit=300):
     return _redact_text("\n".join(keep[-lines:]))[-limit:]
 
 
-def guarded(service, part, mode, action, run, interactive=False):
+def guarded(service, part, mode, action, run, interactive=False, review=None):
     """run() performs a write: blocked for read, logged for write, approved first for confirm
-    (interactive: a terminal session – stderr stays the terminal, nothing is captured)"""
+    (interactive: a terminal session – stderr stays the terminal, nothing is captured; review: diff and flags shown with
+    the approval)"""
     if mode == "read":
         audit(service, part, mode, action, "blocked")
         report("blocked", f"Blocked: {service} ({part}) is read-only", action)
         sys.exit(f"svc: {service} is read-only ({part}) – '{action[:80]}' is not allowed")
     decision, by, who = "auto", "", {}
     if mode == "confirm":
-        decision, by, who = request_approval(service, part, action, interactive)
+        decision, by, who = request_approval(service, part, action, interactive, review)
         if decision == "handoff":
             print(f"svc: ⏸ approval still pending – the user approves it at {by}\n"
                   "Give the user this link in one line now, then run exactly the same command again "
@@ -2397,8 +2463,11 @@ def guarded(service, part, mode, action, run, interactive=False):
             sys.exit(HANDOFF_EXIT)
         if decision != "approved":
             audit(service, part, mode, action, decision, detail="" if who.get("approver") else by, **who)
+            reason = who.get("reason", "")
             sys.exit(f"svc: {service}: {action[:80]} – {decision}{(' (' + by + ')') if by else ''}. "
-                     "Not executed – tell the user, don't work around it.")
+                     "Not executed – tell the user, don't work around it."
+                     + (f"\nReason given by the user: “{reason}” – if it states a lasting rule, propose it as a note "
+                        "where it belongs (Learn where it belongs)." if reason else ""))
         print(f"svc: ✓ approved{' – ' + by if by.startswith('grant') else ''}", file=sys.stderr, flush=True)
     t = time.time()
     rc, err = (run(), "") if interactive else run_teed(run)

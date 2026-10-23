@@ -5,6 +5,7 @@
   <div class="banner approval-banner">
     <div style="min-width:0">
       <strong>{{ icon('activity') }}Approval needed: {{ a.service }}</strong> <span class="tag">{{ a.part }}</span>
+      {% if a.get('flags') %}<span class="pill warn" title="{{ a.flags | join('; ') }}">⚠ check the changes</span>{% endif %}
       {% if a.get('from') %}<span class="small muted">from {{ a['from'] }}</span>{% endif %}
       <div class="mono small approval-action-line" title="{{ a.action }}">{{ a.action }}</div>
     </div>

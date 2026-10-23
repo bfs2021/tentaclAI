@@ -590,3 +590,11 @@ pre.diff { max-height: 320px; overflow: auto; white-space: pre; background: var(
 .locked-note h2 { margin: 8px 0; font-size: 17px; }
 .locked-icon svg { width: 34px; height: 34px; color: var(--muted); }
 .module-locked h2, .module-locked p { opacity: .6; }
+
+/* approvals: the changes of a configuration write, and the reason for a denial */
+.approval-diff { margin-top: 8px; } .approval-diff summary { cursor: pointer; color: var(--muted); }
+pre.diff { margin: 6px 0 0; padding: 8px 10px; background: var(--bg-2); border: 1px solid var(--border); border-radius: var(--radius-sm); max-height: 320px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; }
+.diff-add { color: var(--ok); } .diff-del { color: var(--err); } .diff-hunk { color: var(--faint); }
+.approval-flags { margin: 8px 0 0; }
+.deny-form { gap: 6px; flex-wrap: nowrap; } .deny-reason { width: 220px; max-width: 100%; }
+.audit-reason { margin-top: 3px; white-space: normal; overflow-wrap: anywhere; }

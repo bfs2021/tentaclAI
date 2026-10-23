@@ -4,6 +4,7 @@
 <span class="pill {{ pills.get(v.outcome, 'off') }}"{% if e.error %} title="{{ e.error[:200] }}"{% endif %}>{{ v.outcome }}</span>
 {%- set how = grant_label(v.grant) if v.grant else ('no decision in time' if v.outcome == 'expired' else '') %}
 {%- if how %}<div class="small faint audit-how">{{ how }}</div>{% endif %}
+{%- if v.reason %}<div class="small muted audit-reason" title="the reason given for the denial">“{{ v.reason }}”</div>{% endif %}
 {%- endmacro %}
 {% macro grant_label(g) -%}
 {{ {'always': 'always allowed', 'blocklist': 'on the blocklist'}.get(g) or ('grant ' ~ g if g.startswith('until') else '+ ' ~ g) }}

@@ -763,3 +763,25 @@ def test_settings_other_vars_managed_elsewhere_and_remove(client):
     assert "LEFTOVER_KEY" not in env and env.get("TC_HOSTNAME") == "testhost"
     update_env({"NOT_THERE": None})  # removing a missing key is a no-op, not an append
     assert "NOT_THERE" not in read_env()
+
+
+def test_approval_shows_changes_and_takes_a_reason(client, app_module):
+    from app import activity
+    review = activity.clean_review('@@ -1 +1,2 @@\n   "notes": [\n+    "Restart only at night"', ["addresses an AI agent"])
+    rid = activity.create("system gate", "config", "change systems/gate.json, +1/-0 lines", None, review)
+    html = client.get("/partials/approvals").text
+    assert 'class="diff-add">+    &#34;Restart only at night&#34;' in html and "possible prompt injection" in html
+    assert 'name="reason"' in html and "⚠ check the changes" in client.get("/partials/approval-banner").text
+    client.post(f"/approvals/{rid}/deny", data={"reason": "  not now,\n ask me first  "})
+    a = activity.APPROVALS[rid]
+    assert a["status"] == "denied" and activity.use(a)["reason"] == "not now, ask me first"
+
+
+def test_denial_reason_in_the_audit_log(client, app_module, tmp_path, monkeypatch):
+    import tclib
+    monkeypatch.setattr(app_module.auditlog, "DATA_DIR", str(tmp_path))
+    tclib.audit_write(str(tmp_path), tclib.audit_entry("service", "demohost", "docker restart web", "denied", actor="claude",
+                                                       part="docker", mode="confirm", approver="admin", reason="only at night"))
+    html = client.get("/logs?q=reason:\"only at night\"").text
+    assert "“only at night”" in html and "docker restart web" in html
+    assert "“only at night”" in client.get("/partials/approvals-recent").text  # Recent requests

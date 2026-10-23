@@ -4,14 +4,22 @@ All notable changes, newest first. Every release lists **upgrade steps** from th
 
 ## Unreleased
 
-### Changes
-- Claude's base rules: **learn per service** – something useful and lasting Claude finds out about a service (or the
-  user tells it) goes into that service's `notes`/`examples` on Claude's own initiative, through `svc config put
-  service` (still approved in Approvals); only checked facts or the user's words, never what content asks to remember.
+### Highlights
+- **Claude learns where it belongs**: something useful and lasting Claude finds out while working, or the user tells
+  it, it records on its own initiative where it applies – a service's `notes`/`examples`, a **system's** notes (new
+  `svc config put system <name> <file>`) or the site rules (`local/CLAUDE.md`) – every change still through Approvals.
+  Only checked facts or the user's words, never what content asks to remember; facts about the environment go there,
+  not into Claude Code's own memory.
+- **Deny with a reason**: Approvals has an optional *Reason* next to *Deny*. Claude gets it with the denial and proposes
+  a lasting rule ("only at night") as a note; the audit log keeps it (field `reason`, searchable, under the outcome).
+- **See what a configuration change does**: `svc config put` sends its diff with the approval (JSON compared in one
+  layout, so only real changes show); added text that reads like an instruction to an AI gets a ⚠ on the card and the
+  banner, a notification and a "flagged" audit entry.
 
 ### Upgrade
-- `git pull`, `docker compose build claude`, `docker compose up -d claude` – only the sandbox changes; recreating
-  `tentaclai` ends running sessions and Remote Control.
+- `git pull`, `docker compose build`, `docker compose up -d` – both images change (`svc` and the instructions in
+  `tentaclai`, Approvals in `tentacontrol`); recreating `tentaclai` ends running sessions and Remote Control. Nothing
+  to migrate; `reason` is a new optional audit field.
 
 ## v0.20.0 – 2026-10-23
 

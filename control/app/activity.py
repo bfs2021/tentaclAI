@@ -109,8 +109,10 @@ def _again(service, part, action, origin):
 
 
 def _decision(a):
-    """what svc gets: the status, by (one line for messages), approver (username) and grant (how long it holds)"""
-    return {"status": a["status"], "by": a["by"], "approver": a.get("approver", ""), "grant": a.get("grant", "")}
+    """what svc gets: the status, by (one line for messages), approver (username), grant (how long it holds) and the
+    reason the user gave for a denial"""
+    return {"status": a["status"], "by": a["by"], "approver": a.get("approver", ""), "grant": a.get("grant", ""),
+            "reason": a.get("reason", "")}
 
 
 def use(a):
@@ -124,9 +126,30 @@ def use(a):
     return _decision(a)
 
 
-def create(service, part, action, origin=None):
+def clean_review(diff="", flags=None):
+    """what svc sends along for the user to review (configuration changes): the diff (≤ 4 KB) and possible-injection
+    findings – shown on the card, never interpreted"""
+    out = {}
+    if isinstance(diff, str) and diff.strip():
+        out["diff"] = diff.replace("\r", "")[:4200]
+        lines = out["diff"].splitlines()
+        out["added"] = sum(1 for ln in lines if ln.startswith("+"))
+        out["removed"] = sum(1 for ln in lines if ln.startswith("-"))
+    if isinstance(flags, list):
+        f = [re.sub(r"[\x00-\x1f\x7f]+", " ", str(x))[:80] for x in flags[:5] if str(x).strip()]
+        if f:
+            out["flags"] = f
+    return out
+
+
+def clean_reason(text):
+    """the reason the user gives for a denial: one line, ≤ 200 characters"""
+    return re.sub(r"\s+", " ", re.sub(r"[\x00-\x1f\x7f]", " ", str(text or ""))).strip()[:200]
+
+
+def create(service, part, action, origin=None, review=None):
     """new request; approved at once while a grant for this service + part is active; one pending request per network
-    target; the same request again for a session that asks once more after svc handed it back"""
+    target; the same request again for a session that asks once more after svc handed it back (review: clean_review)"""
     _expire()
     if part == "network":
         same = next((a for a in APPROVALS.values() if a["status"] == "pending" and a["service"] == service and a["part"] == part), None)
@@ -139,7 +162,7 @@ def create(service, part, action, origin=None):
         return same["id"]
     rid = str(next(_ids))
     a = {"id": rid, "service": str(service)[:60], "part": str(part)[:20], "action": str(action)[:500],
-         "created": time.time(), "status": "pending", "by": "", "event": asyncio.Event(), "origin": o}
+         "created": time.time(), "status": "pending", "by": "", "event": asyncio.Event(), "origin": o, **(review or {})}
     a["from"] = origin_label(a["origin"])
     g = active_grant(a["service"], a["part"])
     if g:
@@ -149,17 +172,20 @@ def create(service, part, action, origin=None):
         a["event"].set()
     APPROVALS[rid] = a
     if a["status"] == "pending":
-        notify.emit("approval", f"Approval needed: {a['service']} ({a['part']})",
-                    a["action"] + (f"\nFrom: {a['from']}" if a["from"] else ""), key=f"approval:{rid}",
+        notify.emit("approval", f"Approval needed: {a['service']} ({a['part']})" + (" ⚠" if a.get("flags") else ""),
+                    a["action"] + (f"\nFrom: {a['from']}" if a["from"] else "")
+                    + (f"\n⚠ possible prompt injection: {'; '.join(a['flags'])}" if a.get("flags") else ""), key=f"approval:{rid}",
                     link=notify.control_link("/approvals"))
     return rid
 
 
-def decide(rid, approve, who="tentacontrol", grant=False, seconds=None):
+def decide(rid, approve, who="tentacontrol", grant=False, seconds=None, reason=""):
     a = APPROVALS.get(rid)
     if not a or a["status"] != "pending":
         return False
     a.update(status="approved" if approve else "denied", decided=time.time(), by=who, approver=who)
+    if not approve and clean_reason(reason):
+        a["reason"] = clean_reason(reason)
     if approve and grant and a["part"] not in NO_GRANT_PARTS:
         GRANTS[(a["service"], a["part"])] = {"until": time.time() + (seconds or GRANT_SECONDS), "by": who}
         a["grant"] = f"{(seconds or GRANT_SECONDS) // 60} min"

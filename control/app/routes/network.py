@@ -23,7 +23,8 @@ async def internal_approval_create(request: Request):
     if not _svc_auth(request):
         return JSONResponse({"error": "forbidden"}, status_code=403)
     data = await request.json()
-    rid = activity.create(data.get("service", "?"), data.get("part", "?"), data.get("action", "?"), data.get("origin"))
+    rid = activity.create(data.get("service", "?"), data.get("part", "?"), data.get("action", "?"), data.get("origin"),
+                          activity.clean_review(data.get("diff", ""), data.get("flags")))
     a = activity.APPROVALS[rid]
     again = a.pop("again", False)
     return JSONResponse({"id": rid, **activity.use(a), "again": again})
@@ -168,8 +169,9 @@ async def approval_decide(request: Request, rid: str, verdict: str):
     a = activity.APPROVALS.get(rid) or {}
     if verdict in ("always", "block") and a.get("part") == "network" and a.get("status") == "pending":
         egress.add("allow" if verdict == "always" else "block", a["service"])  # host:port
+    reason = (await request.form()).get("reason", "") if verdict == "deny" else ""
     ok = activity.decide(rid, verdict not in ("deny", "block"), who=who, grant=verdict in ("approve15", "net10", "net60"),
-                         seconds={"net10": 600, "net60": 3600}.get(verdict))
+                         seconds={"net10": 600, "net60": 3600}.get(verdict), reason=reason)
     if ok:  # the status stays approved / denied for the gateway; the audit entry names the lasting choice
         if verdict in ("always", "block"):  # lasting: the destination is on a list now
             a["grant"] = "always" if verdict == "always" else "blocklist"
