@@ -100,14 +100,14 @@ def test_change_profile_and_password(fresh, app_module):
     auth.create_admin("mwa", "m@example.org", "", "testpass123")
     c = _client(app_module)
     c.post("/login", data={"username": "mwa", "password": "testpass123"})
-    assert 'value="mwa"' in c.get("/security").text
-    r = c.post("/security/account", data={"username": "max", "email": "x@example.org", "name": "", "current": "wrong"})
+    assert 'value="mwa"' in c.get("/account").text
+    r = c.post("/account/profile", data={"username": "max", "email": "x@example.org", "name": "", "current": "wrong"})
     assert r.status_code == 400 and auth.admin()["username"] == "mwa"
-    r = c.post("/security/account", data={"username": "max", "email": "x@example.org", "name": "Max", "current": "testpass123"})
+    r = c.post("/account/profile", data={"username": "max", "email": "x@example.org", "name": "Max", "current": "testpass123"})
     assert r.status_code == 200 and auth.admin()["username"] == "max"
     assert c.get("/settings").status_code == 200  # renamed – still signed in (the session holds the id)
-    assert c.post("/security/password", data={"current": "testpass123", "password": "newpass1234", "password2": "x"}).status_code == 400
-    assert c.post("/security/password", data={"current": "testpass123", "password": "newpass1234",
+    assert c.post("/account/password", data={"current": "testpass123", "password": "newpass1234", "password2": "x"}).status_code == 400
+    assert c.post("/account/password", data={"current": "testpass123", "password": "newpass1234",
                                               "password2": "newpass1234"}).status_code == 200
     assert auth.check_login("max", "newpass1234") and not auth.check_login("max", "testpass123")
 
@@ -117,3 +117,10 @@ def test_approval_names_the_user(client, app_module):
     rid = activity.create("demo", "api", "POST /things")
     client.post(f"/approvals/{rid}/approve")
     assert activity.APPROVALS[rid]["by"] == "admin"
+
+
+def test_security_moved_to_account(client):
+    r = client.get("/security", follow_redirects=False)
+    assert r.status_code == 301 and r.headers["location"] == "/account"
+    html = client.get("/account").text
+    assert "<h1>Account</h1>" in html and 'href="/account" class="active"' in html

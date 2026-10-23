@@ -58,7 +58,7 @@ async def guard(request: Request, call_next):
 
 AUDIT_SKIP = ("/internal/", "/login", "/setup", "/logout", "/approvals/", "/topology/layout", "/usage/refresh")  # logged elsewhere / layout only
 AUDIT_AREA = {"ssh": "SSH hosts", "rc": "Remote Control", "container": "sandbox", "grants": "Activity", "updates": "updates",
-              "security": "sign-in security", "claude": "Claude"}
+              "account": "account", "claude": "Claude"}
 
 
 @app.middleware("http")

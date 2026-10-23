@@ -15,7 +15,7 @@ if sys.argv[1:] == ["--reset-2fa"]:
         sys.exit("Two-factor sign-in is not on.")
     auth.disable_twofactor()
     print("Two-factor sign-in switched off (secret, recovery codes and trusted browsers removed).")
-    print("Sign in with the password and set it up again under Settings → Security.")
+    print("Sign in with the password and set it up again under Settings → Account.")
     sys.exit(0)
 
 auth.migrate()  # an installation from before accounts that wasn't started since the update

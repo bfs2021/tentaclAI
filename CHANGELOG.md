@@ -13,7 +13,7 @@ All notable changes, newest first. Every release lists **upgrade steps** from th
   exactly what the filters match.
 - **Accounts with a username**: the first setup asks for username, email and an optional name; you sign in with
   username + password, and the username names you in the audit log (field `user`, also for failed sign-ins: the name
-  that was typed) and on approvals. Settings → Security → *Account* changes username, email, name and the password.
+  that was typed) and on approvals. Settings → *Account* (was *Security*) changes username, email, name and the password.
 - **Logs → Containers**: the live log of all three containers (`tentaclai`, `tentaclai-egress`, `tentacontrol`) with a
   line filter and download.
 

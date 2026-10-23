@@ -1,11 +1,11 @@
 {% extends "base.html" %}
 {% from "_tabs.html" import settings_tabs %}
 {% from "_icons.html" import icon, help_link %}
-{% block title %}Security{% endblock %}
+{% block title %}Account{% endblock %}
 {% block content %}
-{{ settings_tabs('security') }}
+{{ settings_tabs('account') }}
 <div class="header">
-  <div><h1>Security</h1><div class="sub">Your account and two-factor sign-in: after the password, tentacontrol asks for a code from an authenticator app (Google Authenticator, Aegis, 1Password, Bitwarden …). Whoever signs in here controls the Docker host – a second factor keeps a leaked password from being enough.</div></div>
+  <div><h1>Account</h1><div class="sub">Your account and two-factor sign-in: after the password, tentacontrol asks for a code from an authenticator app (Google Authenticator, Aegis, 1Password, Bitwarden …). Whoever signs in here controls the Docker host – a second factor keeps a leaked password from being enough.</div></div>
   <div class="row">{{ help_link('two-factor') }}</div>
 </div>
 
@@ -15,7 +15,7 @@
 <div class="card" style="margin-bottom:16px">
   <h2>Account</h2>
   <p class="help" style="margin-top:-4px">You sign in with the username; it names you in the audit log and on approvals.</p>
-  <form method="post" action="/security/account" class="fields" autocomplete="off">
+  <form method="post" action="/account/profile" class="fields" autocomplete="off">
     <div class="field"><label for="ac-un">Username</label>
       <input id="ac-un" name="username" value="{{ account.username }}" autocomplete="username" autocapitalize="none" pattern="[A-Za-z0-9][A-Za-z0-9._\-]{1,31}" required></div>
     <div class="field"><label for="ac-em">Email</label>
@@ -27,7 +27,7 @@
     <div style="grid-column:1/-1"><button class="btn primary">{{ icon('check') }}Save</button></div>
   </form>
   <h3 style="margin-top:20px">Change password</h3>
-  <form method="post" action="/security/password" class="fields">
+  <form method="post" action="/account/password" class="fields">
     <div class="field"><label for="pw-cur">Current password</label>
       <input id="pw-cur" type="password" name="current" autocomplete="current-password" required></div>
     <div class="field"><label for="pw-new">New password</label>
@@ -53,14 +53,14 @@
   <h2>Two-factor sign-in <span class="pill off">off</span></h2>
   {% if not secret %}
   <p>Set it up in two steps: scan a QR code with the app, then enter the code it shows.</p>
-  <form method="post" action="/security/setup"><button class="btn primary">{{ icon('key') }}Set up</button></form>
+  <form method="post" action="/account/2fa/setup"><button class="btn primary">{{ icon('key') }}Set up</button></form>
   {% else %}
   <div class="row" style="gap:20px;align-items:flex-start;flex-wrap:wrap">
     <div class="rc-qr" title="Scan with the authenticator app">{{ qr | safe }}</div>
     <div class="stack" style="flex:1;min-width:240px">
       <p class="small">1. Scan the QR code with the authenticator app – or enter this key by hand:</p>
       <code class="mono small" style="word-break:break-all">{{ secret }}</code>
-      <form method="post" action="/security/confirm" autocomplete="off" class="stack" style="margin-top:8px">
+      <form method="post" action="/account/2fa/confirm" autocomplete="off" class="stack" style="margin-top:8px">
         <label for="code" class="small">2. The 6-digit code the app shows now</label>
         <div class="row"><input id="code" name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="7" class="mono" style="max-width:140px" required>
           <button class="btn primary">{{ icon('check') }}Switch on</button></div>
@@ -73,13 +73,13 @@
 <div class="card" style="margin-bottom:16px">
   <h2>Two-factor sign-in <span class="pill ok">on</span></h2>
   <p class="small">Recovery codes left: <strong>{{ st.recovery_left }}</strong>{% if st.recovery_left < 3 %} <span class="pill warn">make new ones</span>{% endif %}</p>
-  <form method="post" action="/security/recovery" autocomplete="off" class="row" style="gap:8px;flex-wrap:wrap">
+  <form method="post" action="/account/2fa/recovery" autocomplete="off" class="row" style="gap:8px;flex-wrap:wrap">
     <input name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="7" placeholder="current code" aria-label="Current code" class="mono" style="max-width:140px" required>
     <button class="btn">New recovery codes</button>
     <span class="help">the old ones stop working</span>
   </form>
   <h3 style="margin-top:20px">Switch off</h3>
-  <form method="post" action="/security/disable" autocomplete="off" class="row" style="gap:8px;flex-wrap:wrap">
+  <form method="post" action="/account/2fa/disable" autocomplete="off" class="row" style="gap:8px;flex-wrap:wrap">
     <input type="password" name="password" placeholder="password" aria-label="Password" autocomplete="current-password" required style="max-width:220px">
     <input name="code" placeholder="code or recovery code" aria-label="Code" class="mono" style="max-width:200px" required>
     <button class="btn danger">Switch off</button>
@@ -89,14 +89,14 @@
 
 <div class="card">
   <div class="card-head"><h2>Trusted browsers</h2>
-    {% if st.trusted %}<form method="post" action="/security/revoke"><button class="btn sm ghost">Revoke all</button></form>{% endif %}</div>
+    {% if st.trusted %}<form method="post" action="/account/revoke"><button class="btn sm ghost">Revoke all</button></form>{% endif %}</div>
   <p class="help" style="margin-top:-4px">Browsers where you ticked “Trust this browser” skip the code for {{ days }} days (the password is still needed).</p>
   {% if st.trusted %}
   <div class="table-wrap"><table>
     <thead><tr><th>Browser</th><th>Trusted since</th><th>Last sign-in</th><th></th></tr></thead><tbody>
     {% for t in st.trusted %}
     <tr><td>{{ t.label }}</td><td class="small muted">{{ fmt(t.created) }}</td><td class="small muted">{{ fmt(t.last_used) }}</td>
-      <td style="text-align:right"><form method="post" action="/security/revoke"><input type="hidden" name="tid" value="{{ t.id }}"><button class="btn sm ghost">Revoke</button></form></td></tr>
+      <td style="text-align:right"><form method="post" action="/account/revoke"><input type="hidden" name="tid" value="{{ t.id }}"><button class="btn sm ghost">Revoke</button></form></td></tr>
     {% endfor %}
   </tbody></table></div>
   {% else %}<div class="empty small">None.</div>{% endif %}

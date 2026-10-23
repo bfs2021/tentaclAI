@@ -125,7 +125,7 @@ def _pending_2fa(request):
 
 
 def browser_label(ua):
-    """'Firefox on Linux' – to recognise a trusted browser in Settings → Security"""
+    """'Firefox on Linux' – to recognise a trusted browser in Settings → Account"""
     browser = next((n for k, n in (("Edg/", "Edge"), ("Firefox/", "Firefox"), ("Chrome/", "Chrome"), ("Safari/", "Safari"))
                     if k in ua), "Browser")
     system = next((n for k, n in (("iPhone", "iPhone"), ("iPad", "iPad"), ("Android", "Android"), ("Windows", "Windows"),
@@ -163,7 +163,7 @@ async def login_2fa(request: Request, code: str = Form(...), trust: str = Form("
     if kind == "recovery":
         left = auth.twofactor_status()["recovery_left"]
         notify.emit("signin", "tentacontrol: sign-in with a recovery code", f"{left} recovery codes left.", key=f"signin:{time.time()}")
-        request.session["flash"] = {"msg": f"Signed in with a recovery code – {left} left. Set up new ones under Settings → Security.",
+        request.session["flash"] = {"msg": f"Signed in with a recovery code – {left} left. Set up new ones under Settings → Account.",
                                     "kind": "warn"}
     response = RedirectResponse("/", status_code=303)
     if trust:

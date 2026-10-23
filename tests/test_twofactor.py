@@ -123,21 +123,21 @@ def test_signin_with_recovery_code(tf, app_module):
 
 def test_security_page_disable_needs_password_and_code(tf, logged_in):
     from app import auth
-    assert "Two-factor sign-in" in logged_in.get("/security").text
-    assert logged_in.post("/security/disable", data={"password": "testpass123", "code": "000000"}).status_code == 400
+    assert "Two-factor sign-in" in logged_in.get("/account").text
+    assert logged_in.post("/account/2fa/disable", data={"password": "testpass123", "code": "000000"}).status_code == 400
     assert auth.twofactor_enabled()
-    r = logged_in.post("/security/disable", data={"password": "testpass123", "code": next_code(tf["secret"])}, follow_redirects=False)
+    r = logged_in.post("/account/2fa/disable", data={"password": "testpass123", "code": next_code(tf["secret"])}, follow_redirects=False)
     assert r.status_code == 303 and not auth.twofactor_enabled()
 
 
 def test_setup_through_the_page(logged_in, app_module):
     from app import auth, totp
     auth.disable_twofactor()
-    logged_in.post("/security/setup", follow_redirects=False)
-    page = logged_in.get("/security").text
+    logged_in.post("/account/2fa/setup", follow_redirects=False)
+    page = logged_in.get("/account").text
     secret = auth.pending_secret()
     assert secret and secret in page and "<svg" in page
-    r = logged_in.post("/security/confirm", data={"code": totp.code(secret, int(time.time() // 30))})
+    r = logged_in.post("/account/2fa/confirm", data={"code": totp.code(secret, int(time.time() // 30))})
     assert r.status_code == 200 and "Recovery codes" in r.text and auth.twofactor_enabled()
     auth.disable_twofactor()
 
