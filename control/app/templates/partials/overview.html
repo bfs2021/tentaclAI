@@ -184,7 +184,7 @@
     <dl class="kv">
       <dt>Destinations</dt><dd>{{ net.total }}</dd>
       <dt>Without a rule</dt><dd>{% if net.unknown %}<a href="/network">{{ net.unknown }}</a>{% else %}0{% endif %}</dd>
-      <dt>Waiting for approval</dt><dd>{% if net.pending %}<a href="/activity"><span class="pill warn">{{ net.pending }}</span></a>{% else %}0{% endif %}</dd>
+      <dt>Waiting for approval</dt><dd>{% if net.pending %}<a href="/approvals"><span class="pill warn">{{ net.pending }}</span></a>{% else %}0{% endif %}</dd>
     </dl>
   </div>
 </div>

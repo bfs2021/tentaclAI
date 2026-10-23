@@ -21,7 +21,7 @@
       <a href="/terminal" class="{{ 'active' if nav == 'terminal' }}">{{ icon('terminal') }}Terminal</a>
       <a href="/services" class="{{ 'active' if nav in ('services', 'service_edit', 'system_edit', 'systems', 'ssh', 'topology') }}">{{ icon('plug') }}Tentacles</a>
       <a href="/network" class="{{ 'active' if nav == 'network' }}">{{ icon('globe') }}Network</a>
-      <a href="/activity" class="{{ 'active' if nav == 'activity' }}">{{ icon('activity') }}Activity
+      <a href="/approvals" class="{{ 'active' if nav == 'approvals' }}">{{ icon('activity') }}Approvals
         <span class="nav-count" hx-get="/partials/approval-count" hx-trigger="load, every 5s" hx-swap="innerHTML"></span></a>
       <a href="/jobs" class="{{ 'active' if nav in ('jobs', 'job_edit') }}">{{ icon('clock') }}Jobs
         <span class="nav-count" hx-get="/partials/job-count" hx-trigger="load, every 30s" hx-swap="innerHTML"></span></a>
@@ -48,7 +48,7 @@
     <a class="version-tag" href="https://github.com/mwaldegg/tentaclai/releases" target="_blank" rel="noopener" title="Releases on GitHub">tentaclAI v{{ tc_version }}</a>
   </aside>
   <main class="main">
-    {% if nav != 'activity' %}<div id="approval-banner" hx-get="/partials/approval-banner" hx-trigger="load" hx-swap="outerHTML"></div>{% endif %}
+    {% if nav != 'approvals' %}<div id="approval-banner" hx-get="/partials/approval-banner" hx-trigger="load" hx-swap="outerHTML"></div>{% endif %}
     {% if restart_needed %}
     <div class="banner">
       <div><strong>{{ 'A newer tentaclAI image is ready.' if newer_image else 'Configuration changed.' }}</strong> <span class="muted">tentaclAI has to be recreated for the changes to take effect – running Claude sessions will end.</span></div>

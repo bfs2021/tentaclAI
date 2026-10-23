@@ -1026,7 +1026,7 @@ AUDIT_TYPES = {"service": "svc", "tool": "tool", "network": "network", "admin": 
 AUDIT_OUTCOMES = ("ok", "approved", "flagged", "denied", "blocked", "expired", "failed")
 AUDIT_FIELDS = ("outcome", "actor", "type", "target", "source", "user")  # the facets, in this order
 AUDIT_KEYS = {"actor": "actor", "user": "user", "source": "source", "type": "type", "target": "target",
-              "action": "action", "outcome": "outcome", "decision": "decision", "ip": "ip",
+              "action": "action", "outcome": "outcome", "decision": "decision", "mode": "mode", "ip": "ip",
               "category": "type", "service": "target"}  # search keys (category/service: the stored names)
 _AUDIT_TOKEN = re.compile(r'(-?)([A-Za-z_]+):"([^"]*)"|(-?)([A-Za-z_]+):(\S+)|(-?)"([^"]*)"|(-?)(\S+)')
 
@@ -1061,7 +1061,7 @@ def audit_view(e, source=None):
     return {"time": e.get("ts", ""), "actor": e.get("actor", ""), "user": e.get("user", ""),
             "source": (source or audit_source)(e) or "", "type": AUDIT_TYPES.get(e.get("category"), e.get("category", "")),
             "target": str(e.get("service", "")), "action": str(e.get("action", "")), "outcome": audit_outcome(e),
-            "decision": e.get("decision", ""), "ip": e.get("ip", "")}
+            "decision": e.get("decision", ""), "mode": e.get("mode", ""), "ip": e.get("ip", "")}
 
 
 def audit_query(text):

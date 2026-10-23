@@ -1,10 +1,10 @@
-"""Activity (approvals, grants), svc's and the gateway's internal endpoints, and the Network page."""
+"""Approvals (pending requests, grants, recent requests), svc's and the gateway's internal endpoints, and the Network page."""
 import asyncio
 import re
 import time
 
 from fastapi import APIRouter, Form, Request
-from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse
+from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse, RedirectResponse
 
 from .. import activity, auditlog, auth, egress, notify
 from ..envfile import update_env
@@ -89,16 +89,28 @@ async def internal_approval_wait(request: Request, rid: str, wait: int = 25):
     return JSONResponse(await activity.wait(rid, wait))
 
 
-@router.get("/activity", response_class=HTMLResponse)
-async def activity_page(request: Request):
-    """approvals only – what was decided and done is in Logs → Audit"""
-    return page(request, "activity.html")
+@router.get("/approvals", response_class=HTMLResponse)
+async def approvals_page(request: Request):
+    """pending approvals, active grants and the latest decided requests (from the audit log)"""
+    return page(request, "approvals.html")
+
+
+@router.get("/activity")
+async def activity_moved(request: Request):
+    return RedirectResponse("/approvals", status_code=301)  # Activity is Approvals now (links in chats keep their #a-<id>)
+
+
+@router.get("/partials/approvals-recent", response_class=HTMLResponse)
+async def approvals_recent(request: Request):
+    entries, more = await asyncio.to_thread(auditlog.approvals)
+    return templates.TemplateResponse(request, "partials/approvals_recent.html",
+                                      {"entries": entries, "more": more, "query": auditlog.APPROVALS_QUERY})
 
 
 @router.get("/partials/approvals", response_class=HTMLResponse)
 async def approvals_partial(request: Request):
     return templates.TemplateResponse(request, "partials/approvals.html",
-                                      {"pending": activity.pending(), "recent": activity.recent_decisions(), "now": time.time(),
+                                      {"pending": activity.pending(), "now": time.time(),
                                        "grants": activity.grants(), "no_grant": activity.NO_GRANT_PARTS})
 
 
@@ -158,9 +170,7 @@ async def approval_decide(request: Request, rid: str, verdict: str):
         egress.add("allow" if verdict == "always" else "block", a["service"])  # host:port
     ok = activity.decide(rid, verdict not in ("deny", "block"), who=who, grant=verdict in ("approve15", "net10", "net60"),
                          seconds={"net10": 600, "net60": 3600}.get(verdict))
-    if ok:
-        if verdict in ("always", "block"):  # the status stays approved / denied for the gateway; Recent decisions shows the lasting choice
-            a["shown"] = "allowed" if verdict == "always" else "blocked"
+    if ok:  # the status stays approved / denied for the gateway; the audit entry names the lasting choice
         activity.audit_network(a, {"block": "blocked", "deny": "denied"}.get(verdict, "approved"),
                                a["by"] + {"always": " · always allowed", "block": " · on the blocklist"}.get(verdict, ""))
     resp = await (approval_banner(request) if request.query_params.get("view") == "banner" else approvals_partial(request))

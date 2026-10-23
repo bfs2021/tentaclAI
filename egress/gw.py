@@ -3,7 +3,7 @@
 
 Forward proxy for CONNECT (any TCP port – HTTPS, ssh, databases; TLS is not opened) and plain HTTP requests.
 Policy (from tentacontrol, refreshed every 15 s): built-in list → blocklist → own allowlist → tentacles → grants →
-EGRESS_MODE permissive (allow, record as "unlisted") or enforce (hold the connection and ask in Activity).
+EGRESS_MODE permissive (allow, record as "unlisted") or enforce (hold the connection and ask in Approvals).
 Every destination is counted in $DATA_DIR/egress-seen.json (host:port → first, last, count, last decision) and – except
 the built-in list – reported to tentacontrol's audit log, one entry per destination and 15 minutes (refused ones at once).
 """
@@ -274,7 +274,7 @@ async def handle(cr, cw):
     if not ok and why in ("blocked", "direct-ip", "denied"):
         asyncio.get_running_loop().run_in_executor(None, report, host, port, why)
     if not ok:
-        return refuse(cw, "403 Forbidden", f"tentaclAI egress: {host}:{port} is {why} – allow it in tentacontrol → Network or approve it in Activity")
+        return refuse(cw, "403 Forbidden", f"tentaclAI egress: {host}:{port} is {why} – allow it in tentacontrol → Network or approve it in Approvals")
     if not ips:
         return refuse(cw, "502 Bad Gateway", f"{host}: name not found")
     try:

@@ -2,7 +2,7 @@
 import pytest
 
 # every GET route without parameters is a page to render – new pages are covered without touching this file
-NOT_PAGES = ("/login", "/setup", "/account/complete", "/security", "/logout", "/healthz", "/api/", "/internal/", "/logs/stream", "/builds/", "/static", "/vendor",
+NOT_PAGES = ("/login", "/setup", "/account/complete", "/security", "/activity", "/logout", "/healthz", "/api/", "/internal/", "/logs/stream", "/builds/", "/static", "/vendor",
              "/topology/ssh-status", "/claude/jobs")  # (ssh-status runs real SSH checks)
 # pages with parameters or variants, rendered with the dummy stack's objects
 VARIANTS = ["/services/demoapi", "/services/demodb", "/services/demohost", "/services/demogit", "/services/demomail", "/systems/box", "/ssh/box/edit",
@@ -218,8 +218,13 @@ def test_network_decision_lands_in_the_audit_log(client, app_module, tmp_path, m
     assert {x["category"] for x in e} == {"network"} and e[0]["actor"] == "claude"
     html = client.get("/logs?since=all").text
     assert "evil.test:443" in html and "not run" not in html
-    recent = client.get("/partials/approvals").text  # Recent decisions names the lasting choice, the status stays for the gateway
-    assert "evil.test:443 blocked" in recent and activity.APPROVALS[rid]["status"] == "denied"
+    recent = client.get("/partials/approvals-recent").text  # Recent requests (from the audit log) names the lasting choice
+    assert "evil.test:443" in recent and ">blocked</span>" in recent and "on the blocklist" in recent
+    assert "api.test:443" in recent and ">approved</span>" in recent and activity.APPROVALS[rid]["status"] == "denied"
+    r = client.get("/activity", follow_redirects=False)
+    assert r.status_code == 301 and r.headers["location"] == "/approvals"
+    html = client.get("/approvals").text
+    assert "<h1>Approvals</h1>" in html and 'href="/approvals" class="active"' in html and "/partials/approvals-recent" in html
 
 
 def test_flagged_entry_shows_what_was_found(client, app_module, tmp_path, monkeypatch):
@@ -283,7 +288,7 @@ def test_badge_disappears_after_the_last_decision(client, app_module):
 def test_approval_banner(client, app_module):
     from app import activity
     assert 'id="approval-banner"' in client.get("/settings").text      # placeholder on normal pages
-    assert 'id="approval-banner"' not in client.get("/activity").text  # Activity has the full list
+    assert 'id="approval-banner"' not in client.get("/approvals").text  # Approvals has the full list
     empty = client.get("/partials/approval-banner").text
     assert 'id="approval-banner"' in empty and "Approval needed" not in empty  # never an empty answer
     rid = activity.create("demohost", "docker", "docker restart x", {"tmux": "claude-rc"})
@@ -351,7 +356,7 @@ def test_approvals_watch(client, app_module, monkeypatch):
     assert d2["sig"] != d["sig"] and [a["id"] for a in d2["pending"]] == [rid] and d2["pending"][0]["from"] == "Remote Control"
     activity.decide(rid, False)
     assert 'id="a-' not in client.get("/partials/approvals").text
-    assert "data-desktop-notify" in client.get("/activity").text
+    assert "data-desktop-notify" in client.get("/approvals").text
 
 
 def test_netguard_does_not_cache_a_failed_lookup(app_module, monkeypatch):

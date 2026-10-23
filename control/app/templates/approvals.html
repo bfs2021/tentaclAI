@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% from "_icons.html" import icon, help_link %}
+{% block title %}Approvals{% endblock %}
+{% block content %}
+<div class="header">
+  <div><h1>Approvals</h1><div class="sub">Writes through <code>svc</code> for tentacles with access <code>confirm</code>, and unknown network destinations in <em>enforce</em> mode, wait here for your decision.</div></div>
+  <div class="row">{{ help_link('approvals') }}</div>
+</div>
+<div class="card" style="margin-bottom:14px">
+  <div class="card-head"><h2>Pending</h2>
+    <button class="btn sm ghost" type="button" data-desktop-notify hidden title="a notification from this browser when an approval waits – while tentacontrol is open in a tab, even in the background">{{ icon('bell') }}<span>Desktop notifications</span></button></div>
+  <div hx-get="/partials/approvals" hx-trigger="load" hx-swap="outerHTML"><div class="skeleton"></div></div>
+</div>
+<div class="card">
+  <div class="card-head"><h2>Recent requests</h2><a class="small" href="/logs?q=mode%3Aconfirm&amp;range=30d">All in Logs → Audit →</a></div>
+  <div hx-get="/partials/approvals-recent" hx-trigger="load" hx-swap="outerHTML"><div class="skeleton"></div></div>
+</div>
+{% endblock %}

@@ -43,9 +43,4 @@
     {% endfor %}
   </div>
   {% endif %}
-  {% if recent %}
-  <div class="small muted" style="margin-top:10px">Recent decisions:
-    {% for a in recent %}{% set shown = a.shown or a.status %}<span class="pill {{ {'approved':'ok','allowed':'ok','blocked':'warn','expired':'off'}.get(shown, 'err') }}" title="{{ a.action }}">#{{ a.id }} {{ a.service }} {{ shown }}</span> {% endfor %}
-  </div>
-  {% endif %}
 </div>

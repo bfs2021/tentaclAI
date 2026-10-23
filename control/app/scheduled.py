@@ -7,7 +7,7 @@ Profiles – the job's limit on top of each tentacle's own access (the stricter 
 - read-only: Claude Code only allows reading tools and `svc` (dontAsk), and svc treats every tentacle as read. svc
   recognises the job by the marker tc-job=<run id> in the command line of the run's wrapper process (an ancestor of
   every svc call) plus job-runs.json (root's file).
-- standard: like a terminal session – read/write/confirm of the tentacles apply; confirm waits for an approval in Activity.
+- standard: like a terminal session – read/write/confirm of the tentacles apply; confirm waits for an approval in Approvals.
 
 State: jobs.json (definitions), job-history.json (last runs), job-runs.json (running now – read by svc).
 """
@@ -785,7 +785,7 @@ def execute(run_id, jid):
 
 def run_actions(run_id, picks):
     """run the proposals the user picked – exactly as proposed, one after the other, in the background.
-    They go through svc like everything else: read stays read, confirm still asks in Activity, a limited job stays limited."""
+    They go through svc like everything else: read stays read, confirm still asks in Approvals, a limited job stays limited."""
     import threading
     run = next((r for r in history() if r.get("id") == run_id), None)
     if run is None or not run.get("actions"):

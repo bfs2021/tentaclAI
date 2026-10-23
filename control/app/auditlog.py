@@ -115,6 +115,16 @@ def overview(q="", rng="24h", start="", end=""):
             "bars": tclib.audit_histogram(hits, lo, hi, width)}
 
 
+APPROVALS_QUERY = "mode:confirm"  # requests that needed an approval: confirm tentacles and unknown network destinations
+
+
+def approvals(limit=30, days=30):
+    """the latest decided requests (approved, denied, expired …) for the Approvals page – newest first"""
+    label, link = _sources()
+    found, more = tclib.audit_read(DATA_DIR, limit=limit, since=time.time() - days * 86400, query=APPROVALS_QUERY, source=label)
+    return _viewed(found, label, link), more
+
+
 def export(fmt, q="", rng="24h", start="", end=""):
     """every matching entry as export lines (tclib.audit_export) – no page limit"""
     t0, t1 = window(rng, start, end)

@@ -20,8 +20,10 @@ All notable changes, newest first. Every release lists **upgrade steps** from th
   line filter and download.
 
 ### Changes
-- *Activity* is for approvals only (pending approvals, active grants, recent decisions); the audit table moved to
-  *Logs → Audit*, and the ⚠ badge for flagged entries now sits next to *Logs*.
+- *Activity* is now **Approvals** (`/approvals`; `/activity` links still lead there): pending approvals, active grants
+  and **Recent requests** – the latest decided requests of the last 30 days from the audit log (target, action, source,
+  outcome, decided by; survives restarts, unlike the old *Recent decisions*). The audit table moved to *Logs → Audit*,
+  and the ⚠ badge for flagged entries now sits next to *Logs*.
 - One implementation (`tclib.audit_*`) writes, reads, searches and exports the log for `svc` and tentacontrol – the
   two copies are gone. Entry format: flat fields with `id`, `category`, `actor`, RFC 5424 `severity`, RFC 3339 `ts`
   (milliseconds, `+02:00`) and `origin_session/entry/tmux/job/by` instead of the nested `from`; older entries are read

@@ -64,7 +64,7 @@ SETTINGS_GROUPS = [
     ]),
     ("Prompt injection", [
         ("INJECTION_GUARD", "Prompt-injection safeguards",
-         "on (default): svc marks mail and web pages as untrusted, removes hidden text and flags content that looks like it tries to instruct Claude (warning for Claude, Activity, notification); a hook does the same for WebFetch, WebSearch and MCP tools. A heuristic – it warns, it doesn't block", "bool"),
+         "on (default): svc marks mail and web pages as untrusted, removes hidden text and flags content that looks like it tries to instruct Claude (warning for Claude, audit log, notification); a hook does the same for WebFetch, WebSearch and MCP tools. A heuristic – it warns, it doesn't block", "bool"),
     ]),
     ("Audit log", [
         ("AUDIT_RETENTION_DAYS", "Keep the audit log (days)",

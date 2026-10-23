@@ -170,7 +170,7 @@ document.addEventListener("click", function (e) {
       var n = new Notification(a.part === "network" ? "Network: " + a.service : "Approval needed: " + a.service + " (" + a.part + ")",
         { body: a.action + (a.from ? "\nfrom " + a.from : ""), tag: "tc-approval-" + d.boot + "-" + a.id, requireInteraction: true,
           icon: "/static/apple-touch-icon.png" });
-      n.onclick = function () { window.focus(); n.close(); location.href = "/activity#a-" + a.id; };
+      n.onclick = function () { window.focus(); n.close(); location.href = "/approvals#a-" + a.id; };
       shown[a.id] = n;
     });
   }
@@ -183,7 +183,7 @@ document.addEventListener("click", function (e) {
   }
   poll("");
 
-  // the switch on Activity: asks the browser once, then turns the notifications of this browser on and off
+  // the switch on Approvals: asks the browser once, then turns the notifications of this browser on and off
   var btn = document.querySelector("[data-desktop-notify]");
   function show() {
     if (!btn) return;

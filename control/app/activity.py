@@ -1,4 +1,4 @@
-"""Activity: pending approvals (access mode "confirm") and grants; origin labels for approvals and the audit log
+"""Approvals: pending approvals (access mode "confirm") and grants; origin labels for approvals and the audit log
 (Logs → Audit, auditlog.py – network decisions are written from here, svc never sees them).
 
 svc talks to the /internal/* endpoints with the token in data/control/svc-token; approvals live in memory –
@@ -143,7 +143,7 @@ def create(service, part, action, origin=None):
     if a["status"] == "pending":
         notify.emit("approval", f"Approval needed: {a['service']} ({a['part']})",
                     a["action"] + (f"\nFrom: {a['from']}" if a["from"] else ""), key=f"approval:{rid}",
-                    link=notify.control_link("/activity"))
+                    link=notify.control_link("/approvals"))
     return rid
 
 
@@ -195,11 +195,6 @@ async def wait(rid, seconds):
 def pending():
     _expire()
     return sorted((a for a in APPROVALS.values() if a["status"] == "pending"), key=lambda a: a["created"])
-
-
-def recent_decisions(limit=10):
-    done = [a for a in APPROVALS.values() if a["status"] != "pending"]
-    return sorted(done, key=lambda a: a.get("decided", 0), reverse=True)[:limit]
 
 
 def origin_group(o):

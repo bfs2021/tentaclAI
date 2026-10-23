@@ -18,7 +18,7 @@ resolved from the stack's .env (read fresh on every call) and the container envi
   svc git fetch|pull <name>        fetch from the remote (pull: also fast-forward the current branch)
   svc git push <name> [branch] [--force]   push a branch (credentials stay with svc)
   svc ssh <host> [command...]      command (or a shell) on an SSH host – per-host access, default confirm
-  svc pending                      approvals waiting in tentacontrol → Activity (and active grants)
+  svc pending                      approvals waiting in tentacontrol → Approvals (and active grants)
   svc config put service <name> <file> | put local <file>
                                    write a service file / the site rules (local/CLAUDE.md) – always needs approval
   svc docker                       Docker hosts (via ssh, also this host): target, stacks dir, access
@@ -27,7 +27,7 @@ resolved from the stack's .env (read fresh on every call) and the container envi
                                    docker compose in <stacks_dir>/<stack> of that host, e.g. svc compose gate pangolin ps
   (access "read": only read-only docker/compose commands are allowed)
   svc audit [n] [--since 24h] [search]   audit log: words, field:value, -field:value (actor user source type target action outcome)
-  (access "confirm": writes wait for the user's approval in tentacontrol → Activity)
+  (access "confirm": writes wait for the user's approval in tentacontrol → Approvals)
   svc test <name>                  connection test of every part (api, mcp, git, docker, db, web, files)
   svc db [name] "<SQL>" | tables | describe <t> | shell    databases (postgres, mysql/mariadb); [--csv]
   svc web [name] [--links|--raw|--login] [path]          web sources: page as readable text, links, raw HTML
@@ -2117,7 +2117,7 @@ def cmd_pending(args):
     url = (ENV.get("CONTROL_URL") or "").rstrip("/")
     pending, grants = data.get("pending", []), data.get("grants", [])
     if "--json" in args:
-        print(json.dumps({"count": len(pending), "url": f"{url}/activity" if url else "", "grants": len(grants),
+        print(json.dumps({"count": len(pending), "url": f"{url}/approvals" if url else "", "grants": len(grants),
                           "oldest": pending[0] if pending else None}))
         return 0
     if not pending:
@@ -2139,7 +2139,7 @@ def cmd_rc_env():
 
 
 # ---------- audit log and approvals (access mode "confirm") ----------
-# Every write through svc is logged; with access "confirm" it first needs the user's approval in tentacontrol (Activity).
+# Every write through svc is logged; with access "confirm" it first needs the user's approval in tentacontrol (Approvals).
 # Claude runs as an unprivileged user and reaches services only through svc (sudo), so the modes are enforced here.
 
 CONTROL_INTERNAL = os.environ.get("TC_CONTROL_INTERNAL", "http://tentacontrol:8080")
@@ -2198,7 +2198,7 @@ def request_approval(service, part, action, interactive=False):
     if res.get("status") != "pending":  # an active "Approve + 15 min" grant, or a decision made while svc was handed back
         return res["status"], res.get("by", "")
     base = (ENV.get("CONTROL_URL") or "").rstrip("/")
-    where = f"{base}/activity#a-{rid}" if base else f"tentacontrol → Activity (#{rid})"
+    where = f"{base}/approvals#a-{rid}" if base else f"tentacontrol → Approvals (#{rid})"
     handoff = 0 if interactive or job() or not origin().get("session") else tclib.approval_handoff(ENV)
     if res.get("again"):
         print(f"svc: ⏳ still waiting for approval #{rid} – {where}", file=sys.stderr, flush=True)
@@ -2749,7 +2749,7 @@ def write_catalog(services):
         "Call APIs with `svc <name> <METHOD> <path> [curl args]` – auth is injected, tokens never appear in commands.",
         "Details per service: `svc info <name>`. Status \"missing: VAR\" = token not set in `.env` → tell the user, don't work around it.",
         "Read freely; write actions only when the user asked for them. Access modes: `read` = read only, `write` = writes allowed, "
-        "`confirm` = every write waits for approval in tentacontrol → Activity.",
+        "`confirm` = every write waits for approval in tentacontrol → Approvals.",
         "",
         "| Service | Type | Status | Description | API / MCP | Docs |",
         "|---|---|---|---|---|---|",

@@ -1,5 +1,5 @@
 {% from "_icons.html" import icon %}
-{# on every page but Activity: pending approvals with their buttons – refreshes itself, never empty (htmx keeps empty answers) #}
+{# on every page but Approvals: pending approvals with their buttons – refreshes itself, never empty (htmx keeps empty answers) #}
 <div id="approval-banner" hx-get="/partials/approval-banner" hx-trigger="every 3s" hx-swap="outerHTML">
   {% for a in pending %}
   <div class="banner approval-banner">
@@ -19,7 +19,7 @@
         title="Approve this and every further write of {{ a.service }} ({{ a.part }}) for the next 15 minutes">+ 15 min</button>{% endif %}
       <button class="btn sm danger" hx-post="/approvals/{{ a.id }}/deny{{ go }}" hx-target="#approval-banner" hx-swap="outerHTML">Deny</button>
       {% endif %}
-      <a class="btn sm ghost" href="/activity" title="all options and the audit log">More</a>
+      <a class="btn sm ghost" href="/approvals" title="all options and the audit log">More</a>
     </div>
   </div>
   {% endfor %}

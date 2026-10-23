@@ -1,0 +1,25 @@
+{# the latest decided requests, from the audit log (mode confirm) – refreshes itself #}
+{% set pills = {'ok': 'ok', 'approved': 'ok', 'flagged': 'warn', 'denied': 'err', 'blocked': 'warn', 'expired': 'off', 'failed': 'err'} %}
+<div id="approvals-recent" hx-get="/partials/approvals-recent" hx-trigger="every 5s" hx-swap="outerHTML">
+  {% if entries %}
+  <div class="table-wrap"><table class="audit approvals-recent">
+    <colgroup><col style="width:84px"><col style="width:16%"><col><col style="width:18%"><col style="width:104px"><col style="width:18%"></colgroup>
+    <thead><tr><th>Time</th><th>Target</th><th>Action</th><th>Source</th><th>Outcome</th><th>Decided by</th></tr></thead>
+    <tbody>
+    {% for e in entries %}{% set v = e._view %}
+    <tr class="sev-{{ e.severity }}">
+      <td class="mono small nowrap" title="{{ e.ts }}">{{ e.ts[11:19] }}<div class="faint">{{ e.ts[5:10] }}</div></td>
+      <td class="small audit-target"><strong>{{ v.target }}</strong>{% if e.part %} <span class="tag">{{ e.part }}</span>{% endif %}</td>
+      <td class="mono small audit-action" title="{{ v.action }}">{{ v.action }}</td>
+      <td class="small muted audit-target">{% if e._link %}<a href="{{ e._link }}">{{ v.source }}</a>{% else %}{{ v.source or '–' }}{% endif %}</td>
+      <td><span class="pill {{ pills.get(v.outcome, 'off') }}"{% if e.error %} title="{{ e.error[:200] }}"{% endif %}>{{ v.outcome }}</span></td>
+      <td class="small muted">{{ e.detail or '–' }}</td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table></div>
+  {% if more %}<p class="help">The latest {{ entries | length }} of the last 30 days – <a href="/logs?q={{ query | urlencode }}&amp;range=30d">all in Logs → Audit</a>.</p>{% endif %}
+  {% else %}
+  <div class="empty small">No decided requests in the last 30 days.</div>
+  {% endif %}
+</div>

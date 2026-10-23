@@ -43,7 +43,7 @@ n = p.get("count") or 0
 if n:
     o = p.get("oldest") or {}
     what = f"{o.get('service', '')} {o.get('part', '')}".strip()
-    where = p.get("url") or "tentacontrol → Activity"
+    where = p.get("url") or "tentacontrol → Approvals"
     parts.append(f"{YEL}{BOLD}⏳ {n} approval{'s' if n != 1 else ''} pending{R}{YEL} ({what}) → {where}{R}")
 elif p.get("grants"):
     parts.append(f"{YEL}{p['grants']} grant{'s' if p['grants'] != 1 else ''} active{R}")
