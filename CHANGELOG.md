@@ -2,7 +2,7 @@
 
 All notable changes, newest first. Every release lists **upgrade steps** from the previous one.
 
-## Unreleased
+## v0.19.0 – 2026-10-23
 
 ### Highlights
 - **Approvals you don't miss**: tentacontrol shows waiting approvals in the tab title and on its icon, and can send
