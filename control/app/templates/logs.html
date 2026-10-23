@@ -60,7 +60,7 @@
       {% else %}
       <div class="empty small">{{ 'Nothing matches this search.' if links.terms else 'Nothing logged in this time range.' }}</div>
       {% endif %}
-      <p class="help">Newest first; click a row for every field. Search: words, <code>field:value</code>, <code>-field:value</code> (not), <code>field:"with spaces"</code>, <code>*</code> as wildcard – fields <code>actor user source type target action outcome</code>. Secrets are never logged – API requests show method and path, bodies only as “(with body)”, forms in tentacontrol only which page and object. Allowed connections are counted per destination and 15 minutes; the built-in destinations only show on the Network page. Kept {{ retention }} days (<code>AUDIT_RETENTION_DAYS</code>). In the sandbox: <code>svc audit</code>.</p>
+      <p class="help">Newest first; click a row for every field. Search: words, <code>field:value</code>, <code>-field:value</code> (not), <code>field:"with spaces"</code>, <code>*</code> as wildcard – fields <code>actor user source type target action outcome approver grant</code>. Secrets are never logged – API requests show method and path, bodies only as “(with body)”, forms in tentacontrol only which page and object. Allowed connections are counted per destination and 15 minutes; the built-in destinations only show on the Network page. Kept {{ retention }} days (<code>AUDIT_RETENTION_DAYS</code>). In the sandbox: <code>svc audit</code>.</p>
     </div>
   </div>
 </div>

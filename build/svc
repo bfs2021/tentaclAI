@@ -2154,7 +2154,8 @@ def access_mode(part, default="read"):
     return tclib.access(part.get("access"), default)
 
 
-def audit(service, part, mode, action, decision, rc=None, duration=None, detail="", error="", excerpts=None, category=None):
+def audit(service, part, mode, action, decision, rc=None, duration=None, detail="", error="", excerpts=None, category=None,
+          approver="", grant=""):
     """append one line to the audit log (format: tclib.audit_entry) – never lets the command fail; part "claude" is
     one of Claude's own tools (tc-guard), everything else a tentacle"""
     global AUDITED
@@ -2162,7 +2163,7 @@ def audit(service, part, mode, action, decision, rc=None, duration=None, detail=
     category = category or ("tool" if part == "claude" else "service")
     entry = tclib.audit_entry(category, service, action, decision, part=part, mode=mode, origin=origin(),
                               exit=rc, seconds=None if duration is None else round(duration, 1), detail=detail, error=error,
-                              excerpts=[{"reason": r, "text": x} for r, x in (excerpts or [])])
+                              excerpts=[{"reason": r, "text": x} for r, x in (excerpts or [])], approver=approver, grant=grant)
     try:
         tclib.audit_write(AUDIT_DIR, entry)
     except OSError as e:
@@ -2186,7 +2187,8 @@ HANDOFF_EXIT = 75  # EX_TEMPFAIL: the approval is still pending, run the same co
 
 
 def request_approval(service, part, action, interactive=False):
-    """('approved'|'denied'|'expired'|'error'|'handoff', who/why/link) – waits for the user's decision in tentacontrol.
+    """('approved'|'denied'|'expired'|'error'|'handoff', who/why/link, {approver, grant}) – waits for the user's decision
+    in tentacontrol.
     A Claude session gets 'handoff' after APPROVAL_HANDOFF seconds: a running command shows nothing in the chat
     (Remote Control in the browser), so Claude posts the link and runs the same command again – tentacontrol hands the
     same request back to the same session (pending, or decided and not used yet)."""
@@ -2194,9 +2196,9 @@ def request_approval(service, part, action, interactive=False):
         res = _control("POST", "/internal/approvals", {"service": service, "part": part, "action": action, "origin": origin()})
         rid = res["id"]
     except Exception as e:  # noqa: BLE001
-        return "error", f"tentacontrol not reachable: {e}"
+        return "error", f"tentacontrol not reachable: {e}", {}
     if res.get("status") != "pending":  # an active "Approve + 15 min" grant, or a decision made while svc was handed back
-        return res["status"], res.get("by", "")
+        return res["status"], res.get("by", ""), _who(res)
     base = (ENV.get("CONTROL_URL") or "").rstrip("/")
     where = f"{base}/approvals#a-{rid}" if base else f"tentacontrol → Approvals (#{rid})"
     handoff = 0 if interactive or job() or not origin().get("session") else tclib.approval_handoff(ENV)
@@ -2210,7 +2212,7 @@ def request_approval(service, part, action, interactive=False):
     reminded = start
     while time.time() < end:
         if handoff and not res.get("again") and time.time() - start >= handoff:
-            return "handoff", where
+            return "handoff", where, {}
         if time.time() - reminded >= 60:  # visible in the live output of a running command
             reminded = time.time()
             print(f"svc: ⏳ still waiting for approval #{rid} ({int(reminded - start) // 60} min) – {where}", file=sys.stderr, flush=True)
@@ -2218,10 +2220,15 @@ def request_approval(service, part, action, interactive=False):
             st = _control("GET", f"/internal/approvals/{rid}?wait={min(25, handoff) if handoff and not res.get('again') else 25}",
                           timeout=40)
         except Exception as e:  # noqa: BLE001
-            return "error", f"tentacontrol not reachable: {e}"
+            return "error", f"tentacontrol not reachable: {e}", {}
         if st.get("status") != "pending":
-            return st.get("status", "error"), st.get("by", "")
-    return "expired", ""
+            return st.get("status", "error"), st.get("by", ""), _who(st)
+    return "expired", "", {}
+
+
+def _who(res):
+    """approver and grant of tentacontrol's answer, for the audit entry (only well-formed values)"""
+    return {k: str(res.get(k, ""))[:40] for k in ("approver", "grant") if re.fullmatch(r"[\w .:@()+-]{0,40}", str(res.get(k, "")))}
 
 
 # ---------- prompt-injection safeguards (tclib.injection_signals) ----------
@@ -2380,23 +2387,23 @@ def guarded(service, part, mode, action, run, interactive=False):
         audit(service, part, mode, action, "blocked")
         report("blocked", f"Blocked: {service} ({part}) is read-only", action)
         sys.exit(f"svc: {service} is read-only ({part}) – '{action[:80]}' is not allowed")
-    decision, by = "auto", ""
+    decision, by, who = "auto", "", {}
     if mode == "confirm":
-        decision, by = request_approval(service, part, action, interactive)
+        decision, by, who = request_approval(service, part, action, interactive)
         if decision == "handoff":
             print(f"svc: ⏸ approval still pending – the user approves it at {by}\n"
                   "Give the user this link in one line now, then run exactly the same command again "
                   "(Bash timeout 600000 ms): it waits for the same request.", file=sys.stderr, flush=True)
             sys.exit(HANDOFF_EXIT)
         if decision != "approved":
-            audit(service, part, mode, action, decision, detail=by)
+            audit(service, part, mode, action, decision, detail="" if who.get("approver") else by, **who)
             sys.exit(f"svc: {service}: {action[:80]} – {decision}{(' (' + by + ')') if by else ''}. "
                      "Not executed – tell the user, don't work around it.")
         print(f"svc: ✓ approved{' – ' + by if by.startswith('grant') else ''}", file=sys.stderr, flush=True)
     t = time.time()
     rc, err = (run(), "") if interactive else run_teed(run)
-    audit(service, part, mode, action, decision, rc=rc, duration=time.time() - t, detail=by,
-          error=error_tail(err) if rc else "")
+    audit(service, part, mode, action, decision, rc=rc, duration=time.time() - t, detail="" if who.get("approver") else by,
+          error=error_tail(err) if rc else "", **who)
     return rc
 
 

@@ -400,6 +400,7 @@ tr.audit-row { cursor: pointer; } tr.audit-row:hover td, tr.audit-row.open td { 
 tr.audit-row:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 .audit-action { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } tr.audit-row.open .audit-action { white-space: pre-wrap; }
 .audit-target { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.audit-how { margin-top: 3px; white-space: nowrap; }
 a.audit-val { color: inherit; } a.audit-val:hover { text-decoration: underline; }
 tr.audit-detail > td { background: var(--panel-2); padding: 10px 14px 14px; }
 .audit-fields { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 2px 18px; }

@@ -1,5 +1,5 @@
 {# rows of Logs → Audit – the page and "Load more" (/logs/audit/more) render the same rows; each with a detail row #}
-{% set pills = {'ok': 'ok', 'approved': 'ok', 'flagged': 'warn', 'denied': 'err', 'blocked': 'warn', 'expired': 'off', 'failed': 'err'} %}
+{% from "_audit.html" import outcome %}
 {% macro val(field, value, label=None) %}{% if value %}<a class="audit-val" href="{{ links.toggle(field, value) }}" title="filter {{ field }}:{{ value }}">{{ label or value }}</a>{% endif %}{% endmacro %}
 {% for e in entries %}{% set v = e._view %}
 <tr class="audit-row sev-{{ e.severity }}" data-audit-row tabindex="0" aria-expanded="false">
@@ -8,12 +8,12 @@
   <td><span class="tag">{{ val('type', v.type) }}</span></td>
   <td class="audit-target small">{{ val('target', v.target) }}</td>
   <td class="mono small audit-action">{{ v.action }}</td>
-  <td><span class="pill {{ pills.get(v.outcome, 'off') }}"{% if e.error %} title="{{ e.error[:200] }}"{% endif %}>{{ v.outcome }}</span></td>
+  <td>{{ outcome(v, e) }}</td>
 </tr>
 <tr class="audit-detail" hidden><td colspan="6">
   <div class="audit-fields">
     {% for key, value in (('time', e.ts), ('actor', v.actor), ('user', v.user), ('source', v.source), ('type', v.type), ('target', v.target),
-                          ('action', v.action), ('outcome', v.outcome), ('decision', v.decision)) if value %}
+                          ('action', v.action), ('outcome', v.outcome), ('approver', v.approver), ('grant', v.grant), ('decision', v.decision)) if value %}
     <div class="af"><span class="af-k">{{ key }}</span><span class="af-v{{ ' mono' if key in ('action', 'time') }}">{% if key == 'source' and e._link %}<a href="{{ e._link }}">{{ value }}</a>{% else %}{{ value }}{% endif %}</span>
       {% if key not in ('time', 'action') %}<span class="af-act"><a href="{{ links.toggle(key, value) }}">filter</a><a href="{{ links.exclude(key, value) }}">exclude</a></span>{% endif %}</div>
     {% endfor %}

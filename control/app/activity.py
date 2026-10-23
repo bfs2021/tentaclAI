@@ -46,7 +46,8 @@ def token_ok(value):
 def audit_network(a, decision, detail=""):
     """a decided request of the egress gateway (unknown destination) – svc never sees these"""
     if a.get("part") == "network":
-        auditlog.write("network", a["service"], a["action"], decision, actor="claude", mode="confirm", detail=detail or a.get("by", ""))
+        auditlog.write("network", a["service"], a["action"], decision, actor="claude", mode="confirm", detail=detail,
+                       approver=a.get("approver", ""), grant=a.get("grant", ""))
 
 
 def _expire():
@@ -107,15 +108,20 @@ def _again(service, part, action, origin):
                  and not a.get("used") and (a["status"] == "pending" or now - a.get("decided", now) < TIMEOUT)), None)
 
 
+def _decision(a):
+    """what svc gets: the status, by (one line for messages), approver (username) and grant (how long it holds)"""
+    return {"status": a["status"], "by": a["by"], "approver": a.get("approver", ""), "grant": a.get("grant", "")}
+
+
 def use(a):
     """svc learns a decision once – a second call waiting on the same request gets an error and runs nothing
     (network requests are shared on purpose: every connection to that target waits for the one decision)"""
     if a["status"] == "pending" or a["part"] == "network":
-        return {"status": a["status"], "by": a["by"]}
+        return _decision(a)
     if a.get("used"):
-        return {"status": "error", "by": "this approval was already used by another call"}
+        return {"status": "error", "by": "this approval was already used by another call", "approver": "", "grant": ""}
     a["used"] = True
-    return {"status": a["status"], "by": a["by"]}
+    return _decision(a)
 
 
 def create(service, part, action, origin=None):
@@ -137,7 +143,9 @@ def create(service, part, action, origin=None):
     a["from"] = origin_label(a["origin"])
     g = active_grant(a["service"], a["part"])
     if g:
-        a.update(status="approved", decided=time.time(), by=f"grant until {time.strftime('%H:%M', time.localtime(g['until']))} ({g['by']})")
+        until = time.strftime('%H:%M', time.localtime(g['until']))
+        a.update(status="approved", decided=time.time(), by=f"grant until {until} ({g['by']})", approver=g["by"],
+                 grant=f"until {until}")
         a["event"].set()
     APPROVALS[rid] = a
     if a["status"] == "pending":
@@ -151,10 +159,11 @@ def decide(rid, approve, who="tentacontrol", grant=False, seconds=None):
     a = APPROVALS.get(rid)
     if not a or a["status"] != "pending":
         return False
-    a.update(status="approved" if approve else "denied", decided=time.time(), by=who)
+    a.update(status="approved" if approve else "denied", decided=time.time(), by=who, approver=who)
     if approve and grant and a["part"] not in NO_GRANT_PARTS:
         GRANTS[(a["service"], a["part"])] = {"until": time.time() + (seconds or GRANT_SECONDS), "by": who}
-        a["by"] = who + f" + {(seconds or GRANT_SECONDS) // 60} min"
+        a["grant"] = f"{(seconds or GRANT_SECONDS) // 60} min"
+        a["by"] = who + f" + {a['grant']}"
     a["event"].set()
     return True
 
@@ -182,7 +191,7 @@ def revoke(service, part):
 async def wait(rid, seconds):
     a = APPROVALS.get(rid)
     if not a:
-        return {"status": "error", "by": "unknown request (tentacontrol restarted?)"}
+        return {"status": "error", "by": "unknown request (tentacontrol restarted?)", "approver": "", "grant": ""}
     if a["status"] == "pending":
         try:
             await asyncio.wait_for(a["event"].wait(), timeout=max(1, min(seconds, 30)))

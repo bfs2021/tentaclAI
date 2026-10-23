@@ -392,6 +392,18 @@ def test_audit_outcome_and_matching():
     assert hits("DOCKER") == ["gate", "origin", "docktopus"] and hits("-docker") == []
 
 
+def test_audit_approval_fields_and_older_entries():
+    e = tclib.audit_entry("service", "gate", "compose up", "approved", actor="claude", mode="confirm", approver="mwa", grant="15 min")
+    assert tclib.audit_view(e)["approver"] == "mwa" and tclib.audit_view(e)["grant"] == "15 min"
+    old = {"mode": "confirm"}
+    for detail, want in (("mwa + 15 min", ("mwa", "15 min")), ("grant until 14:20 (mwa)", ("mwa", "until 14:20")),
+                         ("mwa · always allowed", ("mwa", "always")), ("mwa + 10 min · on the blocklist", ("mwa", "blocklist")),
+                         ("tentacontrol (192.168.1.2) + 10 min", ("", "10 min")), ("tentacontrol (192.168.1.2)", ("", "")),
+                         ("no decision in time", ("", ""))):
+        assert tclib.audit_approval({**old, "detail": detail}) == want, detail
+    assert tclib.audit_approval({"mode": "write", "detail": "mwa + 15 min"}) == ("", "")  # only approvals
+
+
 def test_audit_facets_and_histogram():
     t0 = 1_800_000_000
     es = []

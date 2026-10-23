@@ -246,6 +246,7 @@ $C svc config put job tjob /tmp/job.json > "$T/put-job.out" 2>&1 &
 wait_for 30 sh -c "curl -s -b '$J' http://$IP:8080/partials/approvals | grep -q 'job tjob'" || true
 decide approve; wait
 check "config put job: saved paused after approval" "$(tail -1 "$T/put-job.out")" "✓ job tjob saved – paused: switch it on in tentacontrol → Jobs"
+check "… the audit entry names the approver" "$(docker exec tctest-claude grep "job tjob" "$T/data/control/audit.jsonl" 2>/dev/null | grep -c "\"approver\": \"admin\"" || true)" "1"
 check "svc jobs lists it" "$($C svc jobs 2>/dev/null | grep -c '^tjob ' || true)" "1"
 # a Claude session gets the request back with its link after APPROVAL_HANDOFF s (exit 75); the same command again waits for it
 CS="docker exec -u claude -e CLAUDE_CODE_SESSION_ID=0badcafe-0000-4000-8000-$(date +%s%N | tail -c 13) tctest-claude"  # own per run: a kept REUSE stack may hold the last run's request

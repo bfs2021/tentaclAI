@@ -833,7 +833,7 @@ AUDIT_ACTORS = ("claude", "job", "user", "system")
 AUDIT_DECISIONS = ("read", "auto", "approved", "denied", "expired", "blocked", "error", "flagged", "allowed", "ok", "failed")
 SEVERITY = {"err": 3, "warning": 4, "notice": 5, "info": 6}
 AUDIT_ORIGIN = ("session", "entry", "tmux", "by", "job")  # origin_<key>: where a call came from (svc's origin())
-_AUDIT_LIMITS = {"action": 500, "detail": 300, "error": 1000, "service": 120, "part": 20, "mode": 20, "ip": 64, "user": 32}
+_AUDIT_LIMITS = {"action": 500, "detail": 300, "error": 1000, "service": 120, "part": 20, "mode": 20, "ip": 64, "user": 32, "approver": 40, "grant": 40}
 
 
 def audit_ts(t=None):
@@ -1024,9 +1024,9 @@ def audit_read(data_dir, limit=200, since=0, until=0, filters=None, q="", after=
 AUDIT_TYPES = {"service": "svc", "tool": "tool", "network": "network", "admin": "admin", "auth": "sign-in", "job": "job",
                "system": "system"}  # category → the word shown as type
 AUDIT_OUTCOMES = ("ok", "approved", "flagged", "denied", "blocked", "expired", "failed")
-AUDIT_FIELDS = ("outcome", "actor", "type", "target", "source", "user")  # the facets, in this order
+AUDIT_FIELDS = ("outcome", "actor", "type", "target", "source", "user", "approver")  # the facets, in this order
 AUDIT_KEYS = {"actor": "actor", "user": "user", "source": "source", "type": "type", "target": "target",
-              "action": "action", "outcome": "outcome", "decision": "decision", "mode": "mode", "ip": "ip",
+              "action": "action", "outcome": "outcome", "decision": "decision", "mode": "mode", "ip": "ip", "approver": "approver", "grant": "grant",
               "category": "type", "service": "target"}  # search keys (category/service: the stored names)
 _AUDIT_TOKEN = re.compile(r'(-?)([A-Za-z_]+):"([^"]*)"|(-?)([A-Za-z_]+):(\S+)|(-?)"([^"]*)"|(-?)(\S+)')
 
@@ -1056,9 +1056,32 @@ def audit_source(e):
     return e.get("ip", "")
 
 
+_OLD_GRANT = re.compile(r"^(?:grant until (\d\d:\d\d) \((.+)\)|(.+?) \+ (\d+ min))(?: · (always allowed|on the blocklist))?$")
+
+
+def audit_approval(e):
+    """(approver, grant) of an approval – stored since accounts; older entries had both in detail
+    ("mwa + 15 min", "grant until 14:20 (mwa)", "… · always allowed"); "tentacontrol (IP)" named no one"""
+    if e.get("approver") or e.get("grant") or e.get("mode") != "confirm":
+        return e.get("approver", ""), e.get("grant", "")
+    d = str(e.get("detail", ""))
+    lasting = {"always allowed": "always", "on the blocklist": "blocklist"}
+    m = _OLD_GRANT.match(d)
+    if m:
+        who, grant = (m.group(2), f"until {m.group(1)}") if m.group(1) else (m.group(3), m.group(4))
+        grant = lasting.get(m.group(5), grant)
+    else:
+        who, _, tail = d.partition(" · ")
+        grant = lasting.get(tail, "")
+    if who.startswith("tentacontrol") or not re.fullmatch(r"[a-z0-9][a-z0-9._-]{1,31}", who):
+        who = ""
+    return who, grant
+
+
 def audit_view(e, source=None):
-    """the fields of the page and the CSV: time, actor, user, source, type, target, action, outcome"""
-    return {"time": e.get("ts", ""), "actor": e.get("actor", ""), "user": e.get("user", ""),
+    """the fields of the page and the CSV: time, actor, user, source, type, target, action, outcome (+ approver, grant)"""
+    approver, grant = audit_approval(e)
+    return {"approver": approver, "grant": grant,"time": e.get("ts", ""), "actor": e.get("actor", ""), "user": e.get("user", ""),
             "source": (source or audit_source)(e) or "", "type": AUDIT_TYPES.get(e.get("category"), e.get("category", "")),
             "target": str(e.get("service", "")), "action": str(e.get("action", "")), "outcome": audit_outcome(e),
             "decision": e.get("decision", ""), "mode": e.get("mode", ""), "ip": e.get("ip", "")}
@@ -1195,9 +1218,10 @@ def audit_retention(env):
 
 
 AUDIT_STORED = ("ts", "id", "severity", "category", "actor", "user", "service", "part", "mode", "action", "decision",
-                "exit", "seconds", "count", "detail", "error", "ip", "origin_session", "origin_entry", "origin_tmux",
+                "approver", "grant", "exit", "seconds", "count", "detail", "error", "ip", "origin_session", "origin_entry", "origin_tmux",
                 "origin_job", "origin_by", "excerpts")  # the flat stored fields (syslog structured data)
-AUDIT_CSV = ("time", "actor", "user", "source", "type", "target", "action", "outcome", "decision", "part", "mode", "exit",
+AUDIT_CSV = ("time", "actor", "user", "source", "type", "target", "action", "outcome", "approver", "grant", "decision",
+             "part", "mode", "exit",
              "seconds", "count", "detail", "error", "ip", "id", "severity", "excerpts")  # the view's names, then details
 
 

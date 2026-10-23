@@ -214,13 +214,16 @@ def test_network_decision_lands_in_the_audit_log(client, app_module, tmp_path, m
     client.post(f"/approvals/{rid2}/net10")
     e = [json.loads(line) for line in (tmp_path / "audit.jsonl").read_text().splitlines()]
     assert [(x["service"], x["part"], x["decision"]) for x in e] == [("evil.test:443", "network", "blocked"), ("api.test:443", "network", "approved")]
-    assert "on the blocklist" in e[0]["detail"] and "+ 10 min" in e[1]["detail"]
+    assert (e[0]["approver"], e[0]["grant"], e[1]["approver"], e[1]["grant"]) == ("admin", "blocklist", "admin", "10 min")
     assert {x["category"] for x in e} == {"network"} and e[0]["actor"] == "claude"
     html = client.get("/logs?since=all").text
     assert "evil.test:443" in html and "not run" not in html
     recent = client.get("/partials/approvals-recent").text  # Recent requests (from the audit log) names the lasting choice
-    assert "evil.test:443" in recent and ">blocked</span>" in recent and "on the blocklist" in recent
-    assert "api.test:443" in recent and ">approved</span>" in recent and activity.APPROVALS[rid]["status"] == "denied"
+    assert "evil.test:443" in recent and ">blocked</span>" in recent and "on the blocklist" in recent and ">admin</td>" in recent
+    assert "api.test:443" in recent and ">approved</span>" in recent and "+ 10 min" in recent
+    assert activity.APPROVALS[rid]["status"] == "denied"
+    html = client.get("/logs?q=approver:admin&range=all").text  # a search field and a facet
+    assert "evil.test:443" in html and '<span class="facet-name">admin</span>' in html
     r = client.get("/activity", follow_redirects=False)
     assert r.status_code == 301 and r.headers["location"] == "/approvals"
     html = client.get("/approvals").text
