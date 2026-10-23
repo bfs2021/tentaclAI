@@ -168,7 +168,7 @@ def job_allows(name):
 
 def require_allowed(name):
     if not job_allows(name):
-        audit(name, "job", "–", f"use {name}", "blocked", detail="tentacle not in job")
+        audit(name, "job", "–", "use", "blocked", detail="tentacle not in job")
         sys.exit(f"svc: this job may only use the tentacles its task names ({', '.join(sorted(job()['allow'])) or 'none'}) – not {name}")
 
 
@@ -1919,7 +1919,7 @@ def cmd_ssh(name_args):
         if sensitive_read(words):
             return call_redacted(["ssh", "-T", "--", alias, remote])
         return subprocess.call(argv)
-    return guarded(alias, "ssh", mode, f"ssh {alias} {remote}" if remote else f"ssh {alias} (interactive shell)",
+    return guarded(alias, "ssh", mode, f"ssh {remote}" if remote else "ssh (interactive shell)",
                    lambda: subprocess.call(argv), interactive=tty)
 
 
@@ -2328,9 +2328,9 @@ def cmd_tool_report(args):
     findings = [(str(f[0])[:80], str(f[1])) for f in (d.get("findings") or [])
                 if isinstance(f, list) and len(f) == 2 and isinstance(f[0], str) and (f[0] in known or str(f[0]).startswith("hidden text ("))][:5]
     target = guard_text(d.get("target", ""), 200)
-    if findings and guard_on() and guard_note("tool result", tool, "claude", f"{tool} {target}".strip(), findings):
+    if findings and guard_on() and guard_note("tool result", tool, "claude", target or "call", findings):
         return 0
-    audit(tool, "claude", "", target or tool, "ok")
+    audit(tool, "claude", "", target or "call", "ok")
     return 0
 
 
@@ -2939,7 +2939,10 @@ def read_entry(argv, rc, seconds):
         name = argv[1] if argv[1] in SERVICE_NAMES else next((a for a in argv[2:] if a in SERVICE_NAMES), "")
     part = argv[1] if argv[1] in tclib.PARTS or argv[1] in ("ssh", "test", "sync", "jobs", "config") else \
         "api" if name == argv[1] else argv[1][:20]
-    action = _redact_text(" ".join(["svc"] + argv[1:]))[:500]
+    rest = argv[1:]
+    if name in rest:  # the target has its own field – the action is the rest of the command line
+        rest.remove(name)
+    action = _redact_text(" ".join(rest))[:500]
     audit(name or "svc", part, "read", action, "read", rc=rc, duration=seconds)
 
 

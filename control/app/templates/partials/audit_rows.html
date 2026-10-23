@@ -7,7 +7,7 @@
   <td class="small nowrap audit-actor">{% if v.actor == 'user' and v.user %}<span class="actor actor-user">{{ val('user', v.user) }}</span>{% else %}<span class="actor actor-{{ v.actor }}">{{ val('actor', v.actor) }}</span>{% endif %}</td>
   <td><span class="tag">{{ val('type', v.type) }}</span></td>
   <td class="audit-target small">{{ val('target', v.target) }}</td>
-  <td class="mono small audit-action">{{ v.action }}</td>
+  <td class="mono small audit-action">{{ v.action }}{% if e.count and e.count > 1 %} <span class="faint">· {{ e.count }}×</span>{% endif %}</td>
   <td>{{ outcome(v, e) }}</td>
 </tr>
 <tr class="audit-detail" hidden><td colspan="6">

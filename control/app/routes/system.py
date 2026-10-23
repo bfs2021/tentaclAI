@@ -285,11 +285,11 @@ async def ws_terminal(ws: WebSocket, p: str = "claude", alias: str = ""):
         await ws.close()
         return
     t = time.time()
-    auditlog.user(ws, "admin", alias or p, f"terminal opened: {p}" + (f" {alias}" if alias else ""), part="terminal")
+    auditlog.user(ws, "admin", alias or p, "terminal opened" + (f" ({p})" if alias else ""), part="terminal")
     try:
         await bridge(ws, cmd)
     finally:
-        auditlog.user(ws, "admin", alias or p, f"terminal closed: {p}" + (f" {alias}" if alias else ""), part="terminal",
+        auditlog.user(ws, "admin", alias or p, "terminal closed" + (f" ({p})" if alias else ""), part="terminal",
                       seconds=round(time.time() - t))
 
 

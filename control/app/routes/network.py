@@ -67,7 +67,7 @@ async def internal_egress_audit(request: Request):
         if not tclib.HOST_RE.fullmatch(host.strip("[]").replace(":", ".")) or not 0 < port < 65536:
             continue
         since = time.strftime("%H:%M", time.localtime(first)) if first else ""
-        auditlog.write("network", f"{host}:{port}", f"connect {host}:{port}",
+        auditlog.write("network", f"{host}:{port}", "connect",
                        "blocked" if e.get("decision") == "blocked" else "allowed", actor="claude", count=max(1, count),
                        detail=f"{reason} · {count}× since {since}" if since else reason)
     return JSONResponse({"ok": True})
@@ -203,7 +203,7 @@ async def internal_egress_ask(request: Request):
         host, port = egress.normalize(str(data.get("host", ""))), int(data.get("port", 0))
     except (ValueError, TypeError):
         return JSONResponse({"error": "bad target"}, status_code=400)
-    rid = activity.create(f"{host}:{port}", "network", f"connect to {host}:{port}")
+    rid = activity.create(f"{host}:{port}", "network", "connect")
     return JSONResponse({"id": rid})
 
 

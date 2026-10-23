@@ -208,9 +208,9 @@ def test_network_decision_lands_in_the_audit_log(client, app_module, tmp_path, m
     monkeypatch.setattr(auditlog, "DATA_DIR", str(tmp_path))
     monkeypatch.setattr(egress, "add", lambda kind, entry: None)
     monkeypatch.setattr(activity, "GRANTS", {})  # the "+ 10 min" below must not outlive the test
-    rid = activity.create("evil.test:443", "network", "connect to evil.test:443")
+    rid = activity.create("evil.test:443", "network", "connect")
     client.post(f"/approvals/{rid}/block")
-    rid2 = activity.create("api.test:443", "network", "connect to api.test:443")
+    rid2 = activity.create("api.test:443", "network", "connect")
     client.post(f"/approvals/{rid2}/net10")
     e = [json.loads(line) for line in (tmp_path / "audit.jsonl").read_text().splitlines()]
     assert [(x["service"], x["part"], x["decision"]) for x in e] == [("evil.test:443", "network", "blocked"), ("api.test:443", "network", "approved")]
@@ -327,7 +327,7 @@ def test_network_decision_reaches_every_waiting_connection(app_module, monkeypat
     from app import activity
     monkeypatch.setattr(activity, "APPROVALS", {})
     monkeypatch.setattr(activity, "GRANTS", {})
-    rid = activity.create("example.org:443", "network", "connect to example.org:443")
+    rid = activity.create("example.org:443", "network", "connect")
     assert asyncio.run(activity.wait(rid, 1))["status"] == "pending"
     activity.decide(rid, True, grant=True, seconds=600)
     assert [asyncio.run(activity.wait(rid, 1))["status"] for _ in range(3)] == ["approved"] * 3
@@ -739,6 +739,9 @@ def test_egress_audit_endpoint(client, app_module, tmp_path, monkeypatch):
         {"host": "bad host!", "port": 1}]})
     e = tclib.audit_read(str(tmp_path), filters={"category": "network"})[0]
     assert [(x["service"], x["decision"], x.get("count")) for x in e] == [("evil.test:22", "blocked", 1), ("api.example.net:443", "allowed", 7)]
+    assert {x["action"] for x in e} == {"connect"}  # the destination is the target, not repeated in the action
+    html = client.get("/logs?range=all").text
+    assert 'connect <span class="faint">· 7×</span>' in html and "· 1×" not in html
 
 
 def test_log_containers_tabs(client):

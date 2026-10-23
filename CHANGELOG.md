@@ -35,6 +35,9 @@ All notable changes, newest first. Every release lists **upgrade steps** from th
   `audit.jsonl.1` at 5 MB); archives are kept `AUDIT_RETENTION_DAYS` (new, default 90, Settings → General).
 - The Claude Code hook `tc-guard` now runs for every tool (`matcher: "*"`) and also with `INJECTION_GUARD=false`
   (then `tc-guard --no-scan`: logging only). It reports through `svc tool-report` (`svc guard-report` still works).
+- An entry's action no longer repeats its target: `connect` (not `connect n8n.example:443`, the count of a 15-minute
+  window shows next to it, `connect · 24×`), `ssh tar …`, `test`, `sync`, `started 0.20.0`, `terminal opened`;
+  reads through `svc` log the command line without `svc` and the tentacle. Older entries keep their text.
 - `./tentaclai.sh passwd` shows the username; `./tentaclai.sh passwd --username <name>` renames the account.
 - `svc audit [n] [--since 24h|7d] [search]` takes the same search (`svc audit 50 type:network outcome:blocked`); the
   older `--category/--service/--decision/--actor` still work.

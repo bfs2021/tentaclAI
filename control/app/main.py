@@ -71,7 +71,7 @@ async def audit_admin(request: Request, call_next):
         params = [str(v)[:80] for v in request.path_params.values()]
         area = path.strip("/").split("/")[0]
         auditlog.user(request, "admin", params[0] if params else AUDIT_AREA.get(area, area or "tentacontrol"),
-                      endpoint.replace("_", " ") + (f": {' · '.join(params)}" if params else ""),
+                      endpoint.replace("_", " ") + (f": {' · '.join(params[1:])}" if params[1:] else ""),
                       "ok" if response.status_code < 400 else "failed", part=area[:20], mode=request.method,
                       detail=f"{request.method} {path} → {response.status_code}")
     return response
@@ -110,7 +110,7 @@ async def prepare_activity():
 
 async def start_audit():
     """the audit log: tentacontrol's start as an entry, archives past the retention removed every 6 h"""
-    auditlog.write("system", "tentacontrol", f"tentacontrol {TC_VERSION} started", actor="system")
+    auditlog.write("system", "tentacontrol", f"started {TC_VERSION}", actor="system")
     asyncio.get_running_loop().create_task(auditlog.prune_loop())
 
 

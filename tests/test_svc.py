@@ -304,12 +304,12 @@ def test_tool_report_takes_only_known_reasons(monkeypatch):
     report({"tool": "WebFetch", "target": "https://x.test/\x1b[31mpage",
             "findings": [["asks to ignore instructions", "line 3: … ignore all previous instructions …"],
                          ["rm -rf everything", "x"], [["not", "a reason"], "x"]]})
-    assert got == [("tool result", "WebFetch", "claude", "WebFetch https://x.test/[31mpage",
+    assert got == [("tool result", "WebFetch", "claude", "https://x.test/[31mpage",
                     [("asks to ignore instructions", "line 3: … ignore all previous instructions …")])]
     assert logged == []  # a finding is one "flagged" entry, not two
     got.clear()
     report({"tool": "x", "findings": [["nothing known", ""]]})
-    assert got == [] and logged == [(("x", "claude", "", "x", "ok"), {})]  # no finding: a plain tool entry
+    assert got == [] and logged == [(("x", "claude", "", "call", "ok"), {})]  # no finding: a plain tool entry
     logged.clear()
     report({"tool": "Bash;rm", "target": "ls\n-la"})
     assert logged[0][0][:5] == ("Bashrm", "claude", "", "ls -la", "ok")
@@ -375,14 +375,14 @@ def test_read_entry_for_calls_that_logged_nothing(monkeypatch):
     svc.read_entry(["svc", "db", "demodb", "SELECT 1"], 0, 0.42)
     svc.read_entry(["svc", "demoapi", "GET", "/items"], 0, 0.1)
     svc.read_entry(["svc", "pending"], 0, 0.1)  # plumbing: no entry
-    assert [(a[0], a[1], a[3], a[4]) for a, _ in logged] == [("demodb", "db", "svc db demodb SELECT 1", "read"),
-                                                            ("demoapi", "api", "svc demoapi GET /items", "read")]
+    assert [(a[0], a[1], a[3], a[4]) for a, _ in logged] == [("demodb", "db", "db SELECT 1", "read"),
+                                                            ("demoapi", "api", "GET /items", "read")]
     assert logged[0][1] == {"rc": 0, "duration": 0.42}
     logged.clear()
     monkeypatch.setattr(svc, "via_sudo", lambda: False)  # tentacontrol polls docker ps for the topology: no entry
     svc.read_entry(["svc", "docker", "demohost", "ps"], 0, 0.1)
     svc.read_entry(["svc", "sync"], 0, 1.0)
-    assert [a[3] for a, _ in logged] == ["svc sync"]
+    assert [a[3] for a, _ in logged] == ["sync"]  # the target has its own field
     logged.clear()
     monkeypatch.setattr(svc, "AUDITED", True)  # a write logged itself already
     svc.read_entry(["svc", "demoapi", "POST", "/items"], 0, 0.1)
