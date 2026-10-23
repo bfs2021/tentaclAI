@@ -48,14 +48,19 @@ def _enrich(e):
     return e
 
 
-def _origin_match(origin):
-    """the From filter: session / job / host, or job:<name>"""
+def _origin_match(origin, target=""):
+    """the Who filter's origin (session / job / host, or job:<name>) and the target filter (part of the target's name,
+    any case) as one predicate"""
     from .activity import origin_group, origin_label
-    if not origin:
-        return None
+    tests = []
     if origin.startswith("job:"):
-        return lambda e: origin_label(tclib.audit_origin(e)) == f"Job · {origin[4:]}"
-    return lambda e: origin_group(tclib.audit_origin(e)) == origin
+        tests.append(lambda e: origin_label(tclib.audit_origin(e)) == f"Job · {origin[4:]}")
+    elif origin:
+        tests.append(lambda e: origin_group(tclib.audit_origin(e)) == origin)
+    if target.strip():
+        t = target.strip().lower()
+        tests.append(lambda e: t in str(e.get("service", "")).lower())
+    return (lambda e: all(test(e) for test in tests)) if tests else None
 
 
 def window(since="", start="", end=""):
@@ -70,18 +75,19 @@ def window(since="", start="", end=""):
     return (time.time() - SINCE[since], 0) if since in SINCE else (0, 0)
 
 
-def entries(limit=None, since="24h", start="", end="", q="", after="", origin="", **filters):
-    """(entries, more) newest first for the page – filters: category, actor, service, decision"""
+def entries(limit=None, since="24h", start="", end="", q="", after="", origin="", service="", **filters):
+    """(entries, more) newest first for the page – filters: category, actor, decision; service: part of the target"""
     t0, t1 = window(since, start, end)
     found, more = tclib.audit_read(DATA_DIR, limit=limit or PAGE, since=t0, until=t1, filters=filters, q=q, after=after,
-                                   match=_origin_match(origin))
+                                   match=_origin_match(origin, service))
     return [_enrich(e) for e in found], more
 
 
-def export(fmt, since="24h", start="", end="", q="", origin="", **filters):
+def export(fmt, since="24h", start="", end="", q="", origin="", service="", **filters):
     """every matching entry as export lines (tclib.audit_export) – no page limit"""
     t0, t1 = window(since, start, end)
-    found, _ = tclib.audit_read(DATA_DIR, limit=500_000, since=t0, until=t1, filters=filters, q=q, match=_origin_match(origin))
+    found, _ = tclib.audit_read(DATA_DIR, limit=500_000, since=t0, until=t1, filters=filters, q=q,
+                                match=_origin_match(origin, service))
     return tclib.audit_export(found, fmt)
 
 

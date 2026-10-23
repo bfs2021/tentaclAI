@@ -661,6 +661,8 @@ def test_audit_filters_error_and_origin_link(client, app_module, tmp_path, monke
     html = client.get("/logs?who=system&since=all").text
     assert "POST /items" in html and "compose web" not in html and 'type="date"' not in html  # dates only for own dates
     assert 'type="date"' in client.get("/logs?since=custom").text
+    html = client.get("/logs?service=DEMOH&since=all").text  # target: part of the name, any case
+    assert "compose web" in html and "POST /items" not in html and 'value="DEMOH"' in html
 
 
 def test_audit_load_more_and_export(client, app_module, tmp_path, monkeypatch):

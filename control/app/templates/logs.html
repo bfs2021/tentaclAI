@@ -33,11 +33,9 @@
         <option value="">any kind</option>
         {% for c in categories %}<option value="{{ c }}" {{ 'selected' if c == f.category }}>{{ kinds.get(c, c) }}</option>{% endfor %}
       </select>
-      <select name="service" class="sys-select" onchange="this.form.submit()" aria-label="Target">
-        <option value="">any target</option>
-        {% for s in services_known %}<option value="{{ s }}" {{ 'selected' if s == f.service }}>{{ s }}</option>{% endfor %}
-        {% if f.service and f.service not in services_known %}<option value="{{ f.service }}" selected>{{ f.service }}</option>{% endif %}
-      </select></label>
+      <input type="search" name="service" value="{{ f.service }}" placeholder="target…" list="audit-targets" class="sys-select audit-target"
+             aria-label="Target" title="part of the target's name – a service, host, tool or page; Enter to filter" onchange="this.form.submit()">
+      <datalist id="audit-targets">{% for s in services_known %}<option value="{{ s }}">{% endfor %}</datalist></label>
     <label class="audit-f"><span>Decision</span>
       <select name="decision" class="sys-select" onchange="this.form.submit()">
         <option value="">any</option>
