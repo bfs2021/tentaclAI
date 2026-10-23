@@ -152,8 +152,8 @@ def issue_url(x, version="", repo=None, run=None, edition=""):
 
 
 def issue_title(text, limit=80):
-    """the first sentence, cut at a word – not mid-word with a dangling comma"""
-    first = re.split(r"(?<=[.!?])\s", text, maxsplit=1)[0].rstrip(".")
+    """the first sentence (e.g., i.e., etc. and vs. don't end it), cut at a word – not mid-word with a dangling comma"""
+    first = re.split(r"(?<![\s(]e\.g\.)(?<![\s(]i\.e\.)(?<!\betc\.)(?<!\bvs\.)(?<=[.!?])\s", text, maxsplit=1)[0].rstrip(".")
     if len(first) <= limit:
         return first
     return first[:limit].rsplit(" ", 1)[0].rstrip(",;:–- ") + " …"

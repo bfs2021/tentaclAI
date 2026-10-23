@@ -455,3 +455,9 @@ def test_audit_syslog_rfc5424():
     assert m.split("] ", 1)[1].startswith("﻿denied: demo]db")
     old = tclib.audit_normalize({"ts": "2026-10-20T10:00:00+0200", "service": "x", "part": "api", "action": "a", "decision": "auto"})
     assert " 2026-10-20T10:00:00+02:00 " in tclib.audit_syslog(old)
+
+
+def test_audit_unknown_keys():
+    assert tclib.audit_unknown_keys("status:denied outcome:ok Status:x docker") == ["status"]
+    assert tclib.audit_unknown_keys('-foo:"a b" https://example.com service:x category:job') == ["foo"]
+    assert tclib.audit_unknown_keys("") == []

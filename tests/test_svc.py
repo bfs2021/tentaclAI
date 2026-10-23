@@ -508,3 +508,26 @@ def test_mail_help_per_subcommand(capsys):
     assert svc.cmd_mail({}, ["box", "list", "--help"]) == 0
     out = capsys.readouterr().out
     assert "--unseen" in out and "--limit N" in out and "default 20" in out
+
+
+def test_api_fails_on_http_errors_unless_the_caller_reads_the_status():
+    assert svc.fail_on_http_error(["-H", "Accept: x"])
+    for extra in (["-w", "%{http_code}"], ["-w%{http_code}"], ["--write-out=%{http_code}"], ["-f"], ["--fail"], ["--fail-with-body"]):
+        assert not svc.fail_on_http_error(extra), extra
+
+
+def test_doubled_path_prefix():
+    assert svc.doubled_prefix("http://ha.local:8123/api", "/api/states") == "/api"
+    assert svc.doubled_prefix("http://ha.local:8123/api/", "api") == "/api"
+    assert svc.doubled_prefix("http://ha.local:8123/api", "/states") == ""
+    assert svc.doubled_prefix("http://ha.local:8123/api", "/apis/x") == ""
+    assert svc.doubled_prefix("http://ha.local:8123", "/api/states") == ""
+
+
+def test_broken_pipe_ends_quietly(monkeypatch):
+    # a closed pipe (svc audit | head) must not end in a traceback
+    def closed(argv):
+        raise BrokenPipeError(32, "Broken pipe")
+    monkeypatch.setattr(svc, "run", closed)
+    monkeypatch.setattr(svc.os, "dup2", lambda *a: None)
+    assert svc.cli(["svc", "audit"]) == 141

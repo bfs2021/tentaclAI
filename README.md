@@ -196,7 +196,7 @@ Inside the sandbox, Claude (and you) use:
 ```bash
 svc list | info <name> | test <name>        # services, details, connection test
 svc systems [name]                          # systems with SSH host, members and rules
-svc <name> GET /path [curl args]            # API call, auth injected – tokens never in argv
+svc <name> GET /path [curl args]            # API call, auth injected – tokens never in argv; HTTP 4xx/5xx exits non-zero
 svc docker <host> ps                        # docker CLI on a docker host (over SSH, sudo-aware)
 svc compose <host> <stack> logs --tail 50   # compose in <stacks_dir>/<stack> of that host
 svc db <name> "SELECT …" | tables           # databases (read = read-only session)

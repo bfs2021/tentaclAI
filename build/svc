@@ -13,6 +13,7 @@ resolved from the stack's .env (read fresh on every call) and the container envi
                                    API call with auth injected, e.g.
                                    svc arcane GET /environments
                                    svc mealie POST /households/shopping/items -d '{"note":"milk"}'
+                                   HTTP 4xx/5xx exits non-zero (body printed) – unless -w reads the status
   svc git                          git repos: path, access (read/write), branch, ahead/behind, changes
   svc git sync [name...]           clone missing repos, apply settings, fetch
   svc git fetch|pull <name>        fetch from the remote (pull: also fast-forward the current branch)
@@ -387,14 +388,37 @@ def cmd_call(services, name, method, path, extra):
         cmd = ["curl", "-q", "-sS", "-X", method.upper(), "-H", f"@{files[0]}", "-K", files[1]]
         if api.get("insecure_tls"):
             cmd.append("-k")
+        if fail_on_http_error(extra):
+            cmd.append("--fail-with-body")
         if method.upper() in ("GET", "HEAD", "OPTIONS"):
-            return scanned("API response", name, "api", f"{method.upper()} {path}", cmd + list(extra), **runner())
-        body = " (with body)" if any(a in ("-d", "--data", "--data-raw", "--data-binary", "--json", "-F", "--form", "-T") for a in extra) else ""
-        return guarded(name, "api", access_mode(svc["api"], "write"), f"{method.upper()} {path}{body}",
-                       lambda: subprocess.call(cmd + list(extra), **runner()))
+            rc = scanned("API response", name, "api", f"{method.upper()} {path}", cmd + list(extra), **runner())
+        else:
+            body = " (with body)" if any(a in ("-d", "--data", "--data-raw", "--data-binary", "--json", "-F", "--form", "-T") for a in extra) else ""
+            rc = guarded(name, "api", access_mode(svc["api"], "write"), f"{method.upper()} {path}{body}",
+                         lambda: subprocess.call(cmd + list(extra), **runner()))
+        doubled = doubled_prefix(api["base_url"], path)
+        if rc and doubled:
+            print(f"svc: the path starts with {doubled}, which the base URL already contains – try "
+                  f"{path[len(doubled):] or '/'}", file=sys.stderr)
+        return rc
     finally:
         for f in files:
             os.unlink(f)
+
+
+def fail_on_http_error(extra):
+    """exit non-zero on HTTP 4xx/5xx (curl 22, the body is still printed) – unless the caller reads the status itself
+    (-w, e.g. svc test) or chose --fail on its own"""
+    return not any(a in ("-f", "--fail", "--fail-with-body", "-w", "--write-out") or a.startswith(("-w", "--write-out="))
+                   for a in extra)
+
+
+def doubled_prefix(base_url, path):
+    """the base URL's path prefix (e.g. /api) when the request path repeats it – '' otherwise"""
+    from urllib.parse import urlparse
+    prefix = urlparse(base_url).path.rstrip("/")
+    p = "/" + path.lstrip("/")
+    return prefix if prefix and (p == prefix or p.startswith(prefix + "/")) else ""
 
 
 # ---------- oauth2 (client credentials) ----------
@@ -2535,7 +2559,12 @@ def cmd_audit(args):
             terms.append(f"{a[2:]}:{next(it, '')}")
         else:
             terms.append(a)
-    entries, _ = tclib.audit_read(AUDIT_DIR, limit=n, since=since, query=" ".join(terms))
+    query = " ".join(terms)
+    unknown = tclib.audit_unknown_keys(query)
+    if unknown:
+        print(f"svc audit: no field {', '.join(unknown)} – searched as text. Fields: {' '.join(tclib.AUDIT_SEARCH_KEYS)}",
+              file=sys.stderr)
+    entries, _ = tclib.audit_read(AUDIT_DIR, limit=n, since=since, query=query)
     if not entries:
         print("No matching audit entries.")
         return 0
@@ -3114,5 +3143,13 @@ def run(argv):
     return rc
 
 
+def cli(argv):
+    try:
+        return run(argv)
+    except BrokenPipeError:  # output piped into head & co., which stopped reading – end quietly like other CLI tools
+        os.dup2(os.open(os.devnull, os.O_WRONLY), sys.stdout.fileno())  # no second error when Python flushes at exit
+        return 141  # 128 + SIGPIPE, what the shell reports for a tool killed by the closed pipe
+
+
 if __name__ == "__main__":
-    sys.exit(run(sys.argv))
+    sys.exit(cli(sys.argv))

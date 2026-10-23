@@ -1073,6 +1073,8 @@ AUDIT_KEYS = {"actor": "actor", "user": "user", "source": "source", "type": "typ
               "action": "action", "outcome": "outcome", "decision": "decision", "mode": "mode", "ip": "ip", "approver": "approver", "grant": "grant",
               "reason": "reason",
               "category": "type", "service": "target"}  # search keys (category/service: the stored names)
+AUDIT_SEARCH_KEYS = ("actor", "user", "source", "type", "target", "action", "outcome", "decision", "mode", "ip", "approver",
+                     "grant", "reason")  # the search keys to name in a hint (without the stored aliases)
 _AUDIT_TOKEN = re.compile(r'(-?)([A-Za-z_]+):"([^"]*)"|(-?)([A-Za-z_]+):(\S+)|(-?)"([^"]*)"|(-?)(\S+)')
 
 
@@ -1155,6 +1157,17 @@ def audit_query(text):
             if val and val != "-":
                 terms.append((bool(neg), None, val.lower()))
     return terms
+
+
+def audit_unknown_keys(text):
+    """field names in a search that aren't fields (e.g. status:denied) – audit_query treats them as words, so a hint
+    can name the real ones. A value starting with / (http://…) is no field."""
+    out = []
+    for m in _AUDIT_TOKEN.finditer(text or ""):
+        key, val = (m.group(2), m.group(3)) if m.group(2) else (m.group(5), m.group(6))
+        if key and key.lower() not in AUDIT_KEYS and not (val or "").startswith("/") and key.lower() not in out:
+            out.append(key.lower())
+    return out
 
 
 def audit_query_str(terms):

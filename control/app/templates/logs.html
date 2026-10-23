@@ -46,6 +46,8 @@
     <span class="small muted">{{ '{:,}'.format(ov.total) }}{{ '+' if ov.capped }} events</span>
   </div>
 
+  {% if unknown_keys %}<p class="help" style="color:var(--warn)">No field {{ unknown_keys | join(', ') }} – searched as text. Fields: <code>{{ search_keys | join(' ') }}</code></p>{% endif %}
+
   {% include "partials/audit_histogram.html" %}
 
   <div class="audit-layout">

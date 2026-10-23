@@ -225,3 +225,10 @@ def test_issue_body_has_repro_and_environment(kn):
                  "**Expected:** the options", "- tentaclAI: 0.21.0 community", "- Claude Code: 2.1.0 · model claude-opus-5-5",
                  "- Part: svc", "(profile read-only)"):
         assert part in body, part
+
+
+def test_issue_title_keeps_abbreviations():
+    from app import knowledge as kn
+    t = "svc audit treats an unknown field (e.g. status:denied) as a word. More text."
+    assert kn.issue_title(t) == "svc audit treats an unknown field (e.g. status:denied) as a word"
+    assert kn.issue_title("a, i.e. b, etc. and c vs. d. Next") == "a, i.e. b, etc. and c vs. d"

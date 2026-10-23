@@ -2,6 +2,17 @@
 
 All notable changes, newest first. Every release lists **upgrade steps** from the previous one.
 
+## Unreleased
+
+### Changes / fixes
+- `svc <name> GET …`: an HTTP error (4xx/5xx) now exits non-zero (curl 22, the body is still printed) – calls that read
+  the status themselves with `-w` (svc test, Test API, tc-scan) or pass `--fail` behave as before. A path that repeats
+  the base URL's prefix (`/api` + `/api/states`) gets a hint (#18).
+- `svc audit` and Logs → Audit: a `field:value` with a field that doesn't exist (`status:denied`) is still searched as
+  text, but now with a hint naming the real fields (#17).
+- `svc audit … | head` and other svc output into a closed pipe end quietly instead of with a traceback (#16).
+- Product findings → GitHub: the issue title no longer ends at "e.g." / "i.e." / "etc." / "vs.".
+
 ## v0.21.0 – 2026-10-24
 
 ### Highlights

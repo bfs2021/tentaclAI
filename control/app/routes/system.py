@@ -490,7 +490,8 @@ async def logs_page(request: Request):
     entries, more, ov = await asyncio.to_thread(auditlog.overview, **args)
     ctx = _audit_ctx(f)
     return page(request, "logs.html", entries=entries, more=more, ov=ov, hist=_audit_bars(ov, ctx["links"]),
-                ranges=AUDIT_RANGES, fields=tclib.AUDIT_FIELDS, retention=tclib.audit_retention(read_env()), **ctx)
+                ranges=AUDIT_RANGES, fields=tclib.AUDIT_FIELDS, unknown_keys=tclib.audit_unknown_keys(f["q"]),
+                search_keys=tclib.AUDIT_SEARCH_KEYS, retention=tclib.audit_retention(read_env()), **ctx)
 
 
 @router.get("/logs/audit/more", response_class=HTMLResponse)

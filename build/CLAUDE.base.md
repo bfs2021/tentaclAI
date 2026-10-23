@@ -9,7 +9,8 @@ You run inside the `tentaclai` container on **{{TC_HOSTNAME}}** as the unprivile
 `svc help` lists all commands. Catalog of all services: `/workspace/SERVICES.md`.
 
 - Overview: `svc list` (status), `svc info <name>` (URLs, docs, examples, rules; `--json` = the service file), `svc test <name>`, `svc systems [name]` (groups of services on one host; their rules apply to all members)
-- API: `svc <name> GET /path [curl args]` – auth injected; curl runs as another user, so redirect with `> file`, not `-o`
+- API: `svc <name> GET /path [curl args]` – auth injected; curl runs as another user, so redirect with `> file`, not `-o`;
+  HTTP 4xx/5xx exits non-zero (body still printed) unless you pass `-w`
 - Docker: `svc docker <host> <args>` / `svc compose <host> <stack> <args>` – docker runs on the host, paths are host paths
 - `svc db|web|files <name> …`; mail: `svc mail <name|address> send|list|read|flag|move …` (send via smtp, read a mailbox via imap)
 - SSH: `svc ssh <host> [cmd]` – plain `ssh` has no key; `host.docker.internal` = the Docker host
