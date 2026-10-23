@@ -7,7 +7,7 @@ resolved from the stack's .env (read fresh on every call) and the container envi
 
   svc list                         services, types, system, status (missing variables)
   svc systems [name]               systems (groups of services on one host) with SSH host, members and rules
-  svc info <name>                  description, URLs, docs, examples, notes (no secrets)
+  svc info <name> [--json]         description, URLs, docs, examples, notes (no secrets); --json: the service file as stored
   svc sync                         MCP -> Claude user config, clone missing git repos, regenerate /workspace/SERVICES.md
   svc <name> <METHOD> <path> [curl args...]
                                    API call with auth injected, e.g.
@@ -1981,8 +1981,7 @@ def cmd_config(services, args):
         os.makedirs(os.path.dirname(target), exist_ok=True)
         with open(target + ".tmp", "w") as f:
             f.write(text)
-        if kind in ("local", "system"):
-            os.chmod(target + ".tmp", 0o644)  # Claude reads them (local: @import) – svc's inherited umask is 077
+        os.chmod(target + ".tmp", 0o644)  # Claude reads them (local: @import) – svc's inherited umask is 077; no secrets in them
         os.replace(target + ".tmp", target)
         print(f"✓ {os.path.relpath(target, TC_DIR)} written" + (" (previous version kept as .bak-…)" if old is not None else ""))
         if kind == "local":
@@ -2601,6 +2600,14 @@ def cmd_list(services):
         print(f"{name:<18}{kinds(svc):<14}{svc.get('system') or '–':<14}{status(svc)}")
 
 
+def cmd_info_json(services, name):
+    """the service file as stored (${VAR} placeholders, no secrets) – the starting point for `svc config put service`"""
+    get(services, name)  # unknown names end here
+    with open(os.path.join(SERVICES_DIR, f"{name}.json")) as f:
+        sys.stdout.write(f.read())
+    return 0
+
+
 def cmd_info(services, name):
     svc = get(services, name)
     print(f"# {name} – {svc.get('description', '')}\nStatus: {status(svc)}")
@@ -2942,6 +2949,8 @@ def main(argv):
         return cmd_list(services)
     if cmd in ("systems", "system"):
         return cmd_systems(services, argv[2] if len(argv) > 2 else None)
+    if cmd == "info" and len(argv) == 4 and argv[3] == "--json":
+        return cmd_info_json(services, argv[2])
     if cmd == "info" and len(argv) == 3:
         return cmd_info(services, argv[2])
     if cmd == "sync":

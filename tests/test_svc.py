@@ -457,6 +457,7 @@ def test_config_put_flags_text_that_instructs_an_ai(config_put, tmp_path):
     assert svc.cmd_config({}, ["put", "service", "demo", str(src)]) == 0
     assert config_put["review"]["flags"] and config_put["flagged"][0] == "configuration change"
     assert config_put["action"] == "create services/demo.json (no parts)"
+    assert oct((tmp_path / "services" / "demo.json").stat().st_mode)[-3:] == "644"  # Claude reads it with svc info --json
 
 
 def test_denial_reason_reaches_claude(monkeypatch):
@@ -468,3 +469,12 @@ def test_denial_reason_reaches_claude(monkeypatch):
         svc.guarded("demohost", "docker", "confirm", "docker restart web", lambda: 0)
     assert "Reason given by the user: “never during the day – only after 22:00”" in str(e.value)
     assert logged[0]["reason"] == "never during the day – only after 22:00" and logged[0]["approver"] == "mwa"
+
+
+def test_info_json_prints_the_stored_file(monkeypatch, tmp_path, capsys):
+    (tmp_path / "demo.json").write_text('{"name": "demo", "api": {"base_url": "${DEMO_URL}"}}\n')
+    monkeypatch.setattr(svc, "SERVICES_DIR", str(tmp_path))
+    assert svc.cmd_info_json({"demo": {"name": "demo"}}, "demo") == 0
+    assert capsys.readouterr().out == '{"name": "demo", "api": {"base_url": "${DEMO_URL}"}}\n'  # placeholders, not values
+    with pytest.raises(SystemExit):
+        svc.cmd_info_json({}, "nope")

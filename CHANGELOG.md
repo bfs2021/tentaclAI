@@ -26,6 +26,12 @@ All notable changes, newest first. Every release lists **upgrade steps** from th
   and Claude's memory). New settings `KNOWLEDGE_LOCAL_KB` (default 6) and `KNOWLEDGE_NOTES` (default 8);
   Claude → Instructions shows the knowledge budget. `svc audit` prints the reason of a denial.
 
+### Fixes
+- `svc config put service` wrote the file readable by root only, so Claude couldn't read it back; it is `0644` now (no
+  secrets in service files). New `svc info <name> --json` prints the service file as stored – the starting point for
+  a change (the rule pointed to `svc info`, which prints text). The SSH section of Claude's instructions says how to
+  quote a remote command (patterns with `|`, spaces or `{{…}}`) – runs failed on that again and again.
+
 ### Upgrade
 - `git pull`, `docker compose build`, `docker compose up -d` – both images change (`svc` and the instructions in
   `tentaclai`, Approvals and Jobs in `tentacontrol`); recreating `tentaclai` ends running sessions and Remote Control. Nothing

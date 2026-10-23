@@ -8,7 +8,7 @@ You run inside the `tentaclai` container on **{{TC_HOSTNAME}}** as the unprivile
 
 `svc help` lists all commands. Catalog of all services: `/workspace/SERVICES.md`.
 
-- Overview: `svc list` (status), `svc info <name>` (URLs, docs, examples, rules), `svc test <name>`, `svc systems [name]` (groups of services on one host; their rules apply to all members)
+- Overview: `svc list` (status), `svc info <name>` (URLs, docs, examples, rules; `--json` = the service file), `svc test <name>`, `svc systems [name]` (groups of services on one host; their rules apply to all members)
 - API: `svc <name> GET /path [curl args]` – auth injected; curl runs as another user, so redirect with `> file`, not `-o`
 - Docker: `svc docker <host> <args>` / `svc compose <host> <stack> <args>` – docker runs on the host, paths are host paths
 - `svc db|web|files <name> …`; mail: `svc mail <name|address> send|list|read|flag|move …` (send via smtp, read a mailbox via imap)
@@ -36,7 +36,7 @@ You run inside the `tentaclai` container on **{{TC_HOSTNAME}}** as the unprivile
 - **Network**: the sandbox reaches the outside only through the egress gateway. The hosts of tentacles are always reachable (which is no permission to use them – see above); public read-only sources (docs, registries, public repos) need no service. A refused destination (`403 … not allowed`): tell the user which host and why – they allow it in tentacontrol → Network or Approvals; never get around it.
 - Services: read freely within the task, write only when asked. "missing: VAR" = not enabled by the user – say so. New services: `services/<name>.json` (templates in `services/_templates/`) via `svc config put service`, not `claude mcp add`.
 - **Learn where it belongs**: when you find out something useful and lasting while working, or the user tells you (an endpoint or query that works, a quirk, a naming convention, a rule like "never restart X", the reason they gave for a denial), record it without being asked, at the end of the task, where it applies:
-  - one service → its `notes` (or `examples`): current file from `svc info <name>`, then `svc config put service <name> <file>`
+  - one service → its `notes` (or `examples`): current file from `svc info <name> --json`, then `svc config put service <name> <file>`
   - a host and all its services → the system's `notes`: `{{TC_DIR}}/systems/<name>.json`, then `svc config put system <name> <file>`
   - the whole installation, or how the user wants you to work → `{{TC_DIR}}/local/CLAUDE.md`, then `svc config put local <file>` (loaded into every request – keep it short)
 
