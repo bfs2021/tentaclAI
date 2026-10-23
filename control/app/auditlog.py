@@ -192,6 +192,94 @@ def prune():
         print(f"audit log: {n} archive file(s) older than the retention removed", flush=True)
 
 
+class Follower:
+    """new entries of the active file since the last poll – starts at its end; after a rotation the rest of the moved
+    file comes first. Only whole lines; a broken line is skipped."""
+
+    def __init__(self, data_dir=None):
+        self.dir = data_dir or DATA_DIR
+        self.path = os.path.join(self.dir, tclib.AUDIT_FILE)
+        try:
+            st = os.stat(self.path)
+            self.ino, self.pos = st.st_ino, st.st_size
+        except OSError:
+            self.ino, self.pos = None, 0
+
+    def _read(self, path, pos):
+        """(entries, new position) from pos to the last complete line"""
+        try:
+            with open(path, "rb") as f:
+                f.seek(pos)
+                data = f.read()
+        except OSError:
+            return [], pos
+        end = data.rfind(b"\n") + 1
+        out = []
+        for line in data[:end].splitlines():
+            try:
+                e = json.loads(line)
+            except ValueError:
+                continue
+            if isinstance(e, dict):
+                out.append(e)
+        return out, pos + end
+
+    def _moved(self):
+        """the archive the active file was rotated into (same inode)"""
+        arch = os.path.join(self.dir, tclib.AUDIT_ARCHIVE)
+        try:
+            names = sorted(os.listdir(arch), reverse=True)[:5]
+        except OSError:
+            return None
+        for n in names:
+            p = os.path.join(arch, n)
+            try:
+                if os.stat(p).st_ino == self.ino:
+                    return p
+            except OSError:
+                pass
+        return None
+
+    def poll(self):
+        out = []
+        try:
+            st = os.stat(self.path)
+        except OSError:
+            return out
+        if self.ino is not None and st.st_ino != self.ino:
+            moved = self._moved()
+            if moved:
+                out, _ = self._read(moved, self.pos)
+            self.ino, self.pos = st.st_ino, 0
+        elif self.ino is None:
+            self.ino, self.pos = st.st_ino, 0
+        if st.st_size < self.pos:  # truncated
+            self.pos = 0
+        new, self.pos = self._read(self.path, self.pos)
+        return out + new
+
+
+async def follow_loop(hooks, every=2):
+    """hand every new entry to the extensions' on_audit hooks (hooks() → [(fn, name)], asked each round, so a disabled
+    extension drops out at once) – a failing hook is logged and doesn't stop the others"""
+    def deliver(entries):
+        for fn, name in hooks():
+            for e in entries:
+                try:
+                    fn(dict(e))
+                except Exception as err:  # noqa: BLE001
+                    print(f"extension {name}: on_audit: {err}", flush=True)
+    f = Follower()
+    while True:
+        try:
+            entries = await asyncio.to_thread(f.poll)
+            if entries:
+                await asyncio.to_thread(deliver, entries)
+        except Exception as e:  # noqa: BLE001
+            print(f"audit follower: {e}", flush=True)
+        await asyncio.sleep(every)
+
+
 async def prune_loop():
     while True:
         try:

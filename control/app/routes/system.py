@@ -305,8 +305,36 @@ COMMUNITY_MODULES = [
 
 @router.get("/modules", response_class=HTMLResponse)
 async def modules_page(request: Request):
-    return page(request, "modules.html",
-                modules=COMMUNITY_MODULES if extensions.edition() == "community" else extensions.modules())
+    return page(request, "modules.html", exts=extensions.available(), modules=extensions.modules(),
+                community_modules=COMMUNITY_MODULES, enterprise_modules=extensions.licensed_modules())
+
+
+@router.post("/modules/{name}/{action}", response_class=HTMLResponse)
+async def module_switch(request: Request, name: str, action: str):
+    """enable (loaded at the next start) or disable (at once) a built-in or third-party module"""
+    if action not in ("enable", "disable"):
+        return PlainTextResponse("unknown action", status_code=404)
+    try:
+        extensions.set_enabled(name, action == "enable")
+    except ValueError as e:
+        return respond(request, str(e), "err")
+    if action == "disable":
+        return respond(request, f"{extensions.title(name)} disabled", refresh=True)
+    if extensions.active(name):
+        return respond(request, f"{extensions.title(name)} enabled", refresh=True)
+    return respond(request, f"{extensions.title(name)} enabled – restart tentacontrol to load it", refresh=True)
+
+
+RESTART_WAIT = """<div><strong>Restarting tentacontrol …</strong> <span class="muted">the page reloads when it is back.</span></div>
+<script>(function w(){setTimeout(function(){fetch('/healthz',{cache:'no-store'}).then(function(r){r.ok?location.reload():w()}).catch(w)},2000)})()</script>"""
+
+
+@router.post("/modules/restart", response_class=HTMLResponse)
+async def modules_restart(request: Request):
+    """end tentacontrol's process – Docker starts it again (restart: unless-stopped) and it loads the enabled modules"""
+    import signal
+    asyncio.get_running_loop().call_later(0.5, os.kill, os.getpid(), signal.SIGTERM)
+    return HTMLResponse(RESTART_WAIT)
 
 
 @router.get("/help", response_class=HTMLResponse)

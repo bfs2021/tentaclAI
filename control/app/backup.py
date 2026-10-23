@@ -12,7 +12,7 @@ import time
 
 import tclib
 
-from . import claude_files, egress, jsonstore, notify, scheduled, services_store, skills, sshhosts, systems_store
+from . import claude_files, egress, extensions, jsonstore, notify, scheduled, services_store, skills, sshhosts, systems_store
 from .config import DATA_DIR, SERVICES_DIR, SETTINGS_GROUPS, STACK_DIR, SYSTEMS_DIR, is_secret
 from .envfile import read_env, update_env
 
@@ -28,6 +28,17 @@ SECTIONS = {
 }
 # picked in the preview only on request: they change how Claude works or what this installation is
 OPT_IN = {"instructions", "skills", "settings"}
+EXT_PREFIX = "x_"  # parts of extensions (add_backup_part): x_<extension>_<key>, always opt-in
+
+
+def sections():
+    """SECTIONS plus the parts of the active extensions"""
+    out = dict(SECTIONS)
+    for sid, p in extensions.backup_parts().items():
+        out[sid] = f"{p['label']} ({extensions.title(p['ext'])})"
+    return out
+
+
 SSH_FIELDS = ("alias", "hostname", "user", "port", "proxyjump", "hostkeyalias", "sudo", "access")
 SKIP_GROUPS = {"Paths & mounts"}  # host specific
 CHANNEL_KINDS = {"ntfy", "webhook", "email", "apprise"}
@@ -80,7 +91,8 @@ def _notifications():
 
 def export(parts=None):
     """the export document and the plain secrets that were left out (service, key path) – shown before the download"""
-    parts = [p for p in (parts or SECTIONS) if p in SECTIONS]
+    known = sections()
+    parts = [p for p in (parts or known) if p in known]
     env = read_env()
     doc = {"format": FORMAT, "version": VERSION, "tentaclai": _version(), "created": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
            "host": env.get("TC_HOSTNAME", "")}
@@ -108,6 +120,12 @@ def export(parts=None):
         doc["skills"] = {name: skills.site_text(name) for name in tclib.site_skills(STACK_DIR)}
     if "settings" in parts:
         doc["settings"] = {k: env[k] for k in setting_keys() if env.get(k)}
+    for sid, p in extensions.backup_parts().items():
+        if sid in parts:
+            try:
+                doc[sid] = p["export"]()
+            except Exception as e:  # noqa: BLE001 – an extension's part must not break the export
+                print(f"extension {p['ext']}: backup export: {e}", flush=True)
     needed = set()
     for data in doc.get("services", {}).values():
         needed |= tclib.variables({k: v for k, v in data.items() if k in tclib.PARTS})
@@ -134,7 +152,8 @@ def parse(raw):
         raise ValueError("not a tentaclAI export")
     if doc.get("version") != VERSION:
         raise ValueError(f"export format version {doc.get('version')} – this tentaclAI reads version {VERSION}")
-    unknown = set(doc) - set(SECTIONS) - {"format", "version", "tentaclai", "created", "host", "variables"}
+    unknown = {k for k in set(doc) - set(SECTIONS) - {"format", "version", "tentaclai", "created", "host", "variables"}
+               if not k.startswith(EXT_PREFIX)}  # an extension's part: checked in the preview
     if unknown:
         raise ValueError(f"unknown parts: {', '.join(sorted(unknown))}")
     types = {"services": dict, "systems": dict, "ssh_hosts": list, "jobs": dict, "network": dict, "notifications": dict,
@@ -184,7 +203,7 @@ def _row(section, key, old, new, error="", note="", label=None):
         status = "changed"
     return {"section": section, "key": key, "id": f"{section}:{key}", "label": label or key, "status": status,
             "error": error, "note": note, "diff": _diff(old, new) if status == "changed" else "",
-            "checked": status in ("new", "changed") and section not in OPT_IN}
+            "checked": status in ("new", "changed") and section not in OPT_IN and not section.startswith(EXT_PREFIX)}
 
 
 def _access_note(data):
@@ -195,7 +214,8 @@ def _access_note(data):
 
 def preview(doc):
     """section → rows {id, label, status new/changed/same/invalid, error, note, diff, checked} – nothing is written"""
-    rows = {s: [] for s in SECTIONS if s in doc}
+    known = sections()
+    rows = {s: [] for s in list(known) + sorted(k for k in doc if k.startswith(EXT_PREFIX) and k not in known) if s in doc}
     services = _raw_dir(SERVICES_DIR)
     for data in services.values():
         tclib.migrate_access(data)  # a file still saying ro/rw is not "changed" by the same file in read/write
@@ -317,6 +337,17 @@ def preview(doc):
             if not err and (not isinstance(v, str) or "\n" in v):
                 err = "a one-line text value"
             rows["settings"].append(_row("settings", k, env.get(k) or None, v, err))
+    parts = extensions.backup_parts()
+    for sid in [k for k in rows if k.startswith(EXT_PREFIX)]:
+        if sid not in parts:
+            rows[sid].append(_row(sid, "data", None, doc[sid], "the extension of this part isn't installed or enabled here",
+                                  label=sid))
+            continue
+        try:
+            cur = parts[sid]["export"]()
+        except Exception:  # noqa: BLE001
+            cur = None
+        rows[sid].append(_row(sid, "data", cur, doc[sid], "", label="all of it", note="replaces what the extension has"))
     return rows
 
 
@@ -332,10 +363,11 @@ def apply(doc, picked):
     rows = preview(doc)
     stamp = time.strftime("%Y-%m-%d-%H%M%S")
     results = []
-    todo = [r for s in SECTIONS for r in rows.get(s, []) if r["id"] in picked and r["status"] in ("new", "changed")]
+    known = sections()
+    todo = [r for s in rows for r in rows[s] if r["id"] in picked and r["status"] in ("new", "changed")]
 
     def done(r, msg, ok=True):
-        results.append({"id": r["id"], "label": r["label"], "section": SECTIONS[r["section"]], "ok": ok, "msg": msg})
+        results.append({"id": r["id"], "label": r["label"], "section": known.get(r["section"], r["section"]), "ok": ok, "msg": msg})
 
     jobs_saved = False
     for r in todo:
@@ -395,6 +427,8 @@ def apply(doc, picked):
                 skills.save_site(key, doc["skills"][key])  # keeps its own .bak
             elif sec == "settings":
                 update_env({key: doc["settings"][key]})
+            elif sec.startswith(EXT_PREFIX):
+                extensions.backup_parts()[sec]["apply"](doc[sec])
             done(r, "added" if r["status"] == "new" else "updated")
         except (ValueError, OSError, KeyError, StopIteration) as e:
             done(r, str(e) or "not found", ok=False)

@@ -1,5 +1,9 @@
-{# tab bars of the Settings area (tentaclAI itself) and the Claude area (what steers Claude in the sandbox) #}
+{# tab bars of the Settings area (tentaclAI itself) and the Claude area (what steers Claude in the sandbox) – extensions add
+   tabs with api.add_tab(area, href, …); their page passes its href as `active` #}
 {% from "_icons.html" import icon %}
+{% macro ext_tab_links(area, active) -%}
+{% for t in ext_tabs(area) %}<a href="{{ t.href }}" class="{{ 'active' if active == t.href }}">{{ icon(t.icon) }}{{ t.label }}</a>{% endfor %}
+{%- endmacro %}
 {% macro settings_tabs(active) -%}
 <nav class="conn-tabs" aria-label="Settings">
   <a href="/settings" class="{{ 'active' if active == 'settings' }}">{{ icon('settings') }}General</a>
@@ -7,6 +11,7 @@
   <a href="/account" class="{{ 'active' if active == 'account' }}">{{ icon('key') }}Account</a>
   <a href="/backup" class="{{ 'active' if active == 'backup' }}">{{ icon('download') }}Export / Import</a>
   <a href="/license" class="{{ 'active' if active == 'license' }}">{{ icon('lock') }}License</a>
+  {{ ext_tab_links('settings', active) }}
 </nav>
 {%- endmacro %}
 {% macro claude_tabs(active) -%}
@@ -17,11 +22,13 @@
   <a href="/skills" class="{{ 'active' if active == 'skills' }}">{{ icon('sparkle') }}Skills</a>
   <a href="/usage" class="{{ 'active' if active == 'usage' }}">{{ icon('chart') }}Usage</a>
   <a href="/claude/settings" class="{{ 'active' if active == 'settings' }}">{{ icon('settings') }}settings.json</a>
+  {{ ext_tab_links('claude', active) }}
 </nav>
 {%- endmacro %}
 {% macro logs_tabs(active) -%}
 <nav class="conn-tabs" aria-label="Logs">
   <a href="/logs" class="{{ 'active' if active == 'audit' }}">{{ icon('activity') }}Audit</a>
   <a href="/logs/containers" class="{{ 'active' if active == 'containers' }}">{{ icon('logs') }}Containers</a>
+  {{ ext_tab_links('logs', active) }}
 </nav>
 {%- endmacro %}

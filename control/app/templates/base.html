@@ -25,10 +25,10 @@
         <span class="nav-count" hx-get="/partials/approval-count" hx-trigger="load, every 5s" hx-swap="innerHTML"></span></a>
       <a href="/jobs" class="{{ 'active' if nav in ('jobs', 'job_edit') }}">{{ icon('clock') }}Jobs
         <span class="nav-count" hx-get="/partials/job-count" hx-trigger="load, every 30s" hx-swap="innerHTML"></span></a>
-      {% for m in module_nav %}<a href="{{ m.href }}" class="{{ 'active' if nav == m.nav_id }}">{{ icon(m.icon) }}{{ m.label }}</a>
+      {% for m in module_nav %}<a href="{{ m.href }}" class="{{ 'active' if nav == m.nav_id }}">{{ icon(m.icon) }}{{ m.label }}
+        {%- if m.count_url %}<span class="nav-count" hx-get="{{ m.count_url }}" hx-trigger="load, every 30s" hx-swap="innerHTML"></span>{% endif %}</a>
       {% endfor %}
-      {% set locked = edition == 'community' %}
-      <a href="/modules" class="{{ 'nav-locked' if locked }} {{ 'active' if nav == 'modules' }}"{% if locked %} title="Enterprise"{% endif %}>{{ icon('grid') }}Modules{% if locked %}<span class="nav-count">{{ icon('lock') }}</span>{% endif %}</a>
+      <a href="/modules" class="{{ 'active' if nav in ('modules', 'module_locked') }}">{{ icon('grid') }}Modules</a>
       <a href="/claude/instructions" class="{{ 'active' if nav in ('claude_instructions', 'claude_memory', 'claude_settings', 'skills', 'models', 'usage') }}">{{ icon('claude') }}Claude</a>
       <a href="/settings" class="{{ 'active' if nav in ('settings', 'notifications', 'account', 'backup') }}">{{ icon('settings') }}Settings</a>
       <a href="/updates" class="{{ 'active' if nav in ('updates', 'job') }}">{{ icon('refresh') }}Updates</a>
@@ -53,6 +53,18 @@
     <div class="banner">
       <div><strong>{{ 'A newer tentaclAI image is ready.' if newer_image else 'Configuration changed.' }}</strong> <span class="muted">tentaclAI has to be recreated for the changes to take effect – running Claude sessions will end.</span></div>
       <button class="btn primary sm" hx-post="/container/recreate" hx-confirm="Recreate tentaclAI now? Running sessions will end.">{{ icon('refresh') }}Apply now</button>
+    </div>
+    {% endif %}
+    {% for b in ext_banners %}
+    <div class="banner {{ b.kind if b.kind != 'warn' }}">
+      <div>{{ b.text }}</div>
+      {% if b.href %}<a class="btn sm" href="{{ b.href }}">{{ b.link or 'Open' }}</a>{% endif %}
+    </div>
+    {% endfor %}
+    {% if ext_restart and nav != 'modules' %}
+    <div class="banner">
+      <div><strong>Modules changed.</strong> <span class="muted">tentacontrol has to restart to load {{ ext_restart | join(', ') }}.</span></div>
+      <a class="btn sm" href="/modules">{{ icon('grid') }}Modules</a>
     </div>
     {% endif %}
     {% block content %}{% endblock %}

@@ -26,11 +26,15 @@ tentaclAI = sandbox + service gateway for Claude Code. Three containers (`compos
   not `jobs.py`, which runs tentacontrol's own build jobs); `svc` recognises a job run by the `tc-job=<run>` marker in
   an ancestor's command line plus root's `data/control/job-runs.json`.
 
-**Community / Enterprise:** this repository is tentaclAI Community. tentaclAI Enterprise is a separate, private package
-(`tentaclai_enterprise`) that tentacontrol loads through `control/app/extensions.py` (`TC_EXTENSIONS`): its routes and
-templates come first, `extensions.features()` / `edition()` tell pages what is unlocked, and `add_module()` registers a module
-(Modules page) with its sidebar entry, shown while the license unlocks it. Keep Enterprise code out of
-this repository – here only the extension points and the placeholders (Modules locked, Settings → License).
+**Modules / Community / Enterprise:** tentacontrol loads extensions through `control/app/extensions.py` (Extension API
+v1, `docs/extensions.md`): registration via `Api` in `register(api)`, runtime helpers in `control/app/extapi.py` – the
+only parts of `app.*` an extension may use; keep both stable (a change that breaks them needs a new `API_VERSION`).
+Origins decide the rights: *configured* (`TC_EXTENSIONS`, e.g. the private `tentaclai_enterprise` package – may
+`provide_license()` and replace pages/templates), *builtin* (`control/extensions/` → `/app/extensions/`) and *local*
+(`local/extensions/`, third-party) – both off until enabled (`data/control/extensions.json`), only below `/x/<name>/`,
+templates as `<name>/…`; their code is never imported before they are enabled. The example `examples/extensions/tcx_hello`
+is also the test fixture (`tests/test_extensions.py`). Keep Enterprise code out of this repository – here only the
+extension points and the placeholders (Enterprise part of Modules locked, Settings → License).
 
 Two layers: `svc` decides *what* happens with a tentacle (credentials, `read`/`write`/`confirm`); the gateway decides *where*
 the sandbox may connect. ssh/rsync go through `ProxyCommand tc-connect`, databases and mail through `svc`'s local `tunnel()`.

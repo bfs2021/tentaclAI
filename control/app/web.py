@@ -26,13 +26,14 @@ templates.env.globals["asset_v"] = str(int(max(os.path.getmtime(os.path.join(BAS
 RESTART_FLAG = os.path.join(DATA_DIR, "restart-needed")
 
 
-def page(request, name, **ctx):
+def page(request, name, nav=None, **ctx):
+    """a full page; nav: the sidebar entry to highlight (default: the template's name)"""
     st = dockerops.status()
     newer = dockerops.newer_image() if st.get("exists") else False
     unlocked = extensions.features()
-    ctx.update(request=request, nav=name.split(".")[0], cstatus=st, restart_needed=restart_needed(st) or newer, newer_image=newer, site=site(),
+    ctx.update(request=request, nav=nav or name.split(".")[0], cstatus=st, restart_needed=restart_needed(st) or newer, newer_image=newer, site=site(),
                update=updatecheck.status(TC_VERSION), features=unlocked, edition=extensions.edition(),
-               module_nav=extensions.nav_entries(unlocked), me=auth.current_user(request) or {},
+               module_nav=extensions.nav_entries(unlocked), ext_restart=extensions.restart_pending(), ext_banners=extensions.banners(request), me=auth.current_user(request) or {},
                flash=request.session.pop("flash", None))
     return templates.TemplateResponse(request, name, ctx)
 

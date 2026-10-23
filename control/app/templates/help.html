@@ -26,8 +26,9 @@
     <a href="#terminal">Terminal &amp; tmux</a><a href="#rc">Remote control</a><a href="#services">Services</a>
     <a href="#systems">Systems</a><a href="#topology">Topology</a><a href="#docker">Docker hosts</a><a href="#onboard">Onboarding a service</a><a href="#auth">Auth types</a>
     <a href="#git">Git repositories</a><a href="#db">Databases</a><a href="#web">Web sources</a><a href="#files">Files</a><a href="#mail">Mail</a><a href="#templates">Templates</a><a href="#inventory">System inventory</a>
-    <a href="#approvals">Approvals</a><a href="#audit">Logs</a><a href="#jobs">Jobs</a><a href="#network">Network</a><a href="#ssh">SSH targets</a><a href="#claude">Claude</a><a href="#settings">Settings</a><a href="#license">Enterprise</a><a href="#updates">Updates</a><a href="#cli">Commands</a>
+    <a href="#approvals">Approvals</a><a href="#audit">Logs</a><a href="#jobs">Jobs</a><a href="#network">Network</a><a href="#ssh">SSH targets</a><a href="#claude">Claude</a><a href="#settings">Settings</a><a href="#modules">Modules</a><a href="#license">Enterprise</a><a href="#updates">Updates</a><a href="#cli">Commands</a>
     <a href="#security">Security</a><a href="#troubleshooting">Troubleshooting</a><a href="#roadmap">Roadmap</a>
+    {% for h in ext_help() %}<a href="#{{ h.id }}">{{ h.title }}</a>{% endfor %}
   </nav>
   <div class="doc">
     <section class="card" id="start">
@@ -382,11 +383,21 @@
       <p><strong>Templates:</strong> “Template” on a service page downloads the service as a template – name, system and TLS exception left out, its own variables as <code>EXAMPLE_…</code>, <code>svc &lt;name&gt;</code> as <code>svc NAME</code>, the internal domain (<code>TC_DOMAIN</code>) as <code>{{ '{{DOMAIN}}' }}</code>; fixed addresses that remain are pointed out. Services → <em>Import a template …</em> saves one in <code>local/templates/</code> (marked <em>own</em> in the list); names of built-in templates and plain values in credential fields are refused.</p>
 </section>
 
+    <section class="card" id="modules">
+      <h2>Modules</h2>
+      <p>Modules extend tentacontrol with pages, sidebar entries, tabs, background tasks, notification events and parts of Export / Import. <a href="/modules">Modules</a> lists them by origin:</p>
+      <ul>
+        <li><strong>Built-in</strong> – shipped with tentaclAI, off until you enable them.</li>
+        <li><strong>Third-party</strong> – your own or someone else's, in <code>local/extensions/&lt;name&gt;/</code> of the stack directory (a Python package with an <code>extension.json</code>). Off until you enable them – <strong>a module runs inside tentacontrol with all of its rights</strong> (it can read the configuration, approve requests and run svc), so only enable code you trust. Its pages live below <code>/x/&lt;name&gt;/</code>; it can't replace tentacontrol's own pages.</li>
+        <li><strong>Enterprise</strong> – from tentaclAI Enterprise (<code>TC_EXTENSIONS</code>), always loaded, unlocked by the license.</li>
+      </ul>
+      <p><em>Enable</em> takes effect when tentacontrol restarts (<em>Restart tentacontrol</em> – a few seconds, the sandbox and Claude keep running); <em>Disable</em> at once. Loading, enabling and disabling land in the audit log. Until it is enabled, tentacontrol reads only a module's <code>extension.json</code> – its code is never run. Writing a module: <code>docs/extensions.md</code> in the repository, with the example <code>examples/extensions/tcx_hello</code>.</p>
+    </section>
+
     <section class="card" id="license">
       <h2>Community &amp; Enterprise</h2>
-      <p>This is <strong>tentaclAI Community</strong>, the free, open-source edition. <strong>tentaclAI Enterprise</strong> is a separate package that hooks into tentacontrol and adds Enterprise modules – listed under <a href="/modules">Modules</a>, e.g. compliance reports and the SIEM export of the audit log. In Community, <em>Modules</em> is shown locked; with Enterprise it lists the installed modules (<em>licensed</em>, <em>locked</em> or <em>planned</em>), and each licensed module brings its own sidebar entry. Settings → <a href="/license">License</a> says what an Enterprise license adds.</p>
+      <p>This is <strong>tentaclAI Community</strong>, the free, open-source edition. <strong>tentaclAI Enterprise</strong> is a separate package that hooks into tentacontrol and adds Enterprise modules – listed under <a href="/modules">Modules</a>, e.g. compliance reports and the SIEM export of the audit log. In Community, the Enterprise part of <em>Modules</em> is shown locked; with Enterprise it lists the Enterprise modules (<em>licensed</em>, <em>locked</em> or <em>planned</em>), and each licensed module brings its own sidebar entry. Settings → <a href="/license">License</a> says what an Enterprise license adds.</p>
       <p>The License tab also shows this installation's <strong>Installation ID</strong> (<code>TCI-…</code>) – needed to order a license bound to this installation. It is derived from the machine's hardware (a hash of the system UUID its firmware reports, or of the Docker engine's ID where there is none), worked out on every start and never stored, so it can't be set by hand or copied along with the data.</p>
-      <p>Extensions: tentacontrol loads the packages named in <code>TC_EXTENSIONS</code> (default <code>tentaclai_enterprise</code>) if they are installed; their pages and templates come before its own, and they register their modules (with sidebar entries) for the Modules page.</p>
     </section>
 
     <section class="card" id="updates">
@@ -460,6 +471,12 @@ gh …                      GitHub CLI without credentials (public data)</pre>
         <li><strong>Claude via API</strong> (n8n &amp; co.): start Claude jobs from outside – HTTP API with its own tokens and profiles (<em>read-only</em> / <em>standard</em>; the svc and gateway guard rails stay), wait for the result or poll a job id, structured answers via a JSON schema, an MCP endpoint (<code>ask_claude</code>) for n8n's MCP client; off by default.</li>
       </ul>
     </section>
+    {% for h in ext_help() %}
+    <section class="card" id="{{ h.id }}">
+      <h2>{{ h.title }}</h2>
+      {% include h.template ignore missing %}
+    </section>
+    {% endfor %}
   </div>
 </div>
 {% endblock %}

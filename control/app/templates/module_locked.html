@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% from "_icons.html" import icon %}
+{% block title %}{{ module_title }}{% endblock %}
+{% block content %}
+<div class="header"><div><h1>{{ module_title }}</h1><div class="sub">An Enterprise module</div></div></div>
+<div class="locked">
+  <div class="locked-note card">
+    <div class="locked-icon">{{ icon('lock') }}</div>
+    <h2>{{ module_title }} needs a license that includes it.</h2>
+    <p class="muted small">The installed license doesn't unlock <code>{{ feature }}</code> – it may have ended or not include this module.</p>
+    <a class="btn sm" href="/license" style="margin-top:6px">License</a>
+  </div>
+</div>
+{% endblock %}

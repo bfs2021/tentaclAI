@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% from "_icons.html" import icon %}
+{% block title %}Hello{% endblock %}
+{% block head %}<link rel="stylesheet" href="{{ ext_static('tcx_hello', 'hello.css') }}">{% endblock %}
+{% block content %}
+<div class="header"><div><h1>{{ icon('wave') }} {{ greeting }}</h1><div class="sub">The example module of the Extension API</div></div></div>
+<div class="grid">
+  <div class="card hello-card">
+    <h2>What it does</h2>
+    <ul class="small">
+      <li>Background task: ticked <strong>{{ ticks }}</strong> times (once a minute – also the badge in the sidebar)</li>
+      <li>Audit hook: <strong>{{ seen }}</strong> new audit entries since tentacontrol started</li>
+      <li>Edition: {{ edition }}</li>
+    </ul>
+    <button class="btn sm" hx-post="/x/tcx_hello/ping">{{ icon('bell') }}Send a test notification</button>
+  </div>
+</div>
+{% endblock %}

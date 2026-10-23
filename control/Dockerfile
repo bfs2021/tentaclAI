@@ -28,6 +28,7 @@ RUN mkdir -p /app/vendor \
 COPY lib/tclib.py lib/egress-default.txt /app/
 COPY VERSION /app/VERSION
 COPY control/app/ /app/app/
+COPY control/extensions/ /app/extensions/
 COPY control/passwd.py /usr/local/bin/tentacontrol-passwd
 COPY control/sshcli.py /usr/local/bin/tentacontrol-ssh
 RUN chmod 0755 /usr/local/bin/tentacontrol-passwd /usr/local/bin/tentacontrol-ssh

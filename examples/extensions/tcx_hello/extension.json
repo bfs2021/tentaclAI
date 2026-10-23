@@ -1,0 +1,9 @@
+{
+  "name": "tcx_hello",
+  "title": "Hello (example)",
+  "description": "The example module of the Extension API: a page with a menu entry and badge, a Settings tab, a background task, a notification event, an audit hook, a Help section and an Export/Import part.",
+  "version": "1.0.0",
+  "author": "tentaclAI",
+  "homepage": "https://github.com/mwaldegg/tentaclAI/blob/main/docs/extensions.md",
+  "requires_api": 1
+}

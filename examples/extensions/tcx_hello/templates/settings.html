@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% from "_tabs.html" import settings_tabs %}
+{% block title %}Settings{% endblock %}
+{% block content %}
+{{ settings_tabs('/x/tcx_hello/settings') }}
+<div class="header"><div><h1>Hello</h1><div class="sub">Settings of the example module</div></div></div>
+<div class="card">
+  <h2>Greeting</h2>
+  <form hx-post="/x/tcx_hello/settings" class="row">
+    <input name="greeting" value="{{ greeting }}" maxlength="60" aria-label="Greeting">
+    <button class="btn primary sm">Save</button>
+  </form>
+</div>
+{% endblock %}

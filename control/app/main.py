@@ -22,7 +22,7 @@ from .web import BASE, TC_VERSION, templates
 async def lifespan(_app):
     """startup: activity token, background loops (notifications, usage, update check, scheduled jobs), setup hint"""
     for start in (migrate, prepare_activity, start_audit, refresh_builtin_jobs, start_notifications, start_update_check,
-                  start_scheduled_jobs, announce_setup):
+                  start_scheduled_jobs, start_extensions, announce_setup):
         await start()
     yield
 
@@ -39,6 +39,8 @@ async def guard(request: Request, call_next):
     path = request.url.path
     if not netguard.allowed(path, request.client.host if request.client else ""):
         return PlainTextResponse("not from here", status_code=403)  # sandbox: svc endpoints only; gateway: egress only
+    if extensions.blocked_path(path):  # an extension disabled since the start (or never loaded)
+        return PlainTextResponse("Not Found", status_code=404)
     if not path.startswith(PUBLIC):
         if not auth.logged_in(request):
             if request.headers.get("hx-request"):
@@ -215,6 +217,30 @@ async def start_update_check():
             await asyncio.to_thread(updatecheck.refresh)
             await asyncio.sleep(1800)
     asyncio.get_running_loop().create_task(loop())
+
+
+async def start_extensions():
+    """the extensions' background tasks and – when one registered on_audit – the audit log follower"""
+    loop = asyncio.get_running_loop()
+
+    def run_task(t):
+        async def task():
+            await asyncio.sleep(t["delay"])
+            while True:
+                if extensions.active(t["ext"]):
+                    try:
+                        if asyncio.iscoroutinefunction(t["fn"]):
+                            await t["fn"]()
+                        else:
+                            await asyncio.to_thread(t["fn"])
+                    except Exception as e:  # noqa: BLE001
+                        print(f"extension {t['ext']}: task {getattr(t['fn'], '__name__', '?')}: {e}", flush=True)
+                await asyncio.sleep(t["every"])
+        return task()
+    for t in extensions.tasks():
+        loop.create_task(run_task(t))
+    if extensions.audit_hooks():
+        loop.create_task(auditlog.follow_loop(extensions.audit_hooks))
 
 
 async def announce_setup():

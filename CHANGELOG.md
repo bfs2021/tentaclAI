@@ -4,6 +4,16 @@ All notable changes, newest first. Every release lists **upgrade steps** from th
 
 ## Unreleased
 
+### Highlights
+- **Modules for everyone – Extension API v1**: tentacontrol loads modules that bring pages, sidebar entries (with a
+  badge), tabs in Settings/Logs/Claude, icons, static files, background tasks, notification events, an audit log hook,
+  Help sections and parts of Export / Import. **Modules** is no longer locked in Community: it lists *built-in* modules
+  (shipped, off until enabled), *third-party* ones (`local/extensions/<name>/`, off until enabled, with a warning – they
+  run with tentacontrol's rights) and the *Enterprise* part (still locked without a license). Enabling takes effect
+  after *Restart tentacontrol* (a few seconds, the sandbox keeps running), disabling at once. Third-party modules live
+  below `/x/<name>/` and can't replace tentacontrol's pages; only tentaclAI Enterprise provides the license.
+  Guide: `docs/extensions.md`, example `examples/extensions/tcx_hello`.
+
 ### Changes / fixes
 - `svc <name> GET …`: an HTTP error (4xx/5xx) now exits non-zero (curl 22, the body is still printed) – calls that read
   the status themselves with `-w` (svc test, Test API, tc-scan) or pass `--fail` behave as before. A path that repeats
@@ -12,6 +22,14 @@ All notable changes, newest first. Every release lists **upgrade steps** from th
   text, but now with a hint naming the real fields (#17).
 - `svc audit … | head` and other svc output into a closed pipe end quietly instead of with a traceback (#16).
 - Product findings → GitHub: the issue title no longer ends at "e.g." / "i.e." / "etc." / "vs.".
+- Extensions: the old calls `add_features()` / `set_edition()` are gone (`provide_license()`); an extension declares
+  `REQUIRES_API = 1`. tentaclAI Enterprise needs its matching version (see Upgrade).
+
+### Upgrade
+- `git pull`, `docker compose build control claude`, `docker compose up -d` – recreating `tentaclai` ends running
+  sessions and Remote Control.
+- tentaclAI Enterprise: update it together with tentaclAI (an older Enterprise package without `REQUIRES_API` is not
+  loaded – the Modules page says so). Its license file moves to `data/control/ext/tentaclai_enterprise/` by itself.
 
 ## v0.21.0 – 2026-10-24
 

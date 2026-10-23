@@ -377,6 +377,20 @@ through an allowed name. *Seen* lists every destination with its rule and last r
 
 Claude Code's telemetry, error reports and `/bug` are off by default (`CLAUDE_TELEMETRY=true` turns them on).
 
+## Modules
+
+tentacontrol can be extended with **modules** – Python packages that bring pages, sidebar entries, tabs, background
+tasks, notification events and parts of Export / Import (tentacontrol → Modules):
+
+- **Built-in** modules ship with tentaclAI and are off until enabled.
+- **Third-party** modules go into `local/extensions/<name>/` (a package with an `extension.json`) and are off until
+  enabled – a module runs inside tentacontrol with all of its rights, so only enable code you trust. Their pages live
+  below `/x/<name>/`; they can't replace tentacontrol's own.
+- **Enterprise** modules come from tentaclAI Enterprise (`TC_EXTENSIONS`) and are unlocked by the license.
+
+Writing one: [docs/extensions.md](docs/extensions.md) (Extension API v1), example in
+[examples/extensions/tcx_hello](examples/extensions/tcx_hello).
+
 ## Security
 
 What tentaclAI does:

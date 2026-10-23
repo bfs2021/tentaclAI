@@ -21,13 +21,13 @@ def _attachment(data, filename):
 
 @router.get("/backup", response_class=HTMLResponse)
 async def backup_page(request: Request):
-    return page(request, "backup.html", sections=backup.SECTIONS, left_out=backup.literal_secrets(),
+    return page(request, "backup.html", sections=backup.sections(), left_out=backup.literal_secrets(),
                 pending=backup.pending() is not None)
 
 
 @router.get("/backup/export")
 async def backup_export(request: Request):
-    parts = request.query_params.getlist("part") or list(backup.SECTIONS)
+    parts = request.query_params.getlist("part") or list(backup.sections())
     doc, _ = await asyncio.to_thread(backup.export, parts)
     host = "".join(c for c in (doc.get("host") or "tentaclai") if c.isalnum() or c in "-_.") or "tentaclai"
     return _attachment(doc, f"tentaclai-{host}-{time.strftime('%Y-%m-%d')}.json")
@@ -36,7 +36,7 @@ async def backup_export(request: Request):
 def _preview(request, doc, error=None):
     rows = backup.preview(doc) if doc else {}
     return templates.TemplateResponse(request, "partials/backup_preview.html", {
-        "doc": doc, "rows": rows, "sections": backup.SECTIONS, "error": error,
+        "doc": doc, "rows": rows, "sections": dict(backup.sections(), **{s: s for s in rows if s not in backup.sections()}), "error": error,
         "counts": {s: {st: sum(1 for r in rs if r["status"] == st) for st in ("new", "changed", "same", "invalid")} for s, rs in rows.items()}})
 
 
