@@ -2,7 +2,7 @@
 
 All notable changes, newest first. Every release lists **upgrade steps** from the previous one.
 
-## Unreleased
+## v0.20.0 – 2026-10-23
 
 ### Highlights
 - **One audit log for everything** – tentacontrol → *Logs → Audit*: Claude's tool calls (through the Claude Code hook),
