@@ -1,5 +1,6 @@
 """Connector and skill state in tentacontrol: discovery, defaults, toggles and what is written into the sandbox."""
 import json
+import os
 
 import pytest
 
@@ -199,3 +200,31 @@ def test_origin_label(app_module, monkeypatch):
     assert activity.origin_label({}) == "" and activity.origin_label(None) == ""
     assert activity.origin_label({"by": "root"}) == "tentacontrol / host"
     assert activity.clean_origin({"tmux": "<b>x</b>", "token": "secret", "entry": "cli"}) == {"entry": "cli"}
+
+
+def test_shipped_templates_name_the_service_as_NAME():
+    """examples and notes of a template call the service by the placeholder – a fixed name ends up in every copy"""
+    import glob
+    import re
+    root = os.path.join(os.path.dirname(__file__), "..", "services", "_templates")
+    call = re.compile(r"\bsvc\s+(?:(?:docker|compose|db|web|files|mail|info|test|git\s+[a-z]+)\s+)?([a-z0-9_-]+)")
+    commands = {"docker", "compose", "db", "web", "files", "mail", "info", "test", "git", "ssh", "list", "systems", "audit",
+                "pending", "jobs", "config", "sync", "help", "sends"}
+    bad = []
+    for p in sorted(glob.glob(os.path.join(root, "*.json"))):
+        d = json.load(open(p))
+        for x in (d.get("examples") or []) + (d.get("notes") or []):
+            bad += [f"{os.path.basename(p)}: {x}" for m in call.finditer(str(x)) if m.group(1) not in commands | {"NAME"}]
+    assert bad == []
+
+
+def test_rename_follows_mail_calls(app_module):
+    from app import services_store
+    services_store.save_raw("mbox", json.dumps({"imap": {"host": "x"}, "examples": ["svc mail mbox list --unseen", "svc mbox GET /"]}))
+    try:
+        data = services_store.rename("mbox", "mbox_home")
+        assert data["examples"] == ["svc mail mbox_home list --unseen", "svc mbox_home GET /"]
+    finally:
+        for n in ("mbox", "mbox_home"):
+            if os.path.exists(services_store.path_of(n)):
+                os.remove(services_store.path_of(n))

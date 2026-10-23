@@ -450,7 +450,7 @@ def rename(old, new):
     if os.path.exists(path_of(new)):
         raise ValueError(f"{new} exists already")
     data = json.loads(read_raw(old))
-    call = re.compile(r"(\bsvc\s+(?:(?:docker|compose|db|web|files|info|test|git\s+[a-z]+)\s+)?)" + re.escape(old) + r"\b")
+    call = re.compile(r"(\bsvc\s+(?:(?:docker|compose|db|web|files|mail|info|test|git\s+[a-z]+)\s+)?)" + re.escape(old) + r"\b")
     for key in ("examples", "notes"):
         if isinstance(data.get(key), list):
             data[key] = [call.sub(lambda m: m.group(1) + new, x) if isinstance(x, str) else x for x in data[key]]

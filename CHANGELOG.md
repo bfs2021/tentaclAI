@@ -31,6 +31,9 @@ All notable changes, newest first. Every release lists **upgrade steps** from th
   secrets in service files). New `svc info <name> --json` prints the service file as stored – the starting point for
   a change (the rule pointed to `svc info`, which prints text). The SSH section of Claude's instructions says how to
   quote a remote command (patterns with `|`, spaces or `{{…}}`) – runs failed on that again and again.
+- Renaming a service now also updates `svc mail <name>` in its examples and notes; the PatchMon template named itself
+  `patchmon` instead of the placeholder, so a copy under another name had a wrong example (a test checks all
+  templates now). Existing services: check examples that still call an old name.
 
 ### Upgrade
 - `git pull`, `docker compose build`, `docker compose up -d` – both images change (`svc` and the instructions in
