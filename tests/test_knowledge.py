@@ -145,3 +145,30 @@ def test_jobs_page_shows_what_a_run_learned(client, app_module, scratch, monkeyp
     assert "Earlier versions (1)" in client.get("/jobs/check").text
     html = client.get("/claude/instructions").text
     assert "Knowledge budget" in html and "/ 6 KB" in html
+
+
+def test_product_findings_are_reported_not_applied(kn):
+    x = kn.check({"target": "product", "name": "svc", "op": "replace", "new": "svc info has no --json\nso Claude read the source",
+                  "why": "svc info --json failed"})
+    assert x["state"] == "proposed" and x["op"] == "add" and x["new"] == "svc info has no --json so Claude read the source"
+    with pytest.raises(ValueError, match="reported, not applied"):
+        kn.apply(x)
+    url = kn.issue_url(x, "0.20.0", repo="someone/fork")
+    assert url.startswith("https://github.com/someone/fork/issues/new?title=svc%3A%20svc%20info%20has%20no%20--json")
+    assert "version%200.20.0" in url and "site%20details" in url
+    assert kn.issue_url(x, repo="bad repo!").startswith("https://github.com/mwaldegg/tentaclai/")
+    assert kn.check({"target": "product", "op": "add", "why": "w"})["state"] == "refused"
+
+
+def test_jobs_page_lists_findings_for_tentaclai(client, app_module, monkeypatch, tmp_path):
+    from app import jsonstore, knowledge, scheduled
+    for k, f in (("HISTORY", "h.json"), ("JOBS", "j.json")):
+        monkeypatch.setattr(scheduled, k, str(tmp_path / f))
+    scheduled.save({"name": "X", "prompt": "Check @demoapi", "kind": "manual"}, new_id="x")
+    item = knowledge.check({"target": "product", "name": "svc", "op": "add", "new": "svc ssh needs quoting hints", "why": "exit 127"})
+    jsonstore.save(scheduled.HISTORY, [{"id": "r2", "job": "x", "name": "X", "status": "done", "queued": time.time(),
+                                        "ended": time.time(), "result": {"status": "ok", "title": "t"}, "knowledge": [item]}])
+    html = client.get("/jobs").text
+    assert "For tentaclAI" in html and "Report on GitHub" in html and "Apply selected" not in html
+    client.post("/jobs/runs/r2/knowledge?reported=1", data={"pick": "0"})
+    assert scheduled.history()[0]["knowledge"][0]["state"] == "reported" and scheduled.pending_proposals() == 0

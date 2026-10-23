@@ -20,7 +20,10 @@ All notable changes, newest first. Every release lists **upgrade steps** from th
   site rules) and – *Suggest prompt improvements*, on by default, `improve` in a job definition – a better version of
   its own task. Both show under the run: *Apply selected* writes the picked notes (backup; a note that changed since
   the run is left alone; ⚠ for text that reads like an instruction to an AI; one audit entry per change), *Use this
-  task* takes the prompt – the editor keeps the last 5 versions (*Earlier versions*, Restore).
+  task* takes the prompt – the editor keeps the last 5 versions (*Earlier versions*, Restore). A weakness of tentaclAI
+  itself (target `product`: a missing svc option, a misleading message) is never written into notes: it shows under
+  *For tentaclAI* with *Report on GitHub* (a prefilled issue for `UPDATE_REPO`, checked by you before sending), *Done*
+  and *Dismiss*.
 - New job templates **Learning review** (weekly: the audit log of the last 7 days – repeated failures and exploration,
   reasons of denials – turned into notes) and **Knowledge cleanup** (monthly: merges, cuts and moves notes, site rules
   and Claude's memory). New settings `KNOWLEDGE_LOCAL_KB` (default 6) and `KNOWLEDGE_NOTES` (default 8);

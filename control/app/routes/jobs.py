@@ -8,8 +8,8 @@ from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 
 import tclib
 
-from .. import auditlog, scheduled
-from ..web import page, respond, sync_services, templates
+from .. import auditlog, knowledge, scheduled
+from ..web import TC_VERSION, page, respond, sync_services, templates
 
 router = APIRouter()
 
@@ -87,6 +87,7 @@ async def jobs_state(v: str = ""):
 async def jobs_page(request: Request):
     scheduled.mark_seen()
     return page(request, "jobs.html", rows=scheduled.overview(), templates=scheduled.templates(), token=scheduled.state_token(), now=time.time(),
+                issue_url=lambda x: knowledge.issue_url(x, TC_VERSION),
                 fmt=lambda ts: time.strftime("%Y-%m-%d %H:%M", time.localtime(ts)) if ts else "–")
 
 
@@ -176,13 +177,14 @@ async def run_discard(request: Request, rid: str, all: int = 0):
 
 
 @router.post("/jobs/runs/{rid}/knowledge", response_class=HTMLResponse)
-async def run_knowledge(request: Request, rid: str, discard: int = 0):
-    """apply (or discard) what a run learned – each applied change gets its own audit entry"""
+async def run_knowledge(request: Request, rid: str, discard: int = 0, reported: int = 0):
+    """apply (or discard) what a run learned – each applied change gets its own audit entry; findings about tentaclAI
+    are only marked (reported or dismissed)"""
     picks = (await request.form()).getlist("pick")
     try:
-        if discard:
-            n = await asyncio.to_thread(scheduled.discard_knowledge, rid, picks)
-            return respond(request, f"{n} proposal{'s' if n != 1 else ''} discarded", refresh=True)
+        if discard or reported:
+            n = await asyncio.to_thread(scheduled.discard_knowledge, rid, picks, "reported" if reported else "discarded")
+            return respond(request, f"{n} {'marked as reported' if reported else 'discarded'}", refresh=True)
         done = await asyncio.to_thread(scheduled.apply_knowledge, rid, picks)
     except ValueError as e:
         return respond(request, f"Not applied: {e}", "err")

@@ -1,5 +1,6 @@
 """What Claude learned, proposed by a scheduled job and applied by the user: notes of a service or system, or the site
-rules (local/CLAUDE.md). A job can't wait for an approval (nobody watches it) and a read-only one can't write – so it
+rules (local/CLAUDE.md). A weakness of tentaclAI itself (target "product") is not written anywhere – the user can report
+it as an issue, so it is fixed where it is, instead of living on as a workaround in the site rules. A job can't wait for an approval (nobody watches it) and a read-only one can't write – so it
 proposes, and tentacontrol applies what the user picks, with a backup and the same size budget the cleanup job keeps.
 """
 import glob
@@ -15,7 +16,7 @@ from . import claude_files, services_store, systems_store
 from .config import SERVICES_DIR, STACK_DIR, SYSTEMS_DIR
 from .envfile import read_env
 
-TARGETS = ("service", "system", "site")
+TARGETS = ("service", "system", "site", "product")
 OPS = ("add", "replace", "remove")
 NOTE_MAX = 500          # characters of one note
 SITE_MAX = 3000         # characters of one change to the site rules (the cleanup job may rewrite a whole section)
@@ -26,8 +27,10 @@ SCHEMA = {"type": "array", "maxItems": 10,
           "description": "lasting facts learned in this run that a note doesn't say yet, or a note to fix or drop – leave out when there is none",
           "items": {"type": "object", "additionalProperties": False, "required": ["target", "op", "why"], "properties": {
               "target": {"type": "string", "enum": list(TARGETS),
-                         "description": "service = one tentacle, system = a host and all its services, site = the whole installation (local/CLAUDE.md)"},
-              "name": {"type": "string", "description": "service or system name (not for site)"},
+                         "description": "service = one tentacle, system = a host and all its services, site = the whole "
+                                        "installation (local/CLAUDE.md), product = a weakness of tentaclAI itself (a missing "
+                                        "svc option, a misleading message, a bug) – reported to its developers, not written"},
+              "name": {"type": "string", "description": "service or system name; product: the part (svc, tentacontrol, …); not for site"},
               "op": {"type": "string", "enum": list(OPS)},
               "old": {"type": "string", "description": "replace/remove: the exact current note (site: an exact passage)"},
               "new": {"type": "string", "description": "add/replace: the note, one line, short"},
@@ -56,6 +59,12 @@ def check(item):
     if not isinstance(item, dict):
         return None
     target, op = str(item.get("target", "")), str(item.get("op", ""))
+    if target == "product":  # nothing to apply – a finding for tentaclAI's developers, kept short and on one line
+        x = {"target": target, "name": _line(item.get("name"), 40), "op": "add", "old": "", "new": _line(item.get("new"), NOTE_MAX),
+             "why": _line(item.get("why"), 300), "state": "proposed"}
+        if not x["new"]:
+            x.update(state="refused", output="nothing to report")
+        return x
     site = target == "site"
     limit = SITE_MAX if site else NOTE_MAX
     clean = (lambda t: str(t or "").replace("\r\n", "\n").strip()[:limit]) if site else (lambda t: _line(t, limit))
@@ -113,10 +122,24 @@ def _site(text, x):
     return re.sub(r"\n{3,}", "\n\n", out)
 
 
+def issue_url(x, version="", repo=None):
+    """a prefilled "new issue" link for a product finding – the user reviews it on GitHub before anything is sent"""
+    from urllib.parse import quote
+    repo = repo or (read_env().get("UPDATE_REPO") or "mwaldegg/tentaclai").strip()
+    if not re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", repo):
+        repo = "mwaldegg/tentaclai"
+    part = f"{x['name']}: " if x.get("name") else ""
+    body = (f"{x['new']}\n\n**How it showed:** {x.get('why') or '–'}\n\n_Found by a tentaclAI job run "
+            f"(version {version or '?'}). Check for host names or other site details before you submit._")
+    return f"https://github.com/{repo}/issues/new?title={quote(part + x['new'][:90])}&body={quote(body)}"
+
+
 def apply(x):
     """write one checked proposal (raises ValueError) → a short description of what changed"""
     if x.get("state") != "proposed":
         raise ValueError("not open")
+    if x["target"] == "product":
+        raise ValueError("a finding for tentaclAI is reported, not applied")
     if x["target"] == "site":
         old = claude_files.read_local() if os.path.exists(claude_files.LOCAL) else ""
         claude_files.save_local(_site(old, x))  # keeps its own backups

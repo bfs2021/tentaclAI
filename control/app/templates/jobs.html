@@ -20,10 +20,11 @@
       </div>{% endif %}
     </form>
 {% endmacro %}
-{% macro learned(r) %}{% set open_items = r.knowledge | selectattr('state', 'equalto', 'proposed') | list %}
-    <form class="job-actions job-learned" hx-post="/jobs/runs/{{ r.id }}/knowledge" style="margin-top:8px">
+{% macro learned(r) %}{% set notes = r.knowledge | rejectattr('target', 'equalto', 'product') | list %}
+{% set open_items = notes | selectattr('state', 'equalto', 'proposed') | list %}{% set product = r.knowledge | selectattr('target', 'equalto', 'product') | list %}
+    {% if notes %}<form class="job-actions job-learned" hx-post="/jobs/runs/{{ r.id }}/knowledge" style="margin-top:8px">
       <div class="small muted" style="margin-bottom:4px">Learned – pick what goes into the notes (with a backup; a note that changed since the run is left alone)</div>
-      {% for x in r.knowledge %}
+      {% for x in r.knowledge %}{% if x.target != 'product' %}
       <div class="ja-row">
         {% if x.state == 'proposed' %}<input type="checkbox" name="pick" value="{{ loop.index0 }}" aria-label="pick">{% else %}<span class="pill {{ {'done': 'ok', 'failed': 'err', 'refused': 'err'}.get(x.state, 'off') }}">{{ x.state }}</span>{% endif %}
         <div style="min-width:0">
@@ -34,13 +35,31 @@
           <div class="small faint">{{ x.why }}{% if x.output and x.state != 'proposed' %} · {{ x.output }}{% endif %}</div>
         </div>
       </div>
-      {% endfor %}
+      {% endif %}{% endfor %}
       {% if open_items %}
       <div class="row" style="margin-top:6px;justify-content:flex-start">
         <button class="btn sm primary">{{ icon('check') }}Apply selected</button>
         <button class="btn sm" hx-post="/jobs/runs/{{ r.id }}/knowledge?discard=1">Discard selected</button>
       </div>{% endif %}
-    </form>
+    </form>{% endif %}
+    {% if product %}<div class="job-actions job-product" style="margin-top:8px">
+      <div class="small muted" style="margin-bottom:4px">For tentaclAI – weaknesses of tentaclAI itself; nothing is written into your notes. Report one as an issue (you check the text on GitHub first – remove host names or other site details).</div>
+      {% for x in r.knowledge %}{% if x.target == 'product' %}
+      <div class="ja-row">
+        {% if x.state != 'proposed' %}<span class="pill {{ 'ok' if x.state == 'reported' else 'off' }}">{{ x.state }}</span>{% endif %}
+        <div style="min-width:0">
+          <div>{% if x.name %}<span class="tag">{{ x.name }}</span> {% endif %}<span class="learned-text">{{ x.new }}</span></div>
+          <div class="small faint">{{ x.why }}</div>
+          {% if x.state == 'proposed' %}<form class="row" style="margin-top:4px;justify-content:flex-start" hx-post="/jobs/runs/{{ r.id }}/knowledge?reported=1">
+            <input type="hidden" name="pick" value="{{ loop.index0 }}">
+            <a class="btn sm" href="{{ issue_url(x) }}" target="_blank" rel="noopener">Report on GitHub</a>
+            <button class="btn sm ghost" title="mark it as reported">Done</button>
+            <button class="btn sm ghost" hx-post="/jobs/runs/{{ r.id }}/knowledge?discard=1">Dismiss</button>
+          </form>{% endif %}
+        </div>
+      </div>
+      {% endif %}{% endfor %}
+    </div>{% endif %}
 {% endmacro %}
 {% macro better_prompt(r) %}{% set p = r.prompt_suggestion %}
     <div class="job-actions job-prompt" style="margin-top:8px">
