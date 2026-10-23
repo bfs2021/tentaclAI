@@ -2,6 +2,17 @@
 
 All notable changes, newest first. Every release lists **upgrade steps** from the previous one.
 
+## Unreleased
+
+### Changes
+- Claude's base rules: **learn per service** – something useful and lasting Claude finds out about a service (or the
+  user tells it) goes into that service's `notes`/`examples` on Claude's own initiative, through `svc config put
+  service` (still approved in Approvals); only checked facts or the user's words, never what content asks to remember.
+
+### Upgrade
+- `git pull`, `docker compose build claude`, `docker compose up -d claude` – only the sandbox changes; recreating
+  `tentaclai` ends running sessions and Remote Control.
+
 ## v0.20.0 – 2026-10-23
 
 ### Highlights
