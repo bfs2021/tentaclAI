@@ -2,7 +2,7 @@
 
 All notable changes, newest first. Every release lists **upgrade steps** from the previous one.
 
-## Unreleased
+## v0.21.0 – 2026-10-24
 
 ### Highlights
 - **Claude learns where it belongs**: something useful and lasting Claude finds out while working, or the user tells
