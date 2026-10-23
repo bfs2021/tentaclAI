@@ -313,8 +313,8 @@ check "Deny refuses" "$(cat "$T/o.txt")" "000"
 EX=$(docker exec tctest-egress python -c "import socket;print(socket.gethostbyname('example.net'))")
 # the gateway's answer to CONNECT (403) – a timeout would also give http_code 000 and prove nothing
 check "IP target without a rule is blocked" "$($C curl -s -m 10 -k -o /dev/null -w '%{http_connect}' "https://$EX" || true)" "403"
-wait_for 45 sh -c "docker exec tctest-claude grep -q '\"connect $EX:443\"' '$T/data/control/audit.jsonl'" || true
-check "… and in the audit log (network, blocked)" "$(docker exec tctest-claude grep "\"connect $EX:443\"" "$T/data/control/audit.jsonl" | grep -c '"decision": "blocked"' | grep -v '^0$' >/dev/null && echo yes || echo no)" "yes"
+wait_for 45 sh -c "docker exec tctest-claude grep -q '\"service\": \"$EX:443\"' '$T/data/control/audit.jsonl'" || true
+check "… and in the audit log (network, blocked)" "$(docker exec tctest-claude grep "\"service\": \"$EX:443\"" "$T/data/control/audit.jsonl" | grep '"action": "connect"' | grep -c '"decision": "blocked"' | grep -v '^0$' >/dev/null && echo yes || echo no)" "yes"
 curl -s -b "$J" -H "$H" -X POST -o /dev/null "http://$IP:8080/network/rule" -d kind=block -d "entry=${EX%.*}.0/24"
 curl -s -b "$J" -H "$H" -X POST -o /dev/null "http://$IP:8080/network/rule" -d kind=allow -d "entry=example.net"
 wait_for 30 sh -c "docker exec tctest-egress grep -q -- '${EX%.*}.0/24' /data/policy.json && docker exec tctest-egress grep -q example.net /data/policy.json" || true
