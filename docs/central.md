@@ -58,7 +58,7 @@ revoked (the agent stops and shows it).
 
 **Status** (heartbeat): `name, hostname, instance_id, version, edition, modules: [{name, title, origin, version, active}],
 services: [{name, parts, test}], audit: {sent_through, waiting}, profile: {rev, applied, drift, missing, refused},
-areas, jobs: [{id, name, enabled, next, last_status}], control_url` (the server's jobs; `control_url`: `CONTROL_URL`, where
+areas, jobs: [{id, name, enabled, next, last_status}], control_url, tamper: [{ts, what}]` (the server's jobs; `control_url`: `CONTROL_URL`, where
 the server sends users back after a sign-in). No secrets – values of credentials never leave the agent.
 
 **Audit entries** are sent as stored (`audit.jsonl`, `tclib.audit_entry`) plus two fields: `owner`, the account of the
@@ -121,6 +121,12 @@ definition says (`"enabled"`, default on – an import starts jobs paused). When
   of tentacontrol; × closes it until the next sign-in (a new `id` shows again). Always shown, informational only.
 - The local admin can change what the server may manage after enrolling (Enterprise → May manage → Change); parts taken
   away keep their values and are no longer locked.
+- **Tamper protection:** a profile with `allow_leave: false` (`tamper_protection: true`) – the agent refuses to leave
+  and to take parts away from what the server may manage (adding is fine); only revoking on the server ends it. Refused
+  attempts go into the audit log and the heartbeat's `tamper` (the last 10); the server also notices parts that shrink
+  without tentacontrol (files edited on the host).
+- `areas_locked: true` in the profile locks *May manage* completely – the local admin can neither add nor take away
+  parts (attempts count as tamper attempts).
 
 ## Sign-in through the server
 

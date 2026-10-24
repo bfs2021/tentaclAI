@@ -69,7 +69,7 @@ def areas():
     """what a server may manage: the parts of the export, modules, and which features of tentacontrol show"""
     from .backup import SECTIONS
     return dict(SECTIONS, modules="Modules", features="Features (hide parts of tentacontrol)",
-                signin="Sign-in (users of the central sign in here; Enterprise-only sign-in)")
+                signin="Sign-in")
 
 
 # features a profile can hide here: label, the paths they live under (the page, its actions, its partials)
@@ -351,13 +351,43 @@ def enroll(code, name, allowed, ca_pem=""):
     return st
 
 
+def tamper_protected():
+    """the server's profile protects its management here: no leaving, nothing taken away from what it may manage
+    (only revoking on the server ends it). Root on the host can still edit the files – the server notices that"""
+    st = state()
+    return bool(st.get("agent_id")) and not st.get("revoked") and (_profile() or {}).get("allow_leave") is False
+
+
+def areas_locked():
+    """the server's profile locks "May manage": the local admin can't change it at all"""
+    st = state()
+    return bool(st.get("agent_id")) and not st.get("revoked") and (_profile() or {}).get("areas_locked") is True
+
+
+def _tamper(what):
+    """a refused attempt: kept for the status (the server shows it) and in the audit log"""
+    with _lock:
+        st = state()
+        st["tamper"] = ((st.get("tamper") or []) + [{"ts": round(time.time()), "what": what[:200]}])[-20:]
+        _save(st)
+    _audit(f"tamper protection: {what}", "refused – the server's profile protects its management here", decision="blocked")
+
+
 def set_areas(allowed):
     """the local admin changes what the server may manage – applied at the next sync (parts taken away keep their
-    values and are no longer locked)"""
+    values and are no longer locked). Under tamper protection parts can only be added"""
     st = state()
     if not st.get("agent_id"):
         raise CentralError("not enrolled")
     allowed = sorted({a for a in allowed if a in areas()})
+    gone = sorted(set(st.get("areas") or []) - set(allowed))
+    if allowed != sorted(st.get("areas") or []) and areas_locked():
+        _tamper("change what the server may manage")
+        raise CentralError("the server's profile locks what it may manage here – ask the server's admin")
+    if gone and tamper_protected():
+        _tamper(f"take away {', '.join(gone)}")
+        raise CentralError("tamper protection: the server's profile doesn't allow taking parts away here – "
+                           "ask the server's admin")
     if allowed != sorted(st.get("areas") or []):
         _update(areas=allowed, report_hash="")
         _audit("may manage changed", ", ".join(allowed) or "nothing")
@@ -369,9 +399,10 @@ def leave():
     st = state()
     if not st.get("agent_id"):
         raise CentralError("not enrolled")
-    prof = _profile()
-    if prof and prof.get("allow_leave") is False and not st.get("revoked"):
-        raise CentralError("the server's profile doesn't allow leaving here – ask the server's admin to revoke this installation")
+    if tamper_protected():
+        _tamper("leave the server")
+        raise CentralError("tamper protection: the server's profile doesn't allow leaving here – ask the server's admin "
+                           "to revoke this installation")
     if not st.get("revoked"):
         with contextlib.suppress(CentralError, KeyError):
             _call("POST", "/leave", {})
@@ -678,7 +709,8 @@ def _status(st):
                         "refused": st.get("refused") or []},
             "areas": st.get("areas") or [],
             "jobs": _job_states(),
-            "control_url": _control_url()}
+            "control_url": _control_url(),
+            "tamper": (st.get("tamper") or [])[-10:]}
 
 
 # ---------------------------------------------------------------- jobs from the server
@@ -846,5 +878,5 @@ def view():
             "last_ok": fmt(st.get("last_ok")), "enrolled_at": fmt(st.get("enrolled")), "profile_at": fmt(st.get("profile_at")),
             "audit_waiting": bool(waiting), "jobs": sorted(managed_jobs()) if st.get("agent_id") else [],
             "hidden": [FEATURES[k][0] for k in sorted(hidden_features())], "banner": banner(),
-            "sso": sso_enabled(), "sign_in_policy": sign_in_policy(), "control_url": _control_url(),
+            "sso": sso_enabled(), "protected": tamper_protected(), "areas_locked": areas_locked(), "sign_in_policy": sign_in_policy(), "control_url": _control_url(),
             "breakglass_until": fmt(breakglass_until()) if breakglass_until() > time.time() else ""}

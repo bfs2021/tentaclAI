@@ -21,6 +21,8 @@ All notable changes, newest first. Every release lists **upgrade steps** from th
 - **From tentaclAI Enterprise:** a profile can hide parts of tentacontrol (Terminal, Jobs, Network, Modules, Claude,
   Export / Import, Updates – part *Features*), the server can show a banner on every page (× closes it until the next
   sign-in), and the local admin can change what the server may manage after enrolling.
+- **Tamper protection from tentaclAI Enterprise:** a profile can protect the management – no *Leave* button, *May
+  manage* can only grow (or is locked completely); attempts are refused, logged and shown on the central.
 - **Sign-in through tentaclAI Enterprise** (part *Sign-in*, needs `CONTROL_URL`): users of the central sign in with
   *Sign in with <server>* on the sign-in page – no local account, the central checks password, second factor and its
   grants and sends back a signed assertion valid for 60 seconds. A profile can allow only these sign-ins

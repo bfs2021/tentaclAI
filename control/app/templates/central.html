@@ -56,10 +56,11 @@
       {% else %}local accounts and users of {{ st.central_name }}{% endif %}</dd>{% endif %}
     {% if c.banner %}<dt>Message</dt><dd>{{ c.banner.text }}</dd>{% endif %}
     <dt>May manage</dt><dd>{% for a in st.areas or [] %}<span class="tag">{{ c.areas.get(a, a) }}</span> {% else %}nothing{% endfor %}
-      {% if not c.revoked %}<details style="margin-top:6px"><summary class="small">Change</summary>
+      {% if c.areas_locked %}<div class="small muted" style="margin-top:6px">{{ icon('lock') }} Locked by the server's profile</div>
+      {% elif not c.revoked %}<details style="margin-top:6px"><summary class="small">Change</summary>
         <form hx-post="/central/areas" style="margin-top:8px">
-          {% for key, label in c.areas.items() %}<label class="check"><input type="checkbox" name="areas" value="{{ key }}" {{ 'checked' if key in (st.areas or []) }}> {{ label }}</label> {% endfor %}
-          <div class="help">Your decision on this installation: parts you take away keep their values and are no longer managed.</div>
+          {% for key, label in c.areas.items() %}{% set on = key in (st.areas or []) %}<label class="check"><input type="checkbox" name="areas" value="{{ key }}" {{ 'checked' if on }} {{ 'disabled' if on and c.protected }}> {{ label }}</label>{% if on and c.protected %}<input type="hidden" name="areas" value="{{ key }}">{% endif %} {% endfor %}
+          <div class="help">{% if c.protected %}Tamper protection of the server's profile: parts can be added, not taken away.{% else %}Your decision on this installation: parts you take away keep their values and are no longer managed.{% endif %}</div>
           <button class="btn sm" style="margin-top:8px">Save</button>
         </form></details>{% endif %}</dd>
     <dt>Server key</dt><dd class="mono small">{{ st.central_key[:12] }}…</dd>
@@ -67,7 +68,8 @@
   <div class="row" style="margin-top:12px">
     {% if not c.revoked %}<button class="btn sm" hx-post="/central/sync">{{ icon('refresh') }}Sync now</button>{% endif %}
     <span class="spacer"></span>
-    <button class="btn sm ghost" hx-post="/central/leave" hx-confirm="Leave {{ st.central_name }}? The values it set stay, nothing is locked any more, the audit log is no longer sent.">Leave</button>
+    {% if c.protected %}<span class="small muted" title="Only the server's admin can end it, by revoking this installation">{{ icon('lock') }} Tamper protection – leaving is off</span>
+    {% else %}<button class="btn sm ghost" hx-post="/central/leave" hx-confirm="Leave {{ st.central_name }}? The values it set stay, nothing is locked any more, the audit log is no longer sent.">Leave</button>{% endif %}
   </div>
 </div>
 
