@@ -1,7 +1,7 @@
 # Central management – agent protocol v1
 
 A tentaclAI installation can be managed by a central server (tentaclAI Enterprise): it then is an **agent**. The agent
-part is in tentacontrol (`control/app/central.py`, Settings → Central management) and open; the server is a separate
+part is in tentacontrol (`control/app/central.py`, the sidebar's *Enterprise* page) and open; the server is a separate
 product. This document is the contract between the two.
 
 The agent always connects to the server, never the other way round (HTTPS, JSON). It works without the server: it

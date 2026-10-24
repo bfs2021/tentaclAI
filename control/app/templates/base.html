@@ -29,6 +29,8 @@
         {%- if m.count_url %}<span class="nav-count" hx-get="{{ m.count_url }}" hx-trigger="load, every 30s" hx-swap="innerHTML"></span>{% endif %}</a>
       {% endfor %}
       <a href="/modules" class="{{ 'active' if nav in ('modules', 'module_locked') }}">{{ icon('grid') }}Modules</a>
+      <a href="/central" class="{{ 'active' if nav == 'enterprise' }}{{ ' nav-locked' if central_nav.state == 'none' }}" title="{{ central_nav.title }}">{{ icon('lock' if central_nav.state == 'none' else 'topology') }}Enterprise
+        {%- if central_nav.state != 'none' %}<span class="dot {{ 'ok' if central_nav.state == 'ok' else 'err' }} nav-dot" aria-label="{{ central_nav.title }}"></span>{% endif %}</a>
       <a href="/claude/instructions" class="{{ 'active' if nav in ('claude_instructions', 'claude_memory', 'claude_settings', 'skills', 'models', 'usage') }}">{{ icon('claude') }}Claude</a>
       <a href="/settings" class="{{ 'active' if nav in ('settings', 'notifications', 'account', 'backup') }}">{{ icon('settings') }}Settings</a>
       <a href="/updates" class="{{ 'active' if nav in ('updates', 'job') }}">{{ icon('refresh') }}Updates</a>

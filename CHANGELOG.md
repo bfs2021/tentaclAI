@@ -14,6 +14,10 @@ All notable changes, newest first. Every release lists **upgrade steps** from th
   below `/x/<name>/` and can't replace tentacontrol's pages. `TC_EXTENSIONS` names packages loaded always (none by
   default – it was `tentaclai_enterprise`); Modules and Settings → License point to tentaclAI Enterprise, the central
   management, instead of locked Enterprise modules.
+- **Enterprise in the sidebar** (replaces Settings → Central): with a lock while the installation runs on its own –
+  the page says what tentaclAI Enterprise adds and takes the enrollment code; once enrolled a dot shows the connection
+  (connected / connection failed / revoked) and the page the server, last contact, profile and when it arrived, the
+  audit backlog and the central jobs.
   Guide: `docs/extensions.md`, example `examples/extensions/tcx_hello`.
 - **Service-Health** – the first built-in module (Modules → enable): `svc test` of every service on a schedule
   (1–60 minutes, default 5), a Health page with the state, a 24-hour bar and the availability over 24 hours and 7 days

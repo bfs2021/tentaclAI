@@ -16,7 +16,7 @@ def test_community_placeholders(client):
     assert 'id="instance-id"' in html or "has no ID" in html
     assert client.get("/reports").status_code == 404  # no Reports in Community – a module brings its own entry
     html = client.get("/modules").text
-    assert "tentaclAI Enterprise" in html and "Compliance reports" not in html and "locked" not in html
+    assert "Compliance reports" not in html and "module-locked" not in html
     assert "No modules installed" in html
     nav = client.get("/settings").text
     assert 'title="Enterprise"' not in nav and 'href="/modules"' in nav  # Modules is open: built-in and own modules

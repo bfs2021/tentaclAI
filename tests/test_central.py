@@ -120,10 +120,15 @@ def test_enroll_and_leave(fc, client):
     with pytest.raises(central.CentralError, match="enrolled already"):
         central.enroll(fc.code("tok-1"), "x", [])
     html = client.get("/central").text
-    assert "Test Central" in html and "A-0001" in html and "Leave" in html
+    assert "Test Central" in html and "A-0001" in html and "Leave" in html and "connected" in html
+    nav = client.get("/settings").text
+    assert 'title="Managed by Test Central"' in nav and "dot ok nav-dot" in nav and 'href="/central" class="active' not in nav
+    central._update(last_error="timed out")
+    assert "connection failed" in client.get("/central").text and "dot err nav-dot" in client.get("/settings").text
     central.leave()
     assert not central.enrolled() and "A-0001" not in fc.agents
-    assert "Enrollment code" in client.get("/central").text
+    html = client.get("/central").text
+    assert "Enrollment code" in html and "This installation runs on its own" in html and "nav-locked" in html
 
 
 def test_certificate_from_the_code(fc):

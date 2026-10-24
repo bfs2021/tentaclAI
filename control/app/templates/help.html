@@ -398,7 +398,7 @@
 
     <section class="card" id="central">
       <h2>Central management</h2>
-      <p>Settings → <a href="/central">Central</a> connects this installation to a central server (tentaclAI Enterprise) as an <strong>agent</strong>: paste the server's enrollment code and pick the parts of the configuration it may manage. The connection always goes from here to the server (every 30 s); nothing has to reach this installation.</p>
+      <p><a href="/central">Enterprise</a> (sidebar) connects this installation to a central server (tentaclAI Enterprise) as an <strong>agent</strong>: paste the server's enrollment code and pick the parts of the configuration it may manage. The connection always goes from here to the server (every 30 s); nothing has to reach this installation.</p>
       <ul>
         <li>The server sees this installation (version, modules, services – never credentials) and receives the <strong>audit log</strong>. Entries not sent yet are kept, also past the retention, until the server has them.</li>
         <li>A <strong>profile</strong> from the server sets items of the allowed parts: <em>enforced</em> ones are locked here (marked <span class="pill info">central</span>, refused in tentacontrol and in <code>svc config put</code>, and reverted if a file is changed on the host), <em>defaults</em> may be changed here. Credentials stay in this installation's <code>.env</code> – values the profile needs and that are empty here are listed on the Central page.</li>
@@ -410,7 +410,7 @@
 
     <section class="card" id="license">
       <h2>Community &amp; Enterprise</h2>
-      <p>This is <strong>tentaclAI Community</strong>, the free, open-source edition – complete on its own, no license needed. <strong>tentaclAI Enterprise</strong> is the central management for many installations: a server of its own that installations join under Settings → <a href="/central">Central</a>. It holds the audit log of every installation, hands out configuration with profiles, runs jobs on all of them and distributes signed modules; compliance reports and a SIEM export are planned there. Enterprise is licensed on its server (seats = installations), not here.</p>
+      <p>This is <strong>tentaclAI Community</strong>, the free, open-source edition – complete on its own, no license needed. <strong>tentaclAI Enterprise</strong> is the central management for many installations: a server of its own that installations join under <a href="/central">Enterprise</a> in the sidebar (with a lock until then; afterwards a dot shows the connection). It holds the audit log of every installation, hands out configuration with profiles, runs jobs on all of them and distributes signed modules; compliance reports and a SIEM export are planned there. Enterprise is licensed on its server (seats = installations), not here.</p>
       <p>Settings → License shows this installation's <strong>Installation ID</strong> (<code>TCI-…</code>) – it identifies the installation, e.g. on the central server. It is derived from the machine's hardware (a hash of the system UUID its firmware reports, or of the Docker engine's ID where there is none), worked out on every start and never stored, so it can't be set by hand or copied along with the data.</p>
     </section>
 

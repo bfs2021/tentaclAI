@@ -395,7 +395,7 @@ tasks, notification events and parts of Export / Import (tentacontrol → Module
   packages signed by tentaclAI get Enterprise rights, unsigned ones are third-party modules; every file
   is checked again at each start ([docs/extensions.md → Packages](docs/extensions.md#packages)).
 
-**Central management:** Settings → Central connects an installation to a central server (tentaclAI Enterprise) as
+**Central management:** *Enterprise* in the sidebar connects an installation to a central server (tentaclAI Enterprise) as
 an agent – it sends its status and audit log, and a signed profile from the server can set and lock parts of its
 configuration (enforced / default items; credentials stay local). The agent connects to the server, never the other
 way round. Protocol: [docs/central.md](docs/central.md).

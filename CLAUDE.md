@@ -40,7 +40,7 @@ is also the test fixture (`tests/test_extensions.py`); the built-in `control/ext
 extension points and the placeholders (Enterprise part of Modules locked, Settings → License).
 
 **Central management (agent):** `control/app/central.py` – this installation as an agent of tentaclAI Enterprise
-(protocol `docs/central.md`, Settings → Central, `routes/central.py`, tests `tests/test_central.py` with a fake server).
+(protocol `docs/central.md`, sidebar → Enterprise, `routes/central.py`, tests `tests/test_central.py` with a fake server).
 Profiles are applied through `backup.preview/apply` (item ids = import preview ids, `hash_old/hash_new` per row);
 enforced items are refused by `_central_check()` in the stores (and `update_env` for settings) unless
 `central.applying()`, and by `tclib.central_locked()` in `svc config put`. Keep new writers of managed parts behind the

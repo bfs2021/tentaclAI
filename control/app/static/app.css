@@ -44,6 +44,8 @@ p { margin: 0 0 10px; }
 .nav a { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: var(--radius-sm); color: var(--muted); font-weight: 500; }
 .nav a:hover { background: var(--panel); color: var(--text); text-decoration: none; }
 .nav a.active { background: var(--accent-soft); color: var(--accent); }
+.nav a .nav-dot { margin-left: auto; }
+.nav a.nav-locked:not(.active) { color: var(--faint); }
 .nav svg { width: 17px; height: 17px; flex: none; }
 .sidebar .spacer { flex: 1; }
 .sidebar .cstate { padding: 10px; border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: 12.5px; color: var(--muted); display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
@@ -602,3 +604,9 @@ pre.diff { margin: 6px 0 0; padding: 8px 10px; background: var(--bg-2); border: 
 .learned-text { white-space: pre-wrap; overflow-wrap: anywhere; }
 .prompt-old { white-space: pre-wrap; max-height: 120px; overflow: auto; }
 .knowledge-budget { margin-top: 12px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+
+/* Enterprise page (not enrolled): what tentaclAI Enterprise adds */
+.ent-intro { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; margin: 14px 0 4px; }
+.ent-intro > div { display: flex; gap: 10px; align-items: flex-start; }
+.ent-intro svg { width: 18px; height: 18px; color: var(--accent); flex: none; margin-top: 2px; }
+.ent-intro strong { display: block; font-size: 13.5px; }

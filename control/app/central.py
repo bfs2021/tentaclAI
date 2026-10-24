@@ -615,7 +615,7 @@ def sync():
                 doc = _call("GET", "/profile")
                 prof = _verify(doc, st)
                 jsonstore.save(PROFILE, doc, mode=0o600)
-                _update(profile_rev=prof.get("rev", 0))
+                _update(profile_rev=prof.get("rev", 0), profile_at=time.time())
                 _audit("profile received", f"{prof.get('name', '')} rev {prof.get('rev')}")
             report = reconcile()
             key = _h({k: report[k] for k in ("rev", "results", "drift", "missing", "refused")})
@@ -671,11 +671,29 @@ def _audit(action, detail="", decision="ok"):
     auditlog.write("admin", "central", f"central: {action}", decision, actor="system", detail=detail[:300])
 
 
+def nav_status():
+    """the sidebar's Enterprise entry: none (not enrolled), ok (in touch), err (the last sync failed or no contact for
+    a while), revoked – with a one-line title"""
+    st = state()
+    if not st.get("agent_id"):
+        return {"state": "none", "title": "tentaclAI Enterprise – central management of many installations"}
+    name = st.get("central_name") or "tentaclAI Enterprise"
+    if st.get("revoked"):
+        return {"state": "revoked", "title": f"{name}: this installation was revoked"}
+    if st.get("last_error") or time.time() - float(st.get("last_ok") or 0) > 4 * INTERVAL:
+        return {"state": "err", "title": f"{name}: connection failed – {st.get('last_error') or 'no contact'}"[:200]}
+    return {"state": "ok", "title": f"Managed by {name}"}
+
+
 def view():
-    """for Settings → Central management"""
+    """for the Enterprise page"""
     st = state()
     prof = _profile() or {}
-    last = st.get("last_ok")
+
+    def fmt(ts):
+        return time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(ts)) if ts else ""
+    _, waiting = _unsent(1) if st.get("agent_id") else ([], False)
     return {"enrolled": bool(st.get("agent_id")), "revoked": bool(st.get("revoked")), "st": st, "profile": prof,
-            "locks": sorted(locks()), "areas": areas(), "ca": os.path.isfile(CA_FILE),
-            "last_ok": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(last)) if last else ""}
+            "locks": sorted(locks()), "areas": areas(), "ca": os.path.isfile(CA_FILE), "nav": nav_status(),
+            "last_ok": fmt(st.get("last_ok")), "enrolled_at": fmt(st.get("enrolled")), "profile_at": fmt(st.get("profile_at")),
+            "audit_waiting": bool(waiting), "jobs": sorted(managed_jobs()) if st.get("agent_id") else []}

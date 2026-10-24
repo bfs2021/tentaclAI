@@ -1,18 +1,27 @@
 {% extends "base.html" %}
-{% from "_tabs.html" import settings_tabs %}
 {% from "_icons.html" import icon, help_link %}
-{% block title %}Central management{% endblock %}
+{% block title %}tentaclAI Enterprise{% endblock %}
 {% block content %}
-{{ settings_tabs('central') }}
 <div class="header">
-  <div><h1>Central management</h1><div class="sub">Connect this installation to a central server (tentaclAI Enterprise): it sees this installation, receives its audit log and can manage parts of its configuration.</div></div>
+  <div><h1>tentaclAI Enterprise</h1><div class="sub">{% if c.enrolled %}This installation is managed centrally.{% else %}Central management for many tentaclAI installations.{% endif %}</div></div>
   <div class="row">{{ help_link('central') }}</div>
 </div>
 {% set st = c.st %}
 {% if not c.enrolled %}
-<form class="card" hx-post="/central/enroll" style="max-width:760px">
-  <div class="card-head"><h2>{{ icon('grid') }}Enroll</h2></div>
-  <p class="muted small">Paste the enrollment code from the central server. The connection always goes from here to the server; nothing has to reach this installation.</p>
+<div class="card" style="max-width:860px;margin-bottom:16px">
+  <div class="card-head"><h2>{{ icon('lock') }}This installation runs on its own</h2><span class="pill off">not managed</span></div>
+  <p class="small" style="margin:0">With <strong>tentaclAI Enterprise</strong> – a server of its own – you manage all your tentaclAI installations in one place:</p>
+  <div class="ent-intro">
+    <div>{{ icon('logs') }}<div><strong>One audit log</strong><span class="small muted">every installation's svc calls, approvals and sign-ins – searchable, exportable</span></div></div>
+    <div>{{ icon('settings') }}<div><strong>Profiles</strong><span class="small muted">services, rules, settings and skills handed out – enforced or as defaults</span></div></div>
+    <div>{{ icon('clock') }}<div><strong>Central jobs</strong><span class="small muted">a Claude task defined once, run everywhere, results in one list</span></div></div>
+    <div>{{ icon('grid') }}<div><strong>Modules</strong><span class="small muted">signed packages installed on every installation</span></div></div>
+  </div>
+  <p class="small muted" style="margin-bottom:0">Approvals stay here, credentials never leave this installation. Enterprise is licensed on its server (seats = installations).</p>
+</div>
+<form class="card" hx-post="/central/enroll" style="max-width:860px">
+  <div class="card-head"><h2>{{ icon('plug') }}Join a tentaclAI Enterprise server</h2></div>
+  <p class="muted small">Paste the enrollment code from the server (Enterprise → Enrollment). The connection always goes from here to the server; nothing has to reach this installation.</p>
   <div class="field"><label for="cc">Enrollment code</label><textarea id="cc" name="code" rows="2" class="mono fit" placeholder="tce1.…" required autocomplete="off"></textarea></div>
   <div class="field"><label for="cn">Name of this installation</label><input id="cn" name="name" value="{{ site.hostname or '' }}" maxlength="60"></div>
   <div class="field">
@@ -28,17 +37,19 @@
   <button class="btn primary">{{ icon('check') }}Enroll</button>
 </form>
 {% else %}
-<div class="card" style="max-width:760px;margin-bottom:16px">
-  <div class="card-head"><h2>{{ icon('grid') }}{{ st.central_name }}</h2>
+<div class="card" style="max-width:860px;margin-bottom:16px">
+  <div class="card-head"><h2>{{ icon('topology') }}{{ st.central_name }}</h2>
     {% if c.revoked %}<span class="pill err">revoked</span>
-    {% elif st.last_error %}<span class="pill warn">not reachable</span>
+    {% elif c.nav.state == 'err' %}<span class="pill err">connection failed</span>
     {% else %}<span class="pill ok">connected</span>{% endif %}</div>
   <dl class="kv">
     <dt>Server</dt><dd class="mono">{{ st.url }}</dd>
-    <dt>This installation</dt><dd>{{ st.name or '–' }} <span class="mono faint">{{ st.agent_id }}</span></dd>
-    <dt>Last contact</dt><dd>{{ c.last_ok or '–' }}</dd>
+    <dt>This installation</dt><dd>{{ st.name or '–' }} <span class="mono faint">{{ st.agent_id }}</span>{% if c.enrolled_at %} <span class="faint">· enrolled {{ c.enrolled_at }}</span>{% endif %}</dd>
+    <dt>Last contact</dt><dd>{{ c.last_ok or '–' }} <span class="faint">· every 30 s</span></dd>
     {% if st.last_error %}<dt>Problem</dt><dd style="color:var(--err)">{{ st.last_error }}</dd>{% endif %}
-    <dt>Profile</dt><dd>{% if c.profile %}{{ c.profile.name or 'unnamed' }} <span class="faint">rev {{ c.profile.rev }}</span>{% else %}none yet{% endif %}</dd>
+    <dt>Profile</dt><dd>{% if c.profile %}{{ c.profile.name or 'unnamed' }} <span class="faint">rev {{ c.profile.rev }}{% if c.profile_at %} · received {{ c.profile_at }}{% endif %}</span>{% else %}none yet{% endif %}</dd>
+    <dt>Audit log</dt><dd>{{ 'entries waiting to be sent' if c.audit_waiting else 'everything sent' }}</dd>
+    {% if c.jobs %}<dt>Central jobs</dt><dd>{% for j in c.jobs %}<a class="tag" href="/jobs/{{ j }}">{{ j }}</a> {% endfor %}</dd>{% endif %}
     <dt>May manage</dt><dd>{% for a in st.areas or [] %}<span class="tag">{{ c.areas.get(a, a) }}</span> {% else %}nothing{% endfor %}</dd>
     <dt>Server key</dt><dd class="mono small">{{ st.central_key[:12] }}…</dd>
   </dl>
@@ -49,9 +60,9 @@
   </div>
 </div>
 
-{% if c.revoked %}<div class="alert err" style="max-width:760px">The server revoked this installation. Leave, then enroll again with a new code if needed.</div>{% endif %}
+{% if c.revoked %}<div class="alert err" style="max-width:860px">The server revoked this installation. Leave, then enroll again with a new code if needed.</div>{% endif %}
 
-<div class="card" style="max-width:760px;margin-bottom:16px">
+<div class="card" style="max-width:860px;margin-bottom:16px">
   <div class="card-head"><h2>{{ icon('lock') }}Managed by the server</h2><span class="pill {{ 'info' if c.locks else 'off' }}">{{ c.locks | length }} locked</span></div>
   {% if c.locks %}
   <p class="small muted">These can only be changed on the server:</p>

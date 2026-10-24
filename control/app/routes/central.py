@@ -1,4 +1,4 @@
-"""Settings → Central: enroll at / leave a central server, its profile, locks and what it reports (central.py)."""
+"""Enterprise (sidebar): enroll at / leave a central server, its profile, locks and what it reports (central.py)."""
 import asyncio
 
 from fastapi import APIRouter, Request
@@ -13,7 +13,7 @@ SYNCED = {"ssh_hosts", "systems", "services", "instructions", "skills"}  # parts
 
 @router.get("/central", response_class=HTMLResponse)
 async def central_page(request: Request):
-    return page(request, "central.html", nav="settings", c=central.view())
+    return page(request, "central.html", nav="enterprise", c=central.view())
 
 
 async def _sync():
