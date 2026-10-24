@@ -617,6 +617,6 @@ pre.diff { margin: 6px 0 0; padding: 8px 10px; background: var(--bg-2); border: 
 .edition { display: inline-flex; align-items: center; gap: 3px; border-radius: 99px; font-weight: 700; text-transform: uppercase; white-space: nowrap; }
 .edition.ce { margin-left: 7px; padding: 0 6px; font-size: 9.5px; letter-spacing: .08em; line-height: 16px; vertical-align: 2px;
   border: 1px solid var(--border); color: var(--muted); }
-.edition.ee { display: flex; width: fit-content; margin-top: 2px; padding: 0 5px; font-size: 7.5px; letter-spacing: .09em; line-height: 13px;
+.edition.ee { display: flex; width: fit-content; margin-top: 2px; padding: 0 4.5px; font-size: 7px; letter-spacing: .09em; line-height: 12px;
   background: linear-gradient(135deg, var(--gold-1), var(--gold-2)); color: var(--gold-text);
   box-shadow: inset 0 0 0 1px rgba(255,255,255,.22), 0 1px 6px var(--gold-glow); }
