@@ -13,6 +13,11 @@
   <form class="card" method="post" action="/login">
     <div class="brand"><img class="logo" src="/static/logo.svg?v={{ asset_v }}" alt="" width="32" height="32"><div>tentacl<span class="ai-grad">AI</span><small>Long arms, one brain – safely caged</small></div></div>
     {% if error %}<div class="error">{{ error }}</div>{% endif %}
+    {% if sso %}
+    <a class="btn {{ 'primary' if not local else '' }}" href="/sso/login" style="width:100%;justify-content:center;margin-bottom:14px">Sign in with {{ central_name or 'tentaclAI Enterprise' }}</a>
+    {% if local %}<div class="or-line small faint" style="text-align:center;margin:-4px 0 12px">or with the local account</div>{% endif %}
+    {% endif %}
+    {% if local %}
     {% if ask_username %}
     <div class="field">
       <label for="un">Username</label>
@@ -24,6 +29,9 @@
       <input id="pw" type="password" name="password" autocomplete="current-password" {% if not ask_username or username %}autofocus{% endif %} required>
     </div>
     <button class="btn primary" style="width:100%;justify-content:center">Sign in</button>
+    {% else %}
+    <p class="help small">This installation takes sign-ins through tentaclAI Enterprise only. Emergency access for the local admin: <code>./tentaclai.sh passwd</code> on the host opens the local sign-in for an hour.</p>
+    {% endif %}
     <details class="help forgot" style="margin-top:14px">
       <summary>Forgot the password or username?</summary>
       <p>Set a new one on the host: <code>./tentaclai.sh passwd</code> or <code>docker exec -it tentacontrol tentacontrol-passwd</code> – it shows the username and also revokes the browsers trusted for two-factor sign-in.</p>

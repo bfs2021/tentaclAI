@@ -21,6 +21,11 @@ All notable changes, newest first. Every release lists **upgrade steps** from th
 - **From tentaclAI Enterprise:** a profile can hide parts of tentacontrol (Terminal, Jobs, Network, Modules, Claude,
   Export / Import, Updates – part *Features*), the server can show a banner on every page (× closes it until the next
   sign-in), and the local admin can change what the server may manage after enrolling.
+- **Sign-in through tentaclAI Enterprise** (part *Sign-in*, needs `CONTROL_URL`): users of the central sign in with
+  *Sign in with <server>* on the sign-in page – no local account, the central checks password, second factor and its
+  grants and sends back a signed assertion valid for 60 seconds. A profile can allow only these sign-ins
+  (*Enterprise only*); the local admin then gets in only with the emergency access from the host:
+  `./tentaclai.sh passwd` or `./tentaclai.sh passwd --open` opens the local sign-in for an hour.
   Guide: `docs/extensions.md`, example `examples/extensions/tcx_hello`.
 - **Service-Health** – the first built-in module (Modules → enable): `svc test` of every service on a schedule
   (1–60 minutes, default 5), a Health page with the state, a 24-hour bar and the availability over 24 hours and 7 days

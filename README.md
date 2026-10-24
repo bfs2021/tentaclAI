@@ -397,8 +397,10 @@ tasks, notification events and parts of Export / Import (tentacontrol → Module
 
 **Central management:** *Enterprise* in the sidebar connects an installation to a central server (tentaclAI Enterprise) as
 an agent – it sends its status and audit log, and a signed profile from the server can set and lock parts of its
-configuration (enforced / default items; credentials stay local). The agent connects to the server, never the other
-way round. Protocol: [docs/central.md](docs/central.md).
+configuration (enforced / default items; credentials stay local). Users of the server can sign in through it (*Sign in
+with …*, part *Sign-in*, needs `CONTROL_URL`); a profile can allow only that – emergency access for the local admin is
+`./tentaclai.sh passwd [--open]` on the host (local sign-in for an hour). The agent connects to the server, never the
+other way round. Protocol: [docs/central.md](docs/central.md).
 
 Writing one: [docs/extensions.md](docs/extensions.md) (Extension API v1), example in
 [examples/extensions/tcx_hello](examples/extensions/tcx_hello).

@@ -51,6 +51,9 @@
     <dt>Audit log</dt><dd>{{ 'entries waiting to be sent' if c.audit_waiting else 'everything sent' }}</dd>
     {% if c.jobs %}<dt>Central jobs</dt><dd>{% for j in c.jobs %}{% if 'jobs' in hidden_features %}<span class="tag">{{ j }}</span>{% else %}<a class="tag" href="/jobs/{{ j }}">{{ j }}</a>{% endif %} {% endfor %}</dd>{% endif %}
     {% if c.hidden %}<dt>Hidden here</dt><dd>{% for h in c.hidden %}<span class="tag">{{ h }}</span> {% endfor %}</dd>{% endif %}
+    {% if 'signin' in (st.areas or []) %}<dt>Sign-in</dt><dd>{% if not c.control_url %}<span class="pill warn">off</span> set CONTROL_URL (Settings → tentacontrol address) – the server sends users back there
+      {% elif c.sign_in_policy == 'enterprise' %}only through {{ st.central_name }}{% if c.breakglass_until %} · <span class="pill warn">local sign-in open until {{ c.breakglass_until }}</span>{% endif %}
+      {% else %}local accounts and users of {{ st.central_name }}{% endif %}</dd>{% endif %}
     {% if c.banner %}<dt>Message</dt><dd>{{ c.banner.text }}</dd>{% endif %}
     <dt>May manage</dt><dd>{% for a in st.areas or [] %}<span class="tag">{{ c.areas.get(a, a) }}</span> {% else %}nothing{% endfor %}
       {% if not c.revoked %}<details style="margin-top:6px"><summary class="small">Change</summary>

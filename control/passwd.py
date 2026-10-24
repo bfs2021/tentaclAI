@@ -3,12 +3,27 @@
   docker exec -it tentacontrol tentacontrol-passwd                     (./tentaclai.sh passwd)
   docker exec -it tentacontrol tentacontrol-passwd --username <name>   (./tentaclai.sh passwd --username <name>)
   docker exec -it tentacontrol tentacontrol-passwd --reset-2fa         (./tentaclai.sh reset-2fa)
+  docker exec -it tentacontrol tentacontrol-passwd --open              (./tentaclai.sh passwd --open)
+While tentaclAI Enterprise allows only sign-ins through the central, a password reset (or --open, without one) also
+opens the local sign-in for an hour – the emergency access.
 """
 import getpass
 import sys
 
 sys.path.insert(0, "/app")
-from app import auth  # noqa: E402
+from app import auth, central  # noqa: E402
+
+
+def emergency():
+    """the local sign-in for an hour, when the central's profile allows only its own sign-ins"""
+    if central.sign_in_policy() == "enterprise":
+        import time
+        until = central.open_breakglass("host")
+        print(f"Local sign-in opened until {time.strftime('%H:%M', time.localtime(until))} (only tentaclAI Enterprise sign-in is "
+              "allowed here otherwise).")
+        return True
+    return False
+
 
 if sys.argv[1:] == ["--reset-2fa"]:
     if not auth.twofactor_enabled():
@@ -30,6 +45,10 @@ if sys.argv[1:2] == ["--username"] and len(sys.argv) == 3:
     auth.update_profile(admin["id"], sys.argv[2], admin.get("email", ""), admin.get("name", ""))
     print(f"Username set: {sys.argv[2].strip().lower()}")
     sys.exit(0)
+if sys.argv[1:] == ["--open"]:
+    if not emergency():
+        print("Local sign-in is open anyway – nothing to do.")
+    sys.exit(0)
 if sys.argv[1:]:
     sys.exit(__doc__)
 
@@ -41,3 +60,4 @@ if error:
 auth.set_password(pw, admin["id"])
 auth.revoke_trust()  # a browser trusted for two-factor sign-in must not outlive a password reset
 print("Password set; browsers trusted for two-factor sign-in are revoked. Existing sessions stay valid until they expire.")
+emergency()

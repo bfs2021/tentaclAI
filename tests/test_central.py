@@ -97,7 +97,7 @@ def fc(app_module, tmp_path, monkeypatch):
     from app import central, packages
     for name, val in (("DIR", tmp_path / "central"),):
         monkeypatch.setattr(central, name, str(val))
-    for name in ("KEY_FILE", "STATE", "PROFILE", "LOCKS", "CA_FILE"):
+    for name in ("KEY_FILE", "STATE", "PROFILE", "LOCKS", "CA_FILE", "BREAKGLASS"):
         monkeypatch.setattr(central, name, str(tmp_path / "central" / os.path.basename(getattr(central, name))))
     monkeypatch.setattr(packages, "PACKAGES_DIR", str(tmp_path / "packages"))
     monkeypatch.setattr(packages, "PREV_DIR", str(tmp_path / "packages" / ".prev"))
@@ -351,3 +351,46 @@ def test_hidden_features_and_the_banner(fc, client):
     central.set_areas([])
     central.sync()
     assert central.hidden_features() == set() and client.get("/jobs").status_code == 200
+
+
+def test_sign_in_assertions_are_checked(fc, monkeypatch):
+    """only a fresh assertion of the server, for this agent and this sign-in, makes a session"""
+    from app import central
+    monkeypatch.setattr(central, "_control_url", lambda: "https://tc.example.test")
+    central.enroll(fc.code(), "box", ["signin"])
+    assert central.sso_enabled() and central.local_sign_in()
+    url = central.sso_start(session := {})
+    assert url.startswith(fc.URL + "/sso/authorize?agent=A-0001&") and "redirect=https%3A%2F%2Ftc.example.test%2Fsso%2Fcallback" in url
+
+    def token(key=None, **over):
+        now = int(time.time())
+        claims = dict({"v": 1, "aud": "A-0001", "sub": "u1", "username": "dev", "role": "admin", "nonce": session["sso"]["nonce"],
+                       "iat": now, "exp": now + 60}, **over)
+        raw = canonical(claims)
+        return b64e(raw) + "." + b64e((key or fc.key).sign(raw))
+
+    def finish(tok, state=None):
+        saved = dict(session["sso"])
+        try:
+            return central.sso_finish(session, tok, state or saved["state"])
+        finally:
+            session["sso"] = saved  # the next try reuses the same sign-in
+    for bad in (token(key=Ed25519PrivateKey.generate()), token(aud="A-0002"), token(nonce="other"), token(exp=int(time.time()) - 1),
+                token(role="root"), "garbage"):
+        with pytest.raises(central.CentralError):
+            finish(bad)
+    with pytest.raises(central.CentralError, match="wasn't started here"):
+        finish(token(), state="wrong")
+    u = finish(token())
+    assert u["id"] == "c:u1" and u["username"] == "dev" and u["source"] == "central"
+    tok, st = token(), session.pop("sso")["state"]
+    with pytest.raises(central.CentralError):  # used up
+        central.sso_finish(session, tok, st)
+    # Enterprise only, and the emergency access from the host
+    fc.set_profile(sections={}, modes={}, sign_in={"policy": "enterprise"})
+    central.sync()
+    assert central.sign_in_policy() == "enterprise" and not central.local_sign_in()
+    central.open_breakglass()
+    assert central.local_sign_in()
+    central.leave()
+    assert central.sign_in_policy() == "local" and not central.sso_enabled()

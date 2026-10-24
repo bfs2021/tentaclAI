@@ -64,8 +64,9 @@ async def setup_save(request: Request, token: str = Form(""), username: str = Fo
 
 
 def _login_page(request, error=None, status=200, username=""):
-    return templates.TemplateResponse(request, "login.html", {"error": error, "username": username,
-                                      "ask_username": not auth.profile_missing()}, status_code=status)
+    return templates.TemplateResponse(request, "login.html", {
+        "error": error, "username": username, "ask_username": not auth.profile_missing(), "sso": central.sso_enabled(),
+        "central_name": central.state().get("central_name", ""), "local": central.local_sign_in()}, status_code=status)
 
 
 @router.get("/login", response_class=HTMLResponse)
@@ -83,6 +84,9 @@ async def login(request: Request, username: str = Form(""), password: str = Form
     if wait:
         auditlog.user(request, "auth", "tentacontrol", "sign in", "blocked", detail="too many attempts", user=given)
         return _login_page(request, f"too many attempts – please wait {wait} s", 429, username)
+    if not central.local_sign_in():
+        auditlog.user(request, "auth", "tentacontrol", "sign in", "blocked", detail="only sign-in through tentaclAI Enterprise", user=given)
+        return _login_page(request, "local accounts can't sign in here – use tentaclAI Enterprise", 403, username)
     user = await asyncio.to_thread(auth.check_login, username, password)
     if not user:
         auditlog.user(request, "auth", "tentacontrol", "sign in", "failed", detail="wrong username or password", user=given)
@@ -95,8 +99,9 @@ async def login(request: Request, username: str = Form(""), password: str = Form
         request.session["pending_2fa"] = time.time()  # password done – the code comes next
         request.session["pending_uid"] = user["id"]
         return RedirectResponse("/login/2fa", status_code=303)
-    auth.sign_in(request, user)
-    auditlog.user(request, "auth", "tentacontrol", "sign in", detail="password" + (" + trusted browser" if auth.twofactor_enabled() else ""))
+    auth.sign_in(request, user, breakglass=central.sign_in_policy() == "enterprise")
+    auditlog.user(request, "auth", "tentacontrol", "sign in", detail="password" + (" + trusted browser" if auth.twofactor_enabled() else "")
+                  + (" · emergency access" if central.sign_in_policy() == "enterprise" else ""))
     return RedirectResponse("/", status_code=303)
 
 
@@ -145,7 +150,7 @@ async def login_2fa_form(request: Request):
 
 @router.post("/login/2fa")
 async def login_2fa(request: Request, code: str = Form(...), trust: str = Form("")):
-    if not _pending_2fa(request):
+    if not _pending_2fa(request) or not central.local_sign_in():
         return RedirectResponse("/login", status_code=303)
     ip = client_ip(request)
     ctx = {"days": auth.TRUST_DAYS}
@@ -161,8 +166,9 @@ async def login_2fa(request: Request, code: str = Form(...), trust: str = Form("
         return templates.TemplateResponse(request, "login_2fa.html", {**ctx, "error": "wrong code"}, status_code=401)
     auth.clear_failures(ip)
     user = next((u for u in auth.users() if u.get("id") == request.session.get("pending_uid")), None) or auth.admin()
-    auth.sign_in(request, user)
-    auditlog.user(request, "auth", "tentacontrol", "sign in", detail=f"password + {kind}" + (" · browser trusted" if trust else ""))
+    auth.sign_in(request, user, breakglass=central.sign_in_policy() == "enterprise")
+    auditlog.user(request, "auth", "tentacontrol", "sign in", detail=f"password + {kind}" + (" · browser trusted" if trust else "")
+                  + (" · emergency access" if central.sign_in_policy() == "enterprise" else ""))
     if kind == "recovery":
         left = auth.twofactor_status()["recovery_left"]
         notify.emit("signin", "tentacontrol: sign-in with a recovery code", f"{left} recovery codes left.", key=f"signin:{time.time()}")
@@ -174,6 +180,34 @@ async def login_2fa(request: Request, code: str = Form(...), trust: str = Form("
         response.set_cookie(auth.TRUST_COOKIE, token, max_age=auth.TRUST_DAYS * 86400, httponly=True, samesite="strict",
                             secure=request.url.scheme == "https", path="/")
     return response
+
+
+# ---------------------------------------------------------------- sign-in through tentaclAI Enterprise (docs/central.md)
+# The server posts its assertion from its own site, so the browser leaves the SameSite=Strict session cookie behind:
+# /sso/callback only hands the form on to /sso/finish from this site, which then runs with the session (and its nonce).
+
+@router.get("/sso/login")
+async def sso_login(request: Request):
+    if not central.sso_enabled():
+        return RedirectResponse("/login", status_code=303)
+    return RedirectResponse(central.sso_start(request.session), status_code=303)
+
+
+@router.post("/sso/callback", response_class=HTMLResponse)
+async def sso_callback(request: Request, assertion: str = Form(""), state: str = Form("")):
+    return templates.TemplateResponse(request, "sso_relay.html", {"assertion": assertion[:8000], "state": state[:200]})
+
+
+@router.post("/sso/finish")
+async def sso_finish(request: Request, assertion: str = Form(""), state: str = Form("")):
+    try:
+        user = central.sso_finish(request.session, assertion, state)
+    except central.CentralError as e:
+        auditlog.user(request, "auth", "tentacontrol", "sign in", "failed", detail=f"tentaclAI Enterprise: {e}"[:300], user="")
+        return _login_page(request, str(e), 401)
+    auth.sign_in(request, user)
+    auditlog.user(request, "auth", "tentacontrol", "sign in", detail=f"tentaclAI Enterprise ({user['central']}) as {user['role']}")
+    return RedirectResponse("/", status_code=303)
 
 
 @router.post("/logout")

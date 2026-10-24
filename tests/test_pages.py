@@ -2,7 +2,7 @@
 import pytest
 
 # every GET route without parameters is a page to render – new pages are covered without touching this file
-NOT_PAGES = ("/login", "/setup", "/account/complete", "/security", "/activity", "/logout", "/healthz", "/api/", "/internal/", "/logs/stream", "/builds/", "/static", "/vendor",
+NOT_PAGES = ("/login", "/sso/", "/setup", "/account/complete", "/security", "/activity", "/logout", "/healthz", "/api/", "/internal/", "/logs/stream", "/builds/", "/static", "/vendor",
              "/topology/ssh-status", "/claude/jobs")  # (ssh-status runs real SSH checks)
 # pages with parameters or variants, rendered with the dummy stack's objects
 VARIANTS = ["/services/demoapi", "/services/demodb", "/services/demohost", "/services/demogit", "/services/demomail", "/systems/box", "/ssh/box/edit",

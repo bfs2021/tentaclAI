@@ -31,7 +31,8 @@ app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None, lifespan=lifespan
 app.mount("/static", StaticFiles(directory=os.path.join(BASE, "static")), name="static")
 app.mount("/vendor", StaticFiles(directory=os.environ.get("VENDOR_DIR", "/app/vendor")), name="vendor")  # VENDOR_DIR: tests
 
-PUBLIC = ("/login", "/setup", "/static/", "/vendor/", "/healthz", "/internal/", "/favicon.ico", "/apple-touch-icon")  # /internal/: svc token, checked per route
+PUBLIC = ("/login", "/setup", "/static/", "/vendor/", "/healthz", "/internal/", "/favicon.ico", "/apple-touch-icon",
+          "/sso/")  # /internal/: svc token, checked per route; /sso/: the assertion of the central server
 
 
 @app.middleware("http")
@@ -52,6 +53,8 @@ async def guard(request: Request, call_next):
             return RedirectResponse("/account/complete", status_code=303)
         if request.method == "POST" and not auth.same_origin(request):
             return PlainTextResponse("invalid origin", status_code=403)
+        if request.method == "POST" and path.startswith("/account/") and auth.is_central(request):
+            return PlainTextResponse("your account is managed by tentaclAI Enterprise", status_code=403)
         off = central.hidden_feature_of(path)
         if off:  # hidden by the central server's profile
             if request.method == "GET" and not request.headers.get("hx-request") and not path.startswith("/partials/"):
@@ -64,7 +67,7 @@ async def guard(request: Request, call_next):
     return response
 
 
-AUDIT_SKIP = ("/internal/", "/login", "/setup", "/logout", "/approvals/", "/topology/layout", "/usage/refresh")  # logged elsewhere / layout only
+AUDIT_SKIP = ("/internal/", "/login", "/setup", "/logout", "/sso/", "/approvals/", "/topology/layout", "/usage/refresh")  # logged elsewhere / layout only
 AUDIT_AREA = {"ssh": "SSH hosts", "rc": "Remote Control", "container": "sandbox", "grants": "Approvals", "updates": "updates",
               "account": "account", "claude": "Claude"}
 

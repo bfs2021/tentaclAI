@@ -58,7 +58,8 @@ revoked (the agent stops and shows it).
 
 **Status** (heartbeat): `name, hostname, instance_id, version, edition, modules: [{name, title, origin, version, active}],
 services: [{name, parts, test}], audit: {sent_through, waiting}, profile: {rev, applied, drift, missing, refused},
-areas, jobs: [{id, name, enabled, next, last_status}]` (the server's jobs). No secrets – values of credentials never leave the agent.
+areas, jobs: [{id, name, enabled, next, last_status}], control_url` (the server's jobs; `control_url`: `CONTROL_URL`, where
+the server sends users back after a sign-in). No secrets – values of credentials never leave the agent.
 
 **Audit entries** are sent as stored (`audit.jsonl`, `tclib.audit_entry`) plus two fields: `owner`, the account of the
 installation (Claude, jobs and the system act for it; a user's own actions carry `user`), and `source`, the readable
@@ -120,3 +121,30 @@ definition says (`"enabled"`, default on – an import starts jobs paused). When
   of tentacontrol; × closes it until the next sign-in (a new `id` shows again). Always shown, informational only.
 - The local admin can change what the server may manage after enrolling (Enterprise → May manage → Change); parts taken
   away keep their values and are no longer locked.
+
+## Sign-in through the server
+
+Users of the server sign in to the agents they are granted (directly or through a group, on one agent or on every agent
+with a profile). Only the browser travels between the two – the server never calls the agent. Only while the agent allows
+the part `signin` and `CONTROL_URL` is set.
+
+1. tentacontrol's sign-in page shows *Sign in with <server>*. `GET /sso/login` keeps `state` and `nonce` (random) in the
+   session and sends the browser to `<server>/sso/authorize?agent=<id>&state=…&nonce=…&redirect=<CONTROL_URL>/sso/callback`.
+2. The server refuses unless `redirect` is exactly the `control_url` of the agent's last heartbeat + `/sso/callback` and
+   the agent allows `signin`. It signs the user in (its own accounts with a second factor; later OIDC / LDAP – the agent
+   never sees which) and checks the grants.
+3. It posts `assertion` and `state` to the redirect. The assertion is `base64url(JSON) "." base64url(signature)`, signed
+   with the server's key over exactly those JSON bytes:
+   `{v: 1, iss, aud: <agent id>, sub, username, name, email, source, role: "admin", groups, nonce, iat, exp: iat + 60}`.
+4. `POST /sso/callback` only hands the form on to `POST /sso/finish` from tentacontrol's own site (the session cookie is
+   SameSite=Strict and stays behind on a post from another site). `/sso/finish` checks the signature with the server key
+   from enrolling, `aud`, `state` and `nonce` against the session (used once), `exp`, and the role – then the session
+   belongs to that user: no local account, `c:<sub>` as id; the user names the audit entries and approvals. The account
+   page says it is managed by the server.
+
+Sessions of the server's users end when the agent leaves, is revoked or takes `signin` away.
+
+**Policy:** the profile's `sign_in: {"policy": "local" | "enterprise"}`. With `enterprise` local accounts can't sign in
+and their sessions end (only while the agent allows `signin` and has a `CONTROL_URL` – otherwise nobody could get in).
+**Emergency access:** `./tentaclai.sh passwd` (with a new password) or `./tentaclai.sh passwd --open` on the host opens the
+local sign-in for an hour (`central/breakglass.json`, an audit entry); a session started then stays valid.

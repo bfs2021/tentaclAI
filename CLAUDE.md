@@ -44,7 +44,10 @@ extension points and the placeholders (Enterprise part of Modules locked, Settin
 Profiles are applied through `backup.preview/apply` (item ids = import preview ids, `hash_old/hash_new` per row);
 enforced items are refused by `_central_check()` in the stores (and `update_env` for settings) unless
 `central.applying()`, and by `tclib.central_locked()` in `svc config put`. Keep new writers of managed parts behind the
-same check.
+same check. Sign-in through the server: `central.sso_start/sso_finish` (signed assertion, nonce in the session), routes
+`/sso/*` in `routes/system.py`; a server user's session carries the user (`c:<sub>`, no local account –
+`auth.is_central`), `central.local_sign_in()` applies the *Enterprise only* policy and the emergency access
+(`breakglass.json`, `passwd.py --open`).
 
 Two layers: `svc` decides *what* happens with a tentacle (credentials, `read`/`write`/`confirm`); the gateway decides *where*
 the sandbox may connect. ssh/rsync go through `ProxyCommand tc-connect`, databases and mail through `svc`'s local `tunnel()`.

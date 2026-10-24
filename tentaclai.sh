@@ -10,7 +10,8 @@
 #   ./tentaclai.sh svc        apply services/*.json (MCP, repos, catalog) and show status
 #   ./tentaclai.sh inventory   guided system inventory → local/CLAUDE.md (Claude asks, you approve)
 #   ./tentaclai.sh scan       read-only inventory report (tc-scan)
-#   ./tentaclai.sh passwd     reset the tentacontrol admin password and show the username (--username <name>: rename)
+#   ./tentaclai.sh passwd     reset the tentacontrol admin password and show the username (--username <name>: rename,
+#                             --open: emergency access – local sign-in for an hour while only Enterprise sign-in is allowed)
 #   ./tentaclai.sh reset-2fa  switch tentacontrol's two-factor sign-in off (lost phone and recovery codes)
 #   ./tentaclai.sh setup-url  show the one-time tentacontrol setup link (first start)
 #   ./tentaclai.sh update     to the latest release: what's new (changelog) + rebuild + recreate, asks before each step

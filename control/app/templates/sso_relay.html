@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Signing in · tentaclAI</title>
+  <link rel="icon" type="image/png" sizes="32x32" href="/static/favicon-32.png?v={{ asset_v }}">
+  <link rel="stylesheet" href="/static/app.css?v={{ asset_v }}">
+</head>
+<body onload="document.forms[0].submit()">
+<div class="auth">
+  <form class="card" method="post" action="/sso/finish">
+    <div class="brand"><img class="logo" src="/static/logo.svg?v={{ asset_v }}" alt="" width="32" height="32"><div>tentacl<span class="ai-grad">AI</span></div></div>
+    <p>Signing in …</p>
+    <input type="hidden" name="assertion" value="{{ assertion }}"><input type="hidden" name="state" value="{{ state }}">
+    <button class="btn primary">Continue</button>
+  </form>
+</div>
+</body>
+</html>

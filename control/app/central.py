@@ -7,7 +7,8 @@ applied through backup.preview/apply, enforced ones are locked (check_write, loc
 changed around tentacontrol. Without the server the last profile stays in force and audit entries wait.
 
 State in DATA_DIR/central/ (root only): agent.key (Ed25519, PEM), state.json, profile.json (the signed profile as
-received), locks.json (enforced item ids – svc reads it), ca.pem (optional: the server's CA).
+received), locks.json (enforced item ids – svc reads it), ca.pem (optional: the server's CA), breakglass.json (the
+local sign-in opened from the host while the profile allows only sign-ins through the server).
 """
 import base64
 import contextlib
@@ -67,7 +68,8 @@ def canonical(obj):
 def areas():
     """what a server may manage: the parts of the export, modules, and which features of tentacontrol show"""
     from .backup import SECTIONS
-    return dict(SECTIONS, modules="Modules", features="Features (hide parts of tentacontrol)")
+    return dict(SECTIONS, modules="Modules", features="Features (hide parts of tentacontrol)",
+                signin="Sign-in (users of the central sign in here; Enterprise-only sign-in)")
 
 
 # features a profile can hide here: label, the paths they live under (the page, its actions, its partials)
@@ -115,6 +117,88 @@ def banner():
     """the message the server shows on every installation (None: none)"""
     st = state()
     return st.get("banner") if st.get("agent_id") and not st.get("revoked") else None
+
+
+# ---------------------------------------------------------------- sign-in through the server (docs/central.md → Sign-in)
+
+BREAKGLASS = os.path.join(DIR, "breakglass.json")
+BREAKGLASS_SECONDS = 3600
+SSO_ROLES = ("admin",)       # what tentacontrol knows; the server's grants say which
+SSO_SKEW = 60                # seconds of clock difference accepted on iat
+
+
+def _control_url():
+    from .envfile import read_env
+    url = (read_env().get("CONTROL_URL") or "").strip().rstrip("/")
+    return url if url.startswith(("https://", "http://")) else ""
+
+
+def sso_enabled():
+    """users of the server may sign in here: enrolled, "Sign-in" allowed, and an address to come back to"""
+    st = state()
+    return bool(st.get("agent_id")) and not st.get("revoked") and "signin" in (st.get("areas") or []) and bool(_control_url())
+
+
+def sign_in_policy():
+    """"local" (local accounts and the server) or "enterprise" (only through the server) – the profile says, while
+    the agent lets the server manage Sign-in"""
+    if not sso_enabled():
+        return "local"
+    return "enterprise" if ((_profile() or {}).get("sign_in") or {}).get("policy") == "enterprise" else "local"
+
+
+def breakglass_until():
+    return float((jsonstore.load(BREAKGLASS) or {}).get("until") or 0)
+
+
+def open_breakglass(by="host"):
+    """open the local sign-in for an hour although the profile allows only the server (./tentaclai.sh passwd)"""
+    until = time.time() + BREAKGLASS_SECONDS
+    os.makedirs(DIR, mode=0o700, exist_ok=True)
+    jsonstore.save(BREAKGLASS, {"until": until, "by": by}, mode=0o600)
+    _audit("local sign-in opened for an hour", f"emergency access from the {by}", decision="warn")
+    return until
+
+
+def local_sign_in():
+    """may local accounts sign in now? (the server's policy – unless opened from the host)"""
+    return sign_in_policy() != "enterprise" or breakglass_until() > time.time()
+
+
+def sso_start(session):
+    """the server's address that starts a sign-in; state and nonce wait in the session"""
+    st = state()
+    s, n = secrets.token_urlsafe(24), secrets.token_urlsafe(24)
+    session["sso"] = {"state": s, "nonce": n, "ts": time.time()}
+    from urllib.parse import urlencode
+    return st["url"] + "/sso/authorize?" + urlencode({"agent": st["agent_id"], "state": s, "nonce": n,
+                                                     "redirect": _control_url() + "/sso/callback"})
+
+
+def sso_finish(session, token, state_value):
+    """the user of a signed assertion from the server – CentralError when it isn't valid for this sign-in"""
+    pend = session.pop("sso", None) or {}
+    if not sso_enabled():
+        raise CentralError("sign-in through the server is not allowed here")
+    if not pend or time.time() - pend.get("ts", 0) > 600 or not secrets.compare_digest(str(state_value), pend.get("state", "")):
+        raise CentralError("this sign-in wasn't started here, or it took too long – try again")
+    st = state()
+    try:
+        body, sig = str(token).split(".", 1)
+        raw = b64d(body)
+        from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
+        Ed25519PublicKey.from_public_bytes(b64d(st["central_key"])).verify(b64d(sig), raw)
+        claims = json.loads(raw)
+    except Exception:  # noqa: BLE001 – any defect is the same answer
+        raise CentralError("the server's answer isn't validly signed") from None
+    now = time.time()
+    if (claims.get("v") != 1 or claims.get("aud") != st["agent_id"] or not secrets.compare_digest(str(claims.get("nonce")), pend.get("nonce", ""))
+            or not isinstance(claims.get("exp"), (int, float)) or claims["exp"] < now or float(claims.get("iat") or 0) > now + SSO_SKEW
+            or claims.get("role") not in SSO_ROLES or not claims.get("sub") or not claims.get("username")):
+        raise CentralError("the server's answer is not for this sign-in (expired or meant for another installation)")
+    return {"id": "c:" + str(claims["sub"])[:64], "username": str(claims["username"])[:32], "name": str(claims.get("name") or "")[:80],
+            "email": str(claims.get("email") or "")[:254], "role": claims["role"], "source": "central",
+            "central": st.get("central_name", "")}
 
 
 # ---------------------------------------------------------------- state
@@ -593,7 +677,8 @@ def _status(st):
             "profile": {"rev": st.get("applied_rev", 0), "drift": st.get("drift") or [], "missing": st.get("missing") or [],
                         "refused": st.get("refused") or []},
             "areas": st.get("areas") or [],
-            "jobs": _job_states()}
+            "jobs": _job_states(),
+            "control_url": _control_url()}
 
 
 # ---------------------------------------------------------------- jobs from the server
@@ -760,4 +845,6 @@ def view():
             "locks": sorted(locks()), "areas": areas(), "ca": os.path.isfile(CA_FILE), "nav": nav_status(),
             "last_ok": fmt(st.get("last_ok")), "enrolled_at": fmt(st.get("enrolled")), "profile_at": fmt(st.get("profile_at")),
             "audit_waiting": bool(waiting), "jobs": sorted(managed_jobs()) if st.get("agent_id") else [],
-            "hidden": [FEATURES[k][0] for k in sorted(hidden_features())], "banner": banner()}
+            "hidden": [FEATURES[k][0] for k in sorted(hidden_features())], "banner": banner(),
+            "sso": sso_enabled(), "sign_in_policy": sign_in_policy(), "control_url": _control_url(),
+            "breakglass_until": fmt(breakglass_until()) if breakglass_until() > time.time() else ""}
