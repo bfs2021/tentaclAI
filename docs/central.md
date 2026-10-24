@@ -119,13 +119,13 @@ definition says (`"enabled"`, default on – an import starts jobs paused). When
   running underneath (central jobs, the update check of the image are not affected).
 - `banner` in the heartbeat answer (`{id, text, level: info|warn|critical}` or null) is shown at the top of every page
   of tentacontrol; × closes it until the next sign-in (a new `id` shows again). Always shown, informational only.
-- The local admin can change what the server may manage after enrolling (Enterprise → May manage → Change); parts taken
+- The local admin can change what the server may manage after enrolling (Enterprise → Managed by Enterprise → Change); parts taken
   away keep their values and are no longer locked.
 - **Tamper protection:** a profile with `allow_leave: false` (`tamper_protection: true`) – the agent refuses to leave
   and to take parts away from what the server may manage (adding is fine); only revoking on the server ends it. Refused
   attempts go into the audit log and the heartbeat's `tamper` (the last 10); the server also notices parts that shrink
   without tentacontrol (files edited on the host).
-- `areas_locked: true` in the profile locks *May manage* completely – the local admin can neither add nor take away
+- `areas_locked: true` in the profile locks *Managed by Enterprise* completely – the local admin can neither add nor take away
   parts (attempts count as tamper attempts).
 
 ## Sign-in through the server

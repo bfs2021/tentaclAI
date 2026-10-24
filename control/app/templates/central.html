@@ -25,7 +25,7 @@
   <div class="field"><label for="cc">Enrollment code</label><textarea id="cc" name="code" rows="2" class="mono fit" placeholder="tce1.…" required autocomplete="off"></textarea></div>
   <div class="field"><label for="cn">Name of this installation</label><input id="cn" name="name" value="{{ site.hostname or '' }}" maxlength="60"></div>
   <div class="field">
-    <label>The server may manage</label>
+    <label>What tentaclAI Enterprise manages here</label>
     {% for key, label in c.areas.items() %}
     <label class="check"><input type="checkbox" name="areas" value="{{ key }}" checked> {{ label }}</label>
     {% endfor %}
@@ -55,7 +55,7 @@
       {% elif c.sign_in_policy == 'enterprise' %}only through {{ st.central_name }}{% if c.breakglass_until %} · <span class="pill warn">local sign-in open until {{ c.breakglass_until }}</span>{% endif %}
       {% else %}local accounts and users of {{ st.central_name }}{% endif %}</dd>{% endif %}
     {% if c.banner %}<dt>Message</dt><dd>{{ c.banner.text }}</dd>{% endif %}
-    <dt>May manage</dt><dd>{% for a in st.areas or [] %}<span class="tag">{{ c.areas.get(a, a) }}</span> {% else %}nothing{% endfor %}
+    <dt>Managed by Enterprise</dt><dd>{% for a in st.areas or [] %}<span class="tag">{{ c.areas.get(a, a) }}</span> {% else %}nothing{% endfor %}
       {% if c.areas_locked %}<div class="small muted" style="margin-top:6px">{{ icon('lock') }} Locked by the server's profile</div>
       {% elif not c.revoked %}<details style="margin-top:6px"><summary class="small">Change</summary>
         <form hx-post="/central/areas" style="margin-top:8px">

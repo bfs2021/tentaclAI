@@ -347,7 +347,7 @@ def enroll(code, name, allowed, ca_pem=""):
           "name": name, "areas": allowed, "enrolled": now, "profile_rev": 0, "applied": {},
           "audit_cursor": {"ts": now - AUDIT_BACKLOG_DAYS * 86400, "id": ""}, "runs_cursor": now, "config_hash": "", "last_ok": now, "last_error": ""}
     _save(st)
-    _audit("enrolled", f"{st['central_name']} as {st['agent_id']} – may manage: {', '.join(allowed) or 'nothing'}")
+    _audit("enrolled", f"{st['central_name']} as {st['agent_id']} – manages: {', '.join(allowed) or 'nothing'}")
     return st
 
 
@@ -359,7 +359,7 @@ def tamper_protected():
 
 
 def areas_locked():
-    """the server's profile locks "May manage": the local admin can't change it at all"""
+    """the server's profile locks "Managed by Enterprise": the local admin can't change it at all"""
     st = state()
     return bool(st.get("agent_id")) and not st.get("revoked") and (_profile() or {}).get("areas_locked") is True
 
@@ -383,14 +383,14 @@ def set_areas(allowed):
     gone = sorted(set(st.get("areas") or []) - set(allowed))
     if allowed != sorted(st.get("areas") or []) and areas_locked():
         _tamper("change what the server may manage")
-        raise CentralError("the server's profile locks what it may manage here – ask the server's admin")
+        raise CentralError("the server's profile locks what it manages here – ask the server's admin")
     if gone and tamper_protected():
         _tamper(f"take away {', '.join(gone)}")
         raise CentralError("tamper protection: the server's profile doesn't allow taking parts away here – "
                            "ask the server's admin")
     if allowed != sorted(st.get("areas") or []):
         _update(areas=allowed, report_hash="")
-        _audit("may manage changed", ", ".join(allowed) or "nothing")
+        _audit("managed by Enterprise changed", ", ".join(allowed) or "nothing")
     return allowed
 
 
