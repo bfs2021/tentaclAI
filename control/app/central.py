@@ -441,6 +441,26 @@ def _unsent(limit=AUDIT_BATCH):
     return newer[:limit], len(newer) > limit
 
 
+def _for_central(batch):
+    """copies with what the central can't look up itself: owner – the account of this installation (Community has
+    one; Claude, jobs and the system act for it) – and source, the readable origin ("Claude terminal · “title”")"""
+    from . import auth
+    from .activity import origin_label
+    import tclib
+    owner = (auth.admin() or {}).get("username", "")
+    out = []
+    for e in batch:
+        e = dict(e, owner=owner)
+        o = tclib.audit_origin(e)
+        if o:
+            try:
+                e["source"] = origin_label(o)
+            except Exception:  # noqa: BLE001 – a label is a nicety, shipping must go on
+                pass
+        out.append(e)
+    return out
+
+
 def ship_audit():
     """send what is waiting, in batches – returns the number sent"""
     import tclib
@@ -449,7 +469,7 @@ def ship_audit():
         batch, more = _unsent()
         if not batch:
             break
-        _call("POST", "/audit", {"entries": batch})
+        _call("POST", "/audit", {"entries": _for_central(batch)})
         last = batch[-1]
         _update(audit_cursor={"ts": tclib.audit_epoch(last.get("ts")) or time.time(), "id": last.get("id", "")})
         sent += len(batch)

@@ -214,6 +214,8 @@ def test_audit_is_shipped_once(fc):
     central.sync()
     shipped = [e for e in fc.audit.values() if e["action"].startswith("central shipping")]
     assert len(shipped) == 3
+    from app import auth
+    assert all(e["owner"] == (auth.admin() or {}).get("username", "") and "source" not in e for e in shipped)
     n = len(fc.audit)
     central.sync()
     assert len(fc.audit) - n <= 3  # only the agent's own new entries (profile received …), nothing twice
@@ -256,3 +258,14 @@ def test_module_packages_from_the_profile(fc, ext, monkeypatch):
     report = central.sync()
     assert any(r["id"] == "modules:tcx_pkg" and r["result"] == "failed" and "not signed" in r["msg"] for r in report["results"])
     assert packages.installed_versions() == {"tcx_pkg": "1.0.0"}
+
+
+def test_shipped_entries_say_who_and_where(fc, client):
+    from app import auditlog, central
+    central.enroll(fc.code(), "dev", [])
+    auditlog.write("service", "wiki", "GET /pages", actor="claude", origin={"entry": "cli", "session": "0123abcd-0000"})
+    central.sync()
+    e = next(e for e in fc.audit.values() if e["action"] == "GET /pages")
+    assert e["owner"] == "admin" and e["source"].startswith("Claude terminal")
+    local = next(x for x in auditlog.search("GET /pages", rng="1h")[0])
+    assert "owner" not in local and "source" not in local  # only the copies sent carry them

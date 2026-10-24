@@ -59,7 +59,9 @@ revoked (the agent stops and shows it).
 services: [{name, parts, test}], audit: {sent_through, waiting}, profile: {rev, applied, drift, missing, refused},
 areas`. No secrets – values of credentials never leave the agent.
 
-**Audit entries** are sent as stored (`audit.jsonl`, `tclib.audit_entry`); the server de-duplicates by `id`. After
+**Audit entries** are sent as stored (`audit.jsonl`, `tclib.audit_entry`) plus two fields: `owner`, the account of the
+installation (Claude, jobs and the system act for it; a user's own actions carry `user`), and `source`, the readable
+origin ("Claude terminal · “title”", "Job · backup") when the entry has one. The server de-duplicates by `id`. After
 enrolling the agent sends the last 7 days, then everything new. The local retention keeps entries that weren't sent.
 
 **Config** is tentacontrol's export document (Settings → Export, format 1, all parts, plain secrets left out) – the
