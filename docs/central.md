@@ -12,11 +12,12 @@ keeps the last profile and the audit entries not sent yet, and catches up when t
 The server issues an **enrollment code** – one string to paste into tentacontrol:
 
 ```
-tce1.<base64url(JSON)>      JSON: {"url": "https://central.example.lan", "token": "<random>", "key": "<fingerprint>"}
+tce1.<base64url(JSON)>      JSON: {"url": "https://central.example.lan", "token": "<random>", "key": "<fingerprint>", "ca": "<PEM>"}
 ```
 
 `key` is the fingerprint of the server's Ed25519 key (first 16 hex digits of SHA-256 over the raw public key, in groups
-of four). The agent creates its own Ed25519 key pair (kept in `data/control/central/`, 0600) and sends:
+of four). `ca` (optional) is the certificate the agent trusts for the server's HTTPS – a private CA or the server's own
+certificate; a certificate pasted in tentacontrol's enroll form wins over it. The agent creates its own Ed25519 key pair (kept in `data/control/central/`, 0600) and sends:
 
 ```
 POST /api/agent/v1/enroll

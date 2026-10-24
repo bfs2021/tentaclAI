@@ -34,9 +34,9 @@ class FakeCentral:
         self.tokens, self.agents, self.audit, self.reports, self.configs = {"tok-1"}, {}, {}, [], []
         self.profile, self.rev, self.revoked, self.packages, self.nonces = None, 0, False, {}, set()
 
-    def code(self, token="tok-1", key=None):
+    def code(self, token="tok-1", key=None, **extra):
         from app import central
-        return "tce1." + b64e(json.dumps({"url": self.URL, "token": token, "key": key or central.fingerprint(self.pub)}).encode())
+        return "tce1." + b64e(json.dumps(dict({"url": self.URL, "token": token, "key": key or central.fingerprint(self.pub)}, **extra)).encode())
 
     def set_profile(self, **p):
         self.rev += 1
@@ -119,6 +119,20 @@ def test_enroll_and_leave(fc, client):
     central.leave()
     assert not central.enrolled() and "A-0001" not in fc.agents
     assert "Enrollment code" in client.get("/central").text
+
+
+def test_certificate_from_the_code(fc):
+    from app import central
+    ca = "-----BEGIN CERTIFICATE-----\nMIIB\n-----END CERTIFICATE-----"
+    with pytest.raises(central.CentralError, match="not PEM"):
+        central.enroll(fc.code(ca="hello"), "x", [])
+    central.enroll(fc.code(ca=ca), "box", [])
+    assert open(central.CA_FILE).read() == ca + "\n"
+    central.leave()
+    fc.tokens.add("tok-2")
+    central.enroll(fc.code("tok-2", ca=ca), "box", [], ca_pem="-----BEGIN CERTIFICATE-----\nPASTED\n-----END CERTIFICATE-----")
+    assert "PASTED" in open(central.CA_FILE).read()  # pasted wins over the code's
+    central.leave()
 
 
 def test_profile_enforced_default_and_locks(fc, client):

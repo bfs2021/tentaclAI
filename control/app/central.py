@@ -130,6 +130,8 @@ def parse_code(code):
         raise CentralError("the enrollment code is incomplete")
     if not c["url"].startswith(("https://", "http://")):
         raise CentralError("the enrollment code has no server address")
+    if c.get("ca") is not None and (not isinstance(c["ca"], str) or "BEGIN CERTIFICATE" not in c["ca"]):
+        raise CentralError("the certificate in the enrollment code is not PEM")
     c["url"] = c["url"].rstrip("/")
     return c
 
@@ -191,12 +193,15 @@ def enroll(code, name, allowed, ca_pem=""):
         raise CentralError("this installation is enrolled already – leave first")
     c = parse_code(code)
     allowed = sorted(a for a in allowed if a in areas())
-    if ca_pem.strip():
+    ca_pem = (ca_pem or "").strip() or c.get("ca", "").strip()  # pasted here before the one the server put into the code
+    if ca_pem:
         if "BEGIN CERTIFICATE" not in ca_pem:
             raise CentralError("the CA certificate is not PEM")
         os.makedirs(DIR, mode=0o700, exist_ok=True)
         with open(CA_FILE, "w") as f:
-            f.write(ca_pem.strip() + "\n")
+            f.write(ca_pem + "\n")
+    elif os.path.exists(CA_FILE):
+        os.remove(CA_FILE)  # left by an earlier attempt
     env = read_env()
     priv = _key()
     answer = _call("POST", "/enroll", {"token": c["token"], "public_key": _public(priv), "instance_id": instance.instance_id()[0],
