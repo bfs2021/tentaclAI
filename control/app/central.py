@@ -65,9 +65,56 @@ def canonical(obj):
 
 
 def areas():
-    """what a server may manage: the parts of the export, and modules"""
+    """what a server may manage: the parts of the export, modules, and which features of tentacontrol show"""
     from .backup import SECTIONS
-    return dict(SECTIONS, modules="Modules")
+    return dict(SECTIONS, modules="Modules", features="Features (hide parts of tentacontrol)")
+
+
+# features a profile can hide here: label, the paths they live under (the page, its actions, its partials)
+FEATURES = {
+    "terminal": ("Terminal", ("/terminal", "/ws/terminal")),
+    "jobs": ("Jobs", ("/jobs", "/partials/job-count")),
+    "network": ("Network", ("/network",)),
+    "modules": ("Modules", ("/modules",)),
+    "claude": ("Claude (instructions, memory, models, skills, usage, settings.json)", ("/claude", "/models", "/skills", "/usage")),
+    "backup": ("Export / Import", ("/backup",)),
+    "updates": ("Updates", ("/updates",)),
+}
+
+
+def hidden_features():
+    """the features the server's profile hides here (only when the agent lets it manage features)"""
+    st = state()
+    if not st.get("agent_id") or st.get("revoked") or "features" not in (st.get("areas") or []):
+        return set()
+    return set(((_profile() or {}).get("features") or {}).get("hidden") or []) & set(FEATURES)
+
+
+def hidden_feature_of(path):
+    """the hidden feature a path belongs to, or None"""
+    hidden = hidden_features()
+    for key in hidden:
+        if any(path == p or path.startswith(p + "/") for p in FEATURES[key][1]):
+            return key
+    return None
+
+
+# ---------------------------------------------------------------- the server's banner
+
+BANNER_LEVELS = ("info", "warn", "critical")
+
+
+def _clean_banner(b):
+    if not isinstance(b, dict) or not str(b.get("text") or "").strip() or not b.get("id"):
+        return None
+    return {"id": str(b["id"])[:40], "text": str(b["text"]).strip()[:500],
+            "level": b.get("level") if b.get("level") in BANNER_LEVELS else "info"}
+
+
+def banner():
+    """the message the server shows on every installation (None: none)"""
+    st = state()
+    return st.get("banner") if st.get("agent_id") and not st.get("revoked") else None
 
 
 # ---------------------------------------------------------------- state
@@ -220,6 +267,19 @@ def enroll(code, name, allowed, ca_pem=""):
     return st
 
 
+def set_areas(allowed):
+    """the local admin changes what the server may manage – applied at the next sync (parts taken away keep their
+    values and are no longer locked)"""
+    st = state()
+    if not st.get("agent_id"):
+        raise CentralError("not enrolled")
+    allowed = sorted({a for a in allowed if a in areas()})
+    if allowed != sorted(st.get("areas") or []):
+        _update(areas=allowed, report_hash="")
+        _audit("may manage changed", ", ".join(allowed) or "nothing")
+    return allowed
+
+
 def leave():
     """leave the server (told when it can be reached) – locks go, applied values stay"""
     st = state()
@@ -305,6 +365,7 @@ def reconcile(prof=None):
     allowed = set(st.get("areas") or [])
     sections = {s: v for s, v in (prof.get("sections") or {}).items() if s in backup.SECTIONS}
     refused = sorted(s for s in sections if s not in allowed) + (["modules"] if prof.get("modules") and "modules" not in allowed else [])
+    refused += ["features"] if (prof.get("features") or {}).get("hidden") and "features" not in allowed else []
     sections = {s: v for s, v in sections.items() if s in allowed}
     modes = {k: v for k, v in (prof.get("modes") or {}).items() if v in MODES}
     doc = dict({"format": backup.FORMAT, "version": backup.VERSION, "variables": []}, **sections)
@@ -622,6 +683,8 @@ def sync():
             if key != state().get("report_hash"):
                 _call("POST", "/report", {k: report[k] for k in ("rev", "results", "drift", "missing", "refused")})
                 _update(report_hash=key)
+            if _clean_banner(hb.get("banner")) != st.get("banner"):
+                _update(banner=_clean_banner(hb.get("banner")))
             _run_requested(hb.get("run_jobs"))
             ship_audit()
             ship_runs()
@@ -696,4 +759,5 @@ def view():
     return {"enrolled": bool(st.get("agent_id")), "revoked": bool(st.get("revoked")), "st": st, "profile": prof,
             "locks": sorted(locks()), "areas": areas(), "ca": os.path.isfile(CA_FILE), "nav": nav_status(),
             "last_ok": fmt(st.get("last_ok")), "enrolled_at": fmt(st.get("enrolled")), "profile_at": fmt(st.get("profile_at")),
-            "audit_waiting": bool(waiting), "jobs": sorted(managed_jobs()) if st.get("agent_id") else []}
+            "audit_waiting": bool(waiting), "jobs": sorted(managed_jobs()) if st.get("agent_id") else [],
+            "hidden": [FEATURES[k][0] for k in sorted(hidden_features())], "banner": banner()}

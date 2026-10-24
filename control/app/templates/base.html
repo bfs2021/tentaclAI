@@ -20,22 +20,22 @@
       {%- else %}<span class="edition cm" title="tentaclAI Community Edition">Community</span>{% endif %}</div></div>
     <nav class="nav">
       <a href="/" class="{{ 'active' if nav == 'dashboard' }}">{{ icon('home') }}Overview</a>
-      <a href="/terminal" class="{{ 'active' if nav == 'terminal' }}">{{ icon('terminal') }}Terminal</a>
+      {% if 'terminal' not in hidden_features %}<a href="/terminal" class="{{ 'active' if nav == 'terminal' }}">{{ icon('terminal') }}Terminal</a>{% endif %}
       <a href="/services" class="{{ 'active' if nav in ('services', 'service_edit', 'system_edit', 'systems', 'ssh', 'topology') }}">{{ icon('plug') }}Tentacles</a>
-      <a href="/network" class="{{ 'active' if nav == 'network' }}">{{ icon('globe') }}Network</a>
+      {% if 'network' not in hidden_features %}<a href="/network" class="{{ 'active' if nav == 'network' }}">{{ icon('globe') }}Network</a>{% endif %}
       <a href="/approvals" class="{{ 'active' if nav == 'approvals' }}">{{ icon('activity') }}Approvals
         <span class="nav-count" hx-get="/partials/approval-count" hx-trigger="load, every 5s" hx-swap="innerHTML"></span></a>
-      <a href="/jobs" class="{{ 'active' if nav in ('jobs', 'job_edit') }}">{{ icon('clock') }}Jobs
-        <span class="nav-count" hx-get="/partials/job-count" hx-trigger="load, every 30s" hx-swap="innerHTML"></span></a>
+      {% if 'jobs' not in hidden_features %}<a href="/jobs" class="{{ 'active' if nav in ('jobs', 'job_edit') }}">{{ icon('clock') }}Jobs
+        <span class="nav-count" hx-get="/partials/job-count" hx-trigger="load, every 30s" hx-swap="innerHTML"></span></a>{% endif %}
       {% for m in module_nav %}<a href="{{ m.href }}" class="{{ 'active' if nav == m.nav_id }}">{{ icon(m.icon) }}{{ m.label }}
         {%- if m.count_url %}<span class="nav-count" hx-get="{{ m.count_url }}" hx-trigger="load, every 30s" hx-swap="innerHTML"></span>{% endif %}</a>
       {% endfor %}
-      <a href="/modules" class="{{ 'active' if nav in ('modules', 'module_locked') }}">{{ icon('grid') }}Modules</a>
+      {% if 'modules' not in hidden_features %}<a href="/modules" class="{{ 'active' if nav in ('modules', 'module_locked') }}">{{ icon('grid') }}Modules</a>{% endif %}
       <a href="/central" class="{{ 'active' if nav == 'enterprise' }}{{ ' nav-locked' if central_nav.state == 'none' }}" title="{{ central_nav.title }}">{{ icon('lock' if central_nav.state == 'none' else 'topology') }}Enterprise
         {%- if central_nav.state != 'none' %}<span class="dot {{ 'ok' if central_nav.state == 'ok' else 'err' }} nav-dot" aria-label="{{ central_nav.title }}"></span>{% endif %}</a>
-      <a href="/claude/instructions" class="{{ 'active' if nav in ('claude_instructions', 'claude_memory', 'claude_settings', 'skills', 'models', 'usage') }}">{{ icon('claude') }}Claude</a>
+      {% if 'claude' not in hidden_features %}<a href="/claude/instructions" class="{{ 'active' if nav in ('claude_instructions', 'claude_memory', 'claude_settings', 'skills', 'models', 'usage') }}">{{ icon('claude') }}Claude</a>{% endif %}
       <a href="/settings" class="{{ 'active' if nav in ('settings', 'notifications', 'account', 'backup') }}">{{ icon('settings') }}Settings</a>
-      <a href="/updates" class="{{ 'active' if nav in ('updates', 'job') }}">{{ icon('refresh') }}Updates</a>
+      {% if 'updates' not in hidden_features %}<a href="/updates" class="{{ 'active' if nav in ('updates', 'job') }}">{{ icon('refresh') }}Updates</a>{% endif %}
       <a href="/logs" class="{{ 'active' if nav in ('logs', 'logs_containers') }}">{{ icon('logs') }}Logs
         <span class="nav-count" hx-get="/partials/logs-count" hx-trigger="load, every 5s" hx-swap="innerHTML"></span></a>
       <a href="/help" class="{{ 'active' if nav == 'help' }}">{{ icon('help') }}Help</a>
@@ -52,6 +52,12 @@
     <a class="version-tag" href="https://github.com/mwaldegg/tentaclai/releases" target="_blank" rel="noopener" title="Releases on GitHub">tentaclAI v{{ tc_version }}</a>
   </aside>
   <main class="main">
+    {% if central_banner %}
+    <div class="banner central-banner {{ {'info': 'info', 'warn': '', 'critical': 'err'}[central_banner.level] }}" role="status">
+      <div>{{ icon('topology') }} {{ central_banner.text }} <span class="muted small">– {{ central_nav.name or 'tentaclAI Enterprise' }}</span></div>
+      <button class="btn ghost sm" hx-post="/central/banner/dismiss" hx-target="closest .central-banner" hx-swap="outerHTML" title="Close until the next sign-in" aria-label="Close the message">×</button>
+    </div>
+    {% endif %}
     {% if nav != 'approvals' %}<div id="approval-banner" hx-get="/partials/approval-banner" hx-trigger="load" hx-swap="outerHTML"></div>{% endif %}
     {% if restart_needed %}
     <div class="banner">

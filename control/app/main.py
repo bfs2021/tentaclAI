@@ -15,7 +15,7 @@ from . import activity, auditlog, auth, central, connectors, dockerops, extensio
 from .config import SSH_DIR
 from .envfile import read_env
 from .routes import backup, central as central_routes, claude, jobs, network, settings, ssh, system, tentacles
-from .web import BASE, TC_VERSION, templates
+from .web import BASE, TC_VERSION, page, templates
 
 
 @contextlib.asynccontextmanager
@@ -52,6 +52,11 @@ async def guard(request: Request, call_next):
             return RedirectResponse("/account/complete", status_code=303)
         if request.method == "POST" and not auth.same_origin(request):
             return PlainTextResponse("invalid origin", status_code=403)
+        off = central.hidden_feature_of(path)
+        if off:  # hidden by the central server's profile
+            if request.method == "GET" and not request.headers.get("hx-request") and not path.startswith("/partials/"):
+                return page(request, "feature_off.html", nav="", feature=central.FEATURES[off][0], status=central.state().get("central_name", ""))
+            return PlainTextResponse("", status_code=403)
     response = await call_next(request)
     response.headers.setdefault("X-Frame-Options", "DENY")
     response.headers.setdefault("X-Content-Type-Options", "nosniff")

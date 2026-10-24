@@ -31,12 +31,20 @@ def page(request, name, nav=None, **ctx):
     st = dockerops.status()
     newer = dockerops.newer_image() if st.get("exists") else False
     unlocked = extensions.features()
+    hidden = central.hidden_features()
     ctx.update(request=request, nav=nav or name.split(".")[0], cstatus=st, restart_needed=restart_needed(st) or newer, newer_image=newer, site=site(),
-               update=updatecheck.status(TC_VERSION), features=unlocked, edition=extensions.edition(),
+               update=None if "updates" in hidden else updatecheck.status(TC_VERSION), features=unlocked, edition=extensions.edition(),
                module_nav=extensions.nav_entries(unlocked), ext_restart=extensions.restart_pending(), ext_banners=extensions.banners(request), me=auth.current_user(request) or {},
-               central_locks=central.locks(), central_nav=central.nav_status(),
+               central_locks=central.locks(), central_nav=central.nav_status(), hidden_features=hidden,
+               central_banner=_banner(request),
                flash=request.session.pop("flash", None))
     return templates.TemplateResponse(request, name, ctx)
+
+
+def _banner(request):
+    """the server's banner unless closed in this session"""
+    b = central.banner()
+    return b if b and request.session.get("banner_dismissed") != b["id"] else None
 
 
 def _baseline(st):

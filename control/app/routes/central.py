@@ -48,6 +48,26 @@ async def central_sync(request: Request):
     return respond(request, "Synchronised", refresh=True)
 
 
+@router.post("/central/areas", response_class=HTMLResponse)
+async def central_areas(request: Request):
+    form = await request.form()
+    try:
+        await asyncio.to_thread(central.set_areas, form.getlist("areas"))
+        await _sync()
+    except central.CentralError as e:
+        return respond(request, str(e), "err", refresh=True)
+    return respond(request, "Saved – the server's profile is applied to these parts", refresh=True)
+
+
+@router.post("/central/banner/dismiss", response_class=HTMLResponse)
+async def central_banner_dismiss(request: Request):
+    """× on the server's banner: gone until the next sign-in (the session remembers it)"""
+    b = central.banner()
+    if b:
+        request.session["banner_dismissed"] = b["id"]
+    return HTMLResponse("<!-- closed -->")  # not empty: an empty answer isn't swapped in (app.js)
+
+
 @router.post("/central/leave", response_class=HTMLResponse)
 async def central_leave(request: Request):
     try:

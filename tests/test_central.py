@@ -33,7 +33,7 @@ class FakeCentral:
         self.pub = b64e(self.key.public_key().public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw))
         self.tokens, self.agents, self.audit, self.reports, self.configs = {"tok-1"}, {}, {}, [], []
         self.profile, self.rev, self.revoked, self.packages, self.nonces = None, 0, False, {}, set()
-        self.runs, self.run_jobs = [], []
+        self.runs, self.run_jobs, self.banner = [], [], None
 
     def code(self, token="tok-1", key=None, **extra):
         from app import central
@@ -66,7 +66,7 @@ class FakeCentral:
         if path == "/heartbeat":
             self.status = data
             ask, self.run_jobs = self.run_jobs, []
-            return 200, json.dumps({"profile_rev": self.rev, "want_config": False, "run_jobs": ask}).encode()
+            return 200, json.dumps({"profile_rev": self.rev, "want_config": False, "run_jobs": ask, "banner": self.banner}).encode()
         if path == "/profile":
             prof = dict(self.profile, agent_id=aid)
             return 200, json.dumps({"profile": prof, "sig": b64e(self.key.sign(canonical(prof)))}).encode()
@@ -317,3 +317,37 @@ def test_jobs_from_the_server(fc, monkeypatch):
     for f in (scheduled.JOBS, scheduled.HISTORY):
         if os.path.exists(f):
             os.remove(f)
+
+
+def test_hidden_features_and_the_banner(fc, client):
+    from app import central
+    fc.set_profile(name="P", sections={}, modes={}, features={"hidden": ["jobs", "updates", "nonsense"]})
+    central.enroll(fc.code(), "dev", [])  # features not allowed yet: nothing hidden, the server is told
+    central.sync()
+    assert central.hidden_features() == set()
+    assert client.get("/jobs").status_code == 200
+    central.set_areas(["features"])
+    central.sync()
+    assert central.hidden_features() == {"jobs", "updates"}
+    nav = client.get("/settings").text
+    assert 'href="/jobs"' not in nav and 'href="/updates"' not in nav and 'href="/terminal"' in nav
+    r = client.get("/jobs/new")
+    assert "turned off by Test Central" in r.text.replace("Turned", "turned")
+    assert client.post("/jobs/save", data={"name": "x"}).status_code == 403
+    assert "Hidden here" in client.get("/central").text
+    # the banner: shown on every page until closed, back after a new message
+    import uuid
+    fc.banner = {"id": uuid.uuid4().hex, "text": "Maintenance tonight 22:00", "level": "warn"}  # the client is shared between runs
+    central.sync()
+    assert "Maintenance tonight 22:00" in client.get("/settings").text
+    client.post("/central/banner/dismiss")
+    assert "Maintenance tonight 22:00" not in client.get("/settings").text
+    fc.banner = {"id": uuid.uuid4().hex, "text": "Update done", "level": "info"}
+    central.sync()
+    assert "Update done" in client.get("/settings").text
+    fc.banner = None
+    central.sync()
+    assert central.banner() is None
+    central.set_areas([])
+    central.sync()
+    assert central.hidden_features() == set() and client.get("/jobs").status_code == 200

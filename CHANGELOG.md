@@ -18,6 +18,9 @@ All notable changes, newest first. Every release lists **upgrade steps** from th
   the page says what tentaclAI Enterprise adds and takes the enrollment code; once enrolled a dot shows the connection
   (connected / connection failed / revoked) and the page the server, last contact, profile and when it arrived, the
   audit backlog and the central jobs.
+- **From tentaclAI Enterprise:** a profile can hide parts of tentacontrol (Terminal, Jobs, Network, Modules, Claude,
+  Export / Import, Updates – part *Features*), the server can show a banner on every page (× closes it until the next
+  sign-in), and the local admin can change what the server may manage after enrolling.
   Guide: `docs/extensions.md`, example `examples/extensions/tcx_hello`.
 - **Service-Health** – the first built-in module (Modules → enable): `svc test` of every service on a schedule
   (1–60 minutes, default 5), a Health page with the state, a 24-hour bar and the availability over 24 hours and 7 days

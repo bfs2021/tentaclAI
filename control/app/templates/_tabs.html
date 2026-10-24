@@ -9,7 +9,7 @@
   <a href="/settings" class="{{ 'active' if active == 'settings' }}">{{ icon('settings') }}General</a>
   <a href="/notifications" class="{{ 'active' if active == 'notifications' }}">{{ icon('activity') }}Notifications</a>
   <a href="/account" class="{{ 'active' if active == 'account' }}">{{ icon('key') }}Account</a>
-  <a href="/backup" class="{{ 'active' if active == 'backup' }}">{{ icon('download') }}Export / Import</a>
+  {% if 'backup' not in hidden_features %}<a href="/backup" class="{{ 'active' if active == 'backup' }}">{{ icon('download') }}Export / Import</a>{% endif %}
   <a href="/license" class="{{ 'active' if active == 'license' }}">{{ icon('lock') }}License</a>
   {{ ext_tab_links('settings', active) }}
 </nav>

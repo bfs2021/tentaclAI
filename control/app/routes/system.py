@@ -8,7 +8,7 @@ import segno
 from fastapi import APIRouter, File, Form, Request, UploadFile, WebSocket
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, PlainTextResponse, RedirectResponse, StreamingResponse
 
-from .. import activity, auditlog, auth, dockerops, egress, extensions, jobs, netguard, notify, packages, scheduled, services_store, sshhosts, updatecheck, usage
+from .. import activity, auditlog, auth, central, dockerops, egress, extensions, jobs, netguard, notify, packages, scheduled, services_store, sshhosts, updatecheck, usage
 from ..config import CLAUDE_SERVICE, COMPOSE, LOG_CONTAINERS
 from ..envfile import read_env, update_env
 from ..terminal import PROFILES, bridge, onboard_cmd
@@ -269,7 +269,8 @@ async def terminal_page(request: Request, p: str = "claude", alias: str = ""):
 
 @router.websocket("/ws/terminal")
 async def ws_terminal(ws: WebSocket, p: str = "claude", alias: str = ""):
-    if not netguard.allowed("/ws/terminal", ws.client.host if ws.client else "") or not auth.logged_in(ws) or not auth.same_origin(ws):
+    if (not netguard.allowed("/ws/terminal", ws.client.host if ws.client else "") or not auth.logged_in(ws) or not auth.same_origin(ws)
+            or central.hidden_feature_of("/ws/terminal")):
         await ws.close(code=4401)
         return
     await ws.accept()

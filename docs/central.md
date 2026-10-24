@@ -47,7 +47,7 @@ revoked (the agent stops and shows it).
 
 | Call | Body → answer | When |
 |---|---|---|
-| `POST /heartbeat` | status (below) → `{"profile_rev", "want_config", "time", "run_jobs"}` | every 30 s |
+| `POST /heartbeat` | status (below) → `{"profile_rev", "want_config", "time", "run_jobs", "banner"}` | every 30 s |
 | `GET /profile` | → `{"profile": {...}, "sig"}` | when `profile_rev` changed |
 | `POST /audit` | `{"entries": [...]}` (oldest first, ≤ 500) → `{"stored": n}` | while entries are waiting |
 | `POST /config` | `{"config": <export document>, "hash", "settings_catalog"}` → `{}` | when the configuration changed or `want_config` |
@@ -109,3 +109,14 @@ definition says (`"enabled"`, default on – an import starts jobs paused). When
 - Finished runs of the server's jobs go to `POST /runs`: `{id, job, name, trigger, status, queued, started, ended,
   seconds, error, result: {status, title, summary, details}, proposals}` (proposals: how many – they are picked on the
   agent). A cursor (the last `ended`) keeps them from being sent twice.
+
+## Features and the banner
+
+- The profile's `features: {"hidden": [...]}` hides parts of tentacontrol – `terminal`, `jobs`, `network`, `modules`,
+  `claude`, `backup` (Export / Import), `updates` (also the update notice): gone from the sidebar, their pages say they
+  are turned off, their actions answer 403. Only when the agent allows the part `features`; jobs and updates keep
+  running underneath (central jobs, the update check of the image are not affected).
+- `banner` in the heartbeat answer (`{id, text, level: info|warn|critical}` or null) is shown at the top of every page
+  of tentacontrol; × closes it until the next sign-in (a new `id` shows again). Always shown, informational only.
+- The local admin can change what the server may manage after enrolling (Enterprise → May manage → Change); parts taken
+  away keep their values and are no longer locked.

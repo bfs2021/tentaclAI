@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% from "_icons.html" import icon %}
+{% block title %}{{ feature }}{% endblock %}
+{% block content %}
+<div class="header"><div><h1>{{ feature }}</h1><div class="sub">Turned off on this installation</div></div></div>
+<div class="card" style="max-width:560px">
+  <div class="card-head"><h2>{{ icon('topology') }}Turned off by {{ status or 'tentaclAI Enterprise' }}</h2></div>
+  <p class="small" style="margin:0">The central management hides {{ feature }} on this installation. Ask its admin to change the profile, or see <a href="/central">Enterprise</a>.</p>
+</div>
+{% endblock %}

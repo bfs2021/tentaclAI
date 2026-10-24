@@ -49,8 +49,16 @@
     {% if st.last_error %}<dt>Problem</dt><dd style="color:var(--err)">{{ st.last_error }}</dd>{% endif %}
     <dt>Profile</dt><dd>{% if c.profile %}{{ c.profile.name or 'unnamed' }} <span class="faint">rev {{ c.profile.rev }}{% if c.profile_at %} · received {{ c.profile_at }}{% endif %}</span>{% else %}none yet{% endif %}</dd>
     <dt>Audit log</dt><dd>{{ 'entries waiting to be sent' if c.audit_waiting else 'everything sent' }}</dd>
-    {% if c.jobs %}<dt>Central jobs</dt><dd>{% for j in c.jobs %}<a class="tag" href="/jobs/{{ j }}">{{ j }}</a> {% endfor %}</dd>{% endif %}
-    <dt>May manage</dt><dd>{% for a in st.areas or [] %}<span class="tag">{{ c.areas.get(a, a) }}</span> {% else %}nothing{% endfor %}</dd>
+    {% if c.jobs %}<dt>Central jobs</dt><dd>{% for j in c.jobs %}{% if 'jobs' in hidden_features %}<span class="tag">{{ j }}</span>{% else %}<a class="tag" href="/jobs/{{ j }}">{{ j }}</a>{% endif %} {% endfor %}</dd>{% endif %}
+    {% if c.hidden %}<dt>Hidden here</dt><dd>{% for h in c.hidden %}<span class="tag">{{ h }}</span> {% endfor %}</dd>{% endif %}
+    {% if c.banner %}<dt>Message</dt><dd>{{ c.banner.text }}</dd>{% endif %}
+    <dt>May manage</dt><dd>{% for a in st.areas or [] %}<span class="tag">{{ c.areas.get(a, a) }}</span> {% else %}nothing{% endfor %}
+      {% if not c.revoked %}<details style="margin-top:6px"><summary class="small">Change</summary>
+        <form hx-post="/central/areas" style="margin-top:8px">
+          {% for key, label in c.areas.items() %}<label class="check"><input type="checkbox" name="areas" value="{{ key }}" {{ 'checked' if key in (st.areas or []) }}> {{ label }}</label> {% endfor %}
+          <div class="help">Your decision on this installation: parts you take away keep their values and are no longer managed.</div>
+          <button class="btn sm" style="margin-top:8px">Save</button>
+        </form></details>{% endif %}</dd>
     <dt>Server key</dt><dd class="mono small">{{ st.central_key[:12] }}…</dd>
   </dl>
   <div class="row" style="margin-top:12px">
