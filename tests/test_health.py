@@ -70,7 +70,7 @@ def test_rounds_states_and_notifications(client, health):
     html = client.get("/x/tentaclai_health/").text
     assert ">partly<" in html and ">up<" in html and "75.0 %" not in html.split("credsvc")[0]
     assert '<i class="fail">' in html or '<i class="ok">' in html
-    assert ">box<" in html and "Standalone" in html  # per system
+    assert ">Systems</h2>" in html and ">box<" in html and "Standalone" in html  # per system
 
 
 def test_sandbox_down_is_no_outage(client, health, monkeypatch):
