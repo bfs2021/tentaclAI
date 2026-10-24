@@ -52,7 +52,7 @@
       <a class="btn sm" href="{{ m.nav.href }}">Open {{ m.nav.label }}</a>
       {% endfor %}
       <span class="spacer"></span>
-      {% if e.origin == 'configured' %}<span class="small faint">set in TC_EXTENSIONS</span>
+      {% if e.origin == 'configured' %}
       {% elif e.enabled %}<button class="btn sm ghost" hx-post="/modules/{{ e.name }}/disable">Disable</button>
       {% else %}<button class="btn sm primary" hx-post="/modules/{{ e.name }}/enable"
         {%- if e.origin == 'local' %} hx-confirm="Enable {{ e.title }}? A third-party module runs inside tentacontrol with all of its rights – it can read the configuration, approve requests and run svc. Only enable code you trust."{% endif %}>Enable</button>{% endif %}

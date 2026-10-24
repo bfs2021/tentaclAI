@@ -281,7 +281,7 @@ def test_the_configured_license_provider(client, ext):
     assert client.get("/reports").status_code == 200
     html = client.get("/modules").text
     assert "Enterprise modules are only available" not in html and "Open Reports" in html
-    assert html.count(">licensed<") == 1 and "planned" in html and "set in TC_EXTENSIONS" in html and "Test Enterprise" in html
+    assert html.count(">licensed<") == 1 and "planned" in html and "set in TC_EXTENSIONS" not in html and "Test Enterprise" in html
     with pytest.raises(ValueError):
         ext.mod.set_enabled("tcx_ent", False)
 
