@@ -148,6 +148,11 @@ before an update is kept for *Roll back*). It takes effect when tentacontrol res
   `TC_EXTENSIONS` entry or a folder in `local/extensions/` already uses.
 - Packages are code, not configuration: they are not part of Export / Import – install them again after a restore.
 
+Build one with `scripts/tcpkg.py build <folder> [-o <dir>] [--version X]` (standard library only): `<folder>` is the
+package itself; name, title and version come from its `extension.json`, hidden files and `__pycache__` are left out.
+The result is unsigned – fine for your own modules (third-party). tentaclAI signs its packages in its issuer
+(tcmanager); a signature can't be added by anyone else.
+
 ## Versions
 
 `API_VERSION` is a whole number. Additions (new calls, new optional parameters) don't change it. A change that breaks

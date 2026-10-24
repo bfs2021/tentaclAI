@@ -303,3 +303,35 @@ def test_refused_uploads(client, ext, pk):
     assert "local/extensions/tcx_loc" in upload(client, build("tcx_loc", priv=priv)).text
     r = client.post("/modules/upload/install")
     assert "expired" in r.headers.get("hx-trigger", "")
+
+
+# ---------------------------------------------------------------- scripts/tcpkg.py: building a package
+
+def _tcpkg():
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("tcpkg", os.path.join(os.path.dirname(os.path.dirname(__file__)), "scripts", "tcpkg.py"))
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def test_tcpkg_builds_what_tentacontrol_installs(pk, tmp_path):
+    packages, priv = pk
+    tcpkg = _tcpkg()
+    for name in ("FORMAT", "SUFFIXES", "PLAIN_NAMES"):
+        assert getattr(tcpkg, name) == getattr(packages, name), name
+    hello = os.path.join(os.path.dirname(os.path.dirname(__file__)), "examples", "extensions", "tcx_hello")
+    src = tmp_path / "src" / "tcx_hello"
+    import shutil
+    shutil.copytree(hello, src)
+    os.makedirs(src / "__pycache__")
+    (src / "__pycache__" / "x.pyc").write_bytes(b"")  # left out
+    (src / ".DS_Store").write_bytes(b"")
+    target, m = tcpkg.build(str(src), str(tmp_path))
+    assert target.endswith("tcx_hello-1.0.0.tcpkg.zip") and not any("__pycache__" in f or ".DS_Store" in f for f in m["files"])
+    info = packages.inspect(open(target, "rb").read())
+    assert info["name"] == "tcx_hello" and info["version"] == "1.0.0" and not info["signed"]
+    assert tcpkg.build(str(src), str(tmp_path / "x.zip"), version="2.0.0-rc1")[1]["version"] == "2.0.0-rc1"
+    (src / "lib.so").write_bytes(b"")
+    with pytest.raises(SystemExit, match="file type not allowed"):
+        tcpkg.build(str(src), str(tmp_path))
