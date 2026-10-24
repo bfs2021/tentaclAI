@@ -679,10 +679,10 @@ def nav_status():
         return {"state": "none", "title": "tentaclAI Enterprise – central management of many installations"}
     name = st.get("central_name") or "tentaclAI Enterprise"
     if st.get("revoked"):
-        return {"state": "revoked", "title": f"{name}: this installation was revoked"}
+        return {"state": "revoked", "name": name, "title": f"{name}: this installation was revoked"}
     if st.get("last_error") or time.time() - float(st.get("last_ok") or 0) > 4 * INTERVAL:
-        return {"state": "err", "title": f"{name}: connection failed – {st.get('last_error') or 'no contact'}"[:200]}
-    return {"state": "ok", "title": f"Managed by {name}"}
+        return {"state": "err", "name": name, "title": f"{name}: connection failed – {st.get('last_error') or 'no contact'}"[:200]}
+    return {"state": "ok", "name": name, "title": f"Managed by {name}"}
 
 
 def view():

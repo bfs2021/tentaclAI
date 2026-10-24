@@ -610,3 +610,12 @@ pre.diff { margin: 6px 0 0; padding: 8px 10px; background: var(--bg-2); border: 
 .ent-intro > div { display: flex; gap: 10px; align-items: flex-start; }
 .ent-intro svg { width: 18px; height: 18px; color: var(--accent); flex: none; margin-top: 2px; }
 .ent-intro strong { display: block; font-size: 13.5px; }
+
+/* edition next to the wordmark: CE plain, Enterprise gold */
+:root { --gold-1: #f7df8f; --gold-2: #c8952b; --gold-text: #3a2905; --gold-glow: rgba(233,190,90,.32); }
+@media (prefers-color-scheme: light) { :root { --gold-1: #f2d67a; --gold-2: #b5821b; --gold-text: #2e2003; --gold-glow: rgba(181,130,27,.22); } }
+.edition { display: inline-flex; align-items: center; gap: 3px; margin-left: 7px; padding: 0 6px; border-radius: 99px; font-size: 9.5px;
+  font-weight: 700; letter-spacing: .08em; text-transform: uppercase; line-height: 16px; vertical-align: 2px; white-space: nowrap; }
+.edition.ce { border: 1px solid var(--border); color: var(--muted); }
+.edition.ee { background: linear-gradient(135deg, var(--gold-1), var(--gold-2)); color: var(--gold-text);
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.22), 0 1px 6px var(--gold-glow); }
