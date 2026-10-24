@@ -27,6 +27,8 @@ All notable changes, newest first. Every release lists **upgrade steps** from th
   text, but now with a hint naming the real fields (#17).
 - `svc audit … | head` and other svc output into a closed pipe end quietly instead of with a traceback (#16).
 - Product findings → GitHub: the issue title no longer ends at "e.g." / "i.e." / "etc." / "vs.".
+- Modules: the header says *Enterprise · licensed* or *Enterprise · no license* (it showed a green *Enterprise* as
+  soon as the package was loaded), and the license provider's card gets a *licensed* / *no license* pill.
 - Extension API: `extapi.services()` and `extapi.systems()` list the connected services and systems (no secrets).
 - Extensions: the old calls `add_features()` / `set_edition()` are gone (`provide_license()`); an extension declares
   `REQUIRES_API = 1`. tentaclAI Enterprise needs its matching version (see Upgrade).
