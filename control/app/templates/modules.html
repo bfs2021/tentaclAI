@@ -23,7 +23,10 @@
 {% block content %}
 <div class="header">
   <div><h1>Modules {{ help_link('modules') }}</h1><div class="sub">Extend tentacontrol – built-in modules, your own and Enterprise ones.</div></div>
-  <div class="row"><span class="pill {{ 'off' if edition == 'community' else 'ok' }}">{{ icon('lock') }}{{ 'Community' if edition == 'community' else 'Enterprise' }}</span></div>
+  <div class="row">
+    {%- if edition == 'community' %}<span class="pill off">{{ icon('lock') }}Community</span>
+    {%- elif features %}<a class="pill ok" href="/license" title="Settings → License">{{ icon('lock') }}Enterprise · licensed</a>
+    {%- else %}<a class="pill warn" href="/license" title="Settings → License">{{ icon('lock') }}Enterprise · no license</a>{% endif %}</div>
 </div>
 
 {% if ext_restart %}
@@ -46,6 +49,7 @@
     {% if e.failed %}<p class="small" style="margin:8px 0 0"><span class="pill err">not loaded</span> {{ e.failed }}</p>{% endif %}
     <div class="row" style="margin-top:10px">
       {% if e.active %}<span class="pill ok">active</span>
+      {%- if e.origin == 'configured' and edition != 'community' %} <span class="pill {{ 'ok' if features else 'warn' }}">{{ 'licensed' if features else 'no license' }}</span>{% endif %}
       {% elif e.enabled and not e.failed %}<span class="pill warn">enabled – restart to load</span>
       {% elif not e.enabled %}<span class="pill off">off</span>{% endif %}
       {% for m in modules if m.ext == e.name and m.nav and e.active and not m.planned and (not m.licensed or m.key in features) %}

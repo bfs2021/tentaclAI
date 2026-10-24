@@ -227,9 +227,18 @@ def test_the_configured_license_provider(client, ext):
     assert client.get("/reports").status_code == 200
     html = client.get("/modules").text
     assert "Enterprise modules are only available" not in html and "Open Reports" in html
-    assert html.count(">licensed<") == 1 and "planned" in html and "set in TC_EXTENSIONS" not in html and "Test Enterprise" in html
+    assert html.count(">licensed<") == 2 and "Enterprise · licensed" in html and "planned" in html  # module card + extension card and "set in TC_EXTENSIONS" not in html and "Test Enterprise" in html
     with pytest.raises(ValueError):
         ext.mod.set_enabled("tcx_ent", False)
+
+
+def test_enterprise_without_a_license(client, ext):
+    """the package is loaded, but no license unlocks anything – the Modules page says so instead of a green Enterprise"""
+    ext.install("tcx_ent", {"__init__.py": CONFIGURED.replace("lambda: {\"reports\"}", "lambda: set()")}, origin="configured")
+    ext.reload("tcx_ent")
+    assert ext.mod.edition() == "enterprise" and ext.mod.features() == set()
+    html = client.get("/modules").text
+    assert "Enterprise · no license" in html and ">no license<" in html and "Enterprise · licensed" not in html
 
 
 def test_audit_follower_across_a_rotation(tmp_path, monkeypatch, app_module):
