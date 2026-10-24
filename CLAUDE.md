@@ -30,8 +30,10 @@ tentaclAI = sandbox + service gateway for Claude Code. Three containers (`compos
 v1, `docs/extensions.md`): registration via `Api` in `register(api)`, runtime helpers in `control/app/extapi.py` – the
 only parts of `app.*` an extension may use; keep both stable (a change that breaks them needs a new `API_VERSION`).
 Origins decide the rights: *configured* (`TC_EXTENSIONS`, e.g. the private `tentaclai_enterprise` package – may
-`provide_license()` and replace pages/templates), *builtin* (`control/extensions/` → `/app/extensions/`) and *local*
-(`local/extensions/`, third-party) – both off until enabled (`data/control/extensions.json`), only below `/x/<name>/`,
+`provide_license()` and replace pages/templates), *signed* (a module package from Modules → Install from file, signed
+with a key in `packages.PACKAGE_KEYS` – same rights as configured, always on; `control/app/packages.py`, format in
+`docs/extensions.md` → Packages, tests `tests/test_packages.py`), *builtin* (`control/extensions/` → `/app/extensions/`) and *local*
+(`local/extensions/` or an unsigned package, third-party) – both off until enabled (`data/control/extensions.json`), only below `/x/<name>/`,
 templates as `<name>/…`; their code is never imported before they are enabled. The example `examples/extensions/tcx_hello`
 is also the test fixture (`tests/test_extensions.py`); the built-in `control/extensions/tentaclai_health` (Service-Health,
 `tests/test_health.py`) uses the public API only – keep it that way, it is the proof the API is enough. Keep Enterprise code out of this repository – here only the

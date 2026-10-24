@@ -25,7 +25,7 @@ def new_key():
 
 
 def files_of(name="tcx_pkg", version="1.0.0"):
-    return {f"{name}/__init__.py": b"def register(api):\n    pass\n",
+    return {f"{name}/__init__.py": b"REQUIRES_API = 1\ndef register(api):\n    pass\n",
             f"{name}/extension.json": json.dumps({"name": name, "title": "Package test", "version": version,
                                                   "requires_api": 1}).encode(),
             f"{name}/templates/page.html": b"<p>hi</p>"}
@@ -212,3 +212,94 @@ def test_key_removed_from_the_trusted_list(pk, monkeypatch):
     monkeypatch.setattr(packages, "PACKAGE_KEYS", [])
     v = packages.verify_installed("tcx_pkg")
     assert v["error"] and not v["signed"]
+
+
+# ---------------------------------------------------------------- in tentacontrol: Modules → Install from file
+
+PROVIDER = '''REQUIRES_API = 1
+from fastapi import APIRouter
+from fastapi.responses import PlainTextResponse
+router = APIRouter()
+@router.get("/license")
+async def lic():
+    return PlainTextResponse("from the package")
+def register(api):
+    api.add_router(router)
+    api.provide_license(lambda: {"reports"}, "enterprise")
+'''
+
+
+def provider_files(name="tcx_ent", version="1.0.0"):
+    f = files_of(name, version)
+    f[f"{name}/__init__.py"] = PROVIDER.encode()
+    return f
+
+
+def upload(client, data):
+    return client.post("/modules/upload", files={"file": ("p.tcpkg.zip", data, "application/zip")})
+
+
+def test_signed_package_installs_like_enterprise(client, ext, pk):
+    packages, priv = pk
+    html = upload(client, build("tcx_ent", files=provider_files(), priv=priv)).text
+    assert "signed by tentaclAI" in html and "Install 1.0.0" in html and "I trust this code" not in html
+    r = client.post("/modules/upload/install")
+    assert r.headers.get("hx-refresh") == "true" and packages.pending() is None
+    assert "Restart needed" in client.get("/modules").text and "tcx_ent" in ext.mod.restart_pending()
+    ext.reload()  # = the restart
+    assert ext.mod.LOADED == ["tcx_ent"] and ext.mod.origin("tcx_ent") == "signed" and ext.mod.features() == {"reports"}
+    assert client.get("/license").text == "from the package"  # signed: may replace tentacontrol's pages
+    assert ext.mod.restart_pending() == []
+    html = client.get("/modules").text
+    assert "Signed by tentaclAI" in html and "Package 1.0.0" in html and "/modules/tcx_ent/remove" in html and "Roll back" not in html
+    with pytest.raises(ValueError, match="always on"):
+        ext.mod.set_enabled("tcx_ent", False)
+    upload(client, build("tcx_ent", "1.1.0", files=provider_files(version="1.1.0"), priv=priv))
+    client.post("/modules/upload/install")
+    assert "tcx_ent" in ext.mod.restart_pending() and "1.0.0 kept" in client.get("/modules").text
+    client.post("/modules/tcx_ent/rollback")
+    assert packages.installed_versions() == {"tcx_ent": "1.0.0"} and ext.mod.restart_pending() == []
+    client.post("/modules/tcx_ent/remove")
+    assert packages.names() == [] and ext.mod.restart_pending() == ["tcx_ent"]  # still running until the restart
+    from app import auditlog
+    actions = [e["action"] for e in auditlog.search("target:tcx_ent", rng="1h")[0]]
+    assert any("module package installed: Package test 1.0.0 (signed by tentaclAI" in a for a in actions)
+    assert any("rolled back to 1.0.0" in a for a in actions) and any(a == "module package removed" for a in actions)
+
+
+def test_unsigned_package_is_third_party(client, ext, pk):
+    packages, priv = pk
+    data = build("tcx_ent", files=provider_files())
+    assert "I trust this code" in upload(client, data).text
+    r = client.post("/modules/upload/install")
+    assert "not signed" in r.headers.get("hx-trigger", "") and packages.names() == []
+    client.post("/modules/upload/install", data={"trust": "1"})
+    assert packages.names() == ["tcx_ent"] and "tcx_ent" in ext.mod.enabled()
+    ext.reload()
+    assert ext.mod.origin("tcx_ent") == "local" and "routes must start with /x/tcx_ent/" in ext.mod.FAILED["tcx_ent"]
+    html = client.get("/modules").text
+    assert "Third-party" in html and "unsigned" in html
+    client.post("/modules/tcx_ent/remove")
+    assert "tcx_ent" not in ext.mod.enabled() and packages.names() == []
+
+
+def test_changed_package_is_not_loaded(client, ext, pk):
+    packages, priv = pk
+    packages.install(build("tcx_hi", priv=priv))
+    with open(os.path.join(packages.PACKAGES_DIR, "tcx_hi", "tcx_hi", "__init__.py"), "a") as f:
+        f.write("import os\n")
+    ext.reload()
+    assert "tcx_hi" not in ext.mod.LOADED and "changed after installing" in ext.mod.FAILED["tcx_hi"]
+    assert "changed after installing" in client.get("/modules").text
+
+
+def test_refused_uploads(client, ext, pk):
+    packages, priv = pk
+    assert "Not installed: not a ZIP file" in upload(client, b"nope").text
+    ext.install("tcx_ent", {"__init__.py": PROVIDER}, origin="configured")
+    ext.reload("tcx_ent")
+    assert "TC_EXTENSIONS" in upload(client, build("tcx_ent", files=provider_files(), priv=priv)).text
+    ext.install("tcx_loc", {"__init__.py": "def register(api):\n    pass\n"})
+    assert "local/extensions/tcx_loc" in upload(client, build("tcx_loc", priv=priv)).text
+    r = client.post("/modules/upload/install")
+    assert "expired" in r.headers.get("hx-trigger", "")

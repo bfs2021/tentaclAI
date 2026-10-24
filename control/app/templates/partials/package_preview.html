@@ -1,0 +1,26 @@
+{% from "_icons.html" import icon %}
+{% if error %}
+<div class="alert err" style="margin-top:12px">Not installed: {{ error }}</div>
+{% elif p %}
+<form class="pkg-preview" hx-post="/modules/upload/install" style="margin-top:12px">
+  <dl class="kv">
+    <dt>Module</dt><dd><strong>{{ p.title }}</strong> <span class="mono faint">{{ p.name }}</span></dd>
+    <dt>Version</dt><dd>{{ p.version }}{% if p.installed %} <span class="muted">– replaces {{ p.installed }} (kept for a rollback)</span>{% endif %}</dd>
+    <dt>Signature</dt><dd>{% if p.signed %}<span class="pill ok">{{ icon('check') }}signed by tentaclAI</span> <span class="mono faint">{{ p.key }}</span>
+      {% else %}<span class="pill warn">not signed</span>{% endif %}</dd>
+    <dt>Files</dt><dd>{{ p.files }}, all checked</dd>
+  </dl>
+  {% if p.signed %}
+  <p class="small muted">A signed module has the rights of tentaclAI Enterprise: it may provide the license and replace tentacontrol's pages. It is always on – remove the package to switch it off.</p>
+  {% else %}
+  <div class="alert warn small">An unsigned module runs inside tentacontrol with all of its rights – it can read the configuration, approve requests and run svc.
+    Install it only if you know where it comes from.</div>
+  <label class="check" style="margin:8px 0"><input type="checkbox" name="trust" value="1" required> I trust this code</label>
+  {% endif %}
+  <div class="row">
+    <button class="btn primary">{{ icon('upload') }}Install {{ p.version }}</button>
+    <button class="btn ghost" type="button" hx-post="/modules/upload/cancel" hx-target="closest .pkg-preview" hx-swap="outerHTML">Cancel</button>
+    <span class="help">Takes effect when tentacontrol restarts.</span>
+  </div>
+</form>
+{% endif %}

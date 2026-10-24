@@ -18,6 +18,12 @@ All notable changes, newest first. Every release lists **upgrade steps** from th
   per service and system, a sidebar badge counting services that are down, and the notifications *Service down*
   (urgent) / *Service up again* after a set number of failed checks in a row (default 2). Settings → Health picks the
   interval and the services; the history (7 days) stays in `data/control/ext/tentaclai_health/`.
+- **Install modules from a file** (Modules → *Install from file*): a module package (`.tcpkg.zip`) is checked – size,
+  paths, file types, SHA-256 of every file – and shows name, version and signature before anything is installed. A
+  package signed by tentaclAI gets the rights of Enterprise (tentaclAI Enterprise can be installed offline, without
+  `TC_EXTENSIONS`); an unsigned one is a third-party module after *I trust this code*. Every file is checked again at
+  each start, an update keeps the previous version for *Roll back*, *Remove* deletes it. Format: `docs/extensions.md`
+  → Packages.
 
 ### Changes / fixes
 - `svc <name> GET …`: an HTTP error (4xx/5xx) now exits non-zero (curl 22, the body is still printed) – calls that read

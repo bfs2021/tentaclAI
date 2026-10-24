@@ -20,6 +20,7 @@ import re
 import shutil
 import stat
 import tempfile
+import time
 import zipfile
 
 from .config import DATA_DIR
@@ -302,17 +303,34 @@ def verify_installed(name, keys=None):
 def installed():
     """name → {version, title, signed, key, error, previous} for every package in PACKAGES_DIR"""
     out = {}
-    try:
-        names = sorted(os.listdir(PACKAGES_DIR))
-    except OSError:
-        return out
-    for name in names:
-        if name.startswith(".") or not NAME_RE.match(name) or not os.path.isdir(os.path.join(PACKAGES_DIR, name)):
-            continue
+    for name in names():
         v = verify_installed(name)
         out[name] = {k: v[k] for k in ("version", "title", "signed", "key", "error", "path")}
-        out[name]["previous"] = _version_of(os.path.join(PREV_DIR, name))
+        out[name]["previous"] = previous_version(name)
     return out
+
+
+def names():
+    """the installed packages' names (no checks)"""
+    try:
+        return sorted(n for n in os.listdir(PACKAGES_DIR) if NAME_RE.match(n) and os.path.isdir(os.path.join(PACKAGES_DIR, n)))
+    except OSError:
+        return []
+
+
+def installed_versions():
+    """name → version from tcpkg.json, without checking anything – cheap enough for every page"""
+    return {n: _version_of(os.path.join(PACKAGES_DIR, n)) for n in names()}
+
+
+def is_signed(name):
+    """has a signature file (not checked)"""
+    return os.path.isfile(os.path.join(_dir(name), "tcpkg.sig"))
+
+
+def previous_version(name):
+    """the version kept for rollback(), or """""
+    return _version_of(os.path.join(PREV_DIR, name))
 
 
 def _version_of(base):
@@ -321,6 +339,42 @@ def _version_of(base):
             return str(json.load(f).get("version") or "?")
     except (OSError, ValueError, AttributeError):
         return ""
+
+
+# ---------------------------------------------------------------- an upload waiting for its confirmation
+
+UPLOAD_TTL = 3600
+
+
+def keep(data):
+    """keep an uploaded ZIP until the admin confirms it (one at a time, an hour at most)"""
+    os.makedirs(PACKAGES_DIR, mode=0o700, exist_ok=True)
+    fd = os.open(_upload(), os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "wb") as f:
+        f.write(data)
+
+
+def pending():
+    """the kept upload (bytes), or None when there is none or it is older than an hour"""
+    try:
+        if time.time() - os.path.getmtime(_upload()) > UPLOAD_TTL:
+            drop_pending()
+            return None
+        with open(_upload(), "rb") as f:
+            return f.read()
+    except OSError:
+        return None
+
+
+def drop_pending():
+    try:
+        os.remove(_upload())
+    except OSError:
+        pass
+
+
+def _upload():
+    return os.path.join(PACKAGES_DIR, ".upload.zip")  # PACKAGES_DIR read at call time (tests move it)
 
 
 def remove(name):

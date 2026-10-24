@@ -5,10 +5,10 @@ import os
 import time
 
 import segno
-from fastapi import APIRouter, Form, Request, WebSocket
+from fastapi import APIRouter, File, Form, Request, UploadFile, WebSocket
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, PlainTextResponse, RedirectResponse, StreamingResponse
 
-from .. import activity, auditlog, auth, dockerops, egress, extensions, jobs, netguard, notify, scheduled, services_store, sshhosts, updatecheck, usage
+from .. import activity, auditlog, auth, dockerops, egress, extensions, jobs, netguard, notify, packages, scheduled, services_store, sshhosts, updatecheck, usage
 from ..config import CLAUDE_SERVICE, COMPOSE, LOG_CONTAINERS
 from ..envfile import read_env, update_env
 from ..terminal import PROFILES, bridge, onboard_cmd
@@ -309,9 +309,73 @@ async def modules_page(request: Request):
                 community_modules=COMMUNITY_MODULES, enterprise_modules=extensions.licensed_modules())
 
 
+# ---------------------------------------------------------------- module packages (Install from file)
+
+def _package_clash(name):
+    """why a package with this name can't be installed here, or """""
+    configured = [n.strip() for n in os.environ.get("TC_EXTENSIONS", "tentaclai_enterprise").split(",") if n.strip()]
+    if name in configured and extensions.origin(name) == "configured":
+        return f"{name} is loaded from TC_EXTENSIONS on this installation – take it out there first"
+    if extensions._discover(packages_too=False).get(name, {}).get("origin") == "builtin":
+        return f"{name} is a built-in module"
+    if os.path.isdir(os.path.join(extensions.LOCAL_DIR, name)):
+        return f"local/extensions/{name}/ has that name – remove that folder first"
+    return ""
+
+
+def _package_preview(request, info=None, error=None):
+    return templates.TemplateResponse(request, "partials/package_preview.html", {"p": info, "error": error})
+
+
+@router.post("/modules/upload", response_class=HTMLResponse)
+async def package_upload(request: Request, file: UploadFile = File(...)):
+    """check an uploaded package and show what it is – nothing is installed yet"""
+    data = await file.read(packages.MAX_ZIP + 1)
+    try:
+        info = await asyncio.to_thread(packages.inspect, data)
+    except packages.PackageError as e:
+        return _package_preview(request, error=str(e))
+    clash = _package_clash(info["name"])
+    if clash:
+        return _package_preview(request, error=clash)
+    packages.keep(data)
+    return _package_preview(request, info)
+
+
+@router.post("/modules/upload/install", response_class=HTMLResponse)
+async def package_install(request: Request, trust: str = Form("")):
+    data = packages.pending()
+    if data is None:
+        return respond(request, "The upload expired – upload the file again", "err")
+    try:
+        info = await asyncio.to_thread(packages.inspect, data)
+        clash = _package_clash(info["name"])
+        if clash:
+            raise packages.PackageError(clash)
+        info = await asyncio.to_thread(packages.install, data, bool(trust))
+    except packages.PackageError as e:
+        return respond(request, str(e), "err")
+    packages.drop_pending()
+    name = info["name"]
+    if not info["signed"]:
+        extensions.set_enabled(name, True)
+    how = f"signed by tentaclAI, key {info['key']}" if info["signed"] else "unsigned, trusted by the admin"
+    auditlog.user(request, "admin", name, f"module package installed: {info['title']} {info['version']} ({how})")
+    return respond(request, f"{info['title']} {info['version']} installed – restart tentacontrol to load it", refresh=True)
+
+
+@router.post("/modules/upload/cancel", response_class=HTMLResponse)
+async def package_cancel(request: Request):
+    packages.drop_pending()
+    return HTMLResponse("")
+
+
 @router.post("/modules/{name}/{action}", response_class=HTMLResponse)
 async def module_switch(request: Request, name: str, action: str):
-    """enable (loaded at the next start) or disable (at once) a built-in or third-party module"""
+    """enable (loaded at the next start) or disable (at once) a built-in or third-party module; remove or roll back
+    an installed package (takes effect at the next start)"""
+    if action in ("remove", "rollback"):
+        return await _package_action(request, name, action)
     if action not in ("enable", "disable"):
         return PlainTextResponse("unknown action", status_code=404)
     try:
@@ -323,6 +387,24 @@ async def module_switch(request: Request, name: str, action: str):
     if extensions.active(name):
         return respond(request, f"{extensions.title(name)} enabled", refresh=True)
     return respond(request, f"{extensions.title(name)} enabled – restart tentacontrol to load it", refresh=True)
+
+
+async def _package_action(request, name, action):
+    if name not in packages.names():
+        return respond(request, f"no package {name}", "err")
+    title = extensions.title(name)
+    try:
+        if action == "remove":
+            if name in extensions.enabled():
+                extensions.set_enabled(name, False)
+            await asyncio.to_thread(packages.remove, name)
+            msg = f"{title} removed"
+        else:
+            msg = f"{title} rolled back to {await asyncio.to_thread(packages.rollback, name)}"
+    except (packages.PackageError, ValueError, OSError) as e:
+        return respond(request, str(e), "err")
+    auditlog.user(request, "admin", name, f"module package {msg.replace(title + ' ', '', 1)}")
+    return respond(request, msg + (" – restart tentacontrol to finish" if name in extensions.LOADED else ""), refresh=True)
 
 
 RESTART_WAIT = """<div><strong>Restarting tentacontrol …</strong> <span class="muted">the page reloads when it is back.</span></div>

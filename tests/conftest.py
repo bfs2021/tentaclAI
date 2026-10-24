@@ -143,8 +143,11 @@ def ext(app_module, monkeypatch, tmp_path):
     app, env = app_module.app, web.templates.env
     for attr in ("LOADED", "_tabs", "_help", "_tasks", "_audit_hooks", "_modules", "_banners"):
         monkeypatch.setattr(extensions, attr, list(getattr(extensions, attr)))
-    for attr in ("FAILED", "_exts", "_provider", "_backup_parts", "_icons", "_static"):
+    for attr in ("FAILED", "_exts", "_provider", "_backup_parts", "_icons", "_static", "_pkg_loaded"):
         monkeypatch.setattr(extensions, attr, dict(getattr(extensions, attr)))
+    from app import packages
+    monkeypatch.setattr(packages, "PACKAGES_DIR", str(tmp_path / "packages"))
+    monkeypatch.setattr(packages, "PREV_DIR", str(tmp_path / "packages" / ".prev"))
     monkeypatch.setattr(extensions, "_prefix", extensions.PrefixLoader({}))
     monkeypatch.setattr(app.router, "routes", list(app.router.routes))
     monkeypatch.setattr(notify, "EVENTS", dict(notify.EVENTS))

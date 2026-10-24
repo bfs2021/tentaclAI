@@ -31,7 +31,7 @@
 
 {% if ext_restart %}
 <div class="banner" id="ext-restart">
-  <div><strong>Restart needed.</strong> <span class="muted">tentacontrol loads {{ ext_restart | join(', ') }} at its next start – the page is gone for a few seconds, the sandbox and Claude keep running.</span></div>
+  <div><strong>Restart needed.</strong> <span class="muted">tentacontrol applies the changes to {{ ext_restart | join(', ') }} at its next start – the page is gone for a few seconds, the sandbox and Claude keep running.</span></div>
   <button class="btn primary sm" hx-post="/modules/restart" hx-target="#ext-restart" hx-swap="innerHTML">{{ icon('refresh') }}Restart tentacontrol</button>
 </div>
 {% endif %}
@@ -46,17 +46,23 @@
     <p class="small muted" style="margin:0 0 8px">{{ e.description or 'No description.' }}</p>
     <div class="small faint mono">{{ e.name }}{% if e.version %} · v{{ e.version }}{% endif %}{% if e.author %} · {{ e.author }}{% endif %}
       {% if e.homepage %} · <a href="{{ e.homepage }}" target="_blank" rel="noopener">homepage</a>{% endif %}</div>
+    {% if e.package %}<div class="small faint">Package {{ e.package.version }}{% if e.package.signed %} · key <span class="mono">{{ e.package.key }}</span>{% else %} · unsigned{% endif %}
+      {%- if e.package.previous %} · {{ e.package.previous }} kept{% endif %}</div>{% endif %}
     {% if e.failed %}<p class="small" style="margin:8px 0 0"><span class="pill err">not loaded</span> {{ e.failed }}</p>{% endif %}
     <div class="row" style="margin-top:10px">
       {% if e.active %}<span class="pill ok">active</span>
-      {%- if e.origin == 'configured' and edition != 'community' %} <span class="pill {{ 'ok' if features else 'warn' }}">{{ 'licensed' if features else 'no license' }}</span>{% endif %}
+      {%- if e.origin in ('configured', 'signed') and edition != 'community' %} <span class="pill {{ 'ok' if features else 'warn' }}">{{ 'licensed' if features else 'no license' }}</span>{% endif %}
       {% elif e.enabled and not e.failed %}<span class="pill warn">enabled – restart to load</span>
       {% elif not e.enabled %}<span class="pill off">off</span>{% endif %}
       {% for m in modules if m.ext == e.name and m.nav and e.active and not m.planned and (not m.licensed or m.key in features) %}
       <a class="btn sm" href="{{ m.nav.href }}">Open {{ m.nav.label }}</a>
       {% endfor %}
       <span class="spacer"></span>
-      {% if e.origin == 'configured' %}
+      {% if e.package %}
+      {% if e.package.previous %}<button class="btn sm ghost" hx-post="/modules/{{ e.name }}/rollback" hx-confirm="Go back to {{ e.title }} {{ e.package.previous }}? It takes effect when tentacontrol restarts.">Roll back</button>{% endif %}
+      <button class="btn sm ghost" hx-post="/modules/{{ e.name }}/remove" hx-confirm="Remove {{ e.title }}? Its files are deleted{% if e.origin == 'signed' %}; it stops at the next restart of tentacontrol{% endif %}. Data it stored stays.">Remove</button>
+      {% endif %}
+      {% if e.origin in ('configured', 'signed') %}
       {% elif e.enabled %}<button class="btn sm ghost" hx-post="/modules/{{ e.name }}/disable">Disable</button>
       {% else %}<button class="btn sm primary" hx-post="/modules/{{ e.name }}/enable"
         {%- if e.origin == 'local' %} hx-confirm="Enable {{ e.title }}? A third-party module runs inside tentacontrol with all of its rights – it can read the configuration, approve requests and run svc. Only enable code you trust."{% endif %}>Enable</button>{% endif %}
@@ -65,8 +71,18 @@
   {% endfor %}
 </div>
 {% else %}
-<div class="empty small">No modules installed. Your own go to <code>local/extensions/&lt;name&gt;/</code> – see <a href="/help#modules">Help → Modules</a>.</div>
+<div class="empty small">No modules installed. Install a module package below, or put your own in <code>local/extensions/&lt;name&gt;/</code> – see <a href="/help#modules">Help → Modules</a>.</div>
 {% endif %}
+
+<div class="card" style="margin-top:16px">
+  <h2>{{ icon('upload') }}Install from file</h2>
+  <form hx-post="/modules/upload" hx-encoding="multipart/form-data" hx-target="#pkg-area" class="row" style="flex-wrap:wrap">
+    <input type="file" name="file" accept=".zip,application/zip" aria-label="Module package" required>
+    <button class="btn">{{ icon('upload') }}Check</button>
+    <span class="help">A module package (<code>.tcpkg.zip</code>) – e.g. tentaclAI Enterprise. Nothing is installed before you see what it is; no internet needed.</span>
+  </form>
+  <div id="pkg-area"></div>
+</div>
 
 <h2 class="section-head" style="margin-top:24px">Enterprise</h2>
 {% if edition == 'community' %}

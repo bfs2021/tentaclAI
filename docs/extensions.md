@@ -13,7 +13,8 @@ Where a module comes from decides what it may do – never what the package says
 | Origin | Where | Loaded | May |
 |---|---|---|---|
 | **Built-in** | shipped in the image (`control/extensions/` in this repository) | once enabled on the Modules page | the API below |
-| **Third-party** | `<stack>/local/extensions/<name>/` | once enabled on the Modules page | the API below |
+| **Third-party** | `<stack>/local/extensions/<name>/`, or an unsigned [package](#packages) | once enabled on the Modules page | the API below |
+| **Signed by tentaclAI** | a [package](#packages) signed with tentaclAI's package key | always | like Enterprise |
 | **Enterprise** | named in `TC_EXTENSIONS` (tentaclAI Enterprise) | always | also provide the license and replace tentacontrol's own pages and templates |
 
 A module runs **inside tentacontrol, with all of its rights**: it can read the configuration, approve requests and run
@@ -121,6 +122,31 @@ only while the license unlocks the feature `key`.
 
 Secrets: never store credentials in your data files or show them on a page. Use `${VAR}` names that the admin puts
 into the stack's `.env`, like services do.
+
+## Packages
+
+A module can be handed out as one file and installed offline: Modules → **Install from file** checks the ZIP, shows
+name, version and signature, and installs it after a confirmation (into `data/control/packages/<name>/`; the version
+before an update is kept for *Roll back*). It takes effect when tentacontrol restarts.
+
+```
+<name>-<version>.tcpkg.zip
+├── tcpkg.json   {"format": 1, "name", "version", "requires_api", "title", "files": {"<name>/path": "<sha256>", …}}
+├── tcpkg.sig    {"key": "<fingerprint>", "sig": "<base64url Ed25519 signature over the bytes of tcpkg.json>"}
+└── <name>/      the package itself, with extension.json
+```
+
+- **Signed** with one of tentaclAI's package keys (`PACKAGE_KEYS` in `control/app/packages.py`; the private key never
+  leaves tentaclAI's issuer): origin *Signed by tentaclAI*, the rights of Enterprise, always on – this is how tentaclAI
+  Enterprise is installed without `TC_EXTENSIONS`. A signature from an unknown key is refused.
+- **Unsigned** (no `tcpkg.sig`): a third-party module – installed only after *I trust this code*, then enabled.
+- Every file is listed with its SHA-256 in `tcpkg.json` and checked again at **every start**: a package changed after
+  installing is not loaded (Modules says which file). Compiled caches (`__pycache__`) are removed before loading.
+- Refused: more than 20 MB packed / 50 MB unpacked or 2000 files, paths outside `<name>/`, `..`, symlinks, encrypted
+  entries, files not listed (or listed but missing), file types other than .py .html .css .js .json .svg .png .woff2
+  .md .txt (no compiled code), an `extension.json` that disagrees with `tcpkg.json`, a name that a built-in module, a
+  `TC_EXTENSIONS` entry or a folder in `local/extensions/` already uses.
+- Packages are code, not configuration: they are not part of Export / Import – install them again after a restore.
 
 ## Versions
 

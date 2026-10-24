@@ -4,8 +4,11 @@ Where an extension comes from decides what it may do (never what the package cla
 - configured – named in TC_EXTENSIONS (default "tentaclai_enterprise"), always loaded; may provide the license
   (provide_license) and replace tentacontrol's own pages and templates.
 - builtin    – shipped in the image (BUILTIN_DIR, source control/extensions/), loaded once the admin enabled it.
-- local      – third-party, in STACK_DIR/local/extensions/<name>/, loaded once the admin enabled it.
-builtin and local packages carry an extension.json manifest; the Modules page reads only that, so the code of an
+- signed     – a module package (packages.py) signed by tentaclAI, installed through Modules → Install from file;
+  always loaded, the same rights as configured (it is how Enterprise is installed without TC_EXTENSIONS).
+- local      – third-party, in STACK_DIR/local/extensions/<name>/ or an unsigned package, loaded once the admin
+  enabled it.
+builtin, local and package extensions carry an extension.json manifest; the Modules page reads only that, so the code of an
 extension that isn't enabled is never imported. Enabling takes effect at tentacontrol's next start, disabling at once
 (its pages answer 404, menu entries, tabs, tasks and audit hooks stop).
 
@@ -30,7 +33,8 @@ NAME_RE = re.compile(r"^[a-z][a-z0-9_]{1,40}$")
 BUILTIN_DIR = os.environ.get("TC_BUILTIN_EXTENSIONS", "/app/extensions")
 LOCAL_DIR = os.path.join(STACK_DIR, "local", "extensions")
 STATE = os.path.join(DATA_DIR, "extensions.json")
-ORIGINS = {"configured": "Enterprise", "builtin": "Built-in", "local": "Third-party"}
+ORIGINS = {"configured": "Enterprise", "signed": "Signed by tentaclAI", "builtin": "Built-in", "local": "Third-party"}
+TRUSTED = ("configured", "signed")  # may provide the license and replace tentacontrol's pages
 TAB_AREAS = ("settings", "logs", "claude")
 
 LOADED = []      # names of the extensions that registered, in load order
@@ -47,6 +51,7 @@ _backup_parts = {}  # section id → {label, export, apply, ext}
 _icons = {}      # name → inner SVG
 _static = {}     # name → directory served at /x/<name>/static/
 _prefix = PrefixLoader({})  # templates of builtin/local extensions: "<name>/file.html"
+_pkg_loaded = {}  # package name → the version installed when tentacontrol started (it runs that code until a restart)
 
 
 class ExtensionError(Exception):
@@ -64,6 +69,8 @@ def set_enabled(name, on):
         raise ValueError(f"no extension {name}")
     if origin(name) == "configured":
         raise ValueError(f"{name} is set in TC_EXTENSIONS – change it there")
+    if _discover().get(name, {}).get("origin") == "signed":
+        raise ValueError(f"{name} is a signed package and always on – remove the package instead")
     names = enabled()
     names = names | {name} if on else names - {name}
     jsonstore.save(STATE, {"enabled": sorted(names)})
@@ -73,7 +80,7 @@ def active(name):
     """loaded at this start and (configured or still enabled) – what menu, tabs, pages, tasks and hooks go by"""
     if name not in LOADED:
         return False
-    return origin(name) == "configured" or name in enabled()
+    return origin(name) in TRUSTED or name in enabled()
 
 
 def title(name):
@@ -85,8 +92,16 @@ def origin(name):
 
 
 def restart_pending():
-    """enabled extensions that aren't loaded yet (and didn't fail at this start) – tentacontrol needs a restart"""
-    return sorted(n for n in enabled() if n not in LOADED and n not in FAILED and n in _discover())
+    """enabled extensions that aren't loaded yet (and didn't fail at this start), and packages installed, updated or
+    removed since the start – tentacontrol needs a restart. Called on every page: no checksums here."""
+    from . import packages
+    now = packages.installed_versions()
+    out = {n for n in enabled() if n not in LOADED and n not in FAILED and n not in now and n in _discover(packages_too=False)}
+    for name, version in now.items():
+        if _pkg_loaded.get(name) != version and name not in FAILED and (name in enabled() or packages.is_signed(name)):
+            out.add(name)
+    out |= {n for n in _pkg_loaded if n not in now and n in LOADED}
+    return sorted(out)
 
 
 # ---------------------------------------------------------------- discovery (manifests only, no import)
@@ -115,10 +130,25 @@ def _manifest(path, name, origin_):
     return info
 
 
-def _discover(log=False):
-    """builtin and local extensions by their manifests – a local one with a builtin's name is ignored (log: say so)"""
+def _discover(log=False, packages_too=True):
+    """builtin, package and local extensions by their manifests – first one wins: builtin, then installed packages
+    (checked: signed or not, unchanged), then local/extensions (log: say so)"""
+    from . import packages
     out = {}
-    for origin_, base in (("builtin", BUILTIN_DIR), ("local", LOCAL_DIR)):
+    for origin_, base in (("builtin", BUILTIN_DIR), ("package", packages.PACKAGES_DIR), ("local", LOCAL_DIR)):
+        if origin_ == "package":
+            for name in packages.names() if packages_too else ():
+                if name in out:
+                    if log:
+                        print(f"tentacontrol: package {name} ignored – a built-in module has that name", flush=True)
+                    continue
+                v = packages.verify_installed(name)
+                info = _manifest(v["path"], name, "signed" if v["signed"] else "local")
+                info["error"] = v["error"] or info["error"]
+                info["package"] = {k: v[k] for k in ("version", "signed", "key")}
+                info["package"]["previous"] = packages.previous_version(name)
+                out[name] = info
+            continue
         try:
             names = sorted(os.listdir(base))
         except OSError:
@@ -129,7 +159,7 @@ def _discover(log=False):
                 continue
             if name in out:
                 if log:
-                    print(f"tentacontrol: extension {name} in {base} ignored – a built-in one has that name", flush=True)
+                    print(f"tentacontrol: extension {name} in {base} ignored – a built-in one or a package has that name", flush=True)
                 continue
             info = _manifest(path, name, origin_)
             if not NAME_RE.match(name):
@@ -147,7 +177,8 @@ def available():
         out.append(dict(info, loaded=name in LOADED, failed=FAILED.get(name, "") or info["error"]))
     on = enabled()
     for e in out:
-        e["enabled"] = e["origin"] == "configured" or e["name"] in on
+        e["enabled"] = e["origin"] in TRUSTED or e["name"] in on
+        e.setdefault("package", None)
         e["active"] = active(e["name"])
         e["origin_label"] = ORIGINS[e["origin"]]
     return out
@@ -166,8 +197,8 @@ class Api:
 
     # pages
     def add_router(self, router):
-        """configured: any path (may replace tentacontrol's own pages); others only below /x/<name>/"""
-        if self.origin != "configured":
+        """configured/signed: any path (may replace tentacontrol's own pages); others only below /x/<name>/"""
+        if self.origin not in TRUSTED:
             base = f"/x/{self.name}"
             bad = [r.path for r in router.routes if not (getattr(r, "path", "") == base or getattr(r, "path", "").startswith(base + "/"))]
             if bad:
@@ -175,15 +206,15 @@ class Api:
         n = len(self.app.router.routes)
         self.app.include_router(router)
         added = self.app.router.routes[n:]
-        if self.origin == "configured":  # in front of tentacontrol's own routes, whenever it is loaded
+        if self.origin in TRUSTED:  # in front of tentacontrol's own routes, whenever it is loaded
             del self.app.router.routes[n:]
             self.app.router.routes[0:0] = added
         self._done.append(lambda: [self.app.router.routes.remove(r) for r in added if r in self.app.router.routes])
 
     def add_templates(self, directory):
-        """configured: in front of tentacontrol's templates (may replace them); others as "<name>/file.html" """
+        """configured/signed: in front of tentacontrol's templates (may replace them); others as "<name>/file.html" """
         env = self.templates.env
-        if self.origin == "configured":
+        if self.origin in TRUSTED:
             old = env.loader
             env.loader = ChoiceLoader([FileSystemLoader(directory), old])
             self._done.append(lambda: setattr(env, "loader", old))
@@ -217,11 +248,11 @@ class Api:
         """a module for the Modules page; nav = {"href", "label", "icon"} – its sidebar entry, shown while the extension
         is active, the module isn't only planned and – licensed=True – the license unlocks the feature `key`.
         count_url: a page that answers a short text (e.g. a number) for the badge next to the entry."""
-        if licensed and self.origin != "configured":
+        if licensed and self.origin not in TRUSTED:
             raise ExtensionError("licensed modules come from the license provider only")
         if nav and not (isinstance(nav, dict) and nav.get("href") and nav.get("label")):
             raise ExtensionError("nav needs href and label")
-        if nav and self.origin != "configured" and not str(nav["href"]).startswith(f"/x/{self.name}"):
+        if nav and self.origin not in TRUSTED and not str(nav["href"]).startswith(f"/x/{self.name}"):
             raise ExtensionError(f"nav href must start with /x/{self.name}")
         m = {"key": key, "title": title, "text": text, "nav": nav, "licensed": bool(licensed), "planned": bool(planned),
              "count_url": count_url, "ext": self.name}
@@ -232,7 +263,7 @@ class Api:
         """a tab in the tab bar of Settings, Logs or Claude – the page itself comes with add_router"""
         if area not in TAB_AREAS:
             raise ExtensionError(f"tab area: one of {', '.join(TAB_AREAS)}")
-        if self.origin != "configured" and not href.startswith(f"/x/{self.name}"):
+        if self.origin not in TRUSTED and not href.startswith(f"/x/{self.name}"):
             raise ExtensionError(f"tab href must start with /x/{self.name}")
         t = {"area": area, "href": href, "label": label, "icon": icon, "ext": self.name}
         _tabs.append(t)
@@ -242,7 +273,7 @@ class Api:
         """a section at the end of Help – template: one of the extension's templates (rendered without page context)"""
         if not re.match(r"^[a-z][a-z0-9-]{1,40}$", id or ""):
             raise ExtensionError(f"help section id {id!r}: lowercase letters, digits and -")
-        h = {"id": f"x-{self.name}-{id}" if self.origin != "configured" else id, "title": title, "template": template,
+        h = {"id": f"x-{self.name}-{id}" if self.origin not in TRUSTED else id, "title": title, "template": template,
              "ext": self.name}
         _help.append(h)
         self._done.append(lambda: _help.remove(h))
@@ -289,11 +320,12 @@ class Api:
         _backup_parts[sid] = {"label": label, "export": export, "apply": apply, "ext": self.name}
         self._done.append(lambda: _backup_parts.pop(sid, None))
 
-    # the license (configured extensions only)
+    # the license (configured extensions and signed packages only)
     def provide_license(self, features, edition):
-        """features() → the feature names the license unlocks right now; edition e.g. "enterprise" – once, configured only"""
-        if self.origin != "configured":
-            raise ExtensionError("only an extension from TC_EXTENSIONS can provide the license")
+        """features() → the feature names the license unlocks right now; edition e.g. "enterprise" – once, configured
+        or signed only"""
+        if self.origin not in TRUSTED:
+            raise ExtensionError("only an extension from TC_EXTENSIONS or a package signed by tentaclAI can provide the license")
         if _provider:
             raise ExtensionError(f"{_provider['name']} provides the license already")
         _provider.update(name=self.name, features=features, edition=edition)
@@ -389,8 +421,11 @@ def load(app, templates):
         if name in LOADED:
             continue
         _exts[name] = {k: info[k] for k in ("name", "origin", "title", "description", "version", "author", "homepage", "path")}
-        if name not in on:
-            continue
+        _exts[name]["package"] = info.get("package")
+        if info.get("package"):
+            _pkg_loaded[name] = info["package"]["version"]  # what runs until the next start – also when it fails
+        if name not in on and info["origin"] != "signed" and not (info.get("package") and info["error"]):
+            continue  # a package that fails its check is reported even when it is off
         if info["error"]:
             FAILED[name] = info["error"]
             print(f"tentacontrol: extension {name} not loaded: {info['error']}", flush=True)
