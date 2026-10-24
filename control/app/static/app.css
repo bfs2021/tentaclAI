@@ -611,12 +611,16 @@ pre.diff { margin: 6px 0 0; padding: 8px 10px; background: var(--bg-2); border: 
 .ent-intro svg { width: 18px; height: 18px; color: var(--accent); flex: none; margin-top: 2px; }
 .ent-intro strong { display: block; font-size: 13.5px; }
 
-/* edition: a plain CE next to the wordmark (Community), a gold pill below it in place of the tagline (Enterprise) */
-:root { --gold-1: #f7df8f; --gold-2: #c8952b; --gold-text: #3a2905; --gold-glow: rgba(233,190,90,.32); }
-@media (prefers-color-scheme: light) { :root { --gold-1: #f2d67a; --gold-2: #b5821b; --gold-text: #2e2003; --gold-glow: rgba(181,130,27,.22); } }
-.edition { display: inline-flex; align-items: center; gap: 3px; border-radius: 99px; font-weight: 700; text-transform: uppercase; white-space: nowrap; }
-.edition.ce { margin-left: 7px; padding: 0 6px; font-size: 9.5px; letter-spacing: .08em; line-height: 16px; vertical-align: 2px;
-  border: 1px solid var(--border); color: var(--muted); }
-.edition.ee { display: flex; width: fit-content; margin-top: 2px; padding: 0 4.5px; font-size: 7px; letter-spacing: .09em; line-height: 12px;
-  background: linear-gradient(135deg, var(--gold-1), var(--gold-2)); color: var(--gold-text);
+/* edition below the wordmark, in place of the tagline, exactly as wide as "tentaclAI": silver Community, gold Enterprise */
+:root { --gold-1: #f7df8f; --gold-2: #c8952b; --gold-text: #3a2905; --gold-glow: rgba(233,190,90,.32);
+  --silver-1: #eef1f6; --silver-2: #9aa4b5; --silver-text: #1d2330; --silver-glow: rgba(150,160,180,.25); }
+@media (prefers-color-scheme: light) { :root { --gold-1: #f2d67a; --gold-2: #b5821b; --gold-text: #2e2003; --gold-glow: rgba(181,130,27,.22);
+  --silver-1: #f4f6fa; --silver-2: #a9b2c2; --silver-glow: rgba(120,130,150,.22); } }
+.wordmark-box { display: inline-grid; }
+.wordmark-box > .edition { width: 0; min-width: 100%; box-sizing: border-box; }  /* fills the wordmark's width, never widens it */
+.edition { display: flex; justify-content: center; align-items: center; gap: 3px; margin-top: 2px; padding: 0 4.5px; border-radius: 99px;
+  font-size: 7px; font-weight: 700; letter-spacing: .09em; line-height: 12px; text-transform: uppercase; white-space: nowrap; }
+.edition.ee { background: linear-gradient(135deg, var(--gold-1), var(--gold-2)); color: var(--gold-text);
   box-shadow: inset 0 0 0 1px rgba(255,255,255,.22), 0 1px 6px var(--gold-glow); }
+.edition.cm { background: linear-gradient(135deg, var(--silver-1), var(--silver-2)); color: var(--silver-text);
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.35), 0 1px 5px var(--silver-glow); }

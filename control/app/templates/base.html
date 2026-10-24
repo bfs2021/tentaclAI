@@ -15,9 +15,9 @@
 <body hx-headers='{"X-Requested-With": "htmx"}'>
 <div class="app">
   <aside class="sidebar">
-    <div class="brand"><img class="logo" src="/static/logo.svg?v={{ asset_v }}" alt="" width="32" height="32"><div>tentacl<span class="ai-grad">AI</span>
+    <div class="brand"><img class="logo" src="/static/logo.svg?v={{ asset_v }}" alt="" width="32" height="32"><div class="wordmark-box"><span>tentacl<span class="ai-grad">AI</span></span>
       {%- if central_nav.state in ('ok', 'err') %}<span class="edition ee" title="Managed by tentaclAI Enterprise ({{ central_nav.name }})">★ Enterprise</span>
-      {%- else %}<span class="edition ce" title="tentaclAI Community Edition">CE</span><small>Long arms, one brain – safely caged</small>{% endif %}</div></div>
+      {%- else %}<span class="edition cm" title="tentaclAI Community Edition">Community</span>{% endif %}</div></div>
     <nav class="nav">
       <a href="/" class="{{ 'active' if nav == 'dashboard' }}">{{ icon('home') }}Overview</a>
       <a href="/terminal" class="{{ 'active' if nav == 'terminal' }}">{{ icon('terminal') }}Terminal</a>
