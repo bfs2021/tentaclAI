@@ -29,7 +29,7 @@ PACKAGES_DIR = os.path.join(DATA_DIR, "packages")
 PREV_DIR = os.path.join(PACKAGES_DIR, ".prev")
 # public keys (base64url, raw Ed25519) whose signature makes a package "signed" – the private half is in tcmanager.
 # A list, so a new key can be added before the old one goes.
-PACKAGE_KEYS = []
+PACKAGE_KEYS = ["U8RedZWw0agzm3f0JAurOmEhoxmVR0Co-L876588JVs"]
 FORMAT = 1
 MAX_ZIP = 20 * 1024 * 1024
 MAX_UNPACKED = 50 * 1024 * 1024
