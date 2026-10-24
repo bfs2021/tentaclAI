@@ -6,7 +6,7 @@
   <dl class="kv">
     <dt>Module</dt><dd><strong>{{ p.title }}</strong> <span class="mono faint">{{ p.name }}</span></dd>
     <dt>Version</dt><dd>{{ p.version }}{% if p.installed %} <span class="muted">– replaces {{ p.installed }} (kept for a rollback)</span>{% endif %}</dd>
-    <dt>Signature</dt><dd>{% if p.signed %}<span class="pill ok">{{ icon('check') }}signed by tentaclAI</span> <span class="mono faint">{{ p.key }}</span>
+    <dt>Signature</dt><dd>{% if p.signed %}<span class="pill ok">signed by tentaclAI</span> <span class="mono faint">{{ p.key }}</span>
       {% else %}<span class="pill warn">not signed</span>{% endif %}</dd>
     <dt>Files</dt><dd>{{ p.files }}, all checked</dd>
   </dl>

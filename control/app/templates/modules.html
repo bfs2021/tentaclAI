@@ -75,7 +75,7 @@
 {% endif %}
 
 <div class="card" style="margin-top:16px">
-  <h2>{{ icon('upload') }}Install from file</h2>
+  <div class="card-head"><h2>{{ icon('upload') }}Install from file</h2></div>
   <form hx-post="/modules/upload" hx-encoding="multipart/form-data" hx-target="#pkg-area" class="row" style="flex-wrap:wrap">
     <input type="file" name="file" accept=".zip,application/zip" aria-label="Module package" required>
     <button class="btn">{{ icon('upload') }}Check</button>
