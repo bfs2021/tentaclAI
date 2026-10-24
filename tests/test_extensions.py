@@ -12,11 +12,11 @@ HELLO = os.path.join(ROOT, "examples", "extensions", "tcx_hello")
 
 def test_community_placeholders(client):
     html = client.get("/license").text
-    assert "Currently using tentaclAI Community" in html and "To use Enterprise modules and get support" in html
+    assert "needs no license" in html and 'href="/central"' in html  # Enterprise = the central, licensed there
     assert 'id="instance-id"' in html or "has no ID" in html
     assert client.get("/reports").status_code == 404  # no Reports in Community – a module brings its own entry
     html = client.get("/modules").text
-    assert "Compliance reports" in html and "SIEM export" in html and "Enterprise modules are only available" in html
+    assert "tentaclAI Enterprise" in html and "Compliance reports" not in html and "locked" not in html
     assert "No modules installed" in html
     nav = client.get("/settings").text
     assert 'title="Enterprise"' not in nav and 'href="/modules"' in nav  # Modules is open: built-in and own modules

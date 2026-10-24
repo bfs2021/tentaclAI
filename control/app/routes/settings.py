@@ -307,6 +307,6 @@ async def security_disable(request: Request, password: str = Form(""), code: str
 
 @router.get("/license", response_class=HTMLResponse)
 async def license_page(request: Request):
-    """tentaclAI Community: what an Enterprise license would unlock – tentaclAI Enterprise replaces this page"""
+    """the edition and the installation ID – an extension that provides a license replaces this page"""
     iid, source = instance.instance_id()
     return page(request, "license.html", instance=iid, instance_source=source)

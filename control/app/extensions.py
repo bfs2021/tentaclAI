@@ -1,11 +1,11 @@
 """Extensions: optional Python packages that hook into tentacontrol at start – Extension API v1 (docs/extensions.md).
 
 Where an extension comes from decides what it may do (never what the package claims):
-- configured – named in TC_EXTENSIONS (default "tentaclai_enterprise"), always loaded; may provide the license
+- configured – named in TC_EXTENSIONS (none by default), always loaded; may provide the license
   (provide_license) and replace tentacontrol's own pages and templates.
 - builtin    – shipped in the image (BUILTIN_DIR, source control/extensions/), loaded once the admin enabled it.
 - signed     – a module package (packages.py) signed by tentaclAI, installed through Modules → Install from file;
-  always loaded, the same rights as configured (it is how Enterprise is installed without TC_EXTENSIONS).
+  always loaded, the same rights as configured.
 - local      – third-party, in STACK_DIR/local/extensions/<name>/ or an unsigned package, loaded once the admin
   enabled it.
 builtin, local and package extensions carry an extension.json manifest; the Modules page reads only that, so the code of an
@@ -397,7 +397,7 @@ def load(app, templates):
     if _prefix not in getattr(env.loader, "loaders", []):
         env.loader = ChoiceLoader([env.loader, _prefix])
     env.globals.update(ext_icons=_icons, ext_tabs=tabs, ext_help=help_sections, ext_static=static_url)
-    for name in [n.strip() for n in os.environ.get("TC_EXTENSIONS", "tentaclai_enterprise").split(",") if n.strip()]:
+    for name in [n.strip() for n in os.environ.get("TC_EXTENSIONS", "").split(",") if n.strip()]:
         if name in LOADED:
             continue
         try:

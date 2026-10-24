@@ -29,7 +29,7 @@ tentaclAI = sandbox + service gateway for Claude Code. Three containers (`compos
 **Modules / Community / Enterprise:** tentacontrol loads extensions through `control/app/extensions.py` (Extension API
 v1, `docs/extensions.md`): registration via `Api` in `register(api)`, runtime helpers in `control/app/extapi.py` – the
 only parts of `app.*` an extension may use; keep both stable (a change that breaks them needs a new `API_VERSION`).
-Origins decide the rights: *configured* (`TC_EXTENSIONS`, e.g. the private `tentaclai_enterprise` package – may
+Origins decide the rights: *configured* (`TC_EXTENSIONS`, none by default – may
 `provide_license()` and replace pages/templates), *signed* (a module package from Modules → Install from file, signed
 with a key in `packages.PACKAGE_KEYS` – same rights as configured, always on; `control/app/packages.py`, format in
 `docs/extensions.md` → Packages, tests `tests/test_packages.py`), *builtin* (`control/extensions/` → `/app/extensions/`) and *local*

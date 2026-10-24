@@ -389,9 +389,10 @@ tasks, notification events and parts of Export / Import (tentacontrol → Module
 - **Third-party** modules go into `local/extensions/<name>/` (a package with an `extension.json`) and are off until
   enabled – a module runs inside tentacontrol with all of its rights, so only enable code you trust. Their pages live
   below `/x/<name>/`; they can't replace tentacontrol's own.
-- **Enterprise** modules come from tentaclAI Enterprise (`TC_EXTENSIONS`) and are unlocked by the license.
+- **Enterprise** modules are packages named in `TC_EXTENSIONS` (none by default) – always loaded, they may provide a
+  license and unlock modules with it.
 - **Install from file**: a module packaged as `.tcpkg.zip` is installed offline from the Modules page – checked first,
-  signed packages (e.g. tentaclAI Enterprise) get Enterprise rights, unsigned ones are third-party modules; every file
+  packages signed by tentaclAI get Enterprise rights, unsigned ones are third-party modules; every file
   is checked again at each start ([docs/extensions.md → Packages](docs/extensions.md#packages)).
 
 **Central management:** Settings → Central connects an installation to a central server (tentaclAI Enterprise) as

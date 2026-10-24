@@ -9,9 +9,11 @@ All notable changes, newest first. Every release lists **upgrade steps** from th
   badge), tabs in Settings/Logs/Claude, icons, static files, background tasks, notification events, an audit log hook,
   Help sections and parts of Export / Import. **Modules** is no longer locked in Community: it lists *built-in* modules
   (shipped, off until enabled), *third-party* ones (`local/extensions/<name>/`, off until enabled, with a warning – they
-  run with tentacontrol's rights) and the *Enterprise* part (still locked without a license). Enabling takes effect
+  run with tentacontrol's rights) and signed packages. Enabling takes effect
   after *Restart tentacontrol* (a few seconds, the sandbox keeps running), disabling at once. Third-party modules live
-  below `/x/<name>/` and can't replace tentacontrol's pages; only tentaclAI Enterprise provides the license.
+  below `/x/<name>/` and can't replace tentacontrol's pages. `TC_EXTENSIONS` names packages loaded always (none by
+  default – it was `tentaclai_enterprise`); Modules and Settings → License point to tentaclAI Enterprise, the central
+  management, instead of locked Enterprise modules.
   Guide: `docs/extensions.md`, example `examples/extensions/tcx_hello`.
 - **Service-Health** – the first built-in module (Modules → enable): `svc test` of every service on a schedule
   (1–60 minutes, default 5), a Health page with the state, a 24-hour bar and the availability over 24 hours and 7 days

@@ -15,7 +15,7 @@ Where a module comes from decides what it may do – never what the package says
 | **Built-in** | shipped in the image (`control/extensions/` in this repository) | once enabled on the Modules page | the API below |
 | **Third-party** | `<stack>/local/extensions/<name>/`, or an unsigned [package](#packages) | once enabled on the Modules page | the API below |
 | **Signed by tentaclAI** | a [package](#packages) signed with tentaclAI's package key | always | like Enterprise |
-| **Enterprise** | named in `TC_EXTENSIONS` (tentaclAI Enterprise) | always | also provide the license and replace tentacontrol's own pages and templates |
+| **Enterprise** | named in `TC_EXTENSIONS` (none by default) | always | also provide the license and replace tentacontrol's own pages and templates |
 
 A module runs **inside tentacontrol, with all of its rights**: it can read the configuration, approve requests and run
 `svc` as root in the sandbox. The rules below (namespaces, no license, no replaced pages) keep modules from getting in

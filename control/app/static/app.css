@@ -586,7 +586,6 @@ pre.diff { max-height: 320px; overflow: auto; white-space: pre; background: var(
 .nav-locked { opacity: .55; }
 .nav-locked .nav-count svg { width: 14px; height: 14px; }
 .locked { position: relative; }
-.locked-preview { filter: grayscale(1); opacity: .35; pointer-events: none; user-select: none; }
 .locked-note { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); max-width: 440px; width: calc(100% - 32px);
   text-align: center; box-shadow: 0 10px 40px rgba(0,0,0,.35); }
 .locked-note h2 { margin: 8px 0; font-size: 17px; }

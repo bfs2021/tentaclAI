@@ -22,9 +22,9 @@
 {% endmacro %}
 {% block content %}
 <div class="header">
-  <div><h1>Modules {{ help_link('modules') }}</h1><div class="sub">Extend tentacontrol – built-in modules, your own and Enterprise ones.</div></div>
+  <div><h1>Modules {{ help_link('modules') }}</h1><div class="sub">Extend tentacontrol – built-in modules, your own and signed packages.</div></div>
   <div class="row">
-    {%- if edition == 'community' %}<span class="pill off">{{ icon('lock') }}Community</span>
+    {%- if edition == 'community' %}<span class="pill off">Community</span>
     {%- elif features %}<a class="pill ok" href="/license" title="Settings → License">{{ icon('lock') }}Enterprise · licensed</a>
     {%- else %}<a class="pill warn" href="/license" title="Settings → License">{{ icon('lock') }}Enterprise · no license</a>{% endif %}</div>
 </div>
@@ -84,18 +84,14 @@
   <div id="pkg-area"></div>
 </div>
 
+{% if edition != 'community' %}
 <h2 class="section-head" style="margin-top:24px">Enterprise</h2>
-{% if edition == 'community' %}
-<div class="locked">
-  <div class="locked-preview" aria-hidden="true">{{ enterprise_cards(community_modules) }}</div>
-  <div class="locked-note card">
-    <div class="locked-icon">{{ icon('lock') }}</div>
-    <h2>Enterprise modules are only available with a valid Enterprise license.</h2>
-    <p class="muted small">Compliance reports, the SIEM export of the audit log and more come with tentaclAI Enterprise.</p>
-    <a class="btn sm" href="/license" style="margin-top:6px">License</a>
-  </div>
-</div>
-{% else %}
 {{ enterprise_cards(enterprise_modules) }}
 {% endif %}
+
+<h2 class="section-head" style="margin-top:24px">Many installations?</h2>
+<div class="card">
+  <p class="small" style="margin-top:0"><strong>tentaclAI Enterprise</strong> manages tentaclAI installations from one server: the audit log of all of them in one place, configuration handed out with profiles, jobs that run everywhere, and modules – signed packages installed from there.</p>
+  <a class="btn sm" href="/central">{{ icon('plug') }}Settings → Central</a>
+</div>
 {% endblock %}

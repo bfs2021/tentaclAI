@@ -296,24 +296,17 @@ async def ws_terminal(ws: WebSocket, p: str = "claude", alias: str = ""):
                       seconds=round(time.time() - t))
 
 
-# what tentaclAI Community shows, locked, on Modules – with tentaclAI Enterprise its registered modules are listed instead
-COMMUNITY_MODULES = [
-    {"key": "reports", "title": "Compliance reports", "text": "Reports from the audit log – e.g. all writes to production in a quarter, approvals by approver – as PDF or CSV, as evidence for ISO 27001 or SOC 2."},
-    {"key": "siem", "title": "SIEM export", "text": "Streams the audit log to your SIEM (syslog, Splunk, Elastic) as JSON lines."},
-]
-
-
 @router.get("/modules", response_class=HTMLResponse)
 async def modules_page(request: Request):
     return page(request, "modules.html", exts=extensions.available(), modules=extensions.modules(),
-                community_modules=COMMUNITY_MODULES, enterprise_modules=extensions.licensed_modules())
+                enterprise_modules=extensions.licensed_modules())
 
 
 # ---------------------------------------------------------------- module packages (Install from file)
 
 def _package_clash(name):
     """why a package with this name can't be installed here, or """""
-    configured = [n.strip() for n in os.environ.get("TC_EXTENSIONS", "tentaclai_enterprise").split(",") if n.strip()]
+    configured = [n.strip() for n in os.environ.get("TC_EXTENSIONS", "").split(",") if n.strip()]
     if name in configured and extensions.origin(name) == "configured":
         return f"{name} is loaded from TC_EXTENSIONS on this installation – take it out there first"
     if extensions._discover(packages_too=False).get(name, {}).get("origin") == "builtin":
