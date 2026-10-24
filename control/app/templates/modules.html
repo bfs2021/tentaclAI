@@ -74,13 +74,13 @@
 <div class="empty small">No modules installed. Install a module package below, or put your own in <code>local/extensions/&lt;name&gt;/</code> – see <a href="/help#modules">Help → Modules</a>.</div>
 {% endif %}
 
-<div class="card" style="margin-top:16px">
+<div class="card" style="margin-top:16px;max-width:620px">
   <div class="card-head"><h2>{{ icon('upload') }}Install from file</h2></div>
   <form hx-post="/modules/upload" hx-encoding="multipart/form-data" hx-target="#pkg-area" class="row" style="flex-wrap:wrap">
     <input type="file" name="file" accept=".zip,application/zip" aria-label="Module package" required>
-    <button class="btn">{{ icon('upload') }}Check</button>
-    <span class="help">A module package (<code>.tcpkg.zip</code>) – e.g. tentaclAI Enterprise. Nothing is installed before you see what it is; no internet needed.</span>
+    <button class="btn sm">Check</button>
   </form>
+  <div class="help" style="margin-top:6px">A module package (<code>.tcpkg.zip</code>) – e.g. tentaclAI Enterprise. Nothing is installed before you see what it is; no internet needed.</div>
   <div id="pkg-area"></div>
 </div>
 
