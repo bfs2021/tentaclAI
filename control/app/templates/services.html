@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% from "_icons.html" import icon, help_link %}
 {% from "_conn_tabs.html" import conn_tabs %}
-{% from "_service_card.html" import service_card %}
+{% from "_service_card.html" import service_card with context %}
 {% block title %}Services{% endblock %}
 {% block content %}
 {{ conn_tabs("services") }}

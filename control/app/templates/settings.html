@@ -15,8 +15,9 @@
     <div class="fields">
       {% for key, label, help, kind in items %}
       <div class="field{{ ' wide' if help|length > 160 }}">
-        <label for="f-{{ key }}">{{ label }} <span class="faint mono small">{{ key }}</span></label>
-        {% if kind == 'readonly' %}
+        {% set managed = ('settings:' ~ key) in central_locks %}
+        <label for="f-{{ key }}">{{ label }} <span class="faint mono small">{{ key }}</span>{% if managed %} <span class="pill info" title="set by the central server">{{ icon('lock') }}central</span>{% endif %}</label>
+        {% if kind == 'readonly' or managed %}
         <input id="f-{{ key }}" type="text" value="{{ env.get(key, '') }}" disabled>
         {% elif is_secret(key) %}
         <div class="secret-row">

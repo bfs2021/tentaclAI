@@ -41,6 +41,7 @@ def normalize(entry):
 
 
 def add(kind, entry):
+    _central_check("network", f"{kind}:{normalize(entry)}")
     e = normalize(entry)
     if kind == "block":
         host, _, port = e.rpartition(":") if ":" in e else (e, "", "443")
@@ -57,6 +58,7 @@ def add(kind, entry):
 
 
 def remove(kind, entry):
+    _central_check("network", f"{kind}:{entry}")
     r = rules()
     r[kind] = [x for x in r[kind] if x != entry]
     _save(r)
@@ -126,3 +128,9 @@ def seen_rows():
         kind, label = origin(host, int(port) if port.isdigit() else 0, tent, r)
         rows.append(dict(e, host=host, port=port, kind=kind, label=label))
     return sorted(rows, key=lambda x: -x.get("last", 0))
+
+
+def _central_check(section, key):
+    """refuse a change the central server enforces (central management)"""
+    from .central import check_write
+    check_write(section, key)

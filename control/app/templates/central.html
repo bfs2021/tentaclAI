@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% from "_tabs.html" import settings_tabs %}
+{% from "_icons.html" import icon, help_link %}
+{% block title %}Central management{% endblock %}
+{% block content %}
+{{ settings_tabs('central') }}
+<div class="header">
+  <div><h1>Central management</h1><div class="sub">Connect this installation to a central server (tentaclAI Enterprise): it sees this installation, receives its audit log and can manage parts of its configuration.</div></div>
+  <div class="row">{{ help_link('central') }}</div>
+</div>
+{% set st = c.st %}
+{% if not c.enrolled %}
+<form class="card" hx-post="/central/enroll" style="max-width:760px">
+  <div class="card-head"><h2>{{ icon('grid') }}Enroll</h2></div>
+  <p class="muted small">Paste the enrollment code from the central server. The connection always goes from here to the server; nothing has to reach this installation.</p>
+  <div class="field"><label for="cc">Enrollment code</label><textarea id="cc" name="code" rows="3" class="mono" placeholder="tce1.…" required autocomplete="off"></textarea></div>
+  <div class="field"><label for="cn">Name of this installation</label><input id="cn" name="name" value="{{ site.hostname or '' }}" maxlength="60"></div>
+  <div class="field">
+    <label>The server may manage</label>
+    {% for key, label in c.areas.items() %}
+    <label class="check"><input type="checkbox" name="areas" value="{{ key }}" checked> {{ label }}</label>
+    {% endfor %}
+    <div class="help">Parts you leave out stay local – the server's profile is ignored there. The audit log is always sent. Credentials never leave this installation.</div>
+  </div>
+  <details style="margin-bottom:12px"><summary class="small">The server uses its own CA certificate</summary>
+    <div class="field" style="margin-top:8px"><label for="ca">CA certificate (PEM)</label><textarea id="ca" name="ca" rows="4" class="mono" placeholder="-----BEGIN CERTIFICATE-----"></textarea></div>
+  </details>
+  <button class="btn primary">{{ icon('check') }}Enroll</button>
+</form>
+{% else %}
+<div class="card" style="max-width:760px;margin-bottom:16px">
+  <div class="card-head"><h2>{{ icon('grid') }}{{ st.central_name }}</h2>
+    {% if c.revoked %}<span class="pill err">revoked</span>
+    {% elif st.last_error %}<span class="pill warn">not reachable</span>
+    {% else %}<span class="pill ok">connected</span>{% endif %}</div>
+  <dl class="kv">
+    <dt>Server</dt><dd class="mono">{{ st.url }}</dd>
+    <dt>This installation</dt><dd>{{ st.name or '–' }} <span class="mono faint">{{ st.agent_id }}</span></dd>
+    <dt>Last contact</dt><dd>{{ c.last_ok or '–' }}</dd>
+    {% if st.last_error %}<dt>Problem</dt><dd style="color:var(--err)">{{ st.last_error }}</dd>{% endif %}
+    <dt>Profile</dt><dd>{% if c.profile %}{{ c.profile.name or 'unnamed' }} <span class="faint">rev {{ c.profile.rev }}</span>{% else %}none yet{% endif %}</dd>
+    <dt>May manage</dt><dd>{% for a in st.areas or [] %}<span class="tag">{{ c.areas.get(a, a) }}</span> {% else %}nothing{% endfor %}</dd>
+    <dt>Server key</dt><dd class="mono small">{{ st.central_key[:12] }}…</dd>
+  </dl>
+  <div class="row" style="margin-top:12px">
+    {% if not c.revoked %}<button class="btn sm" hx-post="/central/sync">{{ icon('refresh') }}Sync now</button>{% endif %}
+    <span class="spacer"></span>
+    <button class="btn sm ghost" hx-post="/central/leave" hx-confirm="Leave {{ st.central_name }}? The values it set stay, nothing is locked any more, the audit log is no longer sent.">Leave</button>
+  </div>
+</div>
+
+{% if c.revoked %}<div class="alert err" style="max-width:760px">The server revoked this installation. Leave, then enroll again with a new code if needed.</div>{% endif %}
+
+<div class="card" style="max-width:760px;margin-bottom:16px">
+  <div class="card-head"><h2>{{ icon('lock') }}Managed by the server</h2><span class="pill {{ 'info' if c.locks else 'off' }}">{{ c.locks | length }} locked</span></div>
+  {% if c.locks %}
+  <p class="small muted">These can only be changed on the server:</p>
+  <div>{% for l in c.locks %}<span class="tag mono">{{ l }}</span> {% endfor %}</div>
+  {% else %}<p class="small muted" style="margin:0">Nothing is locked.</p>{% endif %}
+  {% if st.missing %}
+  <p class="small" style="margin-top:12px"><span class="pill warn">values missing</span> The profile uses variables that are empty here:
+    {% for v in st.missing %}<code>{{ v }}</code>{{ ', ' if not loop.last }}{% endfor %} – fill them in under <a href="/backup">Export / Import</a> or Settings.</p>
+  {% endif %}
+  {% if st.drift %}
+  <p class="small" style="margin-top:12px"><span class="pill warn">differences</span></p>
+  <ul class="small">{% for d in st.drift %}<li><span class="mono">{{ d.id }}</span> – {{ d.kind }}</li>{% endfor %}</ul>
+  {% endif %}
+  {% if st.refused %}
+  <p class="small muted" style="margin-top:12px">Not allowed here, ignored: {% for r in st.refused %}<span class="tag">{{ c.areas.get(r, r) }}</span> {% endfor %}</p>
+  {% endif %}
+</div>
+{% endif %}
+{% endblock %}

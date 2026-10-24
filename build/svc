@@ -1999,6 +1999,10 @@ def cmd_config(services, args):
         if not re.fullmatch(r"[a-z0-9][a-z0-9_-]{0,40}", name):
             sys.exit(f"svc: {kind} names: a-z 0-9 _ - (max 41)")
         target = os.path.join(SERVICES_DIR if kind == "service" else SYSTEMS_DIR, f"{name}.json")
+    section = {"service": "services", "system": "systems", "local": "instructions", "skill": "skills"}[kind]
+    central = tclib.central_locked(AUDIT_DIR, section, name)
+    if central:
+        sys.exit(f"svc: {kind} {name} is managed by {central} – it can only be changed there")
     r = subprocess.run(["cat", "--", src], capture_output=True, **as_user(CLAUDE_USER))  # read with Claude's rights
     if r.returncode != 0:
         sys.exit(f"svc: can't read {src}: {r.stderr.decode(errors='replace').strip()[:160]}")

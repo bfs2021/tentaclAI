@@ -396,6 +396,18 @@
       <p><em>Enable</em> takes effect when tentacontrol restarts (<em>Restart tentacontrol</em> – a few seconds, the sandbox and Claude keep running); <em>Disable</em> at once. Loading, enabling and disabling land in the audit log. Until it is enabled, tentacontrol reads only a module's <code>extension.json</code> – its code is never run. Writing a module: <code>docs/extensions.md</code> in the repository, with the example <code>examples/extensions/tcx_hello</code>.</p>
     </section>
 
+    <section class="card" id="central">
+      <h2>Central management</h2>
+      <p>Settings → <a href="/central">Central</a> connects this installation to a central server (tentaclAI Enterprise) as an <strong>agent</strong>: paste the server's enrollment code and pick the parts of the configuration it may manage. The connection always goes from here to the server (every 30 s); nothing has to reach this installation.</p>
+      <ul>
+        <li>The server sees this installation (version, modules, services – never credentials) and receives the <strong>audit log</strong>. Entries not sent yet are kept, also past the retention, until the server has them.</li>
+        <li>A <strong>profile</strong> from the server sets items of the allowed parts: <em>enforced</em> ones are locked here (marked <span class="pill info">central</span>, refused in tentacontrol and in <code>svc config put</code>, and reverted if a file is changed on the host), <em>defaults</em> may be changed here. Credentials stay in this installation's <code>.env</code> – values the profile needs and that are empty here are listed on the Central page.</li>
+        <li>Profiles are signed by the server; without the server the last one stays in force. Every change the server makes lands in the audit log.</li>
+        <li><em>Leave</em> ends it: the values stay, nothing is locked any more. Management is governance, not a sandbox – root on the host can always change files; the server sees the difference.</li>
+      </ul>
+      <p>Protocol: <code>docs/central.md</code> in the repository.</p>
+    </section>
+
     <section class="card" id="license">
       <h2>Community &amp; Enterprise</h2>
       <p>This is <strong>tentaclAI Community</strong>, the free, open-source edition. <strong>tentaclAI Enterprise</strong> is a separate package that hooks into tentacontrol and adds Enterprise modules – listed under <a href="/modules">Modules</a>, e.g. compliance reports and the SIEM export of the audit log. In Community, the Enterprise part of <em>Modules</em> is shown locked; with Enterprise it lists the Enterprise modules (<em>licensed</em>, <em>locked</em> or <em>planned</em>), and each licensed module brings its own sidebar entry. Settings → <a href="/license">License</a> says what an Enterprise license adds.</p>

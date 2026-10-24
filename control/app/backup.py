@@ -5,6 +5,7 @@ Import is two steps: preview() compares the file with this installation (nothing
 entries picked in the preview through the same functions the UI uses – a file that gets overwritten keeps a .bak."""
 import difflib
 import glob
+import hashlib
 import json
 import os
 import shutil
@@ -192,6 +193,10 @@ def _diff(old, new):
     return "\n".join(list(difflib.unified_diff(a, b, "this installation", "import", n=2, lineterm=""))[2:])
 
 
+def _hash(v):
+    return "" if v is None else hashlib.sha256(_dump(v).encode()).hexdigest()[:16]
+
+
 def _row(section, key, old, new, error="", note="", label=None):
     if error:
         status = "invalid"
@@ -203,6 +208,7 @@ def _row(section, key, old, new, error="", note="", label=None):
         status = "changed"
     return {"section": section, "key": key, "id": f"{section}:{key}", "label": label or key, "status": status,
             "error": error, "note": note, "diff": _diff(old, new) if status == "changed" else "",
+            "hash_old": _hash(old), "hash_new": _hash(new),  # central management: which value was applied
             "checked": status in ("new", "changed") and section not in OPT_IN and not section.startswith(EXT_PREFIX)}
 
 

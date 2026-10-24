@@ -39,6 +39,13 @@ is also the test fixture (`tests/test_extensions.py`); the built-in `control/ext
 `tests/test_health.py`) uses the public API only – keep it that way, it is the proof the API is enough. Keep Enterprise code out of this repository – here only the
 extension points and the placeholders (Enterprise part of Modules locked, Settings → License).
 
+**Central management (agent):** `control/app/central.py` – this installation as an agent of tentaclAI Enterprise
+(protocol `docs/central.md`, Settings → Central, `routes/central.py`, tests `tests/test_central.py` with a fake server).
+Profiles are applied through `backup.preview/apply` (item ids = import preview ids, `hash_old/hash_new` per row);
+enforced items are refused by `_central_check()` in the stores (and `update_env` for settings) unless
+`central.applying()`, and by `tclib.central_locked()` in `svc config put`. Keep new writers of managed parts behind the
+same check.
+
 Two layers: `svc` decides *what* happens with a tentacle (credentials, `read`/`write`/`confirm`); the gateway decides *where*
 the sandbox may connect. ssh/rsync go through `ProxyCommand tc-connect`, databases and mail through `svc`'s local `tunnel()`.
 

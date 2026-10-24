@@ -24,14 +24,17 @@ def sudo_of(alias):
 
 
 def add(fields):
+    _central_check("ssh_hosts", fields.get("alias", ""))
     tclib.ssh_add(CONF_D, fields)
 
 
 def update(alias, fields):
+    _central_check("ssh_hosts", alias)
     tclib.ssh_update(CONF_D, alias, fields)
 
 
 def remove(alias):
+    _central_check("ssh_hosts", alias)
     tclib.ssh_remove(CONF_D, alias)
 
 
@@ -45,3 +48,9 @@ def public_key():
             return f.read().strip()
     except FileNotFoundError:
         return None
+
+
+def _central_check(section, key):
+    """refuse a change the central server enforces (central management)"""
+    from .central import check_write
+    check_write(section, key)

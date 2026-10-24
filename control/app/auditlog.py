@@ -187,7 +187,9 @@ def mark_flags_seen():
 # ---------------------------------------------------------------- retention
 
 def prune():
-    n = tclib.audit_prune(DATA_DIR, tclib.audit_retention(read_env()))
+    from . import central
+    days = max(tclib.audit_retention(read_env()), central.retention_floor())  # keep what the central server lacks
+    n = tclib.audit_prune(DATA_DIR, days)
     if n:
         print(f"audit log: {n} archive file(s) older than the retention removed", flush=True)
 

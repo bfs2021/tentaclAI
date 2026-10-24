@@ -567,6 +567,7 @@ def put_preview(jid, d):
 
 def put(jid, d):
     """`svc config put job` after the approval: create (paused) or change"""
+    _central_check("jobs", jid)
     form = form_from_definition(d)
     if get(jid):
         return save(form, jid)
@@ -574,6 +575,7 @@ def put(jid, d):
 
 
 def set_enabled(jid, on):
+    _central_check("jobs", jid)
     jobs = load()
     if jid not in jobs:
         raise ValueError("unknown job")
@@ -601,6 +603,7 @@ def clone(jid):
 
 
 def delete(jid):
+    _central_check("jobs", jid)
     jobs = load()
     if (jobs.get(jid) or {}).get("builtin"):
         raise ValueError("a built-in job can't be deleted – pause it instead")
@@ -1185,3 +1188,9 @@ def rw_tentacles():
         if tclib.ssh_access(conf, h["alias"]) == "write":
             out.append(f"ssh {h['alias']}")
     return sorted(set(out))
+
+
+def _central_check(section, key):
+    """refuse a change the central server enforces (central management)"""
+    from .central import check_write
+    check_write(section, key)

@@ -53,6 +53,7 @@ def _write(path, data):
 
 def save_raw(name, data):
     """write a whole system definition (import) – members still come from the services' own "system" field"""
+    _central_check("systems", name)
     if not isinstance(data, dict):
         raise ValueError("a system is a JSON object")
     _write(path_of(name), {"name": name, **{k: v for k, v in data.items() if k != "name"}})
@@ -91,7 +92,14 @@ def save(name, description, ssh_host, notes, members):
 
 
 def delete(name):
+    _central_check("systems", name)
     for s in services_store.load_all():
         if s["data"].get("system") == name:
             set_service_system(s["name"], "")
     os.remove(path_of(name))
+
+
+def _central_check(section, key):
+    """refuse a change the central server enforces (central management)"""
+    from .central import check_write
+    check_write(section, key)

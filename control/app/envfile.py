@@ -22,6 +22,9 @@ def _quote(v: str) -> str:
 
 def update_env(changes: dict, path: str = ENV_FILE) -> None:
     """changes: key -> new value ('' = empty, None = remove the line). Existing lines are updated in place, new keys appended."""
+    from .central import check_write  # settings the central server enforces are refused
+    for k in changes:
+        check_write("settings", k)
     try:
         with open(path) as f:
             lines = f.read().splitlines()

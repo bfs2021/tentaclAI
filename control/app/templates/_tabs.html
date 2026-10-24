@@ -11,6 +11,7 @@
   <a href="/account" class="{{ 'active' if active == 'account' }}">{{ icon('key') }}Account</a>
   <a href="/backup" class="{{ 'active' if active == 'backup' }}">{{ icon('download') }}Export / Import</a>
   <a href="/license" class="{{ 'active' if active == 'license' }}">{{ icon('lock') }}License</a>
+  <a href="/central" class="{{ 'active' if active == 'central' }}">{{ icon('grid') }}Central</a>
   {{ ext_tab_links('settings', active) }}
 </nav>
 {%- endmacro %}

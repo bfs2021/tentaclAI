@@ -18,6 +18,12 @@ All notable changes, newest first. Every release lists **upgrade steps** from th
   per service and system, a sidebar badge counting services that are down, and the notifications *Service down*
   (urgent) / *Service up again* after a set number of failed checks in a row (default 2). Settings → Health picks the
   interval and the services; the history (7 days) stays in `data/control/ext/tentaclai_health/`.
+- **Central management** (Settings → Central): an installation joins a central server (tentaclAI Enterprise) with
+  an enrollment code and becomes an agent – it sends its status (version, modules, services – no credentials) and its
+  audit log (nothing unsent is pruned), and applies the server's signed profile: enforced items are locked (marked
+  *central*, refused in tentacontrol and in `svc config put`, reverted when changed on the host), defaults may be
+  changed locally, built-in modules and signed packages can be set. The local admin picks which parts the server may
+  manage; credentials stay in `.env`. The agent always connects to the server. Protocol: `docs/central.md`.
 - **Install modules from a file** (Modules → *Install from file*): a module package (`.tcpkg.zip`) is checked – size,
   paths, file types, SHA-256 of every file – and shows name, version and signature before anything is installed. A
   package signed by tentaclAI gets the rights of Enterprise (tentaclAI Enterprise can be installed offline, without

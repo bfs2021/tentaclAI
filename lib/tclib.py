@@ -633,6 +633,19 @@ def site_skill_problem(name, text):
     return None
 
 
+def central_locked(control_dir, section, key):
+    """the name of the central server when it enforces this item (central management: <control_dir>/central/locks.json,
+    written by tentacontrol), else """""
+    try:
+        with open(os.path.join(control_dir, "central", "locks.json")) as f:
+            locks = json.load(f)
+    except (OSError, ValueError):
+        return ""
+    if f"{section}:{key}" in (locks.get("enforced") or []):
+        return locks.get("central") or "the central server"
+    return ""
+
+
 def site_skills(stack_dir):
     """{name: {description, size, mtime}} of local/skills/*/SKILL.md"""
     base = os.path.join(stack_dir, "local", "skills")

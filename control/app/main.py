@@ -11,10 +11,10 @@ from starlette.middleware.sessions import SessionMiddleware
 
 import tclib
 
-from . import activity, auditlog, auth, connectors, dockerops, extensions, netguard, notify, scheduled, services_store, skills, updatecheck, usage
+from . import activity, auditlog, auth, central, connectors, dockerops, extensions, netguard, notify, scheduled, services_store, skills, updatecheck, usage
 from .config import SSH_DIR
 from .envfile import read_env
-from .routes import backup, claude, jobs, network, settings, ssh, system, tentacles
+from .routes import backup, central as central_routes, claude, jobs, network, settings, ssh, system, tentacles
 from .web import BASE, TC_VERSION, templates
 
 
@@ -22,7 +22,7 @@ from .web import BASE, TC_VERSION, templates
 async def lifespan(_app):
     """startup: activity token, background loops (notifications, usage, update check, scheduled jobs), setup hint"""
     for start in (migrate, prepare_activity, start_audit, refresh_builtin_jobs, start_notifications, start_update_check,
-                  start_scheduled_jobs, start_extensions, announce_setup):
+                  start_scheduled_jobs, start_extensions, start_central, announce_setup):
         await start()
     yield
 
@@ -219,6 +219,11 @@ async def start_update_check():
     asyncio.get_running_loop().create_task(loop())
 
 
+async def start_central():
+    """central management: the agent's sync with its server (quiet while not enrolled)"""
+    asyncio.get_running_loop().create_task(central.loop())
+
+
 async def start_extensions():
     """the extensions' background tasks and – when one registered on_audit – the audit log follower"""
     loop = asyncio.get_running_loop()
@@ -252,5 +257,5 @@ async def announce_setup():
 
 
 extensions.load(app, templates)  # first: an extension's pages replace tentacontrol's own (e.g. Settings → License)
-for _r in (system, backup, tentacles, ssh, network, settings, claude, jobs):  # one router per area of the UI
+for _r in (system, backup, tentacles, ssh, network, settings, claude, jobs, central_routes):  # one router per area of the UI
     app.include_router(_r.router)

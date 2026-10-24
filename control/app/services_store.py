@@ -140,6 +140,7 @@ def read_raw(name):
 
 
 def save_raw(name, text):
+    _central_check("services", name)
     data = json.loads(text)  # raises ValueError on invalid JSON
     if not isinstance(data, dict):
         raise ValueError("JSON must be an object")
@@ -392,6 +393,7 @@ def save_template(tid, text):
 
 
 def set_enabled(name, enabled):
+    _central_check("services", name)
     data = json.loads(read_raw(name))
     if enabled:
         data.pop("enabled", None)
@@ -401,6 +403,7 @@ def set_enabled(name, enabled):
 
 
 def delete(name):
+    _central_check("services", name)
     os.remove(path_of(name))
 
 
@@ -476,3 +479,9 @@ def secret_check():
     """is_secret for a whole request (settings page, token forms): name hints + credential positions"""
     creds = credential_variables()
     return lambda key: is_secret(key, creds)
+
+
+def _central_check(section, key):
+    """refuse a change the central server enforces (central management)"""
+    from .central import check_write
+    check_write(section, key)

@@ -9,6 +9,7 @@
     <div class="svc-head">
       <h2><span class="ssh-dot" hx-get="/services/{{ s.name }}/status" hx-trigger="load" hx-swap="innerHTML"><span class="dot" title="checking …"></span></span><a href="/services/{{ s.name }}" title="Edit {{ s.name }}">{{ s.name }}</a></h2>
       {% if s.state != 'ok' %}<span class="pill {{ s.state }}">{{ s.label }}</span>{% endif %}
+      {% if central_locks is defined and ('services:' ~ s.name) in central_locks %}<span class="pill info" title="managed by the central server">{{ icon('lock') }}central</span>{% endif %}
       <a class="btn sm ghost" href="/services/{{ s.name }}" title="Edit" aria-label="Edit">{{ icon('edit') }}</a>
       <details class="menu">
         <summary class="btn sm ghost" title="More actions" aria-label="More actions">{{ icon('more') }}</summary>
