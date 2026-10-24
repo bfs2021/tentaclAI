@@ -221,6 +221,8 @@ def test_audit_is_shipped_once(fc):
     assert len(fc.audit) - n <= 3  # only the agent's own new entries (profile received …), nothing twice
     assert central.retention_floor() >= 2
     assert fc.configs and "services" in fc.configs[0]["config"]
+    cat = {c["key"]: c for c in fc.configs[0]["settings_catalog"]}
+    assert cat["TZ"]["label"] == "Time zone" and cat["RC_ENABLED"]["type"] == "bool" and "TC_DIR" not in cat
     before = len(fc.configs)
     central.sync()
     assert len(fc.configs) == before  # the configuration didn't change: not sent again

@@ -531,9 +531,10 @@ def sync():
             ship_audit()
             cfg, _ = backup.export([s for s in backup.SECTIONS])
             cfg.pop("created", None)
-            ch = _h(cfg)
+            catalog = settings_catalog()
+            ch = _h({"config": cfg, "catalog": catalog})
             if ch != state().get("config_hash") or hb.get("want_config"):
-                _call("POST", "/config", {"config": cfg, "hash": ch})
+                _call("POST", "/config", {"config": cfg, "hash": ch, "settings_catalog": catalog})
                 _update(config_hash=ch)
             _update(last_ok=time.time(), last_error="")
             return report
@@ -559,6 +560,14 @@ async def loop():
                 print(f"central: sync failed: {e}", flush=True)
                 _update(last_error=f"internal error: {e}")
         await asyncio.sleep(INTERVAL)
+
+
+def settings_catalog():
+    """the settings of Settings as the central's profile editor offers them: [{key, label, help, type, group}] – the
+    ones a profile can set (no read-only ones, no credentials)"""
+    from .config import SETTINGS_GROUPS, is_secret
+    return [{"key": k, "label": label, "help": hlp, "type": kind, "group": group}
+            for group, rows in SETTINGS_GROUPS for k, label, hlp, kind in rows if kind != "readonly" and not is_secret(k)]
 
 
 def _audit(action, detail="", decision="ok"):

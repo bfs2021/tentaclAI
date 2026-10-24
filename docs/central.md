@@ -50,7 +50,7 @@ revoked (the agent stops and shows it).
 | `POST /heartbeat` | status (below) → `{"profile_rev", "want_config", "time"}` | every 30 s |
 | `GET /profile` | → `{"profile": {...}, "sig"}` | when `profile_rev` changed |
 | `POST /audit` | `{"entries": [...]}` (oldest first, ≤ 500) → `{"stored": n}` | while entries are waiting |
-| `POST /config` | `{"config": <export document>, "hash"}` → `{}` | when the configuration changed or `want_config` |
+| `POST /config` | `{"config": <export document>, "hash", "settings_catalog"}` → `{}` | when the configuration changed or `want_config` |
 | `POST /report` | `{"rev", "results": [...], "drift": [...]}` → `{}` | after applying a profile, when the result changed |
 | `GET /packages/<name>/<version>` | → the package ZIP | when a profile names a package |
 | `POST /leave` | `{}` → `{}` | the local admin leaves |
@@ -66,6 +66,8 @@ enrolling the agent sends the last 7 days, then everything new. The local retent
 
 **Config** is tentacontrol's export document (Settings → Export, format 1, all parts, plain secrets left out) – the
 server shows it and builds profiles from it.
+With it comes `settings_catalog`, the settings of Settings a profile can set (`[{key, label, help, type, group}]`,
+type `text` or `bool` – `true`/`false`), so the server's profile editor offers them by name.
 
 ## Profiles
 
