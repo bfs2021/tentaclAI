@@ -22,8 +22,8 @@
     {% endfor %}
     <div class="help">Parts you leave out stay local – the server's profile is ignored there. The audit log is always sent. Credentials never leave this installation.</div>
   </div>
-  <details style="margin-bottom:12px"><summary class="small">The server uses its own CA certificate</summary>
-    <div class="field" style="margin-top:8px"><label for="ca">CA certificate (PEM)</label><textarea id="ca" name="ca" rows="4" class="mono" placeholder="-----BEGIN CERTIFICATE-----"></textarea></div>
+  <details style="margin-bottom:12px"><summary class="small">The server has a certificate of its own CA</summary>
+    <div class="field" style="margin-top:8px"><label for="ca">CA certificate (PEM)</label><textarea id="ca" name="ca" rows="4" class="mono" placeholder="-----BEGIN CERTIFICATE-----"></textarea><div class="help">Your CA – or the server's own certificate, which is then trusted on its own.</div></div>
   </details>
   <button class="btn primary">{{ icon('check') }}Enroll</button>
 </form>
