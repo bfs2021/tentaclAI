@@ -40,15 +40,26 @@ def control(path, payload=None, timeout=30):
         return json.load(r)
 
 
+FAIL_LOG_AFTER = 3  # failed fetches in a row before the log says so (with REFRESH 15: ~45 s)
+failing = {"n": 0, "since": 0}
+
+
 def refresh(p=None):
     """policy from tentacontrol (cached on disk); keeps the last known one when tentacontrol is unreachable"""
     if p is None:
         try:
             p = control("/internal/egress/policy", timeout=10)
         except Exception as e:  # noqa: BLE001
-            if pol["ok"]:
-                print(f"policy refresh failed: {e}", flush=True)
+            # a restart of tentacontrol takes a few seconds – only a longer outage is worth a line
+            failing["n"] += 1
+            failing["since"] = failing["since"] or time.time()
+            if pol["ok"] and failing["n"] == FAIL_LOG_AFTER:
+                print(f"policy refresh failing since {time.strftime('%H:%M:%S', time.localtime(failing['since']))} – "
+                      f"keeping the last policy: {e}", flush=True)
             return
+        if failing["n"] >= FAIL_LOG_AFTER:
+            print(f"policy refresh works again after {round(time.time() - failing['since'])} s", flush=True)
+        failing.update(n=0, since=0)
         try:
             with open(POLICY_CACHE + ".tmp", "w") as f:
                 json.dump(p, f)

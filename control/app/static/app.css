@@ -620,3 +620,5 @@ pre.diff { margin: 6px 0 0; padding: 8px 10px; background: var(--bg-2); border: 
 .edition.ee { background: linear-gradient(135deg, var(--gold-1), var(--gold-2)); color: var(--gold-text);
   box-shadow: inset 0 0 0 1px rgba(255,255,255,.22), 0 1px 6px var(--gold-glow); }
 .brand .edition { display: flex; width: fit-content; margin: 2px 0 3px; font-size: 8.5px; line-height: 14px; padding: 0 5px; letter-spacing: .1em; }
+.sidebar .brand { align-items: flex-start; }  /* the logo stays level with the wordmark when the badge adds a line */
+.sidebar .brand .logo { margin-top: 1px; }

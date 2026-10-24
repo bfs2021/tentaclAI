@@ -18,3 +18,24 @@ def test_prune_drops_old_and_caps():
     kept = gw.prune(entries, now)
     assert len(kept) == gw.SEEN_MAX and "old:443" not in kept
     assert "h0:443" in kept and f"h{gw.SEEN_MAX + 49}:443" not in kept  # the most recent stay
+
+
+def test_short_outage_of_tentacontrol_stays_quiet(monkeypatch, capsys):
+    """a restart of tentacontrol (a failed fetch or two) logs nothing; a longer outage one line, and its end one more"""
+    monkeypatch.setitem(gw.pol, "ok", True)
+    monkeypatch.setattr(gw, "failing", {"n": 0, "since": 0})
+    monkeypatch.setattr(gw, "POLICY_CACHE", os.devnull + "-x")  # writing the cache may fail – ignored
+
+    def down(*a, **k):
+        raise OSError("Connection refused")
+    monkeypatch.setattr(gw, "control", down)
+    gw.refresh()
+    gw.refresh()
+    assert capsys.readouterr().out == ""
+    gw.refresh()
+    gw.refresh()
+    out = capsys.readouterr().out
+    assert out.count("policy refresh failing since") == 1 and "Connection refused" in out
+    monkeypatch.setattr(gw, "control", lambda *a, **k: dict(gw.pol, tentacles=[], grants={}))
+    gw.refresh()
+    assert "works again" in capsys.readouterr().out and gw.failing["n"] == 0
