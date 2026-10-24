@@ -102,7 +102,7 @@ def record(now, results):
     """store one round: history line, current state, notifications"""
     results = {n: r for n, r in results.items() if r is not None}
     st, cfg = state(), settings()
-    with open(_history_file(now), "a") as f:
+    with os.fdopen(os.open(_history_file(now), os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o600), "a") as f:
         f.write(json.dumps({"t": int(now), "r": {n: r[0] for n, r in results.items()}}) + "\n")
     cur = st["services"]
     for name in list(cur):

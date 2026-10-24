@@ -61,6 +61,8 @@ def test_rounds_states_and_notifications(client, health):
     health.answers["credsvc"] = "✓ api: GET / → HTTP 200\n"
     c.run_round(now=t + 900)
     assert health.sent[-1] == ("health_up", "credsvc is up again") and c.down_count() == 1
+    from app import extapi
+    assert all(os.stat(os.path.join(extapi.data_dir(NAME), f)).st_mode & 0o077 == 0 for f in os.listdir(extapi.data_dir(NAME)))
     rows = c.history(t - 1)
     assert len(rows) == 4 and c.availability(rows, "credsvc") == 25.0 and c.availability(rows, "demoapi") == 100.0
     bar = c.bar(rows, "credsvc", t + 900)
