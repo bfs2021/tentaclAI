@@ -55,7 +55,7 @@ revoked (the agent stops and shows it).
 | `GET /packages/<name>/<version>` | → the package ZIP | when a profile names a package |
 | `POST /leave` | `{}` → `{}` | the local admin leaves |
 
-**Status** (heartbeat): `name, hostname, instance_id, version, edition, modules: [{name, origin, version, active}],
+**Status** (heartbeat): `name, hostname, instance_id, version, edition, modules: [{name, title, origin, version, active}],
 services: [{name, parts, test}], audit: {sent_through, waiting}, profile: {rev, applied, drift, missing, refused},
 areas`. No secrets – values of credentials never leave the agent.
 

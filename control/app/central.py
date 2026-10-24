@@ -496,7 +496,8 @@ def _status(st):
     _, waiting = _unsent(1)
     return {"name": st.get("name") or env.get("TC_HOSTNAME", ""), "hostname": env.get("TC_HOSTNAME") or socket.gethostname(),
             "instance_id": instance.instance_id()[0], "version": TC_VERSION, "edition": extensions.edition(),
-            "modules": [{"name": e["name"], "origin": e["origin"], "version": e.get("version", ""), "active": e["active"]}
+            "modules": [{"name": e["name"], "title": e.get("title") or e["name"], "origin": e["origin"], "version": e.get("version", ""),
+                         "active": e["active"]}
                         for e in extensions.available()],
             "services": [{"name": s["name"], "parts": s["kinds"], "state": s["state"], "enabled": s["enabled"]}
                          for s in services_store.load_all()],
