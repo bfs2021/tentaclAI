@@ -214,7 +214,7 @@ def enroll(code, name, allowed, ca_pem=""):
     now = time.time()
     st = {"url": c["url"], "agent_id": answer["agent_id"], "central_key": key, "central_name": answer.get("central_name") or c["url"],
           "name": name, "areas": allowed, "enrolled": now, "profile_rev": 0, "applied": {},
-          "audit_cursor": {"ts": now - AUDIT_BACKLOG_DAYS * 86400, "id": ""}, "config_hash": "", "last_ok": now, "last_error": ""}
+          "audit_cursor": {"ts": now - AUDIT_BACKLOG_DAYS * 86400, "id": ""}, "runs_cursor": now, "config_hash": "", "last_ok": now, "last_error": ""}
     _save(st)
     _audit("enrolled", f"{st['central_name']} as {st['agent_id']} – may manage: {', '.join(allowed) or 'nothing'}")
     return st
@@ -254,6 +254,11 @@ def applying():
         yield
     finally:
         _local.applying = False
+
+
+def is_applying():
+    """True while the agent applies a profile (the stores then write what the server sent)"""
+    return getattr(_local, "applying", False)
 
 
 def check_write(section, key):
@@ -343,6 +348,7 @@ def reconcile(prof=None):
             from .web import mark_restart
             mark_restart(old_env, set(restart))
     drift += _local_items(prof, sections, managed_ids)
+    results += _gone_jobs(applied, managed_ids, allowed)
     results += _modules(prof, allowed, applied, drift)
     applied = {k: v for k, v in applied.items() if k in managed_ids or k.startswith("modules:")}
     enforced = sorted(rid for rid in managed_ids if modes.get(rid, "enforced") == "enforced")
@@ -360,6 +366,27 @@ def reconcile(prof=None):
             _audit(f"local change reverted: {d['id']}", "enforced by the central profile", decision="denied")
     return {"rev": prof.get("rev", 0), "results": results, "drift": drift, "missing": missing, "refused": refused,
             "touched": sorted(touched), "restart": restart}
+
+
+def _gone_jobs(applied, managed_ids, allowed):
+    """jobs the server handed out and took back (deleted there or out of the profile) are deleted here too – they were
+    the server's; other parts stay as local items"""
+    from . import scheduled
+    out = []
+    if "jobs" not in allowed:
+        return out
+    for rid in [r for r in applied if r.startswith("jobs:") and r not in managed_ids]:
+        jid = rid.split(":", 1)[1]
+        applied.pop(rid, None)
+        if scheduled.get(jid) is None:
+            continue
+        try:
+            with applying():
+                scheduled.delete(jid)
+            out.append({"id": rid, "result": "applied", "msg": "deleted – no longer in the profile"})
+        except ValueError as e:
+            out.append({"id": rid, "result": "failed", "msg": str(e)})
+    return out
 
 
 def _local_items(prof, sections, managed_ids):
@@ -504,7 +531,73 @@ def _status(st):
             "audit": {"sent_through": (st.get("audit_cursor") or {}).get("id", ""), "waiting": bool(waiting)},
             "profile": {"rev": st.get("applied_rev", 0), "drift": st.get("drift") or [], "missing": st.get("missing") or [],
                         "refused": st.get("refused") or []},
-            "areas": st.get("areas") or []}
+            "areas": st.get("areas") or [],
+            "jobs": _job_states()}
+
+
+# ---------------------------------------------------------------- jobs from the server
+
+RUNS_BATCH = 50
+
+
+def managed_jobs():
+    """ids of the jobs the stored profile hands out (none when the agent doesn't let the server manage jobs)"""
+    if "jobs" not in (state().get("areas") or []):
+        return set()
+    return set(((_profile() or {}).get("sections") or {}).get("jobs") or {})
+
+
+def _job_states():
+    """the server's jobs here: on or paused, next run, the last run's outcome"""
+    from . import scheduled
+    jobs, ids = scheduled.load(), managed_jobs()
+    last = {}
+    for r in scheduled.history():
+        if r.get("job") in ids:
+            last[r["job"]] = r
+    return [{"id": jid, "name": jobs[jid].get("name", jid), "enabled": bool(jobs[jid].get("enabled")),
+             "next": jobs[jid].get("next") if jobs[jid].get("enabled") else None,
+             "last_status": (last.get(jid) or {}).get("status", "")} for jid in sorted(ids) if jid in jobs]
+
+
+def _run_record(r):
+    """what the server gets of a finished run"""
+    res = r.get("result") if isinstance(r.get("result"), dict) else {}
+    return {"id": r["id"], "job": r.get("job", ""), "name": r.get("name", ""), "trigger": r.get("trigger", ""),
+            "status": r.get("status", ""), "queued": r.get("queued"), "started": r.get("started"), "ended": r.get("ended"),
+            "seconds": r.get("seconds"), "error": str(r.get("error") or "")[:2000],
+            "result": {k: str(res.get(k) or "")[:20000 if k == "details" else 2000] for k in ("status", "title", "summary", "details") if res.get(k)},
+            "proposals": len(r.get("actions") or [])}
+
+
+def ship_runs():
+    """finished runs of the server's jobs after the cursor – returns the number sent"""
+    from . import scheduled
+    ids = managed_jobs()
+    since = float(state().get("runs_cursor") or 0)
+    done = sorted((r for r in scheduled.history() if r.get("job") in ids and r.get("ended") and r["ended"] > since
+                   and r.get("status") not in ("queued", "running")), key=lambda r: r["ended"])
+    sent = 0
+    while done[sent:]:
+        batch = done[sent:sent + RUNS_BATCH]
+        _call("POST", "/runs", {"runs": [_run_record(r) for r in batch]})
+        _update(runs_cursor=batch[-1]["ended"])
+        sent += len(batch)
+    return sent
+
+
+def _run_requested(jids):
+    """"run now" from the server – only its own jobs"""
+    from . import scheduled
+    ids = managed_jobs()
+    for jid in jids if isinstance(jids, list) else []:
+        if jid not in ids:
+            continue
+        try:
+            scheduled.run_now(jid, trigger="central")
+            _audit(f"job started: {jid}", "run now from the central")
+        except ValueError as e:
+            _audit(f"job not started: {jid}", str(e), decision="failed")
 
 
 def sync():
@@ -529,7 +622,9 @@ def sync():
             if key != state().get("report_hash"):
                 _call("POST", "/report", {k: report[k] for k in ("rev", "results", "drift", "missing", "refused")})
                 _update(report_hash=key)
+            _run_requested(hb.get("run_jobs"))
             ship_audit()
+            ship_runs()
             cfg, _ = backup.export([s for s in backup.SECTIONS])
             cfg.pop("created", None)
             catalog = settings_catalog()

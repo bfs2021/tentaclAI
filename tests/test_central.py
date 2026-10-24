@@ -33,6 +33,7 @@ class FakeCentral:
         self.pub = b64e(self.key.public_key().public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw))
         self.tokens, self.agents, self.audit, self.reports, self.configs = {"tok-1"}, {}, {}, [], []
         self.profile, self.rev, self.revoked, self.packages, self.nonces = None, 0, False, {}, set()
+        self.runs, self.run_jobs = [], []
 
     def code(self, token="tok-1", key=None, **extra):
         from app import central
@@ -64,7 +65,8 @@ class FakeCentral:
         data = json.loads(body) if body else {}
         if path == "/heartbeat":
             self.status = data
-            return 200, json.dumps({"profile_rev": self.rev, "want_config": False}).encode()
+            ask, self.run_jobs = self.run_jobs, []
+            return 200, json.dumps({"profile_rev": self.rev, "want_config": False, "run_jobs": ask}).encode()
         if path == "/profile":
             prof = dict(self.profile, agent_id=aid)
             return 200, json.dumps({"profile": prof, "sig": b64e(self.key.sign(canonical(prof)))}).encode()
@@ -78,6 +80,9 @@ class FakeCentral:
         if path == "/report":
             self.reports.append(data)
             return 200, b"{}"
+        if path == "/runs":
+            self.runs += data["runs"]
+            return 200, json.dumps({"stored": len(data["runs"])}).encode()
         if path == "/leave":
             self.agents.pop(aid)
             return 200, b"{}"
@@ -271,3 +276,37 @@ def test_shipped_entries_say_who_and_where(fc, client):
     assert e["owner"] == "admin" and e["source"].startswith("Claude terminal")
     local = next(x for x in auditlog.search("GET /pages", rng="1h")[0])
     assert "owner" not in local and "source" not in local  # only the copies sent carry them
+
+
+def test_jobs_from_the_server(fc, monkeypatch):
+    from app import central, scheduled
+    job = {"name": "Disk check", "prompt": "Check the disks.", "schedule": {"kind": "daily", "time": "07:00"}, "profile": "read-only",
+           "notify": "findings"}
+    fc.set_profile(name="P", sections={"jobs": {"disk-check": job}}, modes={})
+    central.enroll(fc.code(), "dev", ["jobs"])
+    central.sync()
+    assert scheduled.get("disk-check")["enabled"] is True  # a job from the server runs – an import would be paused
+    scheduled.save({"name": "Mine", "prompt": "x", "kind": "manual"}, new_id="mine")
+    central.sync()
+    assert [j["id"] for j in fc.status["jobs"]] == ["disk-check"] and fc.status["jobs"][0]["enabled"]
+    started = []
+    monkeypatch.setattr(scheduled, "run_now", lambda jid, trigger="manual": started.append((jid, trigger)) or "r1")
+    fc.run_jobs = ["disk-check", "mine"]
+    central.sync()
+    assert started == [("disk-check", "central")]  # only the server's own jobs
+    h = scheduled.history()
+    now = time.time()
+    h += [{"id": "r1", "job": "disk-check", "name": "Disk check", "trigger": "central", "status": "done", "queued": now - 60,
+           "started": now - 50, "ended": now, "seconds": 40, "result": {"status": "warn", "title": "Disk 91 % full", "summary": "sda"}},
+          {"id": "r2", "job": "mine", "name": "Mine", "status": "done", "ended": now + 1}]
+    scheduled._save_history(h)
+    central.sync()
+    assert [r["id"] for r in fc.runs] == ["r1"] and fc.runs[0]["result"]["title"] == "Disk 91 % full"
+    central.sync()
+    assert len(fc.runs) == 1  # not twice
+    fc.set_profile(name="P", sections={"jobs": {}}, modes={})
+    central.sync()
+    assert scheduled.get("disk-check") is None and scheduled.get("mine")  # the server's job goes, the local one stays
+    for f in (scheduled.JOBS, scheduled.HISTORY):
+        if os.path.exists(f):
+            os.remove(f)

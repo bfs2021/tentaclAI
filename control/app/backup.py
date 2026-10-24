@@ -399,7 +399,9 @@ def apply(doc, picked):
                 if not jobs_saved:
                     _backup(scheduled.JOBS, stamp)
                     jobs_saved = True
-                scheduled.put(key, {k: v for k, v in doc["jobs"][key].items() if k != "enabled"})
+                d = doc["jobs"][key]
+                from .central import is_applying  # a job from the central server starts as it says (default: on), an import paused
+                scheduled.put(key, {k: v for k, v in d.items() if k != "enabled"}, enabled=is_applying() and d.get("enabled", True) is not False)
             elif sec == "network":
                 kind, _, entry = key.partition(":")
                 if r["status"] == "changed":

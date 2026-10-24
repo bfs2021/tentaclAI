@@ -565,13 +565,13 @@ def put_preview(jid, d):
     return [], warnings, summary
 
 
-def put(jid, d):
-    """`svc config put job` after the approval: create (paused) or change"""
+def put(jid, d, enabled=False):
+    """`svc config put job` after the approval: create (paused unless enabled) or change"""
     _central_check("jobs", jid)
     form = form_from_definition(d)
     if get(jid):
         return save(form, jid)
-    return save(form, new_id=jid, enabled=False)
+    return save(form, new_id=jid, enabled=enabled)
 
 
 def set_enabled(jid, on):
