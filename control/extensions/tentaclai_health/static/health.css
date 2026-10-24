@@ -1,0 +1,9 @@
+.hbar { display: grid; grid-template-columns: repeat(48, 1fr); gap: 1px; width: 100%; min-width: 120px; max-width: 260px; height: 18px; }
+.hbar i { border-radius: 2px; background: var(--panel-2); }
+.hbar i.ok { background: var(--ok); }
+.hbar i.partial { background: var(--warn); }
+.hbar i.fail { background: var(--err); }
+.health-detail { max-width: 420px; overflow-wrap: anywhere; }
+.health-sys .stat { margin: 4px 0 2px; }
+.health-watch { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 6px 16px; margin: 8px 0 12px; }
+.health-watch label { display: flex; gap: 8px; align-items: center; }

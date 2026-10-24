@@ -8,7 +8,7 @@ import os
 
 from fastapi import Request
 
-from . import auditlog, dockerops, extensions, instance, jsonstore
+from . import auditlog, dockerops, extensions, instance, jsonstore, services_store, systems_store
 from . import notify as _notify
 from .config import DATA_DIR
 from .web import TC_VERSION, respond, templates, toast  # noqa: F401 – part of the API
@@ -97,6 +97,18 @@ def notify(event, title, body="", key=None, link=""):
 def control_link(path):
     """an absolute link to a page of tentacontrol (CONTROL_URL) – "" when CONTROL_URL isn't set"""
     return _notify.control_link(path)
+
+
+def services():
+    """the connected services, sorted by name: [{"name", "description", "system", "parts", "state"}] – state "ok"
+    (usable), "off" (disabled), "warn" (a ${VAR} is empty in .env) or "error" (invalid JSON). No secrets."""
+    return [{"name": d["name"], "description": d["description"], "system": d["system"], "parts": d["kinds"],
+             "state": d["state"]} for d in services_store.load_all()]
+
+
+def systems():
+    """the systems (groups of services), sorted by name: [{"name", "description"}]"""
+    return [{"name": x["name"], "description": x["description"]} for x in systems_store.load_all()]
 
 
 def svc(*args):

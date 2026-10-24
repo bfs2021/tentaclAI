@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% from "_icons.html" import icon, help_link %}
+{% block title %}Health{% endblock %}
+{% block head %}<link rel="stylesheet" href="{{ ext_static('tentaclai_health', 'health.css') }}">{% endblock %}
+{% macro state_pill(s) -%}
+{% if s == 'ok' %}<span class="pill ok">up</span>{% elif s == 'partial' %}<span class="pill warn">partly</span>
+{%- elif s == 'fail' %}<span class="pill err">down</span>{% else %}<span class="pill off">not checked yet</span>{% endif %}
+{%- endmacro %}
+{% macro pct(v) %}{{ '–' if v is none else (v | string) ~ ' %' }}{% endmacro %}
+{% block content %}
+<div class="header">
+  <div><h1>{{ icon('pulse') }} Service-Health {{ help_link("x-tentaclai_health-about") }}</h1>
+    <div class="sub">Every {{ settings.interval }} min each monitored service runs <code>svc test</code>
+      {%- if last %} · last check {{ last }} ago{% if next %}, next in {{ next }}{% endif %}{% endif %}{% if running %} · checking now…{% endif %}</div></div>
+  <div class="row">
+    <a class="btn sm ghost" href="/x/tentaclai_health/settings">{{ icon('settings') }}Settings</a>
+    <button class="btn sm primary" hx-post="/x/tentaclai_health/run" hx-disabled-elt="this">{{ icon('refresh') }}Check now</button>
+  </div>
+</div>
+
+{% if systems %}
+<div class="grid health-sys">
+  {% for g in systems %}
+  <div class="card">
+    <div class="card-head"><h2>{{ icon('server') }}{{ g.name }}</h2>{{ state_pill(g.state) }}</div>
+    <div class="stat">{{ g.ok }}<span class="muted small"> / {{ g.total }} up</span></div>
+    <div class="small muted">{{ g.description or '' }}{% if g.week is not none %}{{ ' · ' if g.description }}7 days: {{ pct(g.week) }}{% endif %}</div>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+<h2 class="section-head" style="margin-top:20px">Services</h2>
+{% if services %}
+<div class="card"><div class="table-wrap"><table>
+  <thead><tr><th>Service</th><th>System</th><th>Status</th><th>Since</th><th>Last 24 h</th><th>24 h</th><th>7 days</th><th>Last result</th></tr></thead>
+  <tbody>
+  {% for s in services %}
+  <tr>
+    <td><a href="/services/{{ s.name }}">{{ s.name }}</a><div class="small faint">{{ s.parts | join(', ') }}</div></td>
+    <td class="small">{{ s.system or '–' }}</td>
+    <td>{{ state_pill(s.state) }}</td>
+    <td class="small muted">{{ s.since or '–' }}</td>
+    <td><div class="hbar" title="24 hours, 30 minutes per block – oldest left">{% for b in s.bar %}<i class="{{ b }}"></i>{% endfor %}</div></td>
+    <td class="small mono">{{ pct(s.day) }}</td>
+    <td class="small mono">{{ pct(s.week) }}</td>
+    <td class="small muted health-detail">{{ s.detail or '–' }}{% if s.checked %} <span class="faint">({{ s.checked }} ago)</span>{% endif %}</td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table></div></div>
+{% else %}
+<div class="empty small">No service is monitored. Connect services under <a href="/services">Tentacles</a> or pick them in <a href="/x/tentaclai_health/settings">Settings → Health</a>.</div>
+{% endif %}
+
+{% if other %}
+<h2 class="section-head" style="margin-top:20px">Not checked</h2>
+<div class="card small">
+  {% for s in other %}<span class="pill off" title="{{ s.why }}">{{ s.name }} · {{ s.why }}</span> {% endfor %}
+</div>
+{% endif %}
+{% endblock %}

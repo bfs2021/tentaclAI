@@ -387,7 +387,7 @@
       <h2>Modules</h2>
       <p>Modules extend tentacontrol with pages, sidebar entries, tabs, background tasks, notification events and parts of Export / Import. <a href="/modules">Modules</a> lists them by origin:</p>
       <ul>
-        <li><strong>Built-in</strong> – shipped with tentaclAI, off until you enable them.</li>
+        <li><strong>Built-in</strong> – shipped with tentaclAI, off until you enable them: <strong>Service-Health</strong> tests every service on a schedule and notifies on outages (its own section below, once enabled).</li>
         <li><strong>Third-party</strong> – your own or someone else's, in <code>local/extensions/&lt;name&gt;/</code> of the stack directory (a Python package with an <code>extension.json</code>). Off until you enable them – <strong>a module runs inside tentacontrol with all of its rights</strong> (it can read the configuration, approve requests and run svc), so only enable code you trust. Its pages live below <code>/x/&lt;name&gt;/</code>; it can't replace tentacontrol's own pages.</li>
         <li><strong>Enterprise</strong> – from tentaclAI Enterprise (<code>TC_EXTENSIONS</code>), always loaded, unlocked by the license.</li>
       </ul>

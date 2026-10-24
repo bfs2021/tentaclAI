@@ -33,7 +33,8 @@ Origins decide the rights: *configured* (`TC_EXTENSIONS`, e.g. the private `tent
 `provide_license()` and replace pages/templates), *builtin* (`control/extensions/` → `/app/extensions/`) and *local*
 (`local/extensions/`, third-party) – both off until enabled (`data/control/extensions.json`), only below `/x/<name>/`,
 templates as `<name>/…`; their code is never imported before they are enabled. The example `examples/extensions/tcx_hello`
-is also the test fixture (`tests/test_extensions.py`). Keep Enterprise code out of this repository – here only the
+is also the test fixture (`tests/test_extensions.py`); the built-in `control/extensions/tentaclai_health` (Service-Health,
+`tests/test_health.py`) uses the public API only – keep it that way, it is the proof the API is enough. Keep Enterprise code out of this repository – here only the
 extension points and the placeholders (Enterprise part of Modules locked, Settings → License).
 
 Two layers: `svc` decides *what* happens with a tentacle (credentials, `read`/`write`/`confirm`); the gateway decides *where*

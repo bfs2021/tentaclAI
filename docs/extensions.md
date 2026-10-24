@@ -3,7 +3,8 @@
 A **module** (technically: an extension) is a Python package that tentacontrol loads at start. It can bring pages,
 sidebar entries, tabs, an icon, static files, background tasks, notification events, an audit log hook, a Help section
 and a part of Export / Import. The example [`examples/extensions/tcx_hello`](../examples/extensions/tcx_hello) uses
-every one of them – start from a copy of it.
+every one of them – start from a copy of it. A real module built the same way: Service-Health
+([`control/extensions/tentaclai_health`](../control/extensions/tentaclai_health)).
 
 ## Origin and trust
 
@@ -112,6 +113,8 @@ only while the license unlocks the feature `key`.
 | `audit(name, action, target="", decision="ok", request=None, **extra)` | An audit log entry: with `request` an action of the signed-in user, without a system entry. |
 | `notify(event, title, body="", key=None, link="")` | A notification for an event (yours or tentacontrol's); `key` deduplicates. |
 | `control_link(path)` | An absolute link to a tentacontrol page (`CONTROL_URL`), `""` when unset. |
+| `services()` | The connected services, sorted by name: `[{"name", "description", "system", "parts", "state"}]` – `state` is `ok`, `off` (disabled), `warn` (a `${VAR}` is empty in `.env`) or `error` (invalid file). No secrets. |
+| `systems()` | The systems: `[{"name", "description"}]`. |
 | `svc(*args)` | `svc <args>` in the sandbox as root → `(exit code, output)`. Blocking: call it from a task or `asyncio.to_thread`. |
 | `instance_id()` | `(ID, source)` of this installation. |
 | `TC_VERSION`, `API_VERSION` | tentaclAI's version, the Extension API's version. |

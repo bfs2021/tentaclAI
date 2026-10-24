@@ -1,0 +1,9 @@
+{
+  "name": "tentaclai_health",
+  "title": "Service-Health",
+  "description": "Tests every connected service on a schedule (svc test), shows availability over 24 hours and 7 days per service and system, and notifies when a service goes down or comes back.",
+  "version": "1.0.0",
+  "author": "tentaclAI",
+  "homepage": "https://github.com/mwaldegg/tentaclAI#modules",
+  "requires_api": 1
+}

@@ -13,6 +13,11 @@ All notable changes, newest first. Every release lists **upgrade steps** from th
   after *Restart tentacontrol* (a few seconds, the sandbox keeps running), disabling at once. Third-party modules live
   below `/x/<name>/` and can't replace tentacontrol's pages; only tentaclAI Enterprise provides the license.
   Guide: `docs/extensions.md`, example `examples/extensions/tcx_hello`.
+- **Service-Health** – the first built-in module (Modules → enable): `svc test` of every service on a schedule
+  (1–60 minutes, default 5), a Health page with the state, a 24-hour bar and the availability over 24 hours and 7 days
+  per service and system, a sidebar badge counting services that are down, and the notifications *Service down*
+  (urgent) / *Service up again* after a set number of failed checks in a row (default 2). Settings → Health picks the
+  interval and the services; the history (7 days) stays in `data/control/ext/tentaclai_health/`.
 
 ### Changes / fixes
 - `svc <name> GET …`: an HTTP error (4xx/5xx) now exits non-zero (curl 22, the body is still printed) – calls that read
@@ -22,6 +27,7 @@ All notable changes, newest first. Every release lists **upgrade steps** from th
   text, but now with a hint naming the real fields (#17).
 - `svc audit … | head` and other svc output into a closed pipe end quietly instead of with a traceback (#16).
 - Product findings → GitHub: the issue title no longer ends at "e.g." / "i.e." / "etc." / "vs.".
+- Extension API: `extapi.services()` and `extapi.systems()` list the connected services and systems (no secrets).
 - Extensions: the old calls `add_features()` / `set_edition()` are gone (`provide_license()`); an extension declares
   `REQUIRES_API = 1`. tentaclAI Enterprise needs its matching version (see Upgrade).
 

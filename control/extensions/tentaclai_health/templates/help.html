@@ -1,0 +1,15 @@
+<p>The built-in module <strong>Service-Health</strong> runs <code>svc test</code> for every monitored service on a
+schedule (every 5 minutes by default) – the same test as the <em>Test</em> button of a service. It needs no approval
+and writes no audit entries. Disabled services and services with an empty <code>${VAR}</code> are skipped.</p>
+<ul>
+  <li><strong>Health</strong> (sidebar) – the state per service (<em>up</em>, <em>partly</em>: one part of the service
+    fails, <em>down</em>), since when, a bar of the last 24 hours (30 minutes per block, the worst result counts), the
+    availability over 24 hours and 7 days, and a summary per system. <em>Check now</em> runs a round at once.</li>
+  <li>The badge next to <em>Health</em> counts services that failed as many checks in a row as set for notifications.</li>
+  <li><strong>Settings → Health</strong> – interval, after how many failed checks in a row a notification goes out
+    (default 2) and which services are monitored.</li>
+  <li>Notifications: the events <em>Service down</em> (high – passes quiet hours) and <em>Service up again</em>.
+    While the sandbox isn't running nothing is checked – the event <em>Container stopped</em> covers that.</li>
+  <li>The history (7 days) is kept in <code>data/control/ext/tentaclai_health/</code>; Export / Import carries the
+    settings only.</li>
+</ul>

@@ -8,6 +8,7 @@ import os
 import shutil
 import sys
 import tempfile
+import textwrap
 import time
 
 import pytest
@@ -132,3 +133,55 @@ def client(request, logged_in, monkeypatch):
         monkeypatch.setattr(dockerops, "status", lambda: dict(RUNNING))
         monkeypatch.setattr(dockerops, "stats", lambda: {"cpu": 3.5, "mem_mb": 512, "mem_limit_mb": 8192, "mem_pct": 6.2})
     return logged_in
+
+
+@pytest.fixture
+def ext(app_module, monkeypatch, tmp_path):
+    """a sandbox for extensions: own builtin/local folders and state, registries restored afterwards.
+    ext.install(name, files|src, origin) puts a package in place, ext.reload() loads what is enabled (like a restart)."""
+    from app import extensions, notify, web
+    app, env = app_module.app, web.templates.env
+    for attr in ("LOADED", "_tabs", "_help", "_tasks", "_audit_hooks", "_modules", "_banners"):
+        monkeypatch.setattr(extensions, attr, list(getattr(extensions, attr)))
+    for attr in ("FAILED", "_exts", "_provider", "_backup_parts", "_icons", "_static"):
+        monkeypatch.setattr(extensions, attr, dict(getattr(extensions, attr)))
+    monkeypatch.setattr(extensions, "_prefix", extensions.PrefixLoader({}))
+    monkeypatch.setattr(app.router, "routes", list(app.router.routes))
+    monkeypatch.setattr(notify, "EVENTS", dict(notify.EVENTS))
+    monkeypatch.setattr(env, "loader", env.loader)
+    monkeypatch.setattr(env, "globals", dict(env.globals))
+    builtin, local = tmp_path / "builtin", tmp_path / "local"
+    builtin.mkdir()
+    local.mkdir()
+    monkeypatch.setattr(extensions, "BUILTIN_DIR", str(builtin))
+    monkeypatch.setattr(extensions, "LOCAL_DIR", str(local))
+    monkeypatch.setattr(extensions, "STATE", str(tmp_path / "extensions.json"))
+    monkeypatch.setenv("TC_EXTENSIONS", "")
+    from app import extapi
+    monkeypatch.setattr(extapi, "DATA_DIR", str(tmp_path / "data"))
+    monkeypatch.syspath_prepend(str(tmp_path / "configured"))
+    before = set(sys.modules)
+
+    class Ext:
+        mod = extensions
+
+        def install(self, name, files=None, src=None, origin="local", manifest=None):
+            base = tmp_path / ("configured" if origin == "configured" else origin) / name
+            if src:
+                shutil.copytree(src, base)
+            else:
+                base.mkdir(parents=True)
+                for f, text in (files or {}).items():
+                    (base / f).parent.mkdir(parents=True, exist_ok=True)
+                    (base / f).write_text(textwrap.dedent(text))
+                if origin != "configured":
+                    (base / "extension.json").write_text(json.dumps(manifest or {"name": name, "title": name.title(), "requires_api": 1}))
+            return base
+
+        def reload(self, configured=""):
+            monkeypatch.setenv("TC_EXTENSIONS", configured)
+            extensions.load(app, web.templates)
+
+    yield Ext()
+    for name in set(sys.modules) - before:
+        sys.modules.pop(name, None)

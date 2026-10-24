@@ -382,7 +382,10 @@ Claude Code's telemetry, error reports and `/bug` are off by default (`CLAUDE_TE
 tentacontrol can be extended with **modules** – Python packages that bring pages, sidebar entries, tabs, background
 tasks, notification events and parts of Export / Import (tentacontrol → Modules):
 
-- **Built-in** modules ship with tentaclAI and are off until enabled.
+- **Built-in** modules ship with tentaclAI and are off until enabled:
+  - **Service-Health** – runs `svc test` for every service on a schedule (default every 5 minutes), shows the state,
+    a 24-hour bar and the availability over 24 hours and 7 days per service and system, and sends the notifications
+    *Service down* / *Service up again* (after 2 failed checks in a row by default; Settings → Health).
 - **Third-party** modules go into `local/extensions/<name>/` (a package with an `extension.json`) and are off until
   enabled – a module runs inside tentacontrol with all of its rights, so only enable code you trust. Their pages live
   below `/x/<name>/`; they can't replace tentacontrol's own.

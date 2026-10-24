@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% from "_tabs.html" import settings_tabs %}
+{% from "_icons.html" import icon %}
+{% block title %}Settings{% endblock %}
+{% block head %}<link rel="stylesheet" href="{{ ext_static('tentaclai_health', 'health.css') }}">{% endblock %}
+{% block content %}
+{{ settings_tabs('/x/tentaclai_health/settings') }}
+<div class="header"><div><h1>Service-Health</h1><div class="sub">What is tested and when you hear about it – the results are on the <a href="/x/tentaclai_health/">Health</a> page</div></div></div>
+<form class="card" hx-post="/x/tentaclai_health/settings">
+  <h2>Schedule</h2>
+  <div class="row">
+    <div class="field"><label for="h-interval">Check every</label>
+      <select id="h-interval" name="interval">{% for i in intervals %}<option value="{{ i }}" {{ 'selected' if s.interval == i }}>{{ i }} min</option>{% endfor %}</select></div>
+    <div class="field"><label for="h-fails">Notify after</label>
+      <select id="h-fails" name="fails">{% for f in fails %}<option value="{{ f }}" {{ 'selected' if s.fails == f }}>{{ f }} failed check{{ 's' if f > 1 }} in a row</option>{% endfor %}</select></div>
+  </div>
+  <p class="small muted">Notifications go out as the events <em>Service down</em> and <em>Service up again</em> – route them under <a href="/notifications">Notifications</a>.</p>
+  <h2 style="margin-top:16px">Monitored services</h2>
+  {% if services %}
+  <div class="health-watch">
+    {% for x in services %}<label class="small"><input type="checkbox" name="watch" value="{{ x.name }}" {{ 'checked' if x.name not in s.skip }}>{{ x.name }}{% if x.system %} <span class="faint">· {{ x.system }}</span>{% endif %}</label>{% endfor %}
+  </div>
+  <p class="small muted">New services are monitored as soon as they are connected.</p>
+  {% else %}<div class="empty small">No usable service yet.</div>{% endif %}
+  {% if other %}<p class="small faint">Not testable: {% for x in other %}{{ x.name }} ({{ x.why }}){{ ', ' if not loop.last }}{% endfor %}</p>{% endif %}
+  <button class="btn primary sm">Save</button>
+</form>
+{% endblock %}
