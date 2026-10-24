@@ -13,7 +13,7 @@
 <form class="card" hx-post="/central/enroll" style="max-width:760px">
   <div class="card-head"><h2>{{ icon('grid') }}Enroll</h2></div>
   <p class="muted small">Paste the enrollment code from the central server. The connection always goes from here to the server; nothing has to reach this installation.</p>
-  <div class="field"><label for="cc">Enrollment code</label><textarea id="cc" name="code" rows="3" class="mono" placeholder="tce1.…" required autocomplete="off"></textarea></div>
+  <div class="field"><label for="cc">Enrollment code</label><textarea id="cc" name="code" rows="2" class="mono fit" placeholder="tce1.…" required autocomplete="off"></textarea></div>
   <div class="field"><label for="cn">Name of this installation</label><input id="cn" name="name" value="{{ site.hostname or '' }}" maxlength="60"></div>
   <div class="field">
     <label>The server may manage</label>
@@ -23,7 +23,7 @@
     <div class="help">Parts you leave out stay local – the server's profile is ignored there. The audit log is always sent. Credentials never leave this installation.</div>
   </div>
   <details style="margin-bottom:12px"><summary class="small">The server has a certificate of its own CA – and the code doesn't bring it</summary>
-    <div class="field" style="margin-top:8px"><label for="ca">CA certificate (PEM)</label><textarea id="ca" name="ca" rows="4" class="mono" placeholder="-----BEGIN CERTIFICATE-----"></textarea><div class="help">Your CA – or the server's own certificate, which is then trusted on its own. Usually not needed: the server puts the certificate into its enrollment codes (Enterprise → Settings → Server).</div></div>
+    <div class="field" style="margin-top:8px"><label for="ca">CA certificate (PEM)</label><textarea id="ca" name="ca" rows="3" class="mono fit" placeholder="-----BEGIN CERTIFICATE-----"></textarea><div class="help">Your CA – or the server's own certificate, which is then trusted on its own. Usually not needed: the server puts the certificate into its enrollment codes (Enterprise → Settings → Server).</div></div>
   </details>
   <button class="btn primary">{{ icon('check') }}Enroll</button>
 </form>

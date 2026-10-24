@@ -113,6 +113,7 @@ input:not([type]), input[type=text], input[type=password], input[type=email], in
   padding: 8px 11px; font: inherit; outline: none; transition: border-color .12s, box-shadow .12s; }
 input:focus, select:focus, textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
 textarea { font-family: var(--mono); font-size: 12.5px; line-height: 1.5; resize: vertical; min-height: 360px; tab-size: 2; }
+textarea.fit { min-height: 0; resize: none; overflow: hidden; }  /* a key, code or certificate: as high as its text (app.js) */
 .field { margin-bottom: 14px; }
 .fields { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 4px 18px; }
 .field.wide { grid-column: 1 / -1; }  /* long help text: whole row instead of a narrow column */

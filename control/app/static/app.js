@@ -22,6 +22,18 @@
   var flash = document.getElementById("flash");
   if (flash) toast(flash.dataset.msg, flash.dataset.kind);
 
+  // keys, codes and certificates (<textarea class="fit">): as high as their text – on load, while typing or pasting,
+  // when the window changes width and when a folded <details> opens (a hidden one keeps its rows)
+  function fitOne(t) {
+    t.style.height = "auto";
+    if (t.scrollHeight) t.style.height = (t.scrollHeight + 2) + "px";
+  }
+  function fit() { document.querySelectorAll("textarea.fit").forEach(fitOne); }
+  fit();
+  window.addEventListener("resize", fit);
+  document.addEventListener("input", function (e) { if (e.target.matches && e.target.matches("textarea.fit")) fitOne(e.target); });
+  document.addEventListener("toggle", fit, true);
+
   // copy-to-clipboard buttons
   document.addEventListener("click", function (e) {
     var b = e.target.closest("[data-copy]");
