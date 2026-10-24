@@ -24,9 +24,20 @@
 <div class="header">
   <div><h1>Modules {{ help_link('modules') }}</h1><div class="sub">Extend tentacontrol – built-in modules, your own and signed packages.</div></div>
   <div class="row">
+    <button class="btn primary toggle" data-toggle="new-module" aria-expanded="false" aria-controls="new-module">{{ icon('plus') }}Add module</button>
     {%- if edition == 'community' %}<span class="pill off">Community</span>
     {%- elif features %}<a class="pill ok" href="/license" title="Settings → License">{{ icon('lock') }}Enterprise · licensed</a>
     {%- else %}<a class="pill warn" href="/license" title="Settings → License">{{ icon('lock') }}Enterprise · no license</a>{% endif %}</div>
+</div>
+
+<div class="card flat" id="new-module" style="margin-bottom:18px" hidden>
+  <div class="card-head"><h2>{{ icon('upload') }}Install from file</h2></div>
+  <form hx-post="/modules/upload" hx-encoding="multipart/form-data" hx-target="#pkg-area" class="row" style="flex-wrap:wrap">
+    <input type="file" name="file" accept=".zip,application/zip" aria-label="Module package" required>
+    <button class="btn sm">Check</button>
+  </form>
+  <div class="help" style="margin-top:6px">A module package (<code>.tcpkg.zip</code>) – checked before anything is installed. Your own modules can also go into <code>local/extensions/&lt;name&gt;/</code>.</div>
+  <div id="pkg-area"></div>
 </div>
 
 {% if ext_restart %}
@@ -71,18 +82,8 @@
   {% endfor %}
 </div>
 {% else %}
-<div class="empty small">No modules installed. Install a module package below, or put your own in <code>local/extensions/&lt;name&gt;/</code> – see <a href="/help#modules">Help → Modules</a>.</div>
+<div class="empty small">No modules installed. Install a module package with <em>Add module</em>, or put your own in <code>local/extensions/&lt;name&gt;/</code> – see <a href="/help#modules">Help → Modules</a>.</div>
 {% endif %}
-
-<div class="card" style="margin-top:16px;max-width:620px">
-  <div class="card-head"><h2>{{ icon('upload') }}Install from file</h2></div>
-  <form hx-post="/modules/upload" hx-encoding="multipart/form-data" hx-target="#pkg-area" class="row" style="flex-wrap:wrap">
-    <input type="file" name="file" accept=".zip,application/zip" aria-label="Module package" required>
-    <button class="btn sm">Check</button>
-  </form>
-  <div class="help" style="margin-top:6px">A module package (<code>.tcpkg.zip</code>) – checked before anything is installed.</div>
-  <div id="pkg-area"></div>
-</div>
 
 {% if edition != 'community' %}
 <h2 class="section-head" style="margin-top:24px">Enterprise</h2>
