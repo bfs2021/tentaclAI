@@ -123,7 +123,7 @@ def test_enroll_and_leave(fc, client):
     assert "Test Central" in html and "A-0001" in html and "Leave" in html and "connected" in html
     nav = client.get("/settings").text
     assert 'title="Managed by Test Central"' in nav and "dot ok nav-dot" in nav and 'href="/central" class="active' not in nav
-    assert 'class="edition-ee"' in nav and "★ Enterprise" in nav and 'class="edition ce"' not in nav and "Long arms" not in nav
+    assert 'class="edition ee"' in nav and "★ Enterprise" in nav and 'class="edition ce"' not in nav and "Long arms" not in nav
     central._update(last_error="timed out")
     assert "connection failed" in client.get("/central").text and "dot err nav-dot" in client.get("/settings").text
     central.leave()
