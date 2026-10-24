@@ -63,11 +63,11 @@
 {% if c.revoked %}<div class="alert err" style="max-width:860px">The server revoked this installation. Leave, then enroll again with a new code if needed.</div>{% endif %}
 
 <div class="card" style="max-width:860px;margin-bottom:16px">
-  <div class="card-head"><h2>{{ icon('lock') }}Managed by the server</h2><span class="pill {{ 'info' if c.locks else 'off' }}">{{ c.locks | length }} locked</span></div>
+  <div class="card-head"><h2>{{ icon('topology') }}Centrally managed</h2><span class="pill {{ 'info' if c.locks else 'off' }}">{{ c.locks | length }} item{{ '' if c.locks | length == 1 else 's' }}</span></div>
   {% if c.locks %}
-  <p class="small muted">These can only be changed on the server:</p>
+  <p class="small muted">Set by {{ st.central_name }} and kept that way – change them there:</p>
   <div>{% for l in c.locks %}<span class="tag mono">{{ l }}</span> {% endfor %}</div>
-  {% else %}<p class="small muted" style="margin:0">Nothing is locked.</p>{% endif %}
+  {% else %}<p class="small muted" style="margin:0">No centrally managed settings yet – everything here is set locally.</p>{% endif %}
   {% if st.missing %}
   <p class="small" style="margin-top:12px"><span class="pill warn">values missing</span> The profile uses variables that are empty here:
     {% for v in st.missing %}<code>{{ v }}</code>{{ ', ' if not loop.last }}{% endfor %} – fill them in under <a href="/backup">Export / Import</a> or Settings.</p>
