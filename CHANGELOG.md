@@ -69,10 +69,12 @@ All notable changes, newest first. Every release lists **upgrade steps** from th
   longer hold up tentacontrol while the Overview is open; the recent approvals read far less of the audit log.
 
 ### Upgrade
-- `git pull`, `docker compose build control claude`, `docker compose up -d` – recreating `tentaclai` ends running
-  sessions and Remote Control.
-- tentaclAI Enterprise: update it together with tentaclAI (an older Enterprise package without `REQUIRES_API` is not
-  loaded – the Modules page says so). Its license file moves to `data/control/ext/tentaclai_enterprise/` by itself.
+- `git pull`, `docker compose build` (all three images – the gateway's shared library changed too),
+  `docker compose up -d` – recreating `tentaclai` ends running sessions and Remote Control.
+- The old Enterprise extension is retired: if `.env` still has `TC_EXTENSIONS=tentaclai_enterprise`, empty it (and
+  remove the package). tentaclAI Enterprise is now a server of its own – join it under **Enterprise** in the sidebar
+  with an enrollment code; the license lives there (seats = installations), tentacontrol needs none.
+- Sign-in through tentaclAI Enterprise needs `CONTROL_URL` (Settings → tentacontrol address); nothing else is new in `.env`.
 
 ## v0.21.0 – 2026-10-24
 
