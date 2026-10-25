@@ -40,6 +40,7 @@ def remove(alias):
 
 
 def set_sudo(alias, cmd):
+    check_write("ssh_hosts", alias)
     tclib.ssh_set_sudo(CONF_D, alias, cmd)
 
 

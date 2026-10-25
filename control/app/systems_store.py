@@ -42,12 +42,13 @@ def get(name):
 
 
 def _write(path, data):
+    """every write of a system goes through here – refused while the central server enforces it"""
+    check_write("systems", data["name"])
     jsonstore.save(path, data, mode=0o644, readable=True)
 
 
 def save_raw(name, data):
     """write a whole system definition (import) – members still come from the services' own "system" field"""
-    check_write("systems", name)
     if not isinstance(data, dict):
         raise ValueError("a system is a JSON object")
     _write(path_of(name), {"name": name, **{k: v for k, v in data.items() if k != "name"}})

@@ -250,6 +250,27 @@ def test_svc_respects_the_locks(tmp_path):
     assert tclib.central_locked(str(tmp_path / "none"), "services", "wiki") == ""
 
 
+def test_every_writer_respects_the_locks(fc, tmp_path, monkeypatch):
+    """systems (also the edit form), an SSH host's sudo, notification channels and rules – not only the import paths"""
+    from app import central, jsonstore, notify, sshhosts, systems_store
+    monkeypatch.setattr(systems_store, "SYSTEMS_DIR", str(tmp_path / "systems"))
+    monkeypatch.setattr(notify, "CONFIG", str(tmp_path / "notify.json"))
+    monkeypatch.setattr(notify, "update_env", lambda kv: None)
+    jsonstore.save(central.LOCKS, {"enforced": ["systems:edge", "ssh_hosts:gw", "notifications:channel:ops", "notifications:rules"]})
+    for call in (lambda: systems_store.create("edge"), lambda: systems_store.save("edge", "d", "", [], []),
+                 lambda: sshhosts.set_sudo("gw", "sudo -n"), lambda: notify.remove_channel("ops"),
+                 lambda: notify.set_routes({}, {"enabled": False}, 10)):
+        with pytest.raises(ValueError, match="managed by"):
+            call()
+    systems_store.create("other")  # not enforced
+    notify.save({"channels": [{"id": "ops", "name": "Ops", "kind": "webhook", "enabled": False}], "routes": {}})
+    notify.update_channel("ops", "Ops", True, {})  # on/off and the URL stay local
+    with pytest.raises(ValueError, match="managed by"):
+        notify.update_channel("ops", "Renamed", True, {})
+    cid = notify.add_channel("webhook", "hook", {"url": "https://example.test/h"})
+    assert all(cid not in r for r in notify.load()["routes"].values())  # the server sets the routes: no defaults added
+
+
 def test_module_packages_from_the_profile(fc, ext, monkeypatch):
     """Z4: a profile names a signed package – fetched from the server, checked, installed"""
     import importlib.util

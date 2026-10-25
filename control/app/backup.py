@@ -14,6 +14,7 @@ import time
 import tclib
 
 from . import claude_files, egress, extensions, jsonstore, notify, scheduled, services_store, skills, sshhosts, systems_store
+from .central import check_write
 from .config import DATA_DIR, SERVICES_DIR, SETTINGS_GROUPS, STACK_DIR, SYSTEMS_DIR, is_secret
 from .envfile import read_env, update_env
 
@@ -408,6 +409,7 @@ def apply(doc, picked):
                     _backup(egress.RULES, stamp)
                 egress.add(kind, entry)
             elif sec == "notifications":
+                check_write("notifications", key)  # notify.save takes the whole file – the lock is per item
                 _backup(notify.CONFIG, stamp)
                 c = notify.load()
                 if key.startswith("channel:"):

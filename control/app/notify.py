@@ -9,6 +9,7 @@ import re
 import time
 
 from . import jsonstore
+from .central import check_write, locked
 from .config import DATA_DIR
 from .envfile import read_env, update_env
 
@@ -160,8 +161,8 @@ def add_channel(kind, name, form):
     url = build_url(kind, form)
     update_env({env_key(cid): url})
     c["channels"].append({"id": cid, "name": name or cid, "kind": kind, "enabled": True})
-    for ev in ("approval", "rc_down", "logged_out", "container"):  # sensible defaults for a new channel
-        c["routes"].setdefault(ev, [])
+    for ev in () if locked("notifications", "rules") else ("approval", "rc_down", "logged_out", "container"):
+        c["routes"].setdefault(ev, [])  # sensible defaults for a new channel – unless the central server sets the routes
         if cid not in c["routes"][ev]:
             c["routes"][ev].append(cid)
     save(c)
@@ -185,7 +186,10 @@ def update_channel(cid, name, enabled, form):
     ch = next((x for x in c["channels"] if x["id"] == cid), None)
     if ch is None:
         raise ValueError("unknown channel")
-    ch["name"] = (name or ch["name"]).strip()[:30] or ch["name"]
+    new_name = (name or ch["name"]).strip()[:30] or ch["name"]
+    if new_name != ch["name"]:  # the server manages id, name and kind – URL and on/off stay local
+        check_write("notifications", f"channel:{cid}")
+    ch["name"] = new_name
     ch["enabled"] = bool(enabled)
     fields = {"ntfy": ("token",), "webhook": ("url", "header"), "apprise": ("apprise",)}.get(ch["kind"], ())
     old = public_parts(cid) if ch["kind"] == "ntfy" else {}
@@ -205,6 +209,7 @@ def update_channel(cid, name, enabled, form):
 
 
 def remove_channel(cid):
+    check_write("notifications", f"channel:{cid}")
     c = load()
     c["channels"] = [ch for ch in c["channels"] if ch["id"] != cid]
     for ev in c["routes"]:
@@ -214,6 +219,7 @@ def remove_channel(cid):
 
 
 def set_routes(routes, quiet, dedupe_min):
+    check_write("notifications", "rules")
     c = load()
     ids = {ch["id"] for ch in c["channels"]}
     c["routes"] = {ev: [x for x in routes.get(ev, []) if x in ids] for ev in EVENTS}
