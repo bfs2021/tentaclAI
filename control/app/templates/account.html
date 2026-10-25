@@ -9,7 +9,7 @@
   <div class="row">{{ help_link('two-factor') }}</div>
 </div>
 
-{% if central_account %}
+{% if account.source == 'central' %}
 <div class="card" style="margin-bottom:16px">
   <h2>{{ account.name or account.username }}</h2>
   <p>You are signed in through <strong>{{ account.central or 'tentaclAI Enterprise' }}</strong> as <strong>{{ account.username }}</strong>{% if account.email %} ({{ account.email }}){% endif %}, role {{ account.role }}.</p>

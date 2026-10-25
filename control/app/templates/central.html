@@ -56,7 +56,7 @@
       {% else %}local accounts and users of {{ st.central_name }}{% endif %}</dd>{% endif %}
     {% if c.banner %}<dt>Message</dt><dd>{{ c.banner.text }}</dd>{% endif %}
     <dt>Managed by Enterprise</dt><dd>{% for a in st.areas or [] %}<span class="tag">{{ c.areas.get(a, a) }}</span> {% else %}nothing{% endfor %}
-      {% if c.areas_locked %}<div class="small muted" style="margin-top:6px">{{ icon('lock') }} Locked by the server's profile</div>
+      {% if c.areas_locked %}<div class="small muted" style="margin-top:6px">{{ icon('lock') }} {{ 'All parts – set' if c.areas_all else 'Locked' }} by the server's profile</div>
       {% elif not c.revoked %}<details style="margin-top:6px"><summary class="small">Change</summary>
         <form hx-post="/central/areas" style="margin-top:8px">
           {% for key, label in c.areas.items() %}{% set on = key in (st.areas or []) %}<label class="check"><input type="checkbox" name="areas" value="{{ key }}" {{ 'checked' if on }} {{ 'disabled' if on and c.protected }}> {{ label }}</label>{% if on and c.protected %}<input type="hidden" name="areas" value="{{ key }}">{% endif %} {% endfor %}

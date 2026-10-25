@@ -56,8 +56,9 @@ def save(c):
 
 
 def control_link(path):
-    base = (read_env().get("CONTROL_URL") or "").rstrip("/")
-    return base + path if base else ""
+    """CONTROL_URL + path – "" while no http(s) address is set"""
+    base = (read_env().get("CONTROL_URL") or "").strip().rstrip("/")
+    return base + path if base.startswith(("https://", "http://")) else ""
 
 
 def env_key(cid):

@@ -18,7 +18,7 @@ def emergency():
     """the local sign-in for an hour, when the central's profile allows only its own sign-ins"""
     if central.sign_in_policy() == "enterprise":
         import time
-        until = central.open_breakglass("host")
+        until = central.open_breakglass()
         print(f"Local sign-in opened until {time.strftime('%H:%M', time.localtime(until))} (only tentaclAI Enterprise sign-in is "
               "allowed here otherwise).")
         return True

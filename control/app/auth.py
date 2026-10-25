@@ -155,15 +155,16 @@ def migrate():
     return True
 
 
-def sign_in(request: Request, user, breakglass=False) -> None:
+def sign_in(request: Request, user) -> None:
     """a session for a local account, or for a user of the central server (central.sso_finish – no local account;
     the session carries the user)"""
+    from . import central
     request.session.clear()
     request.session["auth"] = True
     request.session["uid"] = user["id"]
-    if user.get("source") == "central":
+    if is_central_id(user["id"]):
         request.session["central_user"] = user
-    if breakglass:
+    elif central.sign_in_policy() == "enterprise":
         request.session["breakglass"] = True  # signed in while the host opened the local sign-in – it stays valid
 
 
@@ -175,9 +176,8 @@ def current_user(request: Request):
     if not request.session.get("auth"):
         return None
     uid = request.session.get("uid")
-    if isinstance(uid, str) and uid.startswith("c:"):
-        u = request.session.get("central_user") or {}
-        return u if u.get("id") == uid and central.sso_enabled() else None
+    if is_central_id(uid):
+        return request.session.get("central_user") if central.sso_enabled() else None
     if not request.session.get("breakglass") and not central.local_sign_in():
         return None
     if uid is None:
@@ -185,8 +185,13 @@ def current_user(request: Request):
     return next((u for u in users() if u.get("id") == uid), None)
 
 
+def is_central_id(uid) -> bool:
+    """a user of the central server (id "c:<sub>") rather than a local account"""
+    return isinstance(uid, str) and uid.startswith("c:")
+
+
 def is_central(request: Request) -> bool:
-    return (current_user(request) or {}).get("source") == "central"
+    return is_central_id(request.session.get("uid"))
 
 
 def username(request: Request) -> str:

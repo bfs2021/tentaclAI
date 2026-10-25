@@ -47,7 +47,7 @@ async def guard(request: Request, call_next):
             if request.headers.get("hx-request"):
                 return PlainTextResponse("", headers={"HX-Redirect": "/login"})
             return RedirectResponse("/login" if auth.has_account() else "/setup", status_code=303)
-        if auth.profile_missing() and not path.startswith(("/account/complete", "/logout")):
+        if auth.profile_missing() and not auth.is_central(request) and not path.startswith(("/account/complete", "/logout")):
             if request.headers.get("hx-request"):  # an account from before usernames: username + email first
                 return PlainTextResponse("", headers={"HX-Redirect": "/account/complete"})
             return RedirectResponse("/account/complete", status_code=303)

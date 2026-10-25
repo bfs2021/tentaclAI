@@ -23,6 +23,8 @@ import time
 import urllib.error
 import urllib.request
 
+from cryptography.exceptions import InvalidSignature
+
 from . import jsonstore
 from .config import DATA_DIR
 
@@ -37,6 +39,7 @@ CODE_PREFIX = "tce1."
 INTERVAL = 30
 AUDIT_BATCH = 500
 AUDIT_BACKLOG_DAYS = 7
+TAMPER_KEEP = 10             # refused attempts kept for the status
 TIMEOUT = 15
 MODES = ("enforced", "default")
 
@@ -125,18 +128,17 @@ BREAKGLASS = os.path.join(DIR, "breakglass.json")
 BREAKGLASS_SECONDS = 3600
 SSO_ROLES = ("admin",)       # what tentacontrol knows; the server's grants say which
 SSO_SKEW = 60                # seconds of clock difference accepted on iat
+SSO_PENDING_SECONDS = 600    # a sign-in started here must come back within
 
 
 def _control_url():
-    from .envfile import read_env
-    url = (read_env().get("CONTROL_URL") or "").strip().rstrip("/")
-    return url if url.startswith(("https://", "http://")) else ""
+    from .notify import control_link
+    return control_link("")
 
 
 def sso_enabled():
     """users of the server may sign in here: enrolled, "Sign-in" allowed, and an address to come back to"""
-    st = state()
-    return bool(st.get("agent_id")) and not st.get("revoked") and "signin" in (st.get("areas") or []) and bool(_control_url())
+    return enrolled() and "signin" in (state().get("areas") or []) and bool(_control_url())
 
 
 def sign_in_policy():
@@ -144,19 +146,19 @@ def sign_in_policy():
     the agent lets the server manage Sign-in"""
     if not sso_enabled():
         return "local"
-    return "enterprise" if ((_profile() or {}).get("sign_in") or {}).get("policy") == "enterprise" else "local"
+    return "enterprise" if (_managed_profile().get("sign_in") or {}).get("policy") == "enterprise" else "local"
 
 
 def breakglass_until():
     return float((jsonstore.load(BREAKGLASS) or {}).get("until") or 0)
 
 
-def open_breakglass(by="host"):
+def open_breakglass():
     """open the local sign-in for an hour although the profile allows only the server (./tentaclai.sh passwd)"""
     until = time.time() + BREAKGLASS_SECONDS
     os.makedirs(DIR, mode=0o700, exist_ok=True)
-    jsonstore.save(BREAKGLASS, {"until": until, "by": by}, mode=0o600)
-    _audit("local sign-in opened for an hour", f"emergency access from the {by}", decision="warn")
+    jsonstore.save(BREAKGLASS, {"until": until, "by": "host"}, mode=0o600)
+    _audit("local sign-in opened for an hour", "emergency access from the host", decision="warn")
     return until
 
 
@@ -180,16 +182,17 @@ def sso_finish(session, token, state_value):
     pend = session.pop("sso", None) or {}
     if not sso_enabled():
         raise CentralError("sign-in through the server is not allowed here")
-    if not pend or time.time() - pend.get("ts", 0) > 600 or not secrets.compare_digest(str(state_value), pend.get("state", "")):
+    if not pend or time.time() - pend.get("ts", 0) > SSO_PENDING_SECONDS or not secrets.compare_digest(str(state_value), pend.get("state", "")):
         raise CentralError("this sign-in wasn't started here, or it took too long – try again")
     st = state()
     try:
         body, sig = str(token).split(".", 1)
         raw = b64d(body)
-        from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
-        Ed25519PublicKey.from_public_bytes(b64d(st["central_key"])).verify(b64d(sig), raw)
+        _check_sig(st, b64d(sig), raw)
         claims = json.loads(raw)
-    except Exception:  # noqa: BLE001 – any defect is the same answer
+        if not isinstance(claims, dict):
+            raise ValueError("not an object")
+    except (KeyError, TypeError, ValueError, InvalidSignature):
         raise CentralError("the server's answer isn't validly signed") from None
     now = time.time()
     if (claims.get("v") != 1 or claims.get("aud") != st["agent_id"] or not secrets.compare_digest(str(claims.get("nonce")), pend.get("nonce", ""))
@@ -351,24 +354,40 @@ def enroll(code, name, allowed, ca_pem=""):
     return st
 
 
+def _managed_profile():
+    """the server's profile while it is in force here (enrolled, not revoked) – {} otherwise"""
+    return (_profile() or {}) if enrolled() else {}
+
+
 def tamper_protected():
     """the server's profile protects its management here: no leaving, nothing taken away from what it may manage
     (only revoking on the server ends it). Root on the host can still edit the files – the server notices that"""
-    st = state()
-    return bool(st.get("agent_id")) and not st.get("revoked") and (_profile() or {}).get("allow_leave") is False
+    return _managed_profile().get("allow_leave") is False
 
 
 def areas_locked():
     """the server's profile locks "Managed by Enterprise": the local admin can't change it at all"""
-    st = state()
-    return bool(st.get("agent_id")) and not st.get("revoked") and (_profile() or {}).get("areas_locked") is True
+    return _managed_profile().get("areas_locked") is True
+
+
+def areas_all():
+    """the server's profile takes over every part ("Managed by Enterprise: all", locked)"""
+    return _managed_profile().get("areas_all") is True
+
+
+def _take_all_areas():
+    """under "all" the agent lets the server manage every part – also parts a later version adds"""
+    want = sorted(areas())
+    if areas_all() and sorted(state().get("areas") or []) != want:
+        _update(areas=want, report_hash="")
+        _audit("managed by Enterprise changed", "all parts – set by the server's profile")
 
 
 def _tamper(what):
     """a refused attempt: kept for the status (the server shows it) and in the audit log"""
     with _lock:
         st = state()
-        st["tamper"] = ((st.get("tamper") or []) + [{"ts": round(time.time()), "what": what[:200]}])[-20:]
+        st["tamper"] = ((st.get("tamper") or []) + [{"ts": round(time.time()), "what": what[:200]}])[-TAMPER_KEEP:]
         _save(st)
     _audit(f"tamper protection: {what}", "refused – the server's profile protects its management here", decision="blocked")
 
@@ -380,17 +399,19 @@ def set_areas(allowed):
     if not st.get("agent_id"):
         raise CentralError("not enrolled")
     allowed = sorted({a for a in allowed if a in areas()})
-    gone = sorted(set(st.get("areas") or []) - set(allowed))
-    if allowed != sorted(st.get("areas") or []) and areas_locked():
+    current = sorted(st.get("areas") or [])
+    if allowed == current:
+        return allowed
+    if areas_locked():
         _tamper("change what the server may manage")
         raise CentralError("the server's profile locks what it manages here – ask the server's admin")
+    gone = sorted(set(current) - set(allowed))
     if gone and tamper_protected():
         _tamper(f"take away {', '.join(gone)}")
         raise CentralError("tamper protection: the server's profile doesn't allow taking parts away here – "
                            "ask the server's admin")
-    if allowed != sorted(st.get("areas") or []):
-        _update(areas=allowed, report_hash="")
-        _audit("managed by Enterprise changed", ", ".join(allowed) or "nothing")
+    _update(areas=allowed, report_hash="")
+    _audit("managed by Enterprise changed", ", ".join(allowed) or "nothing")
     return allowed
 
 
@@ -451,12 +472,16 @@ def _profile():
     return (p or {}).get("profile")
 
 
-def _verify(doc, st):
-    from cryptography.exceptions import InvalidSignature
+def _check_sig(st, sig, raw):
+    """InvalidSignature (or KeyError/ValueError) unless the server's key signed raw"""
     from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
+    Ed25519PublicKey.from_public_bytes(b64d(st["central_key"])).verify(sig, raw)
+
+
+def _verify(doc, st):
     try:
         prof, sig = doc["profile"], b64d(doc["sig"])
-        Ed25519PublicKey.from_public_bytes(b64d(st["central_key"])).verify(sig, canonical(prof))
+        _check_sig(st, sig, canonical(prof))
     except (KeyError, TypeError, ValueError, InvalidSignature):
         raise CentralError("the profile's signature doesn't match the server's key – not applied") from None
     if prof.get("agent_id") != st["agent_id"]:
@@ -710,7 +735,7 @@ def _status(st):
             "areas": st.get("areas") or [],
             "jobs": _job_states(),
             "control_url": _control_url(),
-            "tamper": (st.get("tamper") or [])[-10:]}
+            "tamper": st.get("tamper") or []}
 
 
 # ---------------------------------------------------------------- jobs from the server
@@ -795,6 +820,7 @@ def sync():
                 jsonstore.save(PROFILE, doc, mode=0o600)
                 _update(profile_rev=prof.get("rev", 0), profile_at=time.time())
                 _audit("profile received", f"{prof.get('name', '')} rev {prof.get('rev')}")
+            _take_all_areas()
             report = reconcile()
             key = _h({k: report[k] for k in ("rev", "results", "drift", "missing", "refused")})
             if key != state().get("report_hash"):
@@ -869,6 +895,7 @@ def view():
     """for the Enterprise page"""
     st = state()
     prof = _profile() or {}
+    bg = breakglass_until()
 
     def fmt(ts):
         return time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(ts)) if ts else ""
@@ -878,5 +905,5 @@ def view():
             "last_ok": fmt(st.get("last_ok")), "enrolled_at": fmt(st.get("enrolled")), "profile_at": fmt(st.get("profile_at")),
             "audit_waiting": bool(waiting), "jobs": sorted(managed_jobs()) if st.get("agent_id") else [],
             "hidden": [FEATURES[k][0] for k in sorted(hidden_features())], "banner": banner(),
-            "sso": sso_enabled(), "protected": tamper_protected(), "areas_locked": areas_locked(), "sign_in_policy": sign_in_policy(), "control_url": _control_url(),
-            "breakglass_until": fmt(breakglass_until()) if breakglass_until() > time.time() else ""}
+            "protected": tamper_protected(), "areas_locked": areas_locked(), "areas_all": areas_all(),
+            "sign_in_policy": sign_in_policy(), "control_url": _control_url(), "breakglass_until": fmt(bg) if bg > time.time() else ""}

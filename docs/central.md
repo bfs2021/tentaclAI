@@ -127,6 +127,8 @@ definition says (`"enabled"`, default on – an import starts jobs paused). When
   without tentacontrol (files edited on the host).
 - `areas_locked: true` in the profile locks *Managed by Enterprise* completely – the local admin can neither add nor take away
   parts (attempts count as tamper attempts).
+- `areas_all: true` (sent together with `areas_locked: true`) – the agent lets the server manage every part, also
+  parts a later version of tentaclAI adds; it takes them over when it receives the profile.
 
 ## Sign-in through the server
 

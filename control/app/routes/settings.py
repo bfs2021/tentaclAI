@@ -219,7 +219,7 @@ def _security(request, codes=None, error=None, status=200, done=None):
         link = totp.uri(secret, site().get("hostname") or "tentacontrol")
         qr = segno.make(link, error="m").svg_inline(scale=4, border=2, dark="#111", light="#fff", omitsize=True)
     resp = page(request, "account.html", st=st, secret=secret, qr=qr, codes=codes, error=error, done=done, days=auth.TRUST_DAYS,
-                account=auth.current_user(request) or {}, pw_min=auth.PASSWORD_MIN, central_account=auth.is_central(request),
+                account=auth.current_user(request) or {}, pw_min=auth.PASSWORD_MIN,
                 fmt=lambda ts: time.strftime("%Y-%m-%d %H:%M", time.localtime(ts)) if ts else "–")
     resp.status_code = status
     return resp

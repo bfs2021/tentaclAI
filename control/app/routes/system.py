@@ -69,6 +69,10 @@ def _login_page(request, error=None, status=200, username=""):
         "central_name": central.state().get("central_name", ""), "local": central.local_sign_in()}, status_code=status)
 
 
+def _emergency(request):
+    return " · emergency access" if request.session.get("breakglass") else ""
+
+
 @router.get("/login", response_class=HTMLResponse)
 async def login_form(request: Request):
     if not auth.has_account():
@@ -99,9 +103,9 @@ async def login(request: Request, username: str = Form(""), password: str = Form
         request.session["pending_2fa"] = time.time()  # password done – the code comes next
         request.session["pending_uid"] = user["id"]
         return RedirectResponse("/login/2fa", status_code=303)
-    auth.sign_in(request, user, breakglass=central.sign_in_policy() == "enterprise")
+    auth.sign_in(request, user)
     auditlog.user(request, "auth", "tentacontrol", "sign in", detail="password" + (" + trusted browser" if auth.twofactor_enabled() else "")
-                  + (" · emergency access" if central.sign_in_policy() == "enterprise" else ""))
+                  + _emergency(request))
     return RedirectResponse("/", status_code=303)
 
 
@@ -166,9 +170,9 @@ async def login_2fa(request: Request, code: str = Form(...), trust: str = Form("
         return templates.TemplateResponse(request, "login_2fa.html", {**ctx, "error": "wrong code"}, status_code=401)
     auth.clear_failures(ip)
     user = next((u for u in auth.users() if u.get("id") == request.session.get("pending_uid")), None) or auth.admin()
-    auth.sign_in(request, user, breakglass=central.sign_in_policy() == "enterprise")
+    auth.sign_in(request, user)
     auditlog.user(request, "auth", "tentacontrol", "sign in", detail=f"password + {kind}" + (" · browser trusted" if trust else "")
-                  + (" · emergency access" if central.sign_in_policy() == "enterprise" else ""))
+                  + _emergency(request))
     if kind == "recovery":
         left = auth.twofactor_status()["recovery_left"]
         notify.emit("signin", "tentacontrol: sign-in with a recovery code", f"{left} recovery codes left.", key=f"signin:{time.time()}")
