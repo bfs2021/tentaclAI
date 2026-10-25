@@ -22,7 +22,7 @@
   </div>
   <div class="row">
     <button class="btn" hx-post="/services/{{ svc.name }}/svc-test" hx-target="#svc-test" hx-indicator="#svc-test-spin">{{ icon('check') }}Test connection</button>
-    <a class="btn primary" href="/terminal?p=onboard&alias={{ svc.name | urlencode }}" title="Claude tests and explores the service and agrees on purpose, scope and rules with you">{{ icon('sparkle') }}Onboard with Claude</a>
+    {% if shown('/terminal') %}<a class="btn primary" href="/terminal?p=onboard&alias={{ svc.name | urlencode }}" title="Claude tests and explores the service and agrees on purpose, scope and rules with you">{{ icon('sparkle') }}Onboard with Claude</a>{% endif %}
     <button class="btn" hx-post="/services/{{ svc.name }}/toggle">{{ 'Disable' if svc.enabled else 'Enable' }}</button>
     <button class="btn" type="button" aria-expanded="false" onclick="var f=document.getElementById('rename-form');f.hidden=!f.hidden;this.setAttribute('aria-expanded',String(!f.hidden));if(!f.hidden)f.querySelector('input').select()">Rename</button>
     {% if tpl %}<button class="btn" type="button" aria-expanded="false" title="Download this service as a template – without its tokens, name and system" onclick="var f=document.getElementById('template-form');f.hidden=!f.hidden;this.setAttribute('aria-expanded',String(!f.hidden))">{{ icon('download') }}Template</button>{% endif %}

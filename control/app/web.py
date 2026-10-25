@@ -2,6 +2,7 @@
 import asyncio
 import json
 import os
+from urllib.parse import urlsplit
 
 from fastapi.responses import PlainTextResponse
 from fastapi.templating import Jinja2Templates
@@ -19,6 +20,8 @@ except OSError:
     TC_VERSION = "dev"
 templates.env.globals["tc_version"] = TC_VERSION
 # cache busting: static URLs carry the newest mtime of app.css/app.js, so browsers load a new version right after an update
+# shown("/terminal?p=claude"): False when the central server's profile hides the feature the link leads to
+templates.env.globals["shown"] = lambda href: central.hidden_feature_of(urlsplit(href).path) is None
 templates.env.globals["asset_v"] = str(int(max(os.path.getmtime(os.path.join(BASE, "static", f)) for f in ("app.css", "app.js", "logo.svg"))))
 
 
@@ -34,7 +37,7 @@ def page(request, name, nav=None, **ctx):
     ctx.update(request=request, nav=nav or name.split(".")[0], cstatus=st, restart_needed=restart_needed(st) or newer, newer_image=newer, site=site(),
                update=None if "updates" in hidden else updatecheck.status(TC_VERSION), features=unlocked, edition=extensions.edition(),
                module_nav=extensions.nav_entries(unlocked), ext_restart=extensions.restart_pending(), ext_banners=extensions.banners(request), me=auth.current_user(request) or {},
-               central_locks=central.locks(), central_nav=central.nav_status(), hidden_features=hidden,
+               central_locks=central.locks(), central_nav=central.nav_status(),
                central_banner=_banner(request),
                flash=request.session.pop("flash", None))
     return templates.TemplateResponse(request, name, ctx)

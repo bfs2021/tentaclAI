@@ -53,13 +53,13 @@
       {% if logged and auth.email %}<dt>Account</dt><dd class="small" title="{{ auth.orgName or '' }}">{{ auth.email }}{% if auth.subscriptionType %} <span class="muted">· {{ auth.subscriptionType }}</span>{% endif %}</dd>{% endif %}
       <dt>Sessions</dt><dd>{{ sessions | length }}</dd>
     </dl>
-    {% if limits %}
-    <a href="/usage" class="usage-bars" title="Plan usage (account-wide, from Claude Code) – details">
+    {% if limits %}{% set usage_link = shown('/usage') %}
+    <{{ 'a href="/usage"' if usage_link else 'div' }} class="usage-bars" title="Plan usage (account-wide, from Claude Code){{ ' – details' if usage_link }}">
       {% for l in limits %}
       <div class="ubar"><div class="between small"><span>{{ 'Session' if l.window == 'session' else 'Week' }}</span><span><strong>{{ l.percent }} %</strong> <span class="muted">· resets {{ l.resets }}</span></span></div>
         <div class="ubar-track"><div class="ubar-fill {{ 'err' if l.percent >= 90 else ('warn' if l.percent >= 75 else '') }}" style="width:{{ [l.percent, 100] | min }}%"></div></div></div>
       {% endfor %}
-    </a>
+    </{{ 'a' if usage_link else 'div' }}>
     {% endif %}
     {% if sessions %}
     <div style="margin-top:10px" class="stack small">
@@ -69,10 +69,11 @@
     </div>
     {% endif %}
     <div class="row" style="margin-top:16px">
-      {% if not logged %}
+      {% set terminal = shown('/terminal') %}
+      {% if not logged and terminal %}
       <a class="btn sm primary" href="/terminal?p=login">{{ icon('key') }}Sign in now</a>
       {% endif %}
-      <a class="btn sm" href="/terminal?p=claude" title="Claude Code in /workspace – persistent tmux session, same as ./tentaclai.sh on the host">{{ icon('terminal') }}Claude terminal</a>
+      {% if terminal %}<a class="btn sm" href="/terminal?p=claude" title="Claude Code in /workspace – persistent tmux session, same as ./tentaclai.sh on the host">{{ icon('terminal') }}Claude terminal</a>{% endif %}
       {% if logged and st.running %}<button class="btn sm ghost" hx-post="/claude/logout"
         hx-confirm="Sign out of Claude{{ ' (' ~ auth.email ~ ')' if auth.email }}? Remote control restarts and stays offline, running Claude sessions stop working until you sign in again – e.g. with a different account.">Sign out</button>{% endif %}
     </div>
@@ -114,7 +115,7 @@
       <details class="rc-details"><summary class="small muted">Terminal output</summary><pre class="rc">{{ rc.tail }}</pre></details>
     {% endif %}
     <div class="row" style="margin-top:10px">
-      <a class="btn sm" href="/terminal?p=rc">{{ icon('terminal') }}Open session</a>
+      {% if shown('/terminal') %}<a class="btn sm" href="/terminal?p=rc">{{ icon('terminal') }}Open session</a>{% endif %}
       {% if rc is not none %}
         {% if rc.state == 'disabled' %}<button class="btn sm primary" hx-post="/rc/toggle">{{ icon('play') }}Enable</button>
         {% else %}<button class="btn sm" hx-post="/rc/toggle" hx-confirm="Disable remote control? Connected remote sessions will be disconnected.">{{ icon('stop') }}Disable</button>{% endif %}
@@ -176,14 +177,14 @@
 
   <!-- network -->
   <div class="card">
-    <div class="card-head"><h2>{{ icon('globe') }}Network</h2><a class="btn sm ghost" href="/network">Manage →</a></div>
+    <div class="card-head"><h2>{{ icon('globe') }}Network</h2>{% if shown('/network') %}<a class="btn sm ghost" href="/network">Manage →</a>{% endif %}</div>
     <div class="between" style="margin-bottom:10px">
       <span class="small muted">Mode</span>
       {% if net.mode == 'enforce' %}<span class="pill ok" title="unknown destinations need your approval">enforce</span>{% else %}<span class="pill warn" title="everything is allowed and recorded">permissive</span>{% endif %}
     </div>
     <dl class="kv">
       <dt>Destinations</dt><dd>{{ net.total }}</dd>
-      <dt>Without a rule</dt><dd>{% if net.unknown %}<a href="/network">{{ net.unknown }}</a>{% else %}0{% endif %}</dd>
+      <dt>Without a rule</dt><dd>{% if net.unknown and shown('/network') %}<a href="/network">{{ net.unknown }}</a>{% elif net.unknown %}{{ net.unknown }}{% else %}0{% endif %}</dd>
       <dt>Waiting for approval</dt><dd>{% if net.pending %}<a href="/approvals"><span class="pill warn">{{ net.pending }}</span></a>{% else %}0{% endif %}</dd>
     </dl>
   </div>

@@ -342,16 +342,18 @@ def test_jobs_from_the_server(fc, monkeypatch):
 
 def test_hidden_features_and_the_banner(fc, client):
     from app import central
-    fc.set_profile(name="P", sections={}, modes={}, features={"hidden": ["jobs", "updates", "nonsense"]})
+    fc.set_profile(name="P", sections={}, modes={}, features={"hidden": ["jobs", "updates", "terminal", "nonsense"]})
     central.enroll(fc.code(), "dev", [])  # features not allowed yet: nothing hidden, the server is told
     central.sync()
     assert central.hidden_features() == set()
     assert client.get("/jobs").status_code == 200
     central.set_areas(["features"])
     central.sync()
-    assert central.hidden_features() == {"jobs", "updates"}
+    assert central.hidden_features() == {"jobs", "updates", "terminal"}
     nav = client.get("/settings").text
-    assert 'href="/jobs"' not in nav and 'href="/updates"' not in nav and 'href="/terminal"' in nav
+    assert 'href="/jobs"' not in nav and 'href="/updates"' not in nav and 'href="/network"' in nav
+    for path in ("/settings", "/", "/partials/overview"):  # no link leads to a hidden feature, also outside the sidebar
+        assert 'href="/terminal' not in client.get(path).text
     r = client.get("/jobs/new")
     assert "turned off by Test Central" in r.text.replace("Turned", "turned")
     assert client.post("/jobs/save", data={"name": "x"}).status_code == 403

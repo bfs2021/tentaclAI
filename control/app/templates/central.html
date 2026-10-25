@@ -49,7 +49,7 @@
     {% if st.last_error %}<dt>Problem</dt><dd style="color:var(--err)">{{ st.last_error }}</dd>{% endif %}
     <dt>Profile</dt><dd>{% if c.profile %}{{ c.profile.name or 'unnamed' }} <span class="faint">rev {{ c.profile.rev }}{% if c.profile_at %} · received {{ c.profile_at }}{% endif %}</span>{% else %}none yet{% endif %}</dd>
     <dt>Audit log</dt><dd>{{ 'entries waiting to be sent' if c.audit_waiting else 'everything sent' }}</dd>
-    {% if c.jobs %}<dt>Central jobs</dt><dd>{% for j in c.jobs %}{% if 'jobs' in hidden_features %}<span class="tag">{{ j }}</span>{% else %}<a class="tag" href="/jobs/{{ j }}">{{ j }}</a>{% endif %} {% endfor %}</dd>{% endif %}
+    {% if c.jobs %}<dt>Central jobs</dt><dd>{% for j in c.jobs %}{% if shown('/jobs') %}<a class="tag" href="/jobs/{{ j }}">{{ j }}</a>{% else %}<span class="tag">{{ j }}</span>{% endif %} {% endfor %}</dd>{% endif %}
     {% if c.hidden %}<dt>Hidden here</dt><dd>{% for h in c.hidden %}<span class="tag">{{ h }}</span> {% endfor %}</dd>{% endif %}
     {% if 'signin' in (st.areas or []) %}<dt>Sign-in</dt><dd>{% if not c.control_url %}<span class="pill warn">off</span> set CONTROL_URL (Settings → tentacontrol address) – the server sends users back there
       {% elif c.sign_in_policy == 'enterprise' %}only through {{ st.central_name }}{% if c.breakglass_until %} · <span class="pill warn">local sign-in open until {{ c.breakglass_until }}</span>{% endif %}
