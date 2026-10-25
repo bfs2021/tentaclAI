@@ -164,7 +164,7 @@ def sign_in(request: Request, user) -> None:
     request.session["uid"] = user["id"]
     if is_central_id(user["id"]):
         request.session["central_user"] = user
-    elif central.sign_in_policy() == "enterprise":
+    elif central.breakglass_open():
         request.session["breakglass"] = True  # signed in while the host opened the local sign-in – it stays valid
 
 
@@ -177,7 +177,8 @@ def current_user(request: Request):
         return None
     uid = request.session.get("uid")
     if is_central_id(uid):
-        return request.session.get("central_user") if central.sso_enabled() else None
+        u = _central_session(request)
+        return u if u and central.sso_enabled() else None
     if not request.session.get("breakglass") and not central.local_sign_in():
         return None
     if uid is None:
@@ -190,8 +191,15 @@ def is_central_id(uid) -> bool:
     return isinstance(uid, str) and uid.startswith("c:")
 
 
+def _central_session(request: Request):
+    """the user of the central server this session carries, or None"""
+    uid = request.session.get("uid")
+    u = request.session.get("central_user") or {}
+    return u if is_central_id(uid) and u.get("id") == uid else None
+
+
 def is_central(request: Request) -> bool:
-    return is_central_id(request.session.get("uid"))
+    return _central_session(request) is not None
 
 
 def username(request: Request) -> str:

@@ -376,11 +376,13 @@ def test_sign_in_assertions_are_checked(fc, monkeypatch):
         finally:
             session["sso"] = saved  # the next try reuses the same sign-in
     for bad in (token(key=Ed25519PrivateKey.generate()), token(aud="A-0002"), token(nonce="other"), token(exp=int(time.time()) - 1),
-                token(role="root"), "garbage"):
+                token(role="root"), token(nonce="é"), token(iat="soon"), "garbage"):
         with pytest.raises(central.CentralError):
             finish(bad)
     with pytest.raises(central.CentralError, match="wasn't started here"):
         finish(token(), state="wrong")
+    with pytest.raises(central.CentralError, match="wasn't started here"):
+        finish(token(), state="é")  # not a 500
     u = finish(token())
     assert u["id"] == "c:u1" and u["username"] == "dev" and u["source"] == "central"
     tok, st = token(), session.pop("sso")["state"]
@@ -389,8 +391,14 @@ def test_sign_in_assertions_are_checked(fc, monkeypatch):
     # Enterprise only, and the emergency access from the host
     fc.set_profile(sections={}, modes={}, sign_in={"policy": "enterprise"})
     central.sync()
-    assert central.sign_in_policy() == "enterprise" and not central.local_sign_in()
+    assert central.sign_in_policy() == "enterprise" and not central.local_sign_in() and not central.breakglass_open()
     central.open_breakglass()
-    assert central.local_sign_in()
+    assert central.local_sign_in() and central.breakglass_open()
+    # "all" locks, also without areas_locked, and takes over every part
+    fc.set_profile(sections={}, modes={}, areas_all=True)
+    central.sync()
+    assert central.areas_locked() and central.state()["areas"] == sorted(central.areas())
+    with pytest.raises(central.CentralError, match="locks"):
+        central.set_areas(["signin"])
     central.leave()
     assert central.sign_in_policy() == "local" and not central.sso_enabled()

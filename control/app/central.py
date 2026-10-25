@@ -132,8 +132,10 @@ SSO_PENDING_SECONDS = 600    # a sign-in started here must come back within
 
 
 def _control_url():
+    """CONTROL_URL when it is an http(s) address – the server sends users back there"""
     from .notify import control_link
-    return control_link("")
+    url = control_link("")
+    return url if url.startswith(("https://", "http://")) else ""
 
 
 def sso_enabled():
@@ -162,9 +164,19 @@ def open_breakglass():
     return until
 
 
+def breakglass_open():
+    """the server allows only its own sign-ins, and the host opened the local one for now"""
+    return sign_in_policy() == "enterprise" and breakglass_until() > time.time()
+
+
 def local_sign_in():
     """may local accounts sign in now? (the server's policy – unless opened from the host)"""
     return sign_in_policy() != "enterprise" or breakglass_until() > time.time()
+
+
+def _same(a, b):
+    """constant-time comparison of two tokens of any text (compare_digest refuses non-ASCII str)"""
+    return secrets.compare_digest(str(a).encode(), str(b).encode())
 
 
 def sso_start(session):
@@ -182,7 +194,7 @@ def sso_finish(session, token, state_value):
     pend = session.pop("sso", None) or {}
     if not sso_enabled():
         raise CentralError("sign-in through the server is not allowed here")
-    if not pend or time.time() - pend.get("ts", 0) > SSO_PENDING_SECONDS or not secrets.compare_digest(str(state_value), pend.get("state", "")):
+    if not pend or time.time() - pend.get("ts", 0) > SSO_PENDING_SECONDS or not _same(state_value, pend.get("state", "")):
         raise CentralError("this sign-in wasn't started here, or it took too long – try again")
     st = state()
     try:
@@ -195,8 +207,9 @@ def sso_finish(session, token, state_value):
     except (KeyError, TypeError, ValueError, InvalidSignature):
         raise CentralError("the server's answer isn't validly signed") from None
     now = time.time()
-    if (claims.get("v") != 1 or claims.get("aud") != st["agent_id"] or not secrets.compare_digest(str(claims.get("nonce")), pend.get("nonce", ""))
-            or not isinstance(claims.get("exp"), (int, float)) or claims["exp"] < now or float(claims.get("iat") or 0) > now + SSO_SKEW
+    if (claims.get("v") != 1 or claims.get("aud") != st["agent_id"] or not _same(claims.get("nonce"), pend.get("nonce", ""))
+            or not isinstance(claims.get("exp"), (int, float)) or claims["exp"] < now
+            or not isinstance(claims.get("iat", 0), (int, float)) or claims.get("iat", 0) > now + SSO_SKEW
             or claims.get("role") not in SSO_ROLES or not claims.get("sub") or not claims.get("username")):
         raise CentralError("the server's answer is not for this sign-in (expired or meant for another installation)")
     return {"id": "c:" + str(claims["sub"])[:64], "username": str(claims["username"])[:32], "name": str(claims.get("name") or "")[:80],
@@ -366,8 +379,9 @@ def tamper_protected():
 
 
 def areas_locked():
-    """the server's profile locks "Managed by Enterprise": the local admin can't change it at all"""
-    return _managed_profile().get("areas_locked") is True
+    """the server's profile locks "Managed by Enterprise": the local admin can't change it at all ("all" locks too)"""
+    prof = _managed_profile()
+    return prof.get("areas_locked") is True or prof.get("areas_all") is True
 
 
 def areas_all():
@@ -735,7 +749,7 @@ def _status(st):
             "areas": st.get("areas") or [],
             "jobs": _job_states(),
             "control_url": _control_url(),
-            "tamper": st.get("tamper") or []}
+            "tamper": (st.get("tamper") or [])[-TAMPER_KEEP:]}
 
 
 # ---------------------------------------------------------------- jobs from the server
