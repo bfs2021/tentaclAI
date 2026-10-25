@@ -436,6 +436,22 @@ def history():
     return h if isinstance(h, list) else []
 
 
+_seen_history = [None, []]  # (path, inode, mtime, size) of the last read – the polled badges read the same file again and again
+
+
+def _history_view():
+    """history() for reading only (the sidebar badge, the Jobs page's change token): parsed again only when the file
+    changed – never change what it returns, use history() for that"""
+    try:
+        st = os.stat(HISTORY)
+        key = (HISTORY, st.st_ino, st.st_mtime_ns, st.st_size)  # jsonstore.save replaces the file: a new inode
+    except OSError:
+        return []
+    if _seen_history[0] != key:
+        _seen_history[:] = [key, history()]
+    return _seen_history[1]
+
+
 def _save_history(h):
     jsonstore.save(HISTORY, h[-KEEP_RUNS:], indent=None)
     if len(h) > KEEP_RUNS:
@@ -1050,13 +1066,13 @@ def finding(r):
 def unseen():
     """runs with a finding or a failure that ended after the Jobs page was last opened (the sidebar badge)"""
     seen = (jsonstore.load(SEEN) or {}).get("ts", 0)
-    return sum(1 for r in history() if finding(r) and (r.get("ended") or 0) > seen)
+    return sum(1 for r in _history_view() if finding(r) and (r.get("ended") or 0) > seen)
 
 
 def state_token():
     """changes whenever a run is queued, starts, ends – or a job is added, edited, paused"""
     import hashlib
-    h = history()[-50:]
+    h = _history_view()[-50:]
     raw = json.dumps([(r.get("id"), r.get("status"), [x.get("state") for x in (r.get("actions") or []) + (r.get("knowledge") or [])],
                        (r.get("prompt_suggestion") or {}).get("state")) for r in h]) \
         + str(os.path.getmtime(JOBS) if os.path.exists(JOBS) else 0)
@@ -1074,7 +1090,7 @@ def open_proposals(run, now=None):
 def pending_proposals():
     """proposals waiting for the user's pick – the pulsing badge next to Jobs"""
     now = time.time()
-    return sum(open_proposals(r, now) for r in history())
+    return sum(open_proposals(r, now) for r in _history_view())
 
 
 def _run(run_id):

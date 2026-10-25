@@ -187,6 +187,11 @@ def test_state_token_changes(sj, monkeypatch, tmp_path):
     t1 = sj.state_token()
     jsonstore.save(sj.HISTORY, [{"id": "a", "status": "done"}])
     assert sj.state_token() != t1
+    monkeypatch.setattr(sj, "SEEN", str(tmp_path / "seen.json"))
+    jsonstore.save(sj.HISTORY, [{"id": "a", "status": "queued", "ended": 1}])
+    assert sj.unseen() == 0
+    jsonstore.save(sj.HISTORY, [{"id": "a", "status": "failed", "ended": 1}])  # same size: the badge's cache still sees it
+    assert sj.unseen() == 1
 
 
 def test_manual_only(sj, monkeypatch, tmp_path):

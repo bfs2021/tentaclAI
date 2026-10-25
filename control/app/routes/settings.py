@@ -226,6 +226,8 @@ def _security(request, codes=None, error=None, status=200, done=None):
 
 @router.get("/account", response_class=HTMLResponse)
 async def account_page(request: Request):
+    if auth.is_central(request):  # a user of the central server: no local account, password or second factor here
+        return page(request, "account_central.html", nav="account", account=auth.current_user(request) or {})
     return _security(request)
 
 

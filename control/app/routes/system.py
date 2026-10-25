@@ -111,7 +111,7 @@ async def login(request: Request, username: str = Form(""), password: str = Form
 
 @router.get("/account/complete", response_class=HTMLResponse)
 async def account_complete_form(request: Request):
-    if not auth.profile_missing():
+    if not auth.profile_missing(auth.current_user(request)):
         return RedirectResponse("/", status_code=303)
     return templates.TemplateResponse(request, "account_complete.html", {"error": None, "f": {}})
 
@@ -120,7 +120,7 @@ async def account_complete_form(request: Request):
 async def account_complete(request: Request, username: str = Form(""), email: str = Form(""), name: str = Form("")):
     """an account from before usernames: username and email once, right after the sign-in"""
     u = auth.current_user(request)
-    if not u or not auth.profile_missing():
+    if not u or not auth.profile_missing(u):
         return RedirectResponse("/", status_code=303)
     error = auth.profile_error(username, email, name, uid=u["id"])
     if error:

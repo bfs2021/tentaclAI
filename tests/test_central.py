@@ -427,3 +427,25 @@ def test_sign_in_assertions_are_checked(fc, monkeypatch):
         central.set_areas(["signin"])
     central.leave()
     assert central.sign_in_policy() == "local" and not central.sso_enabled()
+
+
+def test_a_server_user_has_no_local_account(fc, app_module, monkeypatch):
+    """signed in through the server: its own Account page, never asked to complete a local profile"""
+    from urllib.parse import parse_qs, urlsplit
+    from fastapi.testclient import TestClient
+    from app import auth, central
+    monkeypatch.setattr(central, "_control_url", lambda: "https://tc.example.test")
+    central.enroll(fc.code(), "box", ["signin"])
+    c = TestClient(app_module.app, base_url="https://tc.example.test")
+    q = parse_qs(urlsplit(c.get("/sso/login", follow_redirects=False).headers["location"]).query)
+    now = int(time.time())
+    raw = canonical({"v": 1, "aud": "A-0001", "sub": "u1", "username": "dev", "role": "admin", "nonce": q["nonce"][0],
+                     "iat": now, "exp": now + 60})
+    assert c.post("/sso/finish", data={"assertion": b64e(raw) + "." + b64e(fc.key.sign(raw)), "state": q["state"][0]},
+                  follow_redirects=False).status_code == 303
+    monkeypatch.setattr(auth, "admin", lambda: {"id": "a1", "hash": "x"})  # the local admin from before usernames
+    assert c.get("/", follow_redirects=False).status_code == 200  # not sent to /account/complete
+    page = c.get("/account").text
+    assert "no local account" in page and "/account/2fa/setup" not in page
+    assert auth.profile_missing() and not auth.profile_missing({"source": "central", "username": "dev"})
+    central.leave()

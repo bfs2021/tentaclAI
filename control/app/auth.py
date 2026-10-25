@@ -62,10 +62,11 @@ def has_account() -> bool:
     return bool(a and a.get("hash"))
 
 
-def profile_missing() -> bool:
-    """an account from before usernames (migrated admin.hash): username and email still to be set"""
-    a = admin()
-    return bool(a) and not (a.get("username") and a.get("email"))
+def profile_missing(user=None) -> bool:
+    """an account from before usernames (migrated admin.hash): username and email still to be set – the given user's
+    (the signed-in one), or the admin's; never for a user of the central server, which has no local account"""
+    a = user if user is not None else admin()
+    return bool(a) and a.get("source") != "central" and not (a.get("username") and a.get("email"))
 
 
 def profile_error(username, email, name, uid=None):

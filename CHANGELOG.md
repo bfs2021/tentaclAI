@@ -2,6 +2,16 @@
 
 All notable changes, newest first. Every release lists **upgrade steps** from the previous one.
 
+## Unreleased
+
+### Changes / fixes
+- Settings → Account: a user signed in through tentaclAI Enterprise gets a page of their own (no password or
+  two-factor forms); whether a local profile still needs username and email is asked about the signed-in user.
+- The Jobs badge and the Jobs page's refresh read the run history only when it changed.
+
+### Upgrade
+- `git pull`, `docker compose build control`, `docker compose up -d control` – the sandbox keeps running.
+
 ## v0.22.0 – 2026-10-25
 
 ### Highlights

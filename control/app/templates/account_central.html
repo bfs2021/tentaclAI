@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% from "_tabs.html" import settings_tabs %}
+{% block title %}Account{% endblock %}
+{% block content %}
+{{ settings_tabs('account') }}
+<div class="header">
+  <div><h1>Account</h1><div class="sub">You are signed in through tentaclAI Enterprise – no local account.</div></div>
+</div>
+
+<div class="card" style="margin-bottom:16px">
+  <h2>{{ account.name or account.username }}</h2>
+  <p>You are signed in through <strong>{{ account.central or 'tentaclAI Enterprise' }}</strong> as <strong>{{ account.username }}</strong>{% if account.email %} ({{ account.email }}){% endif %}, role {{ account.role }}.</p>
+  <p class="help">Your password and two-factor sign-in are managed there, not on this installation. The local account of tentacontrol and its settings stay with the local admin.</p>
+</div>
+{% endblock %}
