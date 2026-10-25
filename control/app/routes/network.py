@@ -14,14 +14,8 @@ import tclib  # noqa: E402  shared with the sandbox tools
 router = APIRouter()
 
 
-def _svc_auth(request):
-    return activity.token_ok(request.headers.get("x-tc-token", ""))
-
-
 @router.post("/internal/approvals")
 async def internal_approval_create(request: Request):
-    if not _svc_auth(request):
-        return JSONResponse({"error": "forbidden"}, status_code=403)
     data = await request.json()
     rid = activity.create(data.get("service", "?"), data.get("part", "?"), data.get("action", "?"), data.get("origin"),
                           activity.clean_review(data.get("diff", ""), data.get("flags")))
@@ -33,8 +27,6 @@ async def internal_approval_create(request: Request):
 @router.post("/internal/event")
 async def internal_event(request: Request):
     """svc reports something worth a notification (e.g. a blocked write)"""
-    if not _svc_auth(request):
-        return JSONResponse({"error": "forbidden"}, status_code=403)
     d = await request.json()
     if d.get("event") in ("blocked", "injection"):
         notify.emit(d["event"], str(d.get("title", ""))[:200], str(d.get("body", ""))[:500])
@@ -44,8 +36,6 @@ async def internal_event(request: Request):
 @router.post("/internal/egress/event")
 async def internal_egress_event(request: Request):
     """the gateway reports a refused destination"""
-    if _from_proxy(request):
-        return JSONResponse({"error": "forbidden"}, status_code=403)
     d = await request.json()
     target = f"{str(d.get('host', ''))[:200]}:{int(d.get('port', 0) or 0)}"
     notify.emit("blocked", f"Network: {target} {str(d.get('reason', 'refused'))[:30]}", "The sandbox tried to connect.",
@@ -56,8 +46,6 @@ async def internal_egress_event(request: Request):
 @router.post("/internal/egress/audit")
 async def internal_egress_audit(request: Request):
     """the gateway's connections, counted per destination and window – one audit entry each"""
-    if _from_proxy(request):
-        return JSONResponse({"error": "forbidden"}, status_code=403)
     d = await request.json()
     for e in (d.get("entries") or [])[:1000]:
         host, reason = str(e.get("host", ""))[:200], re.sub(r"[^a-z-]", "", str(e.get("reason", "")))[:20]
@@ -75,18 +63,14 @@ async def internal_egress_audit(request: Request):
 
 
 @router.get("/internal/approvals")
-async def internal_approval_list(request: Request):
+async def internal_approval_list():
     """pending requests and active grants – for `svc pending` (the status line in Claude's terminal)"""
-    if not _svc_auth(request):
-        return JSONResponse({"error": "forbidden"}, status_code=403)
     return JSONResponse({"pending": [{k: a[k] for k in ("id", "service", "part", "action", "created")} for a in activity.pending()],
                          "grants": [{k: g[k] for k in ("service", "part", "until")} for g in activity.grants()]})
 
 
 @router.get("/internal/approvals/{rid}")
-async def internal_approval_wait(request: Request, rid: str, wait: int = 25):
-    if not _svc_auth(request):
-        return JSONResponse({"error": "forbidden"}, status_code=403)
+async def internal_approval_wait(rid: str, wait: int = 25):
     return JSONResponse(await activity.wait(rid, wait))
 
 
@@ -182,24 +166,15 @@ async def approval_decide(request: Request, rid: str, verdict: str):
     return resp
 
 
-def _from_proxy(request):
-    """the egress endpoints are for the gateway in the sandbox network – not for requests through the reverse proxy"""
-    return any(h in request.headers for h in ("x-forwarded-for", "x-real-ip", "forwarded"))
-
-
 @router.get("/internal/egress/policy")
-async def internal_egress_policy(request: Request):
+async def internal_egress_policy():
     """for the egress gateway (inside the sandbox network) – host lists only, no secrets"""
-    if _from_proxy(request):
-        return JSONResponse({"error": "forbidden"}, status_code=403)
     return JSONResponse(await asyncio.to_thread(egress.policy))
 
 
 @router.post("/internal/egress/ask")
 async def internal_egress_ask(request: Request):
     """the gateway asks about an unknown destination (enforce) – only creates a request, the user decides"""
-    if _from_proxy(request):
-        return JSONResponse({"error": "forbidden"}, status_code=403)
     data = await request.json()
     try:
         host, port = egress.normalize(str(data.get("host", ""))), int(data.get("port", 0))

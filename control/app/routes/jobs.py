@@ -28,30 +28,23 @@ def _job_page(request, jid=None, job=None):
                                for n, t in sorted(known.items())])
 
 
-# ---------------------------------------------------------------- svc config put job (svc token; svc asks for the approval)
+# ---------------------------------------------------------------- svc config put job (svc token, checked by main.guard; svc asks for the approval)
 
 async def _put_args(request):
-    from .. import activity
-    if not activity.token_ok(request.headers.get("x-tc-token", "")):
-        return None, JSONResponse({"error": "forbidden"}, status_code=403)
     d = await request.json()
-    return (str(d.get("name", "")), d.get("definition")), None
+    return str(d.get("name", "")), d.get("definition")
 
 
 @router.post("/internal/jobs/check")
 async def internal_jobs_check(request: Request):
-    args, err = await _put_args(request)
-    if err:
-        return err
+    args = await _put_args(request)
     errors, warnings, summary = scheduled.put_preview(*args)
     return JSONResponse({"errors": errors, "warnings": warnings, "summary": summary})
 
 
 @router.post("/internal/jobs/put")
 async def internal_jobs_put(request: Request):
-    args, err = await _put_args(request)
-    if err:
-        return err
+    args = await _put_args(request)
     try:
         jid = await asyncio.to_thread(scheduled.put, *args)
     except ValueError as e:

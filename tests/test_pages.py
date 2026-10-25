@@ -190,6 +190,8 @@ def test_gateway_reaches_only_egress_endpoints(logged_in, monkeypatch):
     assert logged_in.get("/internal/egress/policy").status_code == 200
     assert logged_in.get("/settings", follow_redirects=False).status_code == 403
     assert logged_in.get("/internal/approvals").status_code == 403
+    for path in ("/internal/egress/policy", "/internal/egress/wait/x?wait=0"):  # never through the reverse proxy
+        assert logged_in.get(path, headers={"x-forwarded-for": "10.0.0.1"}).status_code == 403, path
 
 
 def test_others_cant_use_egress_endpoints(logged_in, monkeypatch):
@@ -493,11 +495,13 @@ def test_settings_refuse_dangerous_job_helpers(client):
     assert "Helpers refused" in r.headers.get("HX-Trigger", "") and "bash, curl" in r.headers.get("HX-Trigger", "")
 
 
-def test_internal_job_endpoints_need_the_svc_token(client, app_module):
+def test_internal_svc_endpoints_need_the_svc_token(client, app_module):
     from fastapi.testclient import TestClient
     c = TestClient(app_module.app)
-    for path in ("/internal/jobs/check", "/internal/jobs/put"):
-        assert c.post(path, json={"name": "x", "definition": {}}).status_code == 403
+    for path in ("/internal/jobs/check", "/internal/jobs/put", "/internal/approvals", "/internal/event"):
+        assert c.post(path, json={"name": "x", "definition": {}}).status_code == 403, path
+    for path in ("/internal/approvals", "/internal/approvals/x?wait=0"):
+        assert c.get(path).status_code == 403, path
 
 
 def test_job_proposals_render(client, app_module, monkeypatch, tmp_path):

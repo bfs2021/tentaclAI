@@ -5,7 +5,7 @@ import os
 import time
 
 from fastapi import FastAPI, Request
-from fastapi.responses import PlainTextResponse, RedirectResponse
+from fastapi.responses import JSONResponse, PlainTextResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
 
@@ -32,7 +32,16 @@ app.mount("/static", StaticFiles(directory=os.path.join(BASE, "static")), name="
 app.mount("/vendor", StaticFiles(directory=os.environ.get("VENDOR_DIR", "/app/vendor")), name="vendor")  # VENDOR_DIR: tests
 
 PUBLIC = ("/login", "/setup", "/static/", "/vendor/", "/healthz", "/internal/", "/favicon.ico", "/apple-touch-icon",
-          "/sso/")  # /internal/: svc token, checked per route; /sso/: the assertion of the central server
+          "/sso/")  # /internal/: see internal_refused; /sso/: the assertion of the central server
+FORWARDED = ("x-forwarded-for", "x-real-ip", "forwarded")
+
+
+def internal_refused(request, path):
+    """the internal endpoints: the gateway's (/internal/egress/…) never through the reverse proxy, svc's only with its
+    token – on top of netguard, which decides by the source address"""
+    if path.startswith("/internal/egress/"):
+        return any(h in request.headers for h in FORWARDED)
+    return path.startswith("/internal/") and not activity.token_ok(request.headers.get("x-tc-token", ""))
 
 
 @app.middleware("http")
@@ -40,6 +49,8 @@ async def guard(request: Request, call_next):
     path = request.url.path
     if not netguard.allowed(path, request.client.host if request.client else ""):
         return PlainTextResponse("not from here", status_code=403)  # sandbox: svc endpoints only; gateway: egress only
+    if internal_refused(request, path):
+        return JSONResponse({"error": "forbidden"}, status_code=403)
     if extensions.blocked_path(path):  # an extension disabled since the start (or never loaded)
         return PlainTextResponse("Not Found", status_code=404)
     if not path.startswith(PUBLIC):

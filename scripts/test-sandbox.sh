@@ -79,6 +79,7 @@ class H(BaseHTTPRequestHandler):
     def do_GET(self):
         ok = self.headers.get("Authorization") == "Bearer api-secret-123"
         self.send_response(200 if ok else 401); self.end_headers(); self.wfile.write(json.dumps({"auth_ok": ok}).encode())
+    do_POST = do_GET  # a write the API accepts (svc exits non-zero on an HTTP error since #18)
 HTTPServer(("0.0.0.0", 8000), H).serve_forever()
 EOF
 cat > fixtures/hook.py <<'PY'

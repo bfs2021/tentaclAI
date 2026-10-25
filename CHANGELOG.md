@@ -60,6 +60,13 @@ All notable changes, newest first. Every release lists **upgrade steps** from th
 - Extension API: `extapi.services()` and `extapi.systems()` list the connected services and systems (no secrets).
 - Extensions: the old calls `add_features()` / `set_edition()` are gone (`provide_license()`); an extension declares
   `REQUIRES_API = 1`. tentaclAI Enterprise needs its matching version (see Upgrade).
+- Central management: every change to a part the server enforces is refused locally – also editing or renaming a
+  system, an SSH host's sudo and notification channels (name) and rules, which before went through and were put back
+  by the next sync. A channel's URL and on/off stay local.
+- Features hidden by the server's profile no longer show links elsewhere either (Overview, dashboard buttons,
+  *Onboard with Claude*). A joined installation shows *★ Enterprise* on Modules and Settings → License too.
+- Overview: the sandbox's status, Claude's sign-in, stats, sessions and remote control are fetched in parallel and no
+  longer hold up tentacontrol while the Overview is open; the recent approvals read far less of the audit log.
 
 ### Upgrade
 - `git pull`, `docker compose build control claude`, `docker compose up -d` – recreating `tentaclai` ends running
