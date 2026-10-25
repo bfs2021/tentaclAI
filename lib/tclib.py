@@ -1100,14 +1100,19 @@ AUDIT_SEARCH_KEYS = ("actor", "user", "source", "type", "target", "action", "out
 _AUDIT_TOKEN = re.compile(r'(-?)([A-Za-z_]+):"([^"]*)"|(-?)([A-Za-z_]+):(\S+)|(-?)"([^"]*)"|(-?)(\S+)')
 
 
+AUDIT_TONES = {"ok": "ok", "allowed": "ok", "read": "ok", "auto": "ok", "approved": "ok", "flagged": "flagged", "warn": "flagged",
+               "blocked": "denied", "expired": "denied", "denied": "denied", "failed": "failed"}  # outcome → colour / histogram
+
+
 def audit_outcome(e):
-    """one word for decision and result: failed (error or exit ≠ 0), ok (read, automatic, allowed), or the decision"""
-    d = e.get("decision", "")
+    """one word for decision and result: the decision as written (allowed, read, auto, approved, denied …), failed
+    when the call itself failed (error, exit ≠ 0) – tentaclAI Enterprise shows the same word"""
+    d = e.get("decision", "") or "ok"
     if d in ("denied", "blocked", "expired"):
         return d
     if d in ("error", "failed") or e.get("error") or (isinstance(e.get("exit"), int) and e["exit"] != 0):
         return "failed"
-    return d if d in ("approved", "flagged") else "ok"
+    return d
 
 
 def audit_source(e):
@@ -1266,8 +1271,7 @@ def audit_histogram(entries, since, until, width=None):
         i = int((t - start) // width)
         if 0 <= i < n:
             o = (e.get("_view") or audit_view(e))["outcome"]
-            cls = {"approved": "ok", "blocked": "denied", "expired": "denied"}.get(o, o)
-            bars[i][1][cls if cls in bars[i][1] else "ok"] += 1
+            bars[i][1][AUDIT_TONES.get(o, "ok")] += 1
     return bars
 
 

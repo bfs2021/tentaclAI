@@ -420,17 +420,18 @@ def test_audit_outcome_and_matching():
     def e(**kw):
         return tclib.audit_entry(kw.pop("category", "service"), kw.pop("service", "gate"), kw.pop("action", "docker ps"),
                                  kw.pop("decision", "auto"), actor="claude", **kw)
-    assert tclib.audit_outcome(e(exit=0)) == "ok" and tclib.audit_outcome(e(exit=2)) == "failed"
+    assert tclib.audit_outcome(e(exit=0)) == "auto" and tclib.audit_outcome(e(exit=2)) == "failed"
     assert tclib.audit_outcome(e(decision="approved", exit=0)) == "approved"
     assert tclib.audit_outcome(e(decision="approved", error="boom")) == "failed"
-    assert tclib.audit_outcome(e(decision="denied")) == "denied" and tclib.audit_outcome(e(decision="read")) == "ok"
+    assert tclib.audit_outcome(e(decision="denied")) == "denied" and tclib.audit_outcome(e(decision="read")) == "read"
+    assert tclib.audit_outcome(e(category="network", decision="allowed")) == "allowed" and tclib.audit_outcome(e(decision="")) == "ok"
     a, b, c = e(service="gate"), e(service="origin", exit=1), e(service="docktopus", decision="denied")
     def hits(text):
         terms = tclib.audit_query(text)
         return [x["service"] for x in (a, b, c) if not tclib.audit_fails(x, tclib.audit_view(x), terms)]
     assert hits("target:gate target:origin") == ["gate", "origin"]  # same field: or
     assert hits("target:gate outcome:failed") == []  # different fields: and
-    assert hits("-outcome:ok") == ["origin", "docktopus"] and hits("target:d*") == ["docktopus"]
+    assert hits("-outcome:auto") == ["origin", "docktopus"] and hits("target:d*") == ["docktopus"]
     assert hits("DOCKER") == ["gate", "origin", "docktopus"] and hits("-docker") == []
 
 
@@ -455,7 +456,7 @@ def test_audit_facets_and_histogram():
         es.append(x)
     f = tclib.audit_facets(es, tclib.audit_query("target:gate"))
     assert f["target"] == [("origin", 2), ("gate", 2)] or f["target"] == [("gate", 2), ("origin", 2)]  # own field: all values
-    assert f["outcome"] == [("denied", 1), ("ok", 1)]  # other fields: under target:gate
+    assert f["outcome"] == [("auto", 1), ("denied", 1)] or f["outcome"] == [("denied", 1), ("auto", 1)]  # other fields: under target:gate
     bars = tclib.audit_histogram(es, t0, t0 + 1800, 900)
     assert [sum(c.values()) for _, c in bars] == [2, 1, 1] and bars[0][1]["denied"] == 1
     assert tclib.audit_bucket(86400) == 1800 and tclib.audit_bucket(3600) == 60

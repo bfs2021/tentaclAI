@@ -1,6 +1,6 @@
 {# shared bits of Logs → Audit and Approvals → Recent requests #}
 {% macro outcome(v, e) -%}
-{%- set pills = {'ok': 'ok', 'approved': 'ok', 'flagged': 'warn', 'denied': 'err', 'blocked': 'warn', 'expired': 'off', 'failed': 'err'} -%}
+{%- set pills = {'ok': 'ok', 'allowed': 'ok', 'read': 'ok', 'auto': 'ok', 'approved': 'ok', 'flagged': 'warn', 'warn': 'warn', 'denied': 'err', 'blocked': 'warn', 'expired': 'off', 'failed': 'err'} -%}
 <span class="pill {{ pills.get(v.outcome, 'off') }}"{% if e.error %} title="{{ e.error[:200] }}"{% endif %}>{{ v.outcome }}</span>
 {%- set how = grant_label(v.grant) if v.grant else ('no decision in time' if v.outcome == 'expired' else '') %}
 {%- if how %}<div class="small faint audit-how">{{ how }}</div>{% endif %}

@@ -689,8 +689,8 @@ def test_audit_search_facets_and_histogram(client, app_module, tmp_path, monkeyp
     assert "compose old" not in html and "POST /items" in html and "2 events" in html
     html = client.get("/logs?q=outcome:failed").text
     assert "compose web" in html and "POST /items" not in html and 'class="chip"' in html
-    # facets: counted under the other terms – with outcome:failed chosen, ok still shows its number
-    assert 'class="facet-v on"' in html and '<span class="facet-name">ok</span><span class="facet-n">1</span>' in html
+    # facets: counted under the other terms – with outcome:failed chosen, auto still shows its number
+    assert 'class="facet-v on"' in html and '<span class="facet-name">auto</span><span class="facet-n">1</span>' in html
     html = client.get("/logs?q=-target:demohost").text
     assert "POST /items" in html and "compose web" not in html and 'class="chip neg"' in html
     html = client.get("/logs?q=ITEMS").text
