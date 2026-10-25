@@ -2,7 +2,7 @@
 
 All notable changes, newest first. Every release lists **upgrade steps** from the previous one.
 
-## Unreleased
+## v0.22.0 – 2026-10-25
 
 ### Highlights
 - **Modules for everyone – Extension API v1**: tentacontrol loads modules that bring pages, sidebar entries (with a
