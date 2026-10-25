@@ -12,7 +12,7 @@ All notable changes, newest first. Every release lists **upgrade steps** from th
   run with tentacontrol's rights) and signed packages. Enabling takes effect
   after *Restart tentacontrol* (a few seconds, the sandbox keeps running), disabling at once. Third-party modules live
   below `/x/<name>/` and can't replace tentacontrol's pages. `TC_EXTENSIONS` names packages loaded always (none by
-  default – it was `tentaclai_enterprise`); Modules and Settings → License point to tentaclAI Enterprise, the central
+  default); Modules and Settings → License point to tentaclAI Enterprise, the central
   management, instead of locked Enterprise modules.
 - **Enterprise in the sidebar** (replaces Settings → Central): with a lock while the installation runs on its own –
   the page says what tentaclAI Enterprise adds and takes the enrollment code; once enrolled a dot shows the connection
@@ -59,7 +59,7 @@ All notable changes, newest first. Every release lists **upgrade steps** from th
   soon as the package was loaded), and the license provider's card gets a *licensed* / *no license* pill.
 - Extension API: `extapi.services()` and `extapi.systems()` list the connected services and systems (no secrets).
 - Extensions: the old calls `add_features()` / `set_edition()` are gone (`provide_license()`); an extension declares
-  `REQUIRES_API = 1`. tentaclAI Enterprise needs its matching version (see Upgrade).
+  `REQUIRES_API = 1`.
 - Central management: every change to a part the server enforces is refused locally – also editing or renaming a
   system, an SSH host's sudo and notification channels (name) and rules, which before went through and were put back
   by the next sync. A channel's URL and on/off stay local.
@@ -71,9 +71,6 @@ All notable changes, newest first. Every release lists **upgrade steps** from th
 ### Upgrade
 - `git pull`, `docker compose build` (all three images – the gateway's shared library changed too),
   `docker compose up -d` – recreating `tentaclai` ends running sessions and Remote Control.
-- The old Enterprise extension is retired: if `.env` still has `TC_EXTENSIONS=tentaclai_enterprise`, empty it (and
-  remove the package). tentaclAI Enterprise is now a server of its own – join it under **Enterprise** in the sidebar
-  with an enrollment code; the license lives there (seats = installations), tentacontrol needs none.
 - Sign-in through tentaclAI Enterprise needs `CONTROL_URL` (Settings → tentacontrol address); nothing else is new in `.env`.
 
 ## v0.21.0 – 2026-10-24
