@@ -287,6 +287,7 @@ import json, time
 json.dump({'ptest': {'name': 'P test', 'prompt': 'check @testapi', 'profile': 'read-only', 'scope': True, 'propose': True,
                      'schedule': {'kind': 'manual'}, 'enabled': True, 'notify': 'findings'}}, open('/data/jobs.json', 'w'))
 h = json.load(open('/data/job-history.json')) if __import__('os').path.exists('/data/job-history.json') else []
+h = [r for r in h if r.get('id') != 'prop000001']  # a kept REUSE stack still has the run of the last time
 h.append({'id': 'prop000001', 'job': 'ptest', 'name': 'P test', 'status': 'done', 'queued': time.time(), 'ended': time.time(),
           'actions_until': time.time() + 3600, 'actions': [
               {'title': 'api write', 'command': 'svc testapi POST /proposal', 'state': 'proposed'},
