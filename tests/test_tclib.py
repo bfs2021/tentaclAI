@@ -400,6 +400,22 @@ def test_audit_query():
     assert tclib.audit_query("category:auth service:gate") == [(False, "type", "sign-in"), (False, "target", "gate")]
 
 
+def test_audit_raw_pretest_keeps_the_matches(tmp_path):
+    """field values stored as they are pre-test the raw line; derived, OR-ed, wildcard and older spellings don't"""
+    import json
+    q = tclib.audit_query
+    assert tclib._audit_raw_tests(q("mode:confirm docker -target:x")) == ["confirm", "docker"]
+    assert tclib._audit_raw_tests(q("target:a target:b type:svc outcome:ok actor:claude mode:read action:ls*")) == []
+    d = str(tmp_path)
+    old = {"ts": "2026-10-20T10:00:00+0200", "service": "gate", "part": "docker", "mode": "rw", "action": "docker ps", "decision": "approved"}
+    (tmp_path / "audit.jsonl").write_text(json.dumps(old) + "\n")
+    tclib.audit_write(d, tclib.audit_entry("service", "gate", "docker restart web", "approved", part="docker", mode="confirm"))
+    tclib.audit_write(d, tclib.audit_entry("service", "wiki", "GET /", "ok", part="api", mode="read"))
+    for query, want in (("mode:confirm", ["docker restart web"]), ("mode:write", ["docker ps"]), ("target:gate decision:approved", ["docker restart web", "docker ps"]),
+                        ("target:gate target:wiki", ["GET /", "docker restart web", "docker ps"]), ("-mode:confirm target:gate", ["docker ps"])):
+        assert [x["action"] for x in tclib.audit_read(d, query=query)[0]] == want, query
+
+
 def test_audit_outcome_and_matching():
     def e(**kw):
         return tclib.audit_entry(kw.pop("category", "service"), kw.pop("service", "gate"), kw.pop("action", "docker ps"),

@@ -1036,6 +1036,16 @@ def audit_lines(data_dir, cutoff=0):
 
 
 AUDIT_SEARCH = ("action", "service", "part", "detail", "error", "excerpts", "ip", "reason")  # the stored fields words are searched in
+AUDIT_RAW = ("action", "target", "decision", "mode", "ip", "user", "reason")  # search keys whose value is stored as it is
+
+
+def _audit_raw_tests(terms):
+    """substrings every matching line contains: the words, and the values of field terms that are stored as they are
+    (one positive term for the key – several are OR – no wildcard, nothing JSON would escape, no older spelling)"""
+    keys = [k for neg, k, v in terms if k and not neg]
+    return [v for neg, k, v in terms if not neg and (k is None or (
+        k in AUDIT_RAW and keys.count(k) == 1 and "*" not in v and v.isascii() and not set(v) & set('"\\')
+        and not (k == "mode" and v in ACCESS_ALIASES.values())))]
 
 
 def audit_read(data_dir, limit=200, since=0, until=0, after="", query=None, source=None):
@@ -1043,10 +1053,10 @@ def audit_read(data_dir, limit=200, since=0, until=0, after="", query=None, sour
     words; each entry then carries its audit_view as "_view", source names the source as in audit_view), after the id
     of the last entry already shown ("load more") → (entries, more): more is True when further entries match"""
     terms = audit_query(query) if isinstance(query, str) else list(query or [])
-    words = [v for neg, k, v in terms if k is None and not neg]
+    raw = _audit_raw_tests(terms)
     out, skipping = [], bool(after)
     for line in audit_lines(data_dir, since):
-        if words and not all(w in line.lower() for w in words):
+        if raw and not all(w in line.lower() for w in raw):
             continue  # quick test on the raw line first; the fields are checked below
         try:
             e = json.loads(line)
