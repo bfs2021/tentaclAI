@@ -456,6 +456,10 @@ What it does **not** (yet) do – keep it in mind:
 
 ## Roadmap
 
+**Focus: the core.** Modules and the tentaclAI Enterprise integration stay as they are – they keep working and get
+fixes, but no new features for now. Development concentrates on the sandbox, `svc`, the egress gateway, the audit
+log and a faster first setup.
+
 - **Claude via API (n8n & co.):** start Claude jobs from outside – HTTP API with its own tokens and profiles
   (*read-only* / *standard*, the svc and gateway guard rails stay), wait for the result or poll a job id, structured
   answers via a JSON schema, an MCP endpoint (`ask_claude`) for n8n's MCP client; off by default. Later: webhook
