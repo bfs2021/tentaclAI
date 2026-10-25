@@ -58,7 +58,7 @@ async def guard(request: Request, call_next):
         off = central.hidden_feature_of(path)
         if off:  # hidden by the central server's profile
             if request.method == "GET" and not request.headers.get("hx-request") and not path.startswith("/partials/"):
-                return page(request, "feature_off.html", nav="", feature=central.FEATURES[off][0], status=central.state().get("central_name", ""))
+                return page(request, "feature_off.html", nav="", feature=central.FEATURES[off][0])
             return PlainTextResponse("", status_code=403)
     response = await call_next(request)
     response.headers.setdefault("X-Frame-Options", "DENY")

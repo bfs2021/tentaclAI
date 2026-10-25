@@ -22,6 +22,7 @@ import threading
 import time
 import urllib.error
 import urllib.request
+from urllib.parse import urlencode
 
 from cryptography.exceptions import InvalidSignature
 
@@ -89,10 +90,9 @@ FEATURES = {
 
 def hidden_features():
     """the features the server's profile hides here (only when the agent lets it manage features)"""
-    st = state()
-    if not st.get("agent_id") or st.get("revoked") or "features" not in (st.get("areas") or []):
+    if "features" not in (state().get("areas") or []):
         return set()
-    return set(((_profile() or {}).get("features") or {}).get("hidden") or []) & set(FEATURES)
+    return set((_managed_profile().get("features") or {}).get("hidden") or []) & set(FEATURES)
 
 
 def hidden_feature_of(path):
@@ -118,8 +118,7 @@ def _clean_banner(b):
 
 def banner():
     """the message the server shows on every installation (None: none)"""
-    st = state()
-    return st.get("banner") if st.get("agent_id") and not st.get("revoked") else None
+    return state().get("banner") if enrolled() else None
 
 
 # ---------------------------------------------------------------- sign-in through the server (docs/central.md → Sign-in)
@@ -158,20 +157,23 @@ def breakglass_until():
 def open_breakglass():
     """open the local sign-in for an hour although the profile allows only the server (./tentaclai.sh passwd)"""
     until = time.time() + BREAKGLASS_SECONDS
-    os.makedirs(DIR, mode=0o700, exist_ok=True)
-    jsonstore.save(BREAKGLASS, {"until": until, "by": "host"}, mode=0o600)
+    _save({"until": until, "by": "host"}, BREAKGLASS)
     _audit("local sign-in opened for an hour", "emergency access from the host", decision="warn")
     return until
 
 
+def breakglass_active():
+    return breakglass_until() > time.time()
+
+
 def breakglass_open():
     """the server allows only its own sign-ins, and the host opened the local one for now"""
-    return sign_in_policy() == "enterprise" and breakglass_until() > time.time()
+    return sign_in_policy() == "enterprise" and breakglass_active()
 
 
 def local_sign_in():
     """may local accounts sign in now? (the server's policy – unless opened from the host)"""
-    return sign_in_policy() != "enterprise" or breakglass_until() > time.time()
+    return sign_in_policy() != "enterprise" or breakglass_active()
 
 
 def _same(a, b):
@@ -184,7 +186,6 @@ def sso_start(session):
     st = state()
     s, n = secrets.token_urlsafe(24), secrets.token_urlsafe(24)
     session["sso"] = {"state": s, "nonce": n, "ts": time.time()}
-    from urllib.parse import urlencode
     return st["url"] + "/sso/authorize?" + urlencode({"agent": st["agent_id"], "state": s, "nonce": n,
                                                      "redirect": _control_url() + "/sso/callback"})
 
@@ -223,9 +224,10 @@ def state():
     return jsonstore.load(STATE) or {}
 
 
-def _save(st):
+def _save(data, path=None):
+    """state.json, or another file of the central's directory (0700, its files 0600)"""
     os.makedirs(DIR, mode=0o700, exist_ok=True)
-    jsonstore.save(STATE, st, mode=0o600)
+    jsonstore.save(path or STATE, data, mode=0o600)
 
 
 def _update(**kw):
@@ -380,8 +382,7 @@ def tamper_protected():
 
 def areas_locked():
     """the server's profile locks "Managed by Enterprise": the local admin can't change it at all ("all" locks too)"""
-    prof = _managed_profile()
-    return prof.get("areas_locked") is True or prof.get("areas_all") is True
+    return _managed_profile().get("areas_locked") is True or areas_all()
 
 
 def areas_all():
@@ -393,8 +394,12 @@ def _take_all_areas():
     """under "all" the agent lets the server manage every part – also parts a later version adds"""
     want = sorted(areas())
     if areas_all() and sorted(state().get("areas") or []) != want:
-        _update(areas=want, report_hash="")
-        _audit("managed by Enterprise changed", "all parts – set by the server's profile")
+        _store_areas(want, "all parts – set by the server's profile")
+
+
+def _store_areas(allowed, detail):
+    _update(areas=allowed, report_hash="")  # the next sync reports again
+    _audit("managed by Enterprise changed", detail)
 
 
 def _tamper(what):
@@ -424,8 +429,7 @@ def set_areas(allowed):
         _tamper(f"take away {', '.join(gone)}")
         raise CentralError("tamper protection: the server's profile doesn't allow taking parts away here – "
                            "ask the server's admin")
-    _update(areas=allowed, report_hash="")
-    _audit("managed by Enterprise changed", ", ".join(allowed) or "nothing")
+    _store_areas(allowed, ", ".join(allowed) or "nothing")
     return allowed
 
 
@@ -749,7 +753,7 @@ def _status(st):
             "areas": st.get("areas") or [],
             "jobs": _job_states(),
             "control_url": _control_url(),
-            "tamper": (st.get("tamper") or [])[-TAMPER_KEEP:]}
+            "tamper": st.get("tamper") or []}
 
 
 # ---------------------------------------------------------------- jobs from the server
@@ -840,8 +844,9 @@ def sync():
             if key != state().get("report_hash"):
                 _call("POST", "/report", {k: report[k] for k in ("rev", "results", "drift", "missing", "refused")})
                 _update(report_hash=key)
-            if _clean_banner(hb.get("banner")) != st.get("banner"):
-                _update(banner=_clean_banner(hb.get("banner")))
+            b = _clean_banner(hb.get("banner"))
+            if b != st.get("banner"):
+                _update(banner=b)
             _run_requested(hb.get("run_jobs"))
             ship_audit()
             ship_runs()
@@ -909,7 +914,7 @@ def view():
     """for the Enterprise page"""
     st = state()
     prof = _profile() or {}
-    bg = breakglass_until()
+    bg = breakglass_until() if breakglass_active() else 0
 
     def fmt(ts):
         return time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(ts)) if ts else ""
@@ -920,4 +925,4 @@ def view():
             "audit_waiting": bool(waiting), "jobs": sorted(managed_jobs()) if st.get("agent_id") else [],
             "hidden": [FEATURES[k][0] for k in sorted(hidden_features())], "banner": banner(),
             "protected": tamper_protected(), "areas_locked": areas_locked(), "areas_all": areas_all(),
-            "sign_in_policy": sign_in_policy(), "control_url": _control_url(), "breakglass_until": fmt(bg) if bg > time.time() else ""}
+            "sign_in_policy": sign_in_policy(), "control_url": _control_url(), "breakglass_until": fmt(bg)}
