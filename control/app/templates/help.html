@@ -485,6 +485,7 @@ gh …                      GitHub CLI without credentials (public data)</pre>
       <h2>Roadmap</h2>
       <ul>
         <li><strong>Claude via API</strong> (n8n &amp; co.): start Claude jobs from outside – HTTP API with its own tokens and profiles (<em>read-only</em> / <em>standard</em>; the svc and gateway guard rails stay), wait for the result or poll a job id, structured answers via a JSON schema, an MCP endpoint (<code>ask_claude</code>) for n8n's MCP client; off by default.</li>
+        <li><strong>Short-lived SSH certificates</strong>: instead of one permanent key authorized on every host, tentaclAI runs a small SSH CA and signs a certificate per call or session, valid for minutes and limited to the host and principal it needs; hosts trust the CA once (<code>TrustedUserCAKeys</code>), revoking means removing the CA, and every certificate is in the audit log.</li>
       </ul>
     </section>
     {% for h in ext_help() %}

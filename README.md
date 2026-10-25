@@ -460,6 +460,10 @@ What it does **not** (yet) do – keep it in mind:
   (*read-only* / *standard*, the svc and gateway guard rails stay), wait for the result or poll a job id, structured
   answers via a JSON schema, an MCP endpoint (`ask_claude`) for n8n's MCP client; off by default. Later: webhook
   callback, an API key just for API jobs.
+- **Short-lived SSH certificates:** instead of one permanent key authorized on every host, tentaclAI runs a small
+  SSH CA and signs a certificate per call or session, valid for minutes and limited to the host and principal it
+  needs; hosts trust the CA once (`TrustedUserCAKeys`), revoking means removing the CA, and every certificate is
+  in the audit log.
 
 ## License
 
