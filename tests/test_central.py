@@ -358,6 +358,8 @@ def test_hidden_features_and_the_banner(fc, client):
     assert "turned off by Test Central" in r.text.replace("Turned", "turned")
     assert client.post("/jobs/save", data={"name": "x"}).status_code == 403
     assert "Hidden here" in client.get("/central").text
+    # the edition: one answer in the header, on Modules and on Settings → License
+    assert "★ Enterprise" in client.get("/modules").text and "managed by <strong>Test Central" in client.get("/license").text
     # the banner: shown on every page until closed, back after a new message
     import uuid
     fc.banner = {"id": uuid.uuid4().hex, "text": "Maintenance tonight 22:00", "level": "warn"}  # the client is shared between runs

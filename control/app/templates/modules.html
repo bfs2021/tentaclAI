@@ -25,7 +25,8 @@
   <div><h1>Modules {{ help_link('modules') }}</h1><div class="sub">Extend tentacontrol – built-in modules, your own and signed packages.</div></div>
   <div class="row">
     <button class="btn primary toggle" data-toggle="new-module" aria-expanded="false" aria-controls="new-module">{{ icon('plus') }}Add module</button>
-    {%- if edition == 'community' %}<span class="pill off">Community</span>
+    {%- if managed %}<a class="pill ok" href="/central" title="Managed by {{ central_nav.name }}">★ Enterprise</a>
+    {%- elif edition == 'community' %}<span class="pill off">Community</span>
     {%- elif features %}<a class="pill ok" href="/license" title="Settings → License">{{ icon('lock') }}Enterprise · licensed</a>
     {%- else %}<a class="pill warn" href="/license" title="Settings → License">{{ icon('lock') }}Enterprise · no license</a>{% endif %}</div>
 </div>

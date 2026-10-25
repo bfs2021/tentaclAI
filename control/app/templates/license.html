@@ -9,9 +9,15 @@
 </div>
 
 <div class="card" style="margin-bottom:16px">
+  {% if managed %}
+  <div class="card-head"><h2>tentaclAI Enterprise</h2><span class="pill ok">★ managed</span></div>
+  <p class="small">This installation is managed by <strong>{{ central_nav.name }}</strong> – see <a href="/central">Enterprise</a>.</p>
+  <p class="muted small">Enterprise is licensed on that server (seats = installations); this installation needs no license of its own.</p>
+  {% else %}
   <div class="card-head"><h2>tentaclAI Community</h2><span class="pill ok">open source</span></div>
   <p class="small">The free, open-source edition – complete on its own.</p>
   <p class="muted small"><strong>tentaclAI Enterprise</strong>, the central management for many installations, is licensed on its own server (seats = installations) – this installation joins it under <a href="/central">Enterprise</a>.</p>
+  {% endif %}
 </div>
 
 <div class="card">
