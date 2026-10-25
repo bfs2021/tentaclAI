@@ -69,17 +69,11 @@ def refresh_plan():
 
 
 def plan():
-    try:
-        return json.load(open(PLAN_CACHE))
-    except (OSError, ValueError):
-        return {}
+    return jsonstore.load(PLAN_CACHE)
 
 
 def _local():
-    try:
-        d = json.load(open(LOCAL_CACHE))
-    except (OSError, ValueError):
-        d = {}
+    d = jsonstore.load(LOCAL_CACHE)
     d.setdefault("offsets", {})
     d.setdefault("days", {})       # "YYYY-MM-DD" → model → counters
     d.setdefault("sessions", {})   # session id → info

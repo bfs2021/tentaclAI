@@ -3090,7 +3090,7 @@ def main(argv):
         return cmd_db(services, argv[2:])
     if cmd == "jobs":
         return cmd_jobs(argv[2:])
-    if cmd in ("tool-report", "guard-report"):  # guard-report: the name before v0.20 (findings only)
+    if cmd == "tool-report":
         return cmd_tool_report(argv[2:])
     if cmd == "mail":
         return cmd_mail(services, argv[2:])
@@ -3109,7 +3109,7 @@ def main(argv):
 
 
 SERVICE_NAMES = set()
-NOT_LOGGED = {"-h", "--help", "help", "pending", "audit", "guard-report", "tool-report", "mcp-proxy", "git-credential",
+NOT_LOGGED = {"-h", "--help", "help", "pending", "audit", "tool-report", "mcp-proxy", "git-credential",
               "git-push-hook", "rc-env"}  # svc's own plumbing and lookups – no audit entry
 ROOT_LOGGED = {"sync", "git"}  # run by tentacontrol or the entrypoint: only these get an entry (pages poll the rest – svc test
 # for the status dots too; the Test button is an admin action of its own)

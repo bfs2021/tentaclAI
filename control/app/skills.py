@@ -17,6 +17,7 @@ import time
 import tclib
 
 from . import dockerops, jsonstore
+from .central import check_write
 from .config import DATA_DIR, STACK_DIR
 from .usage import session_files
 
@@ -39,10 +40,7 @@ os.replace(p + ".tmp", p)
 
 
 def load():
-    try:
-        s = json.load(open(STATE))
-    except (OSError, ValueError):
-        s = {}
+    s = jsonstore.load(STATE)
     s.setdefault("known", {})
     s.setdefault("modes", {})
     return s
@@ -134,7 +132,7 @@ def site_text(name):
 def save_site(name, text):
     """write a site skill like `svc config put skill` (checked, readable for Claude, last 5 versions kept) – svc sync then
     copies it into Claude's skills"""
-    _central_check("skills", name)
+    check_write("skills", name)
     text = text.replace("\r\n", "\n")
     problem = tclib.site_skill_problem(name, text)
     if problem:
@@ -156,7 +154,7 @@ def save_site(name, text):
 
 def remove_site(name):
     """take a site skill out of local/skills (kept as <name>.bak-…, the last 5) – svc sync then removes Claude's copy"""
-    _central_check("skills", name)
+    check_write("skills", name)
     if name not in tclib.site_skills(STACK_DIR):
         raise ValueError("unknown site skill")
     base = os.path.join(STACK_DIR, "local", "skills")
@@ -181,9 +179,3 @@ def listing():
                          site=name in site, text=site_text(name) if name in site else ""))
     order = {"on": 0, "user-invocable-only": 1, "off": 2}
     return sorted(rows, key=lambda r: (order[r["mode"]], r["name"]))
-
-
-def _central_check(section, key):
-    """refuse a change the central server enforces (central management)"""
-    from .central import check_write
-    check_write(section, key)

@@ -9,7 +9,7 @@ from fastapi.responses import HTMLResponse, PlainTextResponse, Response
 from .. import backup, services_store
 from ..config import RESTART_VARS
 from ..envfile import read_env, update_env
-from ..web import mark_restart, page, respond, sync_services, templates, toast
+from ..web import mark_restart, page, respond, sync_services, templates
 
 router = APIRouter()
 
@@ -63,10 +63,10 @@ async def backup_apply(request: Request):
     form = await request.form()
     doc = backup.pending()
     if not doc:
-        return PlainTextResponse("", headers=toast("The upload expired – upload the file again", "err"))
+        return respond(request, "The upload expired – upload the file again", "err")
     picked = set(form.getlist("pick"))
     if not picked:
-        return PlainTextResponse("", headers=toast("Nothing picked", "info"))
+        return respond(request, "Nothing picked", "info")
     old_env = read_env()
     results, missing = await asyncio.to_thread(backup.apply, doc, picked)
     backup.drop_pending()
@@ -89,11 +89,11 @@ async def backup_variables(request: Request):
     allowed = set(backup.missing({}))
     changes = {k[2:]: v.strip() for k, v in form.items() if k.startswith("k_") and k[2:] in allowed and v.strip()}
     if not changes:
-        return PlainTextResponse("", headers=toast("No values entered", "info"))
+        return respond(request, "No values entered", "info")
     try:
         update_env(changes)
     except ValueError as e:
-        return PlainTextResponse("", headers=toast(str(e), "err"))
+        return respond(request, str(e), "err")
     await sync_services()
     return respond(request, f"{len(changes)} variable(s) saved", redirect="/backup")
 
@@ -113,10 +113,10 @@ async def service_template(request: Request, name: str, title: str = "", categor
 async def template_import(request: Request, file: UploadFile = File(...), name: str = Form("")):
     raw = await file.read(256 * 1024 + 1)
     if len(raw) > 256 * 1024:
-        return PlainTextResponse("", headers=toast("file too large", "err"))
+        return respond(request, "file too large", "err")
     tid = name.strip() or (file.filename or "").rsplit("/", 1)[-1].removesuffix(".json")
     try:
         tid, existed = services_store.save_template(tid.lower(), raw.decode("utf-8"))
     except (ValueError, UnicodeDecodeError) as e:
-        return PlainTextResponse("", headers=toast(f"Not imported: {e}", "err"))
+        return respond(request, f"Not imported: {e}", "err")
     return respond(request, f"Template {tid} {'replaced' if existed else 'added'} – pick it under “Add service”", refresh=True)

@@ -8,6 +8,8 @@ import time
 
 import tclib
 
+from . import jsonstore
+from .central import check_write
 from .config import SERVICES_DIR, STACK_DIR, is_secret  # noqa: F401  (STACK_DIR re-exported)
 from .envfile import read_env, update_env
 
@@ -140,19 +142,13 @@ def read_raw(name):
 
 
 def save_raw(name, text):
-    _central_check("services", name)
+    check_write("services", name)
     data = json.loads(text)  # raises ValueError on invalid JSON
     if not isinstance(data, dict):
         raise ValueError("JSON must be an object")
     data["name"] = name
     tclib.migrate_access(data)  # ro/rw are still understood, but only read/write are written
-    p = path_of(name)
-    tmp = p + ".tmp"
-    with open(tmp, "w") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
-        f.write("\n")
-    os.chmod(tmp, 0o644)
-    os.replace(tmp, p)
+    jsonstore.save(path_of(name), data, mode=0o644, readable=True)
 
 
 def migrate_access():
@@ -165,12 +161,7 @@ def migrate_access():
             continue
         if isinstance(data, dict) and tclib.migrate_access(data):
             shutil.copy2(p, f"{p}.bak-{time.strftime('%Y-%m-%d')}-access")
-            tmp = p + ".tmp"
-            with open(tmp, "w") as f:
-                json.dump(data, f, ensure_ascii=False, indent=2)
-                f.write("\n")
-            os.chmod(tmp, os.stat(p).st_mode & 0o777)
-            os.replace(tmp, p)
+            jsonstore.save(p, data, mode=os.stat(p).st_mode & 0o777, readable=True)
             changed.append(os.path.basename(p)[:-5])
     return changed
 
@@ -178,14 +169,7 @@ def migrate_access():
 def variable_users():
     """${VAR} name → services that use it (a token entered for one is used by all of them)"""
     users = {}
-    for p in sorted(glob.glob(os.path.join(SERVICES_DIR, "*.json"))):
-        n = os.path.basename(p)[:-5]
-        if n.startswith("_"):
-            continue
-        try:
-            data = json.load(open(p))
-        except (OSError, ValueError):
-            continue
+    for n, data in tclib.load_services(SERVICES_DIR).items():
         for v in variables({k: x for k, x in data.items() if k in PARTS}):
             users.setdefault(v, []).append(n)
     return users
@@ -196,13 +180,7 @@ def _own_variables(data, name):
     tokens: PATCHMON_TOKEN_KEY → PATCHMON_SKYNET_TOKEN_KEY. Different kinds keep sharing (e.g. GH_TOKEN for api and git)."""
     kinds = {k for k in PARTS if k in data}
     taken = {}
-    for p in glob.glob(os.path.join(SERVICES_DIR, "*.json")):
-        if os.path.basename(p).startswith("_"):
-            continue
-        try:
-            other = json.load(open(p))
-        except (OSError, ValueError):
-            continue
+    for other in tclib.load_services(SERVICES_DIR).values():
         same = {k for k in PARTS if k in other} == kinds
         for v in variables({k: x for k, x in other.items() if k in PARTS}):
             taken[v] = taken.get(v, False) or same
@@ -383,17 +361,12 @@ def save_template(tid, text):
     existed = os.path.exists(p)
     if existed:
         shutil.copy2(p, f"{p}.bak-{time.strftime('%Y-%m-%d-%H%M%S')}")
-    tmp = p + ".tmp"
-    with open(tmp, "w") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
-        f.write("\n")
-    os.chmod(tmp, 0o644)
-    os.replace(tmp, p)
+    jsonstore.save(p, data, mode=0o644, readable=True)
     return tid, existed
 
 
 def set_enabled(name, enabled):
-    _central_check("services", name)
+    check_write("services", name)
     data = json.loads(read_raw(name))
     if enabled:
         data.pop("enabled", None)
@@ -403,7 +376,7 @@ def set_enabled(name, enabled):
 
 
 def delete(name):
-    _central_check("services", name)
+    check_write("services", name)
     os.remove(path_of(name))
 
 
@@ -465,13 +438,8 @@ def rename(old, new):
 def credential_variables():
     """every ${VAR} some service uses as a credential (see tclib.secret_variables) – computed once per request"""
     found = set()
-    for p in glob.glob(os.path.join(SERVICES_DIR, "*.json")):
-        if os.path.basename(p).startswith("_"):
-            continue
-        try:
-            found |= tclib.secret_variables(json.load(open(p)))
-        except (OSError, ValueError):
-            continue
+    for data in tclib.load_services(SERVICES_DIR).values():
+        found |= tclib.secret_variables(data)
     return found
 
 
@@ -479,9 +447,3 @@ def secret_check():
     """is_secret for a whole request (settings page, token forms): name hints + credential positions"""
     creds = credential_variables()
     return lambda key: is_secret(key, creds)
-
-
-def _central_check(section, key):
-    """refuse a change the central server enforces (central management)"""
-    from .central import check_write
-    check_write(section, key)

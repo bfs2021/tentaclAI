@@ -11,8 +11,7 @@ from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse, Red
 from .. import connectors, dockerops, jsonstore, services_store, sshhosts, systems_store, topology
 from ..config import DATA_DIR, RESTART_VARS
 from ..envfile import read_env, update_env
-from ..web import mark_restart, not_applied, page, respond, sync_services, toast
-import tclib  # noqa: E402  shared with the sandbox tools
+from ..web import mark_restart, not_applied, page, respond, sync_services
 from .ssh import ssh_state
 
 router = APIRouter()
@@ -128,7 +127,7 @@ async def systems_new(request: Request, name: str = Form(...)):
     try:
         systems_store.create(name)
     except ValueError as e:
-        return PlainTextResponse("", headers=toast(str(e), "err"))
+        return respond(request, str(e), "err")
     return respond(request, f"System {name} created – add description, SSH host and services", redirect=f"/systems/{name}")
 
 
@@ -149,7 +148,7 @@ async def system_save(request: Request, name: str):
         systems_store.save(name, form.get("description", ""), form.get("ssh_host", ""),
                            form.get("notes", "").splitlines(), form.getlist("members"))
     except (ValueError, OSError) as e:
-        return PlainTextResponse("", headers=toast(str(e), "err"))
+        return respond(request, str(e), "err")
     await sync_services()
     return respond(request, f"System {name} saved", refresh=True)
 
@@ -159,7 +158,7 @@ async def system_delete(request: Request, name: str):
     try:
         systems_store.delete(name)
     except (ValueError, OSError) as e:
-        return PlainTextResponse("", headers=toast(str(e), "err"))
+        return respond(request, str(e), "err")
     await sync_services()
     return respond(request, f"System {name} deleted – its services are standalone now", redirect="/systems")
 
@@ -174,7 +173,7 @@ async def services_new(request: Request, name: str = Form(...), template: str = 
         else:
             services_store.create(name, template.strip(), address)
     except (ValueError, FileNotFoundError) as e:
-        return PlainTextResponse("", headers=toast(str(e), "err"))
+        return respond(request, str(e), "err")
     await sync_services()
     return respond(request, f"{name} created – check URL/tokens, then “Test connection” and “Onboard with Claude”",
                    redirect=f"/services/{name}")
@@ -209,7 +208,7 @@ async def service_set_tls(request: Request, name: str, insecure: str = Form(""))
     try:
         services_store.set_insecure_tls(name, insecure == "1")
     except (ValueError, OSError) as e:
-        return PlainTextResponse("", headers=toast(str(e), "err"))
+        return respond(request, str(e), "err")
     await sync_services()
     return respond(request, f"{name}: TLS certificates {'NOT verified' if insecure == '1' else 'verified'}",
                    kind="warn" if insecure == "1" else "ok", refresh=True)
@@ -219,11 +218,11 @@ async def service_set_tls(request: Request, name: str, insecure: str = Form(""))
 async def service_set_system(request: Request, name: str, system: str = Form("")):
     system = system.strip()
     if system and system not in {x["name"] for x in systems_store.load_all()}:
-        return PlainTextResponse("", headers=toast("unknown system", "err"))
+        return respond(request, "unknown system", "err")
     try:
         systems_store.set_service_system(name, system)
     except (ValueError, OSError) as e:
-        return PlainTextResponse("", headers=toast(str(e), "err"))
+        return respond(request, str(e), "err")
     await sync_services()
     return respond(request, f"{name} → {system or 'standalone'}", refresh=True)
 
@@ -233,7 +232,7 @@ async def service_save_json(request: Request, name: str, raw: str = Form(...)):
     try:
         services_store.save_raw(name, raw)
     except ValueError as e:
-        return PlainTextResponse("", headers=toast(f"Not saved: {e}", "err"))
+        return respond(request, f"Not saved: {e}", "err")
     await sync_services()
     return respond(request, "Saved & synced", refresh=True)
 
@@ -255,11 +254,11 @@ async def service_save_tokens(request: Request, name: str):
         elif key.startswith("clear_"):
             changes[key[6:]] = ""
     if not changes:
-        return PlainTextResponse("", headers=toast("No changes", "info"))
+        return respond(request, "No changes", "info")
     try:
         update_env(changes)
     except ValueError as e:
-        return PlainTextResponse("", headers=toast(str(e), "err"))
+        return respond(request, str(e), "err")
     if RESTART_VARS & set(changes):
         mark_restart(env, changes)
     await sync_services()
@@ -281,7 +280,7 @@ async def service_delete(request: Request, name: str):
     try:
         services_store.delete(name)
     except (FileNotFoundError, ValueError) as e:
-        return PlainTextResponse("", headers=toast(str(e), "err"))
+        return respond(request, str(e), "err")
     await sync_services()
     return respond(request, f"{name} deleted", redirect="/services")
 

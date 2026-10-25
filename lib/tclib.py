@@ -757,7 +757,6 @@ def approval_handoff(env):
 # Hardening and early warning, no guarantee: hidden text is removed, obvious attempts are flagged. The hard limits stay
 # svc's access modes, the egress gateway and Claude never holding a secret.
 
-GUARD_DEFAULT = True  # INJECTION_GUARD in .env; off only with "false"
 _ZERO_WIDTH = re.compile("[​-‏⁠-⁤﻿­]")
 _BIDI = re.compile("[‪-‮⁦-⁩]")
 _TAGS = re.compile("[\U000e0000-\U000e007f]+")

@@ -61,6 +61,7 @@ def b64d(s):
 
 
 def fingerprint(pub_b64):
+    """the first 16 hex digits of SHA-256 over the raw public key (as tcmanager shows it)"""
     h = hashlib.sha256(b64d(pub_b64)).hexdigest()[:16].upper()
     return " ".join(h[i:i + 4] for i in range(0, 16, 4))
 

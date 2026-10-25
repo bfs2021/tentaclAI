@@ -4,13 +4,13 @@ import time
 
 import segno
 from fastapi import APIRouter, Form, Request
-from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 
 from .. import auth, connectors, instance, models, notify, services_store, skills, totp, usage
 from ..config import RC_VARS, RESTART_VARS, SETTINGS_GROUPS, managed_elsewhere
 from ..envfile import read_env, update_env
 from ..config import site
-from ..web import mark_restart, not_applied, page, respond, sync_services, toast
+from ..web import mark_restart, not_applied, page, respond, sync_services
 import tclib  # noqa: E402  shared with the sandbox tools
 
 router = APIRouter()
@@ -88,8 +88,7 @@ async def notifications_routes(request: Request):
 async def skills_page(request: Request):
     rows = skills.listing()
     saved = sum(r.get("tokens") or 0 for r in rows if r["mode"] != "on")
-    return page(request, "skills.html", rows=rows, saved=saved, modes=tclib.SKILL_MODES,
-                fmt=lambda ts: time.strftime("%Y-%m-%d", time.localtime(ts)) if ts else "–")
+    return page(request, "skills.html", rows=rows, saved=saved, modes=tclib.SKILL_MODES)
 
 
 @router.post("/skills/mode", response_class=HTMLResponse)
@@ -183,19 +182,19 @@ async def settings_save(request: Request):
     new_key, new_val = form.get("new_key", "").strip(), form.get("new_val", "").strip()
     if new_key:
         if not new_key.replace("_", "").isalnum() or not new_key[0].isalpha():
-            return PlainTextResponse("", headers=toast("invalid variable name", "err"))
+            return respond(request, "invalid variable name", "err")
         changes[new_key.upper()] = new_val
     if not changes:
-        return PlainTextResponse("", headers=toast("No changes", "info"))
+        return respond(request, "No changes", "info")
     if "JOB_READONLY_HELPERS" in changes:
         from .. import scheduled
         _, bad = scheduled.check_helpers(changes["JOB_READONLY_HELPERS"])
         if bad:
-            return PlainTextResponse("", headers=toast(f"Helpers refused (they could get around read-only): {', '.join(bad)}", "err"))
+            return respond(request, f"Helpers refused (they could get around read-only): {', '.join(bad)}", "err")
     try:
         update_env(changes)
     except ValueError as e:
-        return PlainTextResponse("", headers=toast(str(e), "err"))
+        return respond(request, str(e), "err")
     removed = sum(v is None for v in changes.values())
     msg = f"{len(changes) - removed} setting(s) saved" if removed < len(changes) else ""
     if removed:

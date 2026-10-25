@@ -14,20 +14,18 @@ from ..web import TC_VERSION, page, respond, sync_services, templates
 router = APIRouter()
 
 
-def _job_page(request, jid=None, job=None, error=None, status=200):
+def _job_page(request, jid=None, job=None):
     if job is None and jid:
         job = scheduled.get(jid)
     known = scheduled.tentacles()
     warnings = scheduled.check_mentions(job, known)[1] if job and job.get("prompt") else []
-    resp = page(request, "job_edit.html", jid=jid, job=job or {}, error=error, profiles=scheduled.PROFILES, labels=scheduled.PROFILE_LABELS,
+    return page(request, "job_edit.html", jid=jid, job=job or {}, profiles=scheduled.PROFILES,
                 notify_rules=scheduled.NOTIFY, days=scheduled.DAYS, templates=scheduled.templates(),
                 rw=[x for x in scheduled.rw_tentacles()
                     if not (job or {}).get("scope") or x.removeprefix("ssh ") in scheduled.mentions(job.get("prompt"))],
                 efforts=tclib.EFFORTS, warnings=warnings, fmt=lambda ts: time.strftime("%Y-%m-%d %H:%M", time.localtime(ts)),
                 tentacle_list=[{"name": n, "kind": t["kind"], "parts": ", ".join(t["parts"]), "on": t["enabled"]}
                                for n, t in sorted(known.items())])
-    resp.status_code = status
-    return resp
 
 
 # ---------------------------------------------------------------- svc config put job (svc token; svc asks for the approval)

@@ -232,16 +232,6 @@ def pending():
     return sorted((a for a in APPROVALS.values() if a["status"] == "pending"), key=lambda a: a["created"])
 
 
-def origin_group(o):
-    """host (tentacontrol / host) · job · session – for the audit log's From filter"""
-    o = clean_origin(o)
-    if not o:
-        return ""
-    if o.get("by") == "root":
-        return "host"
-    return "job" if o.get("job") else "session"
-
-
 def origin_link(o):
     """where to look next: the job's run, or the terminal of a session that can be reattached without starting anything"""
     o = clean_origin(o)

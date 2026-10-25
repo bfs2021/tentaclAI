@@ -26,6 +26,7 @@ import traceback
 from jinja2 import ChoiceLoader, FileSystemLoader, PrefixLoader
 
 from . import jsonstore
+from .central import check_write
 from .config import DATA_DIR, STACK_DIR
 
 API_VERSION = 1
@@ -65,7 +66,7 @@ def enabled():
 
 
 def set_enabled(name, on):
-    _central_check("modules", name)
+    check_write("modules", name)
     if name not in {e["name"] for e in available()}:
         raise ValueError(f"no extension {name}")
     if origin(name) == "configured":
@@ -538,9 +539,3 @@ def blocked_path(path):
     if not path.startswith("/x/"):
         return False
     return not active(path.split("/")[2] if path.count("/") >= 2 else "")
-
-
-def _central_check(section, key):
-    """refuse a change the central server enforces (central management)"""
-    from .central import check_write
-    check_write(section, key)

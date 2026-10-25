@@ -94,7 +94,6 @@ def status():
     c = container()
     if c is None:
         return {"exists": False, "running": False, "state": "not created"}
-    c.reload()
     st = c.attrs.get("State", {})
     started = _parse_ts(st.get("StartedAt", ""))
     created = _parse_ts(c.attrs.get("Created", ""))

@@ -15,6 +15,7 @@ import shutil
 import time
 
 from . import dockerops
+from .central import check_write
 from .config import STACK_DIR, is_secret
 
 LOCAL = os.path.join(STACK_DIR, "local", "CLAUDE.md")
@@ -112,7 +113,7 @@ def read_local():
 def save_local(text):
     """write the site rules like `svc config put local` – returns True if the file appeared or vanished (the
     generated CLAUDE.md imports it only when it has content, so it needs a refresh then)"""
-    _central_check("instructions", "local")
+    check_write("instructions", "local")
     text = text.replace("\r\n", "\n")
     if len(text.encode()) > MAX_SIZE:
         raise ValueError("file too large")
@@ -210,9 +211,3 @@ def save_settings(text):
     code, out = _run("settings", json.dumps(full, indent=2, ensure_ascii=False) + "\n")
     if code != 0:
         raise ValueError(out.strip()[-200:] or "could not write settings.json")
-
-
-def _central_check(section, key):
-    """refuse a change the central server enforces (central management)"""
-    from .central import check_write
-    check_write(section, key)

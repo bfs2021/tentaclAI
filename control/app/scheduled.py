@@ -23,6 +23,7 @@ import uuid
 import tclib
 
 from . import auditlog, dockerops, jsonstore, knowledge, models, notify
+from .central import check_write
 from .config import CLAUDE_CONTAINER, DATA_DIR
 
 JOBS = os.path.join(DATA_DIR, "jobs.json")
@@ -31,7 +32,7 @@ ACTIVE = os.path.join(DATA_DIR, "job-runs.json")
 KEEP_RUNS = 300
 CATCH_UP = 6 * 3600          # a run missed while tentaclAI was down is made up for if it is at most this old
 QUOTA_SKIP = 90              # skip a scheduled run when a plan limit is at least this full
-PROFILES = ("read-only", "standard")
+PROFILES = {"read-only": "Reads only", "standard": "Can write (like a terminal session)"}
 NOTIFY = {"findings": "only on findings (warn, alert) and failures", "always": "every run", "failure": "only on failures"}
 DAYS = tclib.DAYS
 ID_RE = re.compile(r"^[a-z0-9][a-z0-9-]{0,40}$")
@@ -567,7 +568,7 @@ def put_preview(jid, d):
 
 def put(jid, d, enabled=False):
     """`svc config put job` after the approval: create (paused unless enabled) or change"""
-    _central_check("jobs", jid)
+    check_write("jobs", jid)
     form = form_from_definition(d)
     if get(jid):
         return save(form, jid)
@@ -575,7 +576,7 @@ def put(jid, d, enabled=False):
 
 
 def set_enabled(jid, on):
-    _central_check("jobs", jid)
+    check_write("jobs", jid)
     jobs = load()
     if jid not in jobs:
         raise ValueError("unknown job")
@@ -603,7 +604,7 @@ def clone(jid):
 
 
 def delete(jid):
-    _central_check("jobs", jid)
+    check_write("jobs", jid)
     jobs = load()
     if (jobs.get(jid) or {}).get("builtin"):
         raise ValueError("a built-in job can't be deleted – pause it instead")
@@ -1140,9 +1141,6 @@ def mark_seen():
     jsonstore.save(SEEN, {"ts": time.time()})
 
 
-PROFILE_LABELS = {"read-only": "Reads only", "standard": "Can write (like a terminal session)"}
-
-
 def reach(job, known):
     """what a job may change: (writes without asking, asks first) – from its tentacles' access, the named ones if limited"""
     if job.get("profile") != "standard":
@@ -1188,9 +1186,3 @@ def rw_tentacles():
         if tclib.ssh_access(conf, h["alias"]) == "write":
             out.append(f"ssh {h['alias']}")
     return sorted(set(out))
-
-
-def _central_check(section, key):
-    """refuse a change the central server enforces (central management)"""
-    from .central import check_write
-    check_write(section, key)

@@ -4,7 +4,6 @@ Config (no secrets) in data/control/notifications.json; each channel's URL lives
 emit() is cheap and never raises – delivery runs in a background worker.
 """
 import asyncio
-import json
 import os
 import re
 import time
@@ -38,10 +37,7 @@ RECENT = []         # last deliveries for the UI
 
 
 def load():
-    try:
-        c = json.load(open(CONFIG))
-    except (OSError, ValueError):
-        c = {}
+    c = jsonstore.load(CONFIG)
     c.setdefault("channels", [])
     c.setdefault("routes", {})
     for ev in EVENTS:  # an event added in a later version goes where approvals go until it is set itself

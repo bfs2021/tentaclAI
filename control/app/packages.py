@@ -11,7 +11,6 @@ Installed packages live in PACKAGES_DIR/<name>/ (tcpkg.json, tcpkg.sig, <name>/)
 PACKAGES_DIR/.prev/<name>/. verify_installed() checks every file again at each start – a changed file means the
 package isn't loaded.
 """
-import base64
 import hashlib
 import io
 import json
@@ -23,6 +22,7 @@ import tempfile
 import time
 import zipfile
 
+from .central import b64d, fingerprint  # noqa: F401  (fingerprint: part of this module's API)
 from .config import DATA_DIR
 
 PACKAGES_DIR = os.path.join(DATA_DIR, "packages")
@@ -43,16 +43,6 @@ SHA_RE = re.compile(r"^[0-9a-f]{64}$")
 
 class PackageError(ValueError):
     """the file isn't a package tentacontrol installs – the message says why"""
-
-
-def _b64d(s):
-    return base64.urlsafe_b64decode(s + "=" * (-len(s) % 4))
-
-
-def fingerprint(pub_b64):
-    """the first 16 hex digits of SHA-256 over the raw public key (as tcmanager shows it)"""
-    h = hashlib.sha256(_b64d(pub_b64)).hexdigest()[:16].upper()
-    return " ".join(h[i:i + 4] for i in range(0, 16, 4))
 
 
 def _api_version():
@@ -96,12 +86,12 @@ def _signature(raw_manifest, raw_sig, keys):
     from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
     try:
         s = json.loads(raw_sig)
-        sig = _b64d(s["sig"])
+        sig = b64d(s["sig"])
     except (ValueError, KeyError, TypeError):
         raise PackageError("tcpkg.sig is damaged") from None
     for pub in keys:
         try:
-            Ed25519PublicKey.from_public_bytes(_b64d(pub)).verify(sig, raw_manifest)
+            Ed25519PublicKey.from_public_bytes(b64d(pub)).verify(sig, raw_manifest)
             return fingerprint(pub)
         except (ValueError, InvalidSignature):
             continue

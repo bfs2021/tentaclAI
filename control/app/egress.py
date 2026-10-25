@@ -1,12 +1,12 @@
 """Network rules of the egress gateway: own allow/block lists (data/control/egress-rules.json), the shipped default
 list and the tentacles (derived live from services and SSH hosts – never stored, so they can't go stale)."""
-import json
 import os
 import re
 
 import tclib
 
 from . import activity, jsonstore, sshhosts
+from .central import check_write
 from .config import DATA_DIR, SERVICES_DIR, STACK_DIR
 from .envfile import read_env
 
@@ -41,7 +41,7 @@ def normalize(entry):
 
 
 def add(kind, entry):
-    _central_check("network", f"{kind}:{normalize(entry)}")
+    check_write("network", f"{kind}:{normalize(entry)}")
     e = normalize(entry)
     if kind == "block":
         host, _, port = e.rpartition(":") if ":" in e else (e, "", "443")
@@ -58,7 +58,7 @@ def add(kind, entry):
 
 
 def remove(kind, entry):
-    _central_check("network", f"{kind}:{entry}")
+    check_write("network", f"{kind}:{entry}")
     r = rules()
     r[kind] = [x for x in r[kind] if x != entry]
     _save(r)
@@ -115,10 +115,7 @@ def origin(host, port, tent=None, r=None):
 
 
 def seen_rows():
-    try:
-        seen = json.load(open(SEEN))
-    except (OSError, ValueError):
-        seen = {}
+    seen = jsonstore.load(SEEN)
     tent, r, since = tentacles(), rules(), cleared()
     rows = []
     for key, e in seen.items():
@@ -128,9 +125,3 @@ def seen_rows():
         kind, label = origin(host, int(port) if port.isdigit() else 0, tent, r)
         rows.append(dict(e, host=host, port=port, kind=kind, label=label))
     return sorted(rows, key=lambda x: -x.get("last", 0))
-
-
-def _central_check(section, key):
-    """refuse a change the central server enforces (central management)"""
-    from .central import check_write
-    check_write(section, key)

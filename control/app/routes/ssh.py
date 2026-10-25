@@ -4,12 +4,10 @@ import html
 import time
 
 from fastapi import APIRouter, Request
-from fastapi.responses import HTMLResponse, PlainTextResponse
+from fastapi.responses import HTMLResponse
 
 from .. import dockerops, sshhosts, sshops
-from ..config import site
-from ..web import page, respond, sync_services, templates, toast
-import tclib  # noqa: E402  shared with the sandbox tools
+from ..web import page, respond, sync_services, templates
 
 router = APIRouter()
 
@@ -30,7 +28,7 @@ def _ssh_dialog(request, step, **ctx):
     ctx.setdefault("hosts", sshhosts.hosts())
     ctx.setdefault("error", None)
     return templates.TemplateResponse(request, "partials/ssh_dialog.html",
-                                      {"request": request, "step": step, "site": site(), **ctx})
+                                      {"request": request, "step": step, **ctx})
 
 
 async def _ssh_test_results(alias):
@@ -195,14 +193,14 @@ async def ssh_remove_do(request: Request, alias: str):
 @router.post("/ssh/{alias}/sudo")
 async def ssh_sudo(request: Request, alias: str):
     if alias not in {h["alias"] for h in sshhosts.hosts()}:
-        return PlainTextResponse("", headers=toast("unknown host", "err"))
+        return respond(request, "unknown host", "err")
     form = await request.form()
     cmd = form.get("sudo", "").strip() if form.get("use_sudo") else ""
     try:
         sshhosts.set_sudo(alias, cmd)
         _SSH_STATUS.clear()
     except ValueError as e:
-        return PlainTextResponse("", headers=toast(str(e), "err"))
+        return respond(request, str(e), "err")
     await sync_services()  # svc docker contexts + Claude's SSH host table
     return respond(request, f"{alias}: sudo {'= ' + cmd if cmd else 'off'}", refresh=True)
 

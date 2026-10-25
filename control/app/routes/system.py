@@ -229,16 +229,16 @@ async def dashboard(request: Request):
 
 @router.get("/partials/overview", response_class=HTMLResponse)
 async def overview(request: Request):
-    st = dockerops.status()
-    auth = dockerops.claude_auth()
+    run = asyncio.to_thread  # docker calls and execs (seconds together) – in parallel, off the event loop
+    st, auth = await asyncio.gather(run(dockerops.status), run(dockerops.claude_auth))
     plan = usage.plan()
     ctx = {"st": st, "stats": None, "version": None, "logged": bool(auth.get("loggedIn")), "auth": auth,
            "limits": [l for l in plan.get("limits", []) if l["window"] == "session" or l["scope"] in ("", "all models")][:2],
            "sessions": [], "rc": None, "services": services_store.load_all(), "hosts": sshhosts.hosts()}
     if st["running"]:
-        ctx.update(stats=dockerops.stats(), version=dockerops.claude_version(),
-                   sessions=dockerops.tmux_sessions(), rc=dockerops.rc_info())
-    rows = egress.seen_rows()
+        ctx["stats"], ctx["version"], ctx["sessions"], ctx["rc"] = await asyncio.gather(
+            run(dockerops.stats), run(dockerops.claude_version), run(dockerops.tmux_sessions), run(dockerops.rc_info))
+    rows = await run(egress.seen_rows)
     ctx["net"] = {"mode": egress.mode(), "total": len(rows), "unknown": sum(1 for r in rows if r["kind"] == "unknown"),
                   "pending": sum(1 for a in activity.pending() if a["part"] == "network")}
     ctx["flags"] = auditlog.unseen_flags()
@@ -253,7 +253,7 @@ async def container_action(request: Request, action: str):
         try:
             job = jobs.start("Create & start tentaclai", [COMPOSE + ["up", "-d", "--no-deps", "egress"], COMPOSE + ["up", "-d", "--no-deps", CLAUDE_SERVICE]])
         except RuntimeError as e:
-            return PlainTextResponse("", headers=toast(str(e), "err"))
+            return respond(request, str(e), "err")
         return PlainTextResponse("", headers={"HX-Redirect": f"/builds/{job.id}"})
     if action == "recreate":
         try:
@@ -261,7 +261,7 @@ async def container_action(request: Request, action: str):
                              [COMPOSE + ["up", "-d", "--no-deps", "egress"],
                               COMPOSE + ["up", "-d", "--no-deps", "--force-recreate", CLAUDE_SERVICE]])
         except RuntimeError as e:
-            return PlainTextResponse("", headers=toast(str(e), "err"))
+            return respond(request, str(e), "err")
         return PlainTextResponse("", headers={"HX-Redirect": f"/builds/{job.id}"})
     if action not in ("start", "stop", "restart"):
         return PlainTextResponse("unknown action", status_code=400)

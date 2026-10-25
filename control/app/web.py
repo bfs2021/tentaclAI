@@ -2,12 +2,11 @@
 import asyncio
 import json
 import os
-import time
 
 from fastapi.responses import PlainTextResponse
 from fastapi.templating import Jinja2Templates
 
-from . import auth, central, dockerops, extensions, services_store, updatecheck
+from . import auth, central, dockerops, extensions, jsonstore, updatecheck
 from .config import DATA_DIR, RESTART_VARS, site
 from .envfile import read_env
 
@@ -52,11 +51,10 @@ def _baseline(st):
     try:
         if os.path.getmtime(RESTART_FLAG) <= st.get("created_ts", 0):
             return {}  # container was recreated since → flag is stale
-        with open(RESTART_FLAG) as f:
-            data = json.load(f)
-        return data.get("baseline", {}) if isinstance(data, dict) else {}
-    except (OSError, ValueError):
+    except OSError:
         return {}
+    data = jsonstore.load(RESTART_FLAG)
+    return data.get("baseline", {}) if isinstance(data, dict) else {}
 
 
 def restart_needed(st=None):
@@ -73,9 +71,7 @@ def mark_restart(old_env, changed):
     base = _baseline(st)
     for k in RESTART_VARS & set(changed):
         base.setdefault(k, old_env.get(k, ""))
-    os.makedirs(DATA_DIR, exist_ok=True)
-    with open(RESTART_FLAG, "w") as f:
-        json.dump({"ts": time.time(), "baseline": base}, f)
+    jsonstore.save(RESTART_FLAG, {"baseline": base})
 
 
 def not_applied():
