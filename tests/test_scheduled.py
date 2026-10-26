@@ -140,7 +140,8 @@ def test_clone_starts_paused(sj, monkeypatch, tmp_path):
 KNOWN = {"mailrelay": {"kind": "service", "parts": {"smtp": "write"}, "enabled": True, "description": "relay"},
          "imap_x": {"kind": "service", "parts": {"imap": "read"}, "enabled": True, "description": ""},
          "slowmail": {"kind": "service", "parts": {"smtp": "confirm"}, "enabled": True, "description": ""},
-         "n8n": {"kind": "service", "parts": {"api": "write", "mcp": "tools"}, "enabled": False, "description": ""},
+         "n8n": {"kind": "service", "parts": {"api": "write", "mcp": "confirm"}, "enabled": False, "description": ""},
+         "ha": {"kind": "service", "parts": {"mcp": "confirm"}, "enabled": True, "description": ""},
          "nas": {"kind": "ssh", "parts": {"ssh": "write"}, "enabled": True, "description": "SSH host nas"}}
 
 
@@ -151,7 +152,7 @@ def test_mentions(sj):
 def test_check_mentions(sj):
     err, warn = sj.check_mentions({"prompt": "use @nope and @n8n", "profile": "standard", "scope": True}, KNOWN)
     assert err == ["@nope is no service or SSH host"]
-    assert any("@n8n is disabled" in w for w in warn) and any("@n8n: MCP tools are off" in w for w in warn)
+    assert any("@n8n is disabled" in w for w in warn) and not any("MCP" in w for w in warn)
     _, warn = sj.check_mentions({"prompt": "send with @mailrelay", "profile": "read-only"}, KNOWN)
     assert warn == ["@mailrelay can't send mail in a read-only job"]
     _, warn = sj.check_mentions({"prompt": "send with @slowmail", "profile": "standard"}, KNOWN)
@@ -168,7 +169,13 @@ def test_context_scope_and_strict_mcp(sj, monkeypatch):
     assert "@mailrelay = service mailrelay (smtp write) – relay" in system and "svc refuses every other one" in system
     assert "--strict-mcp-config" in argv
     assert "--strict-mcp-config" not in sj.claude_argv(dict(job, scope=False), "run1", "sid")
-    assert "--strict-mcp-config" in sj.claude_argv(dict(job, scope=False, profile="read-only"), "run1", "sid")
+    ro = sj.claude_argv(dict(job, scope=False, profile="read-only"), "run1", "sid")
+    assert "--strict-mcp-config" in ro  # only svc's proxies – they offer a read-only job the reading tools
+    assert ro[ro.index("--allowedTools") + 1].endswith(",mcp__ha")
+    assert json.loads(ro[ro.index("--mcp-config") + 1]) == {"mcpServers": {"ha": {"type": "stdio", "command": "svc", "args": ["mcp-proxy", "ha"]}}}
+    assert json.loads(argv[argv.index("--mcp-config") + 1]) == {"mcpServers": {}}  # limited: none of the named has MCP
+    limited = sj.claude_argv(dict(job, prompt="switch @ha and @n8n"), "run1", "sid")
+    assert list(json.loads(limited[limited.index("--mcp-config") + 1])["mcpServers"]) == ["ha"]  # n8n is disabled
 
 
 def test_registry_carries_the_allow_list(sj, monkeypatch, tmp_path):

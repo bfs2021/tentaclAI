@@ -261,7 +261,7 @@ A service file can combine any of these parts:
 | Part | Fields | Access control |
 |---|---|---|
 | `api` | `base_url`, `auth.type`: `none` · `bearer` · `header` · `basic` · `query` · `oauth2_client_credentials`; `insecure_tls`; `access` (default `write`) | writes = everything but GET/HEAD/OPTIONS |
-| `mcp` | like Claude's `.mcp.json`: `http`/`sse` (`url`, `headers`) or `stdio` (`command`, `args`, `env`) | the MCP server's own permissions |
+| `mcp` | like Claude's `.mcp.json`: `http` (`url`, `headers`) or `stdio` (`command`, `args`, `env`); `access` (default `read`), `read_tools` / `write_tools` | tools the server marks read-only run freely; every other tool call is a write |
 | `git` | `url`, `access`, `auth` (token via credential helper) | `read`: push blocked (pushurl + pre-push hook) |
 | `docker` | `mode` `ssh` (the only one): `ssh_host`, `stacks_dir`; `access` | `read`: only read-only docker/compose commands |
 | `db` | `engine` `postgres`/`mysql`, `host`, `port`, `database`, `user`, `password`, `ssl`; `access` | `read`: read-only session, no shell |
@@ -272,13 +272,18 @@ A service file can combine any of these parts:
 
 **TLS:** internal services with your own CA → set `CA_CERT` (trusted by curl, git, python and node). For devices with self-signed
 certificates, `"insecure_tls": true` in `api`, `web`, `git`, `db`, `smtp` or `imap` (or the switch on the service page) skips certificate
-verification for that part only – the connection stays encrypted. For `mcp` it works when the server needs a token
-(svc bridges those); MCP servers without secrets are reached by Claude Code directly and need `CA_CERT`.
+verification for that part only – the connection stays encrypted (also for `mcp`: svc's proxy makes the connection).
 
-**Access modes** (`access` in `api`, `docker`, `git`, `db`, `files`, `smtp`, `imap`): `read` refuses writes, `write` allows them, `confirm` makes
+**Access modes** (`access` in `api`, `mcp`, `docker`, `git`, `db`, `files`, `smtp`, `imap`): `read` refuses writes, `write` allows them, `confirm` makes
 every write wait for your approval in tentacontrol → **Approvals** (denied or no answer within 10 minutes = not executed).
 The names before v0.16, `ro` and `rw`, still work as `read` and `write`; tentacontrol rewrites them on start (with a
 backup) and only writes the new ones. An unknown value counts as `read`.
+**MCP tool calls** go through the same gate: every MCP server is registered in Claude as `svc mcp-proxy <name>` (http
+bridged with the tokens added, stdio as a child process run by `tcrun`), which sees each tool call. Tools the server marks
+read-only (`readOnlyHint`) run freely and are logged as reads; every other tool is a write – `read` hides and blocks it,
+`write` logs it, `confirm` asks first; a tool marked `destructiveHint` is a risky write (asked on its own, even during a
+grant). Correct the server's marks with `"read_tools"` / `"write_tools"` (names or `fnmatch` patterns) in the `mcp`
+part; the service page lists the tools with their kind as last seen. In a read-only job only the reading tools are offered.
 Everything lands in the **audit log** (tentacontrol → Logs → Audit, or `svc audit` in the sandbox): Claude's tool calls,
 every `svc` command (reads and writes, approvals, blocked attempts), network connections, jobs, your changes and
 sign-ins in tentacontrol – with a search line (`actor:claude outcome:denied docker`), filters with counts per field,
@@ -444,7 +449,7 @@ What tentaclAI does:
 - **Privilege separation** in the sandbox: Claude runs as the unprivileged user `claude`. `.env`, the SSH key, the service
   files, git credentials and the audit log belong to root; Claude reaches them only through `svc` (via sudo), which enforces
   the access modes. Client tools (curl, psql, mariadb, stdio MCP servers) run as a third user `tcrun` with only the secret
-  they need. MCP servers with tokens are proxied by `svc`, git pushes go through a root-owned mirror – Claude never sees a
+  they need. Every MCP server runs behind `svc mcp-proxy`, git pushes go through a root-owned mirror – Claude never sees a
   token or the private key, and can't change its own access modes (`svc config put` always needs your approval).
 - **tentacontrol is out of Claude's reach:** from the sandbox only `svc`'s endpoints for approvals and job proposals answer
   (with its token; an unrecognised address from the sandbox network counts as the sandbox);

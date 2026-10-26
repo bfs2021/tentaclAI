@@ -139,6 +139,9 @@ async def migrate():
     hosts = tclib.ssh_migrate_access(os.path.join(SSH_DIR, "config.d"))
     if services or hosts:
         log.info(f"migration: access ro/rw → read/write in {', '.join(services + hosts)} (backups: *.bak-*-access)")
+    mcp = services_store.migrate_mcp_access()
+    if mcp:
+        log.info(f"migration: MCP access → write (unchanged behaviour, now logged) in {', '.join(mcp)} (backups: *.bak-*-mcp)")
 
 
 async def refresh_builtin_jobs():

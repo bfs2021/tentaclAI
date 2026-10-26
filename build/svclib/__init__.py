@@ -3,7 +3,8 @@
 core        paths, privileges, loading services/systems/.env, running client tools – imports no other part
 gate        access to a tentacle: lookup with the job limit (get, get_part), the audit log, approvals, guarded()
 safeguards  what reaches Claude's context: secrets blanked (redact), untrusted text framed, the injection scan
-*_part      one module per command family: api, git, docker (+ compose), db, mail, web, files, ssh, jobs, config, mcp
+*_part      one module per command family: api, git, docker (+ compose), db, mail, web, files, ssh, jobs, config,
+            mcp (the proxy in front of every MCP server: tools/call through gate.admit/finish)
 catalog     svc list / systems / info / test / sync – what Claude gets to know about the services
 cli         the command line (main)
 

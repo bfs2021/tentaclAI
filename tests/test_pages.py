@@ -98,6 +98,14 @@ def test_site_skill_listed_shown_and_removed(client, monkeypatch):
     assert "Not removed" in r.headers.get("HX-Trigger", "")
 
 
+def test_service_shows_mcp_tools_and_access(client):
+    html = client.get("/services/demoapi").text
+    card = html[html.index("<h2>MCP server</h2>"):]
+    assert "3 tools" in card and "1 read · 1 write · 1 destructive" in card  # an unknown kind is left out
+    assert "get_items" in card and "List items" in card and ">destructive<" in card
+    assert "mcp · " in card[:400]
+
+
 def test_service_without_test_path_warns_and_suggests(client):
     html = client.get("/services/demoapi").text
     assert "no test path" in html and 'value="/items?limit=1"' in html  # suggestion from the template of the same name

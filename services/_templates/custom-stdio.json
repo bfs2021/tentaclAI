@@ -6,6 +6,7 @@
   "description": "Locally started MCP server",
   "mcp": {
     "type": "stdio",
+    "access": "read",
     "command": "npx",
     "args": [
       "-y",

@@ -255,9 +255,7 @@ def tentacles():
     out = {}
     for name, svc in tclib.load_services(SERVICES_DIR, tclib.load_systems(STACK_DIR)).items():
         parts = {p: tclib.access(svc[p].get("access"), tclib.part_default(p))
-                 for p in tclib.PARTS if isinstance(svc.get(p), dict) and p != "mcp"}
-        if "mcp" in svc:
-            parts["mcp"] = "tools"
+                 for p in tclib.PARTS if isinstance(svc.get(p), dict)}
         out[name] = {"kind": "service", "parts": parts, "enabled": tclib.enabled(svc), "description": svc.get("description", "")}
     conf = os.path.join(SSH_DIR, "config.d")
     for h in tclib.ssh_hosts(conf):
@@ -293,11 +291,18 @@ def check_mentions(job, known=None):
         elif not ro and any(t["parts"][p] == "confirm" for p in writes):
             warnings.append(f"@{n} asks for approval ({', '.join(p for p in writes if t['parts'][p] == 'confirm')}) – "
                             "the run waits up to 10 min, at night nobody answers")
-        if job.get("scope") and "mcp" in t["parts"]:
-            warnings.append(f"@{n}: MCP tools are off in a job limited to its tentacles – it can use the other parts")
     if job.get("scope") and not names:
         errors.append("“only the tentacles named in the task” needs at least one @name in the task")
     return errors, warnings
+
+
+def job_mcp_servers(job, known=None):
+    """the MCP servers of a read-only or limited job: every enabled service with an mcp part (a limited job: only the
+    named ones), each as svc's proxy – which offers a read-only job the reading tools only and refuses the rest"""
+    known = tentacles() if known is None else known
+    names = mentions(job.get("prompt")) if job.get("scope") else sorted(known)
+    return {"mcpServers": {n: {"type": "stdio", "command": "svc", "args": ["mcp-proxy", n]} for n in names
+                           if (known.get(n) or {}).get("enabled") and "mcp" in (known.get(n) or {}).get("parts", {})}}
 
 
 def mention_context(job, known=None):
@@ -645,21 +650,23 @@ def claude_argv(job, run_id, session_id):
     if context:
         system += " Tentacles named in the task (@name): " + "; ".join(context) + "."
     if job.get("scope"):
-        system += (" This run may only use those tentacles – svc refuses every other one, and MCP servers are off. "
+        system += (" This run may only use those tentacles – svc refuses every other one, MCP servers included. "
                    "If the task needs another tentacle, say so in the summary.")
     if job.get("propose"):
         system += SYSTEM_PROPOSE
     system += SYSTEM_LEARN + (SYSTEM_IMPROVE if improves(job) else "")
     argv = ["claude", "-p", job["prompt"], "--output-format", "stream-json", "--verbose", "--session-id", session_id,
             "--json-schema", json.dumps(schema(job)), "--append-system-prompt", system]
-    if ro or job.get("scope"):
-        argv += ["--strict-mcp-config"]  # no MCP servers: their tools could reach other services past svc
+    servers = job_mcp_servers(job)["mcpServers"] if ro or job.get("scope") else {}
+    if ro or job.get("scope"):  # only svc's MCP proxies (no claude.ai connectors) – svc applies the job's limits to them
+        argv += ["--mcp-config", json.dumps({"mcpServers": servers}), "--strict-mcp-config"]
     if model:
         argv += ["--model", model]
     if effort:
         argv += ["--effort", effort]
     if ro:
-        tools = ",".join([READ_ONLY_TOOLS] + [f"Bash({h}:*)" for h in readonly_helpers()])
+        tools = ",".join([READ_ONLY_TOOLS] + [f"Bash({h}:*)" for h in readonly_helpers()]
+                         + [f"mcp__{n}" for n in servers])  # svc offers a read-only job only their reading tools
         argv += ["--permission-mode", "dontAsk", "--allowedTools", tools, "--disallowedTools", "Edit,Write,NotebookEdit"]
     else:
         argv += ["--permission-mode", "bypassPermissions"]

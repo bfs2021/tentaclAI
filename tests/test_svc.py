@@ -588,3 +588,179 @@ def test_broken_pipe_ends_quietly(monkeypatch):
     monkeypatch.setattr(svc, "run", closed)
     monkeypatch.setattr(svc.os, "dup2", lambda *a: None)
     assert svc.cli(["svc", "audit"]) == 141
+
+
+# ---------- MCP proxy: the access gate for tool calls ----------
+
+FAKE_MCP = os.path.join(ROOT, "tests", "fixtures", "fake_mcp.py")
+
+
+@pytest.mark.parametrize("m,name,hints,kind", [
+    ({}, "get_state", {"readOnlyHint": True}, "read"),
+    ({}, "turn_on", {}, "write"),
+    ({}, "turn_on", None, "write"),
+    ({}, "wipe", {"destructiveHint": True}, "destructive"),
+    ({"read_tools": ["get_*", 3]}, "get_logs", {}, "read"),
+    ({"write_tools": ["get_secret"]}, "get_secret", {"readOnlyHint": True}, "write"),  # the admin overrides the server
+    ({"write_tools": ["wipe"], "read_tools": ["*"]}, "wipe", {"destructiveHint": True}, "destructive"),
+    ({"read_tools": "get_*"}, "get_logs", {}, "write"),  # not a list: ignored
+])
+def test_mcp_tool_kind(m, name, hints, kind):
+    assert svc.tool_kind(m, name, hints) == kind
+
+
+def test_mcp_call_action_is_stable_and_redacted():
+    a = svc.call_action("set", {"b": 1, "a": "x", "api_token": "s3cret"})
+    assert a == svc.call_action("set", {"api_token": "s3cret", "a": "x", "b": 1})  # same call, same text (handoff)
+    assert a.startswith('set {"a": "x"') and "s3cret" not in a
+
+
+@pytest.fixture
+def mcp_gate(monkeypatch, tmp_path):
+    """svc's gate faked: admit() records the write and refuses wipe; finish() and audit() record what they log"""
+    log = {"admit": [], "finish": [], "audit": []}
+    monkeypatch.setattr(svc, "TOOLS_DIR", str(tmp_path / "mcp-tools"))
+    monkeypatch.setattr(svc, "_job", {})
+
+    def admit(service, part, mode, action, interactive=False, review=None):
+        log["admit"].append((service, part, mode, action, review))
+        if action.startswith("wipe"):
+            raise svc.Stop(f"svc: {service}: {action} – denied (mwa). Not executed")
+        if action.startswith("turn_on") and '"later"' in action:
+            raise svc.Stop("approval still pending", link="https://tc.example/approvals#a-7")
+        return {"action": action}
+    monkeypatch.setattr(svc, "admit", admit)
+    monkeypatch.setattr(svc, "finish", lambda ctx, rc, duration, error="": log["finish"].append((ctx["action"], rc, error)))
+    monkeypatch.setattr(svc, "audit", lambda *a, **k: log["audit"].append((a, k)))
+    return log
+
+
+def _rpc(rid, method, **params):
+    return json.dumps({"jsonrpc": "2.0", "id": rid, "method": method, "params": params})
+
+
+def _run_stdio(monkeypatch, capsys, mcp, calls, tmp_path):
+    """the stdio proxy against tests/fixtures/fake_mcp.py; tool calls are sent once the tool list has come back, as
+    Claude Code does → {id: answer}"""
+    import io
+    import time as _t
+    listed = tmp_path / "mcp-tools" / "demo.json"
+
+    def stdin():
+        yield _rpc(1, "initialize", protocolVersion="2025-06-18") + "\n"
+        yield json.dumps({"jsonrpc": "2.0", "method": "notifications/initialized"}) + "\n"
+        yield _rpc(2, "tools/list") + "\n"
+        end = _t.time() + 10
+        while not listed.exists() and _t.time() < end:
+            _t.sleep(0.02)
+        for i, (tool, args) in enumerate(calls):
+            yield _rpc(10 + i, "tools/call", name=tool, arguments=args) + "\n"
+    monkeypatch.setattr(sys, "stdin", stdin())
+    m = {"command": sys.executable, "args": [FAKE_MCP], **mcp}
+    assert svc.mcp_stdio(m, svc.ToolGate("demo", m)) == 0
+    out = [json.loads(x) for x in capsys.readouterr().out.splitlines()]
+    return {x["id"]: x for x in out}
+
+
+def test_mcp_proxy_gates_tool_calls(monkeypatch, capsys, tmp_path, mcp_gate):
+    got = _run_stdio(monkeypatch, capsys, {"access": "confirm"}, [
+        ("get_state", {"entity": "light.x"}), ("turn_on", {"entity": "light.x"}), ("wipe", {}),
+        ("turn_on", {"entity": "later"})], tmp_path)
+    assert [t["name"] for t in got[2]["result"]["tools"]] == ["get_state", "turn_on", "wipe"]  # confirm: all offered
+    assert got[10]["result"]["content"][0]["text"] == "did get_state"  # a read: no gate, logged as read
+    assert got[11]["result"]["content"][0]["text"] == "did turn_on"
+    assert got[12]["result"]["isError"] and "denied" in got[12]["result"]["content"][0]["text"]  # never reached the server
+    assert "approval still pending" in got[13]["result"]["content"][0]["text"] and "#a-7" in got[13]["result"]["content"][0]["text"]
+    admitted = {a[3].split()[0]: a for a in mcp_gate["admit"]}
+    assert set(admitted) == {"turn_on", "wipe"} and admitted["turn_on"][:3] == ("demo", "mcp", "confirm")
+    assert admitted["wipe"][4] == {"risks": ["destructive tool – the server marks it so"]} and admitted["turn_on"][4] is None
+    assert mcp_gate["finish"] == [('turn_on {"entity": "light.x"}', 0, "")]
+    (args, kw), = mcp_gate["audit"]
+    assert args[:5] == ("demo", "mcp", "confirm", 'get_state {"entity": "light.x"}', "read") and kw["rc"] == 0
+    listed = json.loads((tmp_path / "mcp-tools" / "demo.json").read_text())
+    assert [(t["name"], t["kind"]) for t in listed["tools"]] == [("get_state", "read"), ("turn_on", "write"), ("wipe", "destructive")]
+
+
+def test_mcp_proxy_read_offers_and_runs_only_reading_tools(monkeypatch, capsys, tmp_path, mcp_gate):
+    got = _run_stdio(monkeypatch, capsys, {"access": "read", "read_tools": ["turn_*"]}, [
+        ("turn_on", {}), ("nope", {})], tmp_path)
+    assert [t["name"] for t in got[2]["result"]["tools"]] == ["get_state", "turn_on"]  # wipe hidden
+    assert got[10]["result"]["content"][0]["text"] == "did turn_on"  # the service file made it a read
+    assert [a[3] for a in mcp_gate["admit"]] == ["nope {}"]  # an unknown tool is a write – the gate decides
+    assert got[11]["result"]["content"][0]["text"] == "no tool nope"  # (the fake gate lets it through)
+    assert mcp_gate["finish"] == [("nope {}", 1, "no tool nope")]
+
+
+def test_mcp_proxy_read_only_job_offers_reading_tools_only(monkeypatch, capsys, tmp_path, mcp_gate):
+    monkeypatch.setattr(svc, "_job", {"run": "r1", "read_only": True, "allow": None})
+    got = _run_stdio(monkeypatch, capsys, {"access": "confirm"}, [], tmp_path)
+    assert [t["name"] for t in got[2]["result"]["tools"]] == ["get_state"]
+
+
+def test_mcp_kinds_survive_the_session(monkeypatch, tmp_path, mcp_gate):
+    monkeypatch.setattr(svc, "TOOLS_DIR", str(tmp_path))
+    tg = svc.ToolGate("demo", {"access": "write"})
+    tg.request(json.loads(_rpc(1, "tools/list")))
+    tg.response({"jsonrpc": "2.0", "id": 1, "result": {"tools": [{"name": "get", "annotations": {"readOnlyHint": True}}]}})
+    again = svc.ToolGate("demo", {"access": "write"})  # a new session calls before it lists
+    assert again.kind("get") == "read" and again.kind("other") == "write"
+    assert svc.ToolGate("demo", {"access": "write", "write_tools": ["get"]}).kind("get") == "write"
+
+
+def test_mcp_entry_is_always_the_proxy():
+    assert svc.mcp_entry("docs", {"type": "http", "url": "https://docs.example/mcp"}) == \
+        {"type": "stdio", "command": "svc", "args": ["mcp-proxy", "docs"]}
+
+
+def test_tool_report_leaves_proxied_mcp_calls_to_the_proxy(monkeypatch):
+    logged = []
+    monkeypatch.setattr(svc, "audit", lambda *a, **k: logged.append(a))
+    services = {"ha": {"name": "ha", "mcp": {"type": "http"}}}
+    for tool in ("mcp__ha__turn_on", "mcp__claude_ai_Drive__search", "Read"):
+        monkeypatch.setattr(sys, "stdin", __import__("io").StringIO(json.dumps({"tool": tool, "target": "x"})))
+        svc.cmd_tool_report([], services)
+    assert [a[0] for a in logged] == ["mcp__claude_ai_Drive__search", "Read"]
+
+
+def test_mcp_bridge_gates_tool_calls(monkeypatch, capsys, tmp_path, mcp_gate):
+    """the http bridge: same gate – a refused call never reaches the server, the list is filtered for read"""
+    import http.server
+    import io
+    import threading
+    seen = []
+
+    class H(http.server.BaseHTTPRequestHandler):
+        def log_message(self, *a):
+            pass
+
+        def do_POST(self):
+            msg = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
+            seen.append((msg.get("method"), self.headers.get("Authorization")))
+            if msg.get("id") is None:
+                self.send_response(202)
+                self.end_headers()
+                return
+            res = {"tools": [{"name": "get", "annotations": {"readOnlyHint": True}}, {"name": "set"}]} \
+                if msg["method"] == "tools/list" else {"content": [{"type": "text", "text": "ok"}]}
+            body = json.dumps({"jsonrpc": "2.0", "id": msg["id"], "result": res}).encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+    srv = http.server.ThreadingHTTPServer(("127.0.0.1", 0), H)
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    for k in ("http_proxy", "HTTP_PROXY"):
+        monkeypatch.delenv(k, raising=False)
+    try:
+        m = {"type": "http", "url": f"http://127.0.0.1:{srv.server_address[1]}/mcp", "headers": {"Authorization": "Bearer t"},
+             "access": "read"}
+        monkeypatch.setattr(sys, "stdin", io.StringIO("\n".join([
+            _rpc(1, "initialize"), _rpc(2, "tools/list"), _rpc(3, "tools/call", name="wipe", arguments={})]) + "\n"))
+        assert svc.mcp_bridge(m, svc.ToolGate("demo", m)) == 0  # no session id from the fake: every message in order
+    finally:
+        srv.shutdown()
+    got = {x["id"]: x for x in map(json.loads, capsys.readouterr().out.splitlines())}
+    assert [t["name"] for t in got[2]["result"]["tools"]] == ["get"]  # read: set hidden
+    assert got[3]["result"]["isError"] and "denied" in got[3]["result"]["content"][0]["text"]
+    assert [s[0] for s in seen] == ["initialize", "tools/list"] and seen[0][1] == "Bearer t"  # wipe never sent

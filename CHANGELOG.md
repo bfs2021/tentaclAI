@@ -18,6 +18,14 @@ All notable changes, newest first. Every release lists **upgrade steps** from th
 - **Network learning phase for new installations:** `.env.example` now sets `EGRESS_MODE=learn` – permissive for
   `EGRESS_LEARN_MINUTES` (60) from the sandbox's first connection, then `enforce`; the Network page offers the
   destinations seen meanwhile without a rule (*Allow all*, or one by one), plus a notification (*Network learning over*).
+- **MCP tool calls are gated:** every MCP server now runs behind `svc mcp-proxy` (also those without tokens, and stdio
+  servers as a child process run by `tcrun`), and its `mcp` part gets an `access` like every other part. Tools the
+  server marks read-only (`readOnlyHint`) run freely; every other tool call is a write – `read` hides and blocks it,
+  `write` logs it (fail closed), `confirm` asks in Approvals first, with tool and arguments on the card; a tool marked
+  `destructiveHint` is a risky write (never covered by a grant). `"read_tools"` / `"write_tools"` in the `mcp` part
+  correct the server's marks. The service page lists the tools with their kind. Jobs: a read-only job now gets the MCP
+  servers of the services with only their reading tools, a job limited to its tentacles the MCP servers of the named
+  ones (before: no MCP server at all; claude.ai connectors stay off in both).
 
 - **Faster first setup:** `./tentaclai.sh init` asks one question (how to reach tentacontrol – default now the LAN
   on port 8484) and builds and starts everything; the rest has defaults (Settings, or `init --advanced` for every
@@ -40,6 +48,10 @@ All notable changes, newest first. Every release lists **upgrade steps** from th
 - `svc` is split into a package (`build/svclib/`, installed to `/usr/local/lib/tentaclai/svclib`): `core`, `gate`
   (access, audit, approvals), `safeguards`, one module per service part, `catalog`, `cli` – `build/svc` is only the entry
   point. No change in behaviour.
+- Audit: a tool call of a service's MCP server is logged once, by svc's proxy (part `mcp`, with exit code and time) –
+  the `PostToolUse` hook no longer adds a second *tool* entry for it (claude.ai connectors are logged as before).
+- MCP `insecure_tls` now applies to every http MCP server (svc makes the connection); the transport `sse` can't be
+  proxied – use `http` (Streamable HTTP).
 - Enterprise page: the managed parts show short names – the details (e.g. *local/CLAUDE.md*) are tooltips.
 - Fix: the quota notification came again and again once a limit was passed – it was keyed by the reset time, which
   Claude Code prints to the minute, and forgotten on every restart. It now goes out once at 80 % and once at 100 % per
@@ -58,6 +70,15 @@ All notable changes, newest first. Every release lists **upgrade steps** from th
   tentacontrol; log lines now start with a timestamp and level (`… WARNING usage: …`). A script grepping
   `docker logs tentacontrol` for the setup link keeps working.
 - Approvals pending while you upgrade survive the recreation of tentacontrol only from this version on.
+- **MCP access:** on its first start tentacontrol sets `"access": "write"` in every existing `mcp` part without one
+  (backup `services/<name>.json.bak-<date>-mcp`, once – marker `data/control/migrated-mcp-access`): the tools keep
+  working as before, now logged. Consider `confirm` for servers that change things (Home Assistant, n8n – the templates
+  now use `confirm`), or `read`. New `mcp` parts without `access` read. A service file restored from an older backup
+  later reads too.
+- Claude's MCP configuration is rewritten by `svc sync` at the start of the `tentaclai` container (every server becomes
+  `svc mcp-proxy <name>`); running sessions see it after `/mcp` → reconnect. stdio servers without secrets now run as
+  `tcrun` instead of `claude` (own home `/var/lib/tcrun`) – a server that relied on Claude's home or files needs them
+  passed in `env`/`args`. An MCP part of type `sse` stops working – switch it to `http`.
 - `svc` now lives in `build/svclib/` as well – rebuild the `claude` image (`docker compose build claude`); a fork that
   copies `build/svc` alone into its own image must copy `build/svclib/` to `/usr/local/lib/tentaclai/svclib/` too.
 

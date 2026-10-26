@@ -75,7 +75,7 @@ def main(argv):
     if cmd == "jobs":
         return jobs_part.cmd_jobs(argv[2:])
     if cmd == "tool-report":
-        return safeguards.cmd_tool_report(argv[2:])
+        return safeguards.cmd_tool_report(argv[2:], services)
     if cmd == "mail":
         return mail_part.cmd_mail(services, argv[2:])
     if cmd == "web":

@@ -16,6 +16,7 @@
   },
   "mcp": {
     "type": "http",
+    "access": "confirm",
     "url": "https://n8n.{{DOMAIN}}/mcp-server/http",
     "headers": {
       "Authorization": "Bearer ${N8N_MCP_TOKEN}"

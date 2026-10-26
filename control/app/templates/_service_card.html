@@ -41,6 +41,7 @@
         {% elif k == 'imap' %}{{ access('imap', s.data.imap.access or 'read') }}
         {% elif k == 'files' %}{{ access('files', s.files.access) }}{% if s.files.sudo %}<span class="pill accent">sudo</span>{% endif %}
         {% elif k == 'web' %}<span class="pill info">web · {{ s.web.auth }}</span>
+        {% elif k == 'mcp' and s.mcp %}{{ access('mcp', s.mcp.access) }}
         {% else %}<span class="pill info">{{ k }}</span>{% endif %}
       {% endfor %}
       {% if s.tls_off %}<span class="pill warn" title="TLS certificates are not verified for {{ s.tls_off | join(', ') }}">TLS not verified</span>{% endif %}

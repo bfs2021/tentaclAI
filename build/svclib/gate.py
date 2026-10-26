@@ -219,36 +219,66 @@ def error_tail(text, lines=2, limit=300):
     return safeguards._redact_text("\n".join(keep[-lines:]))[-limit:]
 
 
-def guarded(service, part, mode, action, run, interactive=False, review=None):
-    """run() performs a write: blocked for read, logged for write, approved first for confirm
-    (interactive: a terminal session – stderr stays the terminal, nothing is captured; review: diff and flags shown with
-    the approval)"""
+class Stop(Exception):
+    """a write that must not run: the message for Claude; link set when the approval is only handed back (still pending)"""
+
+    def __init__(self, message, link=""):
+        super().__init__(message)
+        self.message, self.link = message, link
+
+
+def admit(service, part, mode, action, interactive=False, review=None):
+    """the gate in front of one write: blocked for read, logged for write, approved first for confirm → what finish()
+    needs; raises Stop when it must not run. Never exits – the MCP proxy answers a refused tool call and goes on"""
     if mode == "read":
         audit(service, part, mode, action, "blocked")
         report("blocked", f"Blocked: {service} ({part}) is read-only", action)
-        sys.exit(f"svc: {service} is read-only ({part}) – '{action[:80]}' is not allowed")
+        raise Stop(f"svc: {service} is read-only ({part}) – '{action[:80]}' is not allowed")
     decision, by, who = "auto", "", {}
     if mode == "confirm":
         decision, by, who = request_approval(service, part, action, interactive, review)
         if decision == "handoff":
-            print(f"svc: ⏸ approval still pending – the user approves it at {by}\n"
-                  "Give the user this link in one line now, then run exactly the same command again "
-                  "(Bash timeout 600000 ms): it waits for the same request.", file=sys.stderr, flush=True)
-            sys.exit(HANDOFF_EXIT)
+            raise Stop("approval still pending", link=by)
         if decision != "approved":
             audit(service, part, mode, action, decision, detail="" if who.get("approver") else by, **who)
             reason = who.get("reason", "")
-            sys.exit(f"svc: {service}: {action[:80]} – {decision}{(' (' + by + ')') if by else ''}. "
-                     "Not executed – tell the user, don't work around it."
-                     + (f"\nReason given by the user: “{reason}” – if it states a lasting rule, propose it as a note "
-                        "where it belongs (Learn where it belongs)." if reason else ""))
-        print(f"svc: ✓ approved{' – ' + by if by.startswith('grant') else ''}", file=sys.stderr, flush=True)
+            raise Stop(f"svc: {service}: {action[:80]} – {decision}{(' (' + by + ')') if by else ''}. "
+                       "Not executed – tell the user, don't work around it."
+                       + (f"\nReason given by the user: “{reason}” – if it states a lasting rule, propose it as a note "
+                          "where it belongs (Learn where it belongs)." if reason else ""))
     detail = "" if who.get("approver") else by
-    started = audit(service, part, mode, action, "started", detail=detail, strict=True, **who)  # no entry, no write
+    try:
+        started = audit(service, part, mode, action, "started", detail=detail, strict=True, **who)  # no entry, no write
+    except SystemExit as e:
+        raise Stop(str(e.code)) from None
+    return {"service": service, "part": part, "mode": mode, "action": action, "decision": decision, "by": by,
+            "detail": detail, "who": who, "started": started}
+
+
+def finish(ctx, rc, duration, error=""):
+    """the closing audit entry of an admitted write"""
+    audit(ctx["service"], ctx["part"], ctx["mode"], ctx["action"], ctx["decision"], rc=rc, duration=duration,
+          detail=ctx["detail"], error=error, intent=ctx["started"], **ctx["who"])
+
+
+def guarded(service, part, mode, action, run, interactive=False, review=None):
+    """run() performs a write: blocked for read, logged for write, approved first for confirm
+    (interactive: a terminal session – stderr stays the terminal, nothing is captured; review: diff and flags shown with
+    the approval)"""
+    try:
+        ctx = admit(service, part, mode, action, interactive, review)
+    except Stop as e:
+        if e.link:
+            print(f"svc: ⏸ approval still pending – the user approves it at {e.link}\n"
+                  "Give the user this link in one line now, then run exactly the same command again "
+                  "(Bash timeout 600000 ms): it waits for the same request.", file=sys.stderr, flush=True)
+            sys.exit(HANDOFF_EXIT)
+        sys.exit(e.message)
+    if ctx["decision"] == "approved":
+        print(f"svc: ✓ approved{' – ' + ctx['by'] if ctx['by'].startswith('grant') else ''}", file=sys.stderr, flush=True)
     t = time.time()
     rc, err = (run(), "") if interactive else run_teed(run)
-    audit(service, part, mode, action, decision, rc=rc, duration=time.time() - t, detail=detail,
-          error=error_tail(err) if rc else "", intent=started, **who)
+    finish(ctx, rc, time.time() - t, error_tail(err) if rc else "")
     return rc
 
 

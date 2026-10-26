@@ -25,7 +25,7 @@
     </details>{% endif %}</div>
   <label class="check"><input type="checkbox" name="propose" value="1" {{ 'checked' if job.propose }}> Propose actions instead of changing anything (read-only profile) – the run suggests <code>svc</code> commands, you pick on this page which ones run</label>
   <label class="check"><input type="checkbox" name="improve" value="1" {{ 'checked' if job.improve is not false }}> Suggest prompt improvements – when the task was unclear or lacked something the run had to find out, it proposes a better version; you take it with one click</label>
-  <label class="check"><input type="checkbox" name="scope" value="1" {{ 'checked' if job.scope }}> Only the tentacles named in the task (<code>@name</code>) – <code>svc</code> refuses every other one, MCP servers are off</label>
+  <label class="check"><input type="checkbox" name="scope" value="1" {{ 'checked' if job.scope }}> Only the tentacles named in the task (<code>@name</code>) – <code>svc</code> refuses every other one, MCP servers included</label>
 
   <div class="grid2">
     <div><label>Schedule</label>
@@ -44,7 +44,7 @@
     </div>
     <div><label>Profile</label>
       <select name="profile" id="profile">{% for p, label in profiles.items() %}<option value="{{ p }}" {{ 'selected' if job.profile == p }}>{{ label }}</option>{% endfor %}</select>
-      <div class="help prof" data-p="read-only">Reads only: every tentacle counts as <code>read</code>, no file edits, no MCP tools.</div>
+      <div class="help prof" data-p="read-only">Reads only: every tentacle counts as <code>read</code>, no file edits, only reading MCP tools.</div>
       <div class="help prof" data-p="standard">Like a terminal session: <code>confirm</code> tentacles wait for your approval in Approvals (expires after 10 min), <code>write</code> tentacles are written without asking.</div>
       {% if rw %}<div class="card flat small prof" data-p="standard" style="margin-top:8px"><span class="pill warn">writes without asking</span> {{ rw | join(', ') }}</div>{% endif %}
     </div>

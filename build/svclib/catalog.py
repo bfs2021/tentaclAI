@@ -130,7 +130,7 @@ def cmd_info(services, name):
             print(f"Docs: {api['docs']}")
     mcp = svc.get("mcp")
     if mcp:
-        print(f"MCP:  {mcp.get('type')} {core.render(mcp.get('url', '')) or mcp.get('command', '')}")
+        print(f"MCP:  {mcp.get('type')} {core.render(mcp.get('url', '')) or mcp.get('command', '')}  (access: {tclib.access(mcp.get('access'))})")
     dk = svc.get("docker")
     if dk:
         d = core.render(dk)
@@ -261,7 +261,7 @@ def write_catalog(services):
             continue
         api, mcp = svc.get("api", {}), svc.get("mcp", {})
         base = core.render(api.get("base_url", ""))  # URLs only, never secrets
-        where = " / ".join(x for x in (base, f"MCP `{name}`" if mcp else "") if x)
+        where = " / ".join(x for x in (base, f"MCP `{name}` ({tclib.access(mcp.get('access'))})" if mcp else "") if x)
         lines.append(f"| **{name}** | {core.kinds(svc)} | {core.status(svc)} | {svc.get('description', '')} | {where} | {api.get('docs', '')} |")
     dks = docker_part.docker_services(services, usable=False)
     if dks:

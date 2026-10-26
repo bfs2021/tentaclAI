@@ -20,6 +20,7 @@
   },
   "mcp": {
     "type": "http",
+    "access": "read",
     "url": "https://example.{{DOMAIN}}/mcp",
     "headers": {
       "Authorization": "Bearer ${EXAMPLE_TOKEN}"

@@ -10,7 +10,7 @@ import tclib
 
 from . import jsonstore
 from .central import check_write
-from .config import SERVICES_DIR, STACK_DIR, is_secret  # noqa: F401  (STACK_DIR re-exported)
+from .config import DATA_DIR, SERVICES_DIR, STACK_DIR, is_secret  # noqa: F401  (STACK_DIR re-exported)
 from .envfile import read_env, update_env
 
 TEMPLATES_DIR = os.path.join(SERVICES_DIR, "_templates")
@@ -59,6 +59,7 @@ def describe(name, data, env=None, error=None):
         "db": db_info(data.get("db"), env) if data.get("db") else None,
         "web": web_info(data.get("web"), env) if data.get("web") else None,
         "files": files_info(data.get("files")) if data.get("files") else None,
+        "mcp": mcp_info(name, data.get("mcp")) if isinstance(data.get("mcp"), dict) else None,
         # URLs contain no secrets -> show them with ${VAR}s resolved
         "base_url": tclib.render((data.get("api") or {}).get("base_url", ""), env, keep_unknown=True),
         "vars": [{"name": v, "set": bool(env.get(v)), "secret": is_secret(v, creds),
@@ -74,6 +75,26 @@ def git_info(name, git):
     cloned = bool(host_path and os.path.isdir(os.path.join(host_path, ".git")))
     return {"url": git.get("url", ""), "access": tclib.access(git.get("access")), "branch": git.get("branch", ""),
             "path": path, "cloned": cloned, "auth": (git.get("auth") or {}).get("type", "none")}
+
+
+MCP_TOOLS_DIR = os.path.join(DATA_DIR, "mcp-tools")  # written by svc's MCP proxy at each tools/list
+MCP_KINDS = ("read", "write", "destructive")
+
+
+def mcp_info(name, mcp):
+    """access, transport and the tools the server listed last (with svc's kind: read, write, destructive)"""
+    tools, at = [], 0
+    try:
+        with open(os.path.join(MCP_TOOLS_DIR, f"{name}.json")) as f:
+            doc = json.load(f)
+        at = int(doc.get("at") or 0)
+        tools = [{"name": str(t["name"])[:200], "kind": t["kind"], "title": str(t.get("title", ""))[:160]}
+                 for t in doc.get("tools", []) if isinstance(t, dict) and "name" in t and t.get("kind") in MCP_KINDS]
+    except (OSError, ValueError, TypeError, AttributeError):
+        pass
+    return {"access": tclib.access(mcp.get("access")), "type": mcp.get("type", "stdio" if mcp.get("command") else "http"),
+            "tools": tools, "at": at, "at_s": time.strftime("%Y-%m-%d %H:%M", time.localtime(at)) if at else "", "counts": {k: sum(1 for t in tools if t["kind"] == k) for k in MCP_KINDS},
+            "overrides": any(isinstance(mcp.get(k), list) and mcp.get(k) for k in ("read_tools", "write_tools"))}
 
 
 def _sub(v, env):
@@ -163,6 +184,33 @@ def migrate_access():
             shutil.copy2(p, f"{p}.bak-{time.strftime('%Y-%m-%d')}-access")
             jsonstore.save(p, data, mode=os.stat(p).st_mode & 0o777, readable=True)
             changed.append(os.path.basename(p)[:-5])
+    return changed
+
+
+MCP_MIGRATED = os.path.join(DATA_DIR, "migrated-mcp-access")
+
+
+def migrate_mcp_access():
+    """once: MCP parts without an access mode get "write" – their tools worked unchecked before svc gated them; new
+    MCP parts read by default (a backup of each changed file stays) – returns the changed names"""
+    if os.path.exists(MCP_MIGRATED):
+        return []
+    changed = []
+    for p in sorted(glob.glob(os.path.join(SERVICES_DIR, "*.json"))):
+        if os.path.basename(p).startswith("_"):
+            continue
+        try:
+            data = json.load(open(p))
+        except (OSError, ValueError):
+            continue
+        mcp = data.get("mcp") if isinstance(data, dict) else None
+        if isinstance(mcp, dict) and mcp.get("access") in (None, ""):
+            mcp["access"] = "write"
+            shutil.copy2(p, f"{p}.bak-{time.strftime('%Y-%m-%d')}-mcp")
+            jsonstore.save(p, data, mode=os.stat(p).st_mode & 0o777, readable=True)
+            changed.append(os.path.basename(p)[:-5])
+    with open(MCP_MIGRATED, "w") as f:
+        f.write(time.strftime("%Y-%m-%d %H:%M\n"))
     return changed
 
 

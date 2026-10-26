@@ -173,11 +173,12 @@ def scanned(source, name, part, action, cmd, **kw):
     return rc
 
 
-def cmd_tool_report(args):
+def cmd_tool_report(args, services=None):
     """tc-guard (Claude Code's PostToolUse hook, runs as claude) reports a tool call on stdin – audit (+ notification for
     a finding) only. {"tool", "target", "findings": [[reason, excerpt], …]}. Claude could call this itself: the tool name
     is reduced to safe characters, only known reasons count, target and excerpts are cut short and cleaned – at worst an
-    extra entry, never anything run. A finding gives one "flagged" entry, any other call one "ok" entry."""
+    extra entry, never anything run. A finding gives one "flagged" entry, any other call one "ok" entry – except a tool
+    of a service's MCP server: svc's proxy logged that call already."""
     try:
         d = json.loads(sys.stdin.read(65536))
     except ValueError:
@@ -190,6 +191,9 @@ def cmd_tool_report(args):
                 if isinstance(f, list) and len(f) == 2 and isinstance(f[0], str) and (f[0] in known or str(f[0]).startswith("hidden text ("))][:5]
     target = guard_text(d.get("target", ""), 200)
     if findings and guard_on() and guard_note("tool result", tool, "claude", target or "call", findings):
+        return 0
+    server = tool.split("__")[1] if tool.startswith("mcp__") and tool.count("__") >= 2 else ""
+    if server and "mcp" in ((services or {}).get(server) or {}):
         return 0
     gate.audit(tool, "claude", "", target or "call", "ok")
     return 0

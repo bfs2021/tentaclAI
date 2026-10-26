@@ -93,8 +93,7 @@
           Ignore TLS certificate errors ({{ svc.tls_parts | join(', ') }})</label>
       </form>
       <p class="help">For devices with self-signed certificates (routers, NAS, hypervisors). The connection stays encrypted, but the
-        server is no longer verified. Better: trust your own CA with <code>CA_CERT</code> in the settings{{ ' (set)' if site.ca_cert }}.
-        {% if 'mcp' in svc.tls_parts %}<br>MCP connections are made by Claude Code itself and always verify – use <code>CA_CERT</code> for them; this switch only affects the connection test.{% endif %}</p>
+        server is no longer verified. Better: trust your own CA with <code>CA_CERT</code> in the settings{{ ' (set)' if site.ca_cert }}.</p>
     </div>
     {% endif %}
 
@@ -126,6 +125,33 @@
         <button class="btn sm primary" hx-post="/services/{{ svc.name }}/git-sync" {{ 'disabled' if svc.state != 'ok' }}>{{ icon('refresh') }}{{ 'Fetch & apply protection' if svc.git.cloned else 'Clone now' }}</button>
       </div>
       <p class="help">read: push is blocked by push URL and pre-push hook. To change access set <code>"access"</code> to <code>"read"</code>/<code>"write"</code> in the JSON and save – applied immediately.</p>
+    </div>
+    {% endif %}
+
+    {% if svc.mcp %}
+    <div class="card">
+      <div class="card-head"><h2>MCP server</h2>
+        {{ access('mcp', svc.mcp.access) }}</div>
+      {% if svc.mcp.tools %}
+      <p class="small muted" style="margin-top:-4px">{{ svc.mcp.tools | length }} tools, listed {{ svc.mcp.at_s }} –
+        {{ svc.mcp.counts.read }} read{% if svc.mcp.counts.write %} · {{ svc.mcp.counts.write }} write{% endif %}{% if svc.mcp.counts.destructive %} · {{ svc.mcp.counts.destructive }} destructive{% endif %}</p>
+      <details class="small"{% if svc.mcp.tools | length <= 8 %} open{% endif %}>
+        <summary class="muted">Tools</summary>
+        <table class="table small" style="margin-top:6px">
+          {% for t in svc.mcp.tools %}
+          <tr><td class="mono">{{ t.name }}</td>
+            <td><span class="pill {{ {'read': 'info', 'write': 'accent', 'destructive': 'err'}[t.kind] }}">{{ t.kind }}</span></td>
+            <td class="muted">{{ t.title }}</td></tr>
+          {% endfor %}
+        </table>
+      </details>
+      {% else %}
+      <p class="small muted" style="margin-top:-4px">No tool list yet – it appears after Claude has connected to the server once.</p>
+      {% endif %}
+      <p class="help">Every tool call goes through <code>svc</code>. Tools the server marks read-only (<code>readOnlyHint</code>) run freely;
+        every other tool is a write: <code>read</code> hides and blocks it, <code>write</code> logs it, <code>confirm</code> asks in Approvals first
+        (a tool marked <code>destructiveHint</code> always on its own). Correct the server's marks with <code>"read_tools"</code> / <code>"write_tools"</code>
+        (names or patterns like <code>"get_*"</code>) in the JSON{% if svc.mcp.overrides %} – this service does{% endif %}.</p>
     </div>
     {% endif %}
 

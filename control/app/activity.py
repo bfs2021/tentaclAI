@@ -170,9 +170,9 @@ def use(a):
     return _decision(a)
 
 
-def clean_review(diff="", flags=None):
-    """what svc sends along for the user to review (configuration changes): the diff (≤ 4 KB) and possible-injection
-    findings – shown on the card, never interpreted"""
+def clean_review(diff="", flags=None, risks=None):
+    """what svc sends along for the user to review: the diff of a configuration change (≤ 4 KB), possible-injection
+    findings and risks only svc knows (an MCP tool the server marks destructive) – shown on the card, never interpreted"""
     out = {}
     if isinstance(diff, str) and diff.strip():
         out["diff"] = diff.replace("\r", "")[:4200]
@@ -183,6 +183,10 @@ def clean_review(diff="", flags=None):
         f = [re.sub(r"[\x00-\x1f\x7f]+", " ", str(x))[:80] for x in flags[:5] if str(x).strip()]
         if f:
             out["flags"] = f
+    if isinstance(risks, list):
+        r = [re.sub(r"[\x00-\x1f\x7f]+", " ", str(x))[:80] for x in risks[:5] if str(x).strip()][:3]
+        if r:
+            out["risks"] = r
     return out
 
 
@@ -228,7 +232,7 @@ def create(service, part, action, origin=None, review=None, cid=""):
         a["cid"] = cid
     a["from"] = origin_label(a["origin"])
     if part != "network":
-        a["risks"] = tclib.write_risks(a["part"], a["action"])
+        a["risks"] = (a.get("risks", []) + tclib.write_risks(a["part"], a["action"]))[:4]  # svc's own (clean_review) first
         a["power"] = power(a["service"], a["part"])
     g = active_grant(a["service"], a["part"])
     if g and a.get("risks"):

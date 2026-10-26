@@ -15,6 +15,7 @@
   },
   "mcp": {
     "type": "http",
+    "access": "confirm",
     "url": "${HA_URL}/api/mcp",
     "headers": {
       "Authorization": "Bearer ${HA_TOKEN}"

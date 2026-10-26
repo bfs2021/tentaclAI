@@ -51,6 +51,11 @@ def _stack():
         json.dump({"api": {"base_url": "https://tok.{{DOMAIN}}", "auth": {"type": "basic", "user": "${TOKAPI_KEY}", "password": "${TOKAPI_SECRET}"}}}, f)
     with open(os.path.join(STACK, "services", "_templates", "tokgit.json"), "w") as f:
         json.dump({"git": {"url": "https://git.{{DOMAIN}}/r.git", "auth": {"type": "token", "token": "${TOKAPI_KEY}"}}}, f)
+    os.makedirs(os.path.join(STACK, "data", "control", "mcp-tools"), exist_ok=True)
+    with open(os.path.join(STACK, "data", "control", "mcp-tools", "demoapi.json"), "w") as f:  # svc's MCP proxy writes it
+        json.dump({"at": 1790000000, "tools": [{"name": "get_items", "kind": "read", "title": "List items"},
+                                               {"name": "add_item", "kind": "write"}, {"name": "purge", "kind": "destructive"},
+                                               {"name": "odd", "kind": "admin"}]}, f)
     with open(os.path.join(STACK, "systems", "box.json"), "w") as f:
         json.dump({"description": "Demo server", "ssh_host": "box", "rules": "ask before restarts"}, f)
     with open(os.path.join(STACK, "ssh", "config.d", "box.conf"), "w") as f:

@@ -284,3 +284,41 @@ def test_admin_entries_carry_the_request_id(app_module):
     from app.config import DATA_DIR
     e = [x for x in tclib.audit_read(DATA_DIR, query="cid:feedbeef0001")[0]]
     assert e and e[0]["action"] == "test entry"
+
+
+
+def test_migrate_mcp_access_once(app_module):
+    """MCP tools ran unchecked before svc gated them – existing MCP parts keep working as write (now logged), once"""
+    import glob
+    import os
+    from app import services_store as s
+    old, kept = s.path_of("mcp-old"), s.path_of("mcp-set")
+    with open(old, "w") as f:
+        json.dump({"name": "mcp-old", "mcp": {"type": "http", "url": "x"}}, f)
+    with open(kept, "w") as f:
+        json.dump({"name": "mcp-set", "mcp": {"type": "http", "url": "x", "access": "confirm"}}, f)
+    try:
+        if os.path.exists(s.MCP_MIGRATED):
+            os.remove(s.MCP_MIGRATED)
+        changed = s.migrate_mcp_access()
+        assert "mcp-old" in changed and "mcp-set" not in changed
+        assert json.loads(s.read_raw("mcp-old"))["mcp"]["access"] == "write"
+        assert json.loads(s.read_raw("mcp-set"))["mcp"]["access"] == "confirm"
+        assert len(glob.glob(old + ".bak-*-mcp")) == 1
+        with open(old, "w") as f:  # a new MCP part afterwards: not touched – it reads by default
+            json.dump({"name": "mcp-old", "mcp": {"type": "http", "url": "x"}}, f)
+        assert s.migrate_mcp_access() == [] and "access" not in json.loads(s.read_raw("mcp-old"))["mcp"]
+    finally:
+        for f in glob.glob(old + "*") + glob.glob(kept + "*"):
+            os.remove(f)
+
+
+def test_mcp_risks_from_svc_reach_the_approval(app_module):
+    from app import activity
+    assert activity.clean_review(risks=["destructive tool – the server marks it so", "", 3, "x" * 200, "4th"]) == \
+        {"risks": ["destructive tool – the server marks it so", "3", "x" * 80]}
+    rid = activity.create("demoapi", "mcp", 'wipe {}', review=activity.clean_review(risks=["destructive tool"]))
+    try:
+        assert activity.APPROVALS[rid]["risks"] == ["destructive tool"]
+    finally:
+        activity.decide(rid, False)

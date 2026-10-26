@@ -112,6 +112,8 @@ services:
 EOF
 echo '{"name":"testapi","api":{"base_url":"http://tctest-api:8000","auth":{"type":"bearer","token":"${API_TOKEN}"}}}' > services/testapi.json
 echo '{"name":"testmail","smtp":{"host":"tctest-mail","port":3025,"security":"none","from":"tc@example.com","recipients":["@example.com"],"access":"rw"},"imap":{"host":"tctest-mail","port":3143,"security":"none","user":"alice@example.com","password":"${MAIL_PW}","access":"rw"}}' > services/testmail.json
+echo '{"name":"testmcp","mcp":{"type":"stdio","command":"python3","args":["/usr/local/share/fake_mcp.py"],"access":"confirm"}}' > services/testmcp.json
+echo '{"name":"testmcpro","mcp":{"type":"stdio","command":"python3","args":["/usr/local/share/fake_mcp.py"],"access":"read"}}' > services/testmcpro.json
 echo '{"name":"testdb","db":{"engine":"postgres","host":"tctest-pg","database":"postgres","user":"postgres","password":"${PG_PASSWORD}","ssl":"disable","access":"ro"}}' > services/testdb.json
 echo '{"name":"testdbrw","db":{"engine":"postgres","host":"tctest-pg","database":"postgres","user":"postgres","password":"${PG_PASSWORD}","ssl":"disable","access":"rw"}}' > services/testdbrw.json
 printf 'Host testssh\n    HostName tctest-sshd\n    User deploy\n    Port 2222\n    # tentaclai: access=rw\n' > ssh/config.d/testssh.conf
@@ -241,6 +243,38 @@ IUID="$($C svc mail testmail list 2>/dev/null | grep "$ISUBJ" | awk '{print $1}'
 check "mail: an injection attempt is flagged for Claude" "$($C svc mail testmail read "$IUID" 2>/dev/null | grep -c '⚠ svc: possible prompt injection' || true)" "1"
 check "mail: … and in the audit log" "$(docker exec tctest-claude grep -c '"decision": "flagged"' "$T/data/control/audit.jsonl" 2>/dev/null | grep -v '^0$' >/dev/null && echo yes || echo no)" "yes"
 check "mail: read-only job can't send" "$(J jobro01 'echo x | svc mail testmail send --to alice@example.com --subject ro')" "refused"
+# MCP: every tool call goes through svc's proxy – the stdio server runs as tcrun; reads run, writes wait for approval,
+# a refused call never reaches the server. One proxy session per call set, stdin open until its done file exists.
+docker cp "$SRC/tests/fixtures/fake_mcp.py" tctest-claude:/usr/local/share/fake_mcp.py && docker exec tctest-claude chmod 644 /usr/local/share/fake_mcp.py
+rm -f "$T"/mcp-*.done
+mcp() {  # mcp <service> <name>: JSON-RPC lines from mcp-<name>.in → mcp-<name>.out
+    { cat "$T/mcp-$2.in"; until [ -e "$T/mcp-$2.done" ]; do sleep 0.2; done; } | $CI svc mcp-proxy "$1" > "$T/mcp-$2.out" 2>/dev/null
+}
+rpc() { printf '{"jsonrpc":"2.0","id":%s,"method":"%s","params":%s}\n' "$1" "$2" "${3:-{\}}"; }
+{ rpc 1 initialize; rpc 2 tools/list; } > "$T/mcp-list.in"
+mcp testmcp list & wait_for 20 grep -q '"id":2' "$T/mcp-list.out" || true; touch "$T/mcp-list.done"; wait
+check "mcp: the server is offered all tools (confirm)" "$(grep -o '"name":"[a-z_]*"' "$T/mcp-list.out" | grep -c -e get_state -e turn_on -e wipe)" "3"
+{ rpc 1 initialize; rpc 10 tools/call '{"name":"get_state","arguments":{"entity":"light.x"}}'; rpc 11 tools/call '{"name":"turn_on","arguments":{"entity":"light.x"}}'; } > "$T/mcp-call.in"
+mcp testmcp call & wait_for 20 grep -q '"id":10' "$T/mcp-call.out" || true
+check "mcp: a reading tool runs without approval" "$(grep '"id":10' "$T/mcp-call.out" | grep -c 'did get_state' || true)" "1"
+wait_for 30 sh -c "curl -s -b '$J' http://$IP:8080/partials/approvals | grep -q 'turn_on'" || true
+check "mcp: a write waits for approval with tool and arguments" "$(curl -s -b "$J" "http://$IP:8080/partials/approvals" | grep -c 'turn_on {&#34;entity&#34;: &#34;light.x&#34;}' || true)" "1"
+check "mcp: the stdio server runs as tcrun" "$(docker exec tctest-claude sh -c 'for p in /proc/[0-9]*; do c=$(tr "\0" " " < "$p/cmdline" 2>/dev/null); case "$c" in "python3 /usr/local/share/fake_mcp"*) stat -c %U "$p";; esac; done' | sort -u | tr '\n' ' ')" "tcrun "
+decide approve; wait_for 30 grep -q '"id":11' "$T/mcp-call.out" || true; touch "$T/mcp-call.done"; wait
+check "mcp: … and runs once approved" "$(grep '"id":11' "$T/mcp-call.out" | grep -c 'did turn_on' || true)" "1"
+{ rpc 1 initialize; rpc 12 tools/call '{"name":"wipe","arguments":{}}'; } > "$T/mcp-wipe.in"
+mcp testmcp wipe & wait_for 30 sh -c "curl -s -b '$J' http://$IP:8080/partials/approvals | grep -q 'wipe'" || true
+check "mcp: a destructive tool is marked risky" "$(curl -s -b "$J" "http://$IP:8080/partials/approvals" | grep -c 'destructive tool' || true)" "1"
+decide deny; wait_for 30 grep -q '"id":12' "$T/mcp-wipe.out" || true; touch "$T/mcp-wipe.done"; wait
+check "mcp: a denied call is answered as an error" "$(grep '"id":12' "$T/mcp-wipe.out" | grep '"isError":true' | grep -c 'denied' || true)" "1"
+check "… and never reaches the server" "$(grep -c 'did wipe' "$T/mcp-wipe.out" || true)" "0"
+{ rpc 1 initialize; rpc 2 tools/list; rpc 13 tools/call '{"name":"turn_on","arguments":{}}'; } > "$T/mcp-ro.in"
+mcp testmcpro ro & wait_for 20 grep -q '"id":13' "$T/mcp-ro.out" || true; touch "$T/mcp-ro.done"; wait
+check "mcp read: only the reading tool is offered" "$(grep '"id":2' "$T/mcp-ro.out" | grep -o '"name":"[a-z_]*"' | tr '\n' ' ')" '"name":"get_state" '
+check "mcp read: a write is refused" "$(grep '"id":13' "$T/mcp-ro.out" | grep -c 'is read-only (mcp)' || true)" "1"
+AUDIT="$(docker exec tctest-claude cat "$T/data/control/audit.jsonl" 2>/dev/null || true)"
+check "mcp: the calls are in the audit log" "$(echo "$AUDIT" | grep '"part": "mcp"' | grep -v '"decision": "started"' | grep -o '"decision": "[a-z]*"' | sort | uniq | tr '\n' ' ')" '"decision": "approved" "decision": "blocked" "decision": "denied" "decision": "read" '
+check "mcp: the tool list is kept for tentacontrol" "$(docker exec tctest-control python3 -c "import json; print(' '.join(t['name'] + ':' + t['kind'] for t in json.load(open('/data/mcp-tools/testmcp.json'))['tools']))" 2>&1)" "get_state:read turn_on:write wipe:destructive"
 # jobs from the terminal: svc proposes, the user approves, tentacontrol saves (paused)
 $C sh -c 'printf "%s" "{\"name\": \"T job\", \"prompt\": \"check @testapi\", \"schedule\": {\"kind\": \"manual\"}}" > /tmp/job.json; printf "%s" "{\"name\": \"bad\", \"prompt\": \"p\", \"profile\": \"root\"}" > /tmp/badjob.json'
 $C svc config put job tjob /tmp/job.json > "$T/put-job.out" 2>&1 &
