@@ -26,7 +26,7 @@ EVENTS = {
     "logged_out": ("Claude signed out", "high", "the sandbox is no longer signed in to Claude"),
     "container":  ("Container stopped", "high", "the sandbox or the egress gateway is not running"),
     "update":     ("Update available", "low", "a new tentaclAI release is out"),
-    "quota":      ("Quota running low", "normal", "the Claude session or weekly limit passed 80 %"),
+    "quota":      ("Quota running low", "normal", "the Claude session or weekly limit passed 80 % or was reached – once per window"),
     "signin":     ("Sign-in with a recovery code", "high", "someone signed in to tentacontrol with a 2FA recovery code"),
     "injection":  ("Possible prompt injection", "normal", "content from a service or a tool result looks like it tries to instruct Claude"),
     "job_result": ("Job finding", "normal", "a scheduled Claude job reported something (by its notification rule)"),

@@ -30,6 +30,9 @@ All notable changes, newest first. Every release lists **upgrade steps** from th
 - The Jobs badge and the Jobs page's refresh read the run history only when it changed.
 - Logs → Audit: the outcome is the stored decision (allowed, read, auto …) instead of a plain *ok* – searches for
   `outcome:ok` now only match entries stored as ok (use `-outcome:failed` or the green values); the colours are unchanged.
+- Fix: the quota notification came again and again once a limit was passed – it was keyed by the reset time, which
+  Claude Code prints to the minute, and forgotten on every restart. It now goes out once at 80 % and once at 100 % per
+  limit window (state in `data/control/usage-warned.json`).
 
 ### Upgrade
 - `git pull`, `docker compose build`, `docker compose up -d` – the fail-closed audit is in `svc`, so the sandbox image

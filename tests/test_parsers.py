@@ -89,3 +89,24 @@ def test_session_files_skip_symlinks(app_module, tmp_path):
     finally:
         os.remove(link_file)
         os.remove(link_dir)
+
+
+def test_quota_alerts_once_per_window(app_module):
+    """80 % and 100 % warn once each; a shifting reset time or more percent does not warn again, a new window does"""
+    from app import usage
+    warned = {}
+    lim = lambda pct, resets="3pm": [{"window": "session", "scope": "", "percent": pct, "resets": resets}]
+    assert usage.quota_alerts(lim(50), warned) == []
+    assert [a["percent"] for a in usage.quota_alerts(lim(82), warned)] == [82]
+    assert usage.quota_alerts(lim(90, "2:59pm"), warned) == []
+    assert [a["percent"] for a in usage.quota_alerts(lim(100), warned)] == [100]
+    assert usage.quota_alerts(lim(100, "2:58pm"), warned) == [] and usage.quota_alerts(lim(100), warned) == []
+    assert usage.quota_alerts(lim(3, "8pm"), warned) == [] and warned["session:"] == 0
+    assert len(usage.quota_alerts(lim(85, "8pm"), warned)) == 1
+
+
+def test_check_quota_survives_restart(app_module):
+    from app import usage
+    week = [{"window": "week", "scope": "all models", "percent": 92, "resets": "Oct 29, 7am"}]
+    assert len(usage.check_quota(week)) == 1
+    assert usage.check_quota(week) == []  # state is in DATA_DIR, not in memory

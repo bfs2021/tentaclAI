@@ -200,8 +200,8 @@ async def start_notifications():
 
     async def usage_loop():
         """plan limits every 10 min (no model call), local token totals every 5 min, connectors and skills hourly;
-        quota notification at 80 %"""
-        warned, n = {}, 0
+        quota notification at 80 % and 100 %, once per window"""
+        n = 0
         await asyncio.sleep(20)
         while True:
             try:
@@ -210,13 +210,10 @@ async def start_notifications():
                     await discover_claude()  # hourly
                 if n % 2 == 0 and dockerops.status().get("running") and await asyncio.to_thread(dockerops.logged_in_claude):
                     p = await asyncio.to_thread(usage.refresh_plan)
-                    for lim in p.get("limits", []):
-                        k = f"{lim['window']}:{lim['scope']}"
-                        if lim["percent"] >= 80 and warned.get(k) != lim["resets"]:
-                            name = "session" if lim["window"] == "session" else f"week ({lim['scope'] or 'all models'})"
-                            notify.emit("quota", f"Claude {name}: {lim['percent']} % used", f"Resets {lim['resets']}.",
-                                        key=f"quota:{k}:{lim['resets']}", link=notify.control_link("/usage"))
-                            warned[k] = lim["resets"]
+                    for lim in usage.check_quota(p.get("limits", [])):
+                        name = "session" if lim["window"] == "session" else f"week ({lim['scope'] or 'all models'})"
+                        notify.emit("quota", f"Claude {name}: {lim['percent']} % used", f"Resets {lim['resets']}.",
+                                    key=f"quota:{lim['window']}:{lim['scope']}:{lim['percent'] >= 100}", link=notify.control_link("/usage"))
             except Exception as e:  # noqa: BLE001
                 print(f"usage: {e}", flush=True)
             n += 1

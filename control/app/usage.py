@@ -15,6 +15,7 @@ from .config import DATA_DIR, STACK_DIR
 
 PLAN_CACHE = os.path.join(DATA_DIR, "usage-plan.json")
 LOCAL_CACHE = os.path.join(DATA_DIR, "usage-local.json")
+WARNED = os.path.join(DATA_DIR, "usage-warned.json")
 PROJECTS = os.path.join(STACK_DIR, "data", "claude", ".claude", "projects")
 KEEP_DAYS = 60
 
@@ -70,6 +71,30 @@ def refresh_plan():
 
 def plan():
     return jsonstore.load(PLAN_CACHE)
+
+
+QUOTA_LEVELS = (80, 100)
+
+
+def quota_alerts(limits, warned):
+    """the limits that just crossed a level (80 %, 100 %) – once per window: the level is kept until the usage drops
+    below 80 % again (a new window). Not keyed by the reset time: Claude Code prints it to the minute and it shifts."""
+    alerts = []
+    for lim in limits:
+        k = f"{lim['window']}:{lim['scope']}"
+        level = max((lv for lv in QUOTA_LEVELS if lim["percent"] >= lv), default=0)
+        if level > warned.get(k, 0):
+            alerts.append(lim)
+        warned[k] = max(level, warned.get(k, 0)) if level else 0
+    return alerts
+
+
+def check_quota(limits):
+    """quota_alerts with the state kept in DATA_DIR – a restart of tentacontrol does not warn again"""
+    warned = jsonstore.load(WARNED)
+    alerts = quota_alerts(limits, warned)
+    jsonstore.save(WARNED, warned, indent=None)
+    return alerts
 
 
 def _local():
