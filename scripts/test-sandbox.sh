@@ -275,6 +275,17 @@ check "mcp read: a write is refused" "$(grep '"id":13' "$T/mcp-ro.out" | grep -c
 AUDIT="$(docker exec tctest-claude cat "$T/data/control/audit.jsonl" 2>/dev/null || true)"
 check "mcp: the calls are in the audit log" "$(echo "$AUDIT" | grep '"part": "mcp"' | grep -v '"decision": "started"' | grep -o '"decision": "[a-z]*"' | sort | uniq | tr '\n' ' ')" '"decision": "approved" "decision": "blocked" "decision": "denied" "decision": "read" '
 check "mcp: the tool list is kept for tentacontrol" "$(docker exec tctest-control python3 -c "import json; print(' '.join(t['name'] + ':' + t['kind'] for t in json.load(open('/data/mcp-tools/testmcp.json'))['tools']))" 2>&1)" "get_state:read turn_on:write wipe:destructive"
+# tc-guard: a JPEG Claude reads is no finding, a PDF's text is scanned (hidden white text on page 2)
+for f in clean.pdf injection.pdf; do docker cp "$SRC/tests/fixtures/$f" "tctest-claude:/tmp/$f"; done
+guard() {  # guard <pdf>: the PostToolUse event of a Read of that PDF through tc-guard, as Claude
+    docker exec -i -u claude tctest-claude python3 -c 'import base64, json, sys; print(json.dumps({"tool_name": "Read", "tool_input": {"file_path": "/workspace/" + sys.argv[1]}, "tool_response": {"type": "pdf", "file": {"base64": base64.b64encode(open("/tmp/" + sys.argv[1], "rb").read()).decode()}}}))' "$1" \
+        | docker exec -i -u claude tctest-claude /usr/local/bin/tc-guard
+}
+check "tc-guard: a clean PDF is no finding" "$(guard clean.pdf)" ""
+check "tc-guard: hidden text in a PDF is found" "$(guard injection.pdf | grep -c 'looks like a prompt injection' || true)" "1"
+wait_for 10 sh -c "docker exec tctest-claude grep -q 'PDF page 2' '$T/data/control/audit.jsonl'" || true
+check "… flagged in the audit log with the page" "$(docker exec tctest-claude grep 'PDF page 2' "$T/data/control/audit.jsonl" 2>/dev/null | grep -c '"decision": "flagged"' | grep -v '^0$' >/dev/null && echo yes || echo no)" "yes"
+check "tc-guard: a JPEG is no finding" "$(printf '%s' '{"tool_name": "Read", "tool_input": {"file_path": "/workspace/p.jpg"}, "tool_response": {"type": "image", "file": {"base64": "'"$(head -c 90000 /dev/zero | base64 -w0)"'", "type": "image/jpeg"}}}' | docker exec -i -u claude tctest-claude /usr/local/bin/tc-guard)" ""
 # jobs from the terminal: svc proposes, the user approves, tentacontrol saves (paused)
 $C sh -c 'printf "%s" "{\"name\": \"T job\", \"prompt\": \"check @testapi\", \"schedule\": {\"kind\": \"manual\"}}" > /tmp/job.json; printf "%s" "{\"name\": \"bad\", \"prompt\": \"p\", \"profile\": \"root\"}" > /tmp/badjob.json'
 $C svc config put job tjob /tmp/job.json > "$T/put-job.out" 2>&1 &

@@ -10,6 +10,12 @@ All notable changes, newest first. Every release lists **upgrade steps** from th
   session (or job) and terminal it belongs to, and how many connections wait for the same decision. The audit entry of
   the decision keeps them, plus when it was first requested (`requested` – the entry's time is your decision).
 
+- **PDFs are checked, images no longer flagged:** a JPEG or PNG Claude reads (or an MCP tool returns) is no longer
+  flagged as a *long base64 block* – that was the file itself. A PDF's text is taken out with `pdftotext` (first 50
+  pages, 5 s) and checked page by page for injection attempts, hidden white text included; a finding names the page.
+  A PDF that can't be read gets *PDF text not checked* on its audit entry. Base64 inside text (a mail, a page, `cat`)
+  is still a finding.
+
 ### Changes / fixes
 - Fix: behind a reverse proxy that keeps connections open (nginx-proxy does), a request now and then failed with
   *the server closed the connection* – uvicorn dropped idle connections after 5 s while the proxy reused them for up to
@@ -19,7 +25,8 @@ All notable changes, newest first. Every release lists **upgrade steps** from th
 
 ### Upgrade
 - `git pull`, `docker compose build`, `docker compose up -d` – all three images change (gateway, svc, tentacontrol):
-  recreating `tentaclai` ends running sessions and Remote Control. Nothing else to do.
+  recreating `tentaclai` ends running sessions and Remote Control. The sandbox image now contains `poppler-utils`
+  (`pdftotext`). Nothing else to do.
 
 ## v0.23.0 – 2026-10-26
 

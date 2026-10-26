@@ -15,6 +15,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         openssh-client rsync unzip zip procps iputils-ping dnsutils \
         python3 python3-venv python3-pip make \
         postgresql-client mariadb-client sshpass sudo bash-completion \
+        poppler-utils \
     && ln -s /usr/bin/fdfind /usr/local/bin/fd \
     # GitHub CLI (public data only – the GitHub service goes through svc)
     && install -m 0755 -d /etc/apt/keyrings \

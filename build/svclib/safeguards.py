@@ -173,6 +173,9 @@ def scanned(source, name, part, action, cmd, **kw):
     return rc
 
 
+TOOL_NOTES = ("PDF text not checked",)  # what tc-guard may add to an entry – nothing else is taken from the report
+
+
 def cmd_tool_report(args, services=None):
     """tc-guard (Claude Code's PostToolUse hook, runs as claude) reports a tool call on stdin – audit (+ notification for
     a finding) only. {"tool", "target", "findings": [[reason, excerpt], …]}. Claude could call this itself: the tool name
@@ -190,12 +193,13 @@ def cmd_tool_report(args, services=None):
     findings = [(str(f[0])[:80], str(f[1])) for f in (d.get("findings") or [])
                 if isinstance(f, list) and len(f) == 2 and isinstance(f[0], str) and (f[0] in known or str(f[0]).startswith("hidden text ("))][:5]
     target = guard_text(d.get("target", ""), 200)
+    note = d.get("note") if d.get("note") in TOOL_NOTES else ""
     if findings and guard_on() and guard_note("tool result", tool, "claude", target or "call", findings):
         return 0
     server = tool.split("__")[1] if tool.startswith("mcp__") and tool.count("__") >= 2 else ""
     if server and "mcp" in ((services or {}).get(server) or {}):
         return 0
-    gate.audit(tool, "claude", "", target or "call", "ok")
+    gate.audit(tool, "claude", "", target or "call", "ok", detail=note)
     return 0
 
 

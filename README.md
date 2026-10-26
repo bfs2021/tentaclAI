@@ -440,7 +440,8 @@ What tentaclAI does:
 - **Prompt-injection safeguards** (`INJECTION_GUARD`, on by default): mail and web pages come between untrusted-content
   markers, without hidden text (zero-width/direction/Unicode tag characters, elements hidden by CSS or `hidden`).
   Everything `svc` reads – and, through a Claude Code `PostToolUse` hook in the root-owned managed settings, WebFetch,
-  WebSearch, MCP tools and files Claude reads – is checked for text that tries to instruct an AI. A finding gives Claude
+  WebSearch, MCP tools and files Claude reads, PDFs by their text (`pdftotext`; images are skipped) – is checked for
+  text that tries to instruct an AI. A finding gives Claude
   a warning next to the content, an entry *flagged* in Approvals and a notification. This is a heuristic: hidden
   injections lose their effect and obvious ones are noticed, a well-disguised one can get through. The hard limits stay
   `read`/`confirm`, no secrets in the sandbox, the egress gateway and mail recipient lists – keep writes of tentacles
