@@ -379,3 +379,17 @@ def test_overview_flags_names_that_no_longer_exist(sj, monkeypatch, tmp_path):
     json.dump({"a": {"name": "A", "prompt": "check @mailrelay and @gone", "schedule": {"kind": "manual"}, "profile": "read-only"}},
               open(tmp_path / "jobs.json", "w"))
     assert sj.overview()[0]["unknown"] == ["gone"]
+
+
+def test_svc_calls_name_tentacles_too(sj, monkeypatch, tmp_path):
+    known = dict(KNOWN, mail_root={"kind": "service", "parts": {"imap": "read"}, "enabled": True, "description": ""})
+    prompt = "1. echo x | svc mail mailrelay send --to a@b.c\n2. svc mail mail_root list INBOX; svc ssh nas uptime\n" \
+             "3. svc list, svc mail nobody list and svc imap_x GET / – svc info zuerst"
+    assert sj.named(prompt, known) == ["mailrelay", "mail_root", "nas", "imap_x"]  # unknown words in svc calls ignored
+    assert sj.named("check @nas and svc ssh nas df", known) == ["nas"]
+    err, _ = sj.check_mentions({"prompt": "svc mail mail_root list", "profile": "standard", "scope": True}, known)
+    assert err == []  # an svc call is enough for a limited job
+    monkeypatch.setattr(sj, "ACTIVE", str(tmp_path / "runs.json"))
+    monkeypatch.setattr(sj, "tentacles", lambda: known)
+    sj._register("r1", {"name": "a", "profile": "standard", "scope": True, "prompt": prompt})
+    assert json.load(open(tmp_path / "runs.json"))["r1"]["allow"] == ["mailrelay", "mail_root", "nas", "imap_x"]

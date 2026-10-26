@@ -22,7 +22,8 @@ def _job_page(request, jid=None, job=None):
     return page(request, "job_edit.html", jid=jid, job=job or {}, profiles=scheduled.PROFILES,
                 notify_rules=scheduled.NOTIFY, days=scheduled.DAYS, templates=scheduled.templates(),
                 rw=[x for x in scheduled.rw_tentacles()
-                    if not (job or {}).get("scope") or x.removeprefix("ssh ") in scheduled.mentions(job.get("prompt"))],
+                    if not (job or {}).get("scope") or x.removeprefix("ssh ") in scheduled.named(job.get("prompt"), known)],
+                allowed=scheduled.named((job or {}).get("prompt"), known) if (job or {}).get("scope") else None,
                 efforts=tclib.EFFORTS, warnings=warnings, fmt=lambda ts: time.strftime("%Y-%m-%d %H:%M", time.localtime(ts)),
                 tentacle_list=[{"name": n, "kind": t["kind"], "parts": ", ".join(t["parts"]), "on": t["enabled"]}
                                for n, t in sorted(known.items())])

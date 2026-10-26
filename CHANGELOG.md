@@ -55,6 +55,8 @@ All notable changes, newest first. Every release lists **upgrade steps** from th
 - Renaming a service or SSH host also updates the job tasks that name it (`@name`, `svc … name`); deleting one a
   job names warns, and Jobs marks a job whose task names a tentacle that no longer exists – before, the job only
   failed when it ran.
+- Jobs limited to their tentacles: a tentacle the task calls with `svc` (`svc mail box list`) counts as named, like
+  `@box` – before, only `@name` did and such a call was refused at run time; the editor shows what the job may use.
 - Jobs: the runs the sidebar badge counted are listed on top of the page (*New since your last visit*, with a link to
   each run – also older runs, whose history opens with them marked *new*; *Mark all seen* clears it); before, only each job's latest run was in
   sight.

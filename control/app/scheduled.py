@@ -247,6 +247,8 @@ def templates():
 # ---------------------------------------------------------------- @tentacle mentions
 
 MENTION_RE = re.compile(r"(?<![\w@.])@([a-z0-9][a-z0-9_-]{0,40})\b")
+# a tentacle in an svc call of the task: svc <name> …, svc mail|db|web|files|docker|compose|ssh|info|test <name>, svc git <cmd> <name>
+SVC_CALL_RE = re.compile(r"\bsvc\s+(?:(?:mail|db|web|files|docker|compose|ssh|info|test|git\s+[a-z]+)\s+)?([a-z0-9][a-z0-9_-]{0,40})(?![\w-])")
 
 
 def tentacles():
@@ -272,12 +274,23 @@ def mentions(prompt):
     return seen
 
 
+def named(prompt, known=None):
+    """the tentacles a task names: every @name, plus each existing tentacle it calls with svc (`svc mail box list` names
+    box) – what a job limited to its tentacles may use. From the stored task, which a run can't change"""
+    known = tentacles() if known is None else known
+    out = mentions(prompt)
+    for n in SVC_CALL_RE.findall(prompt or ""):
+        if n in known and n not in out:
+            out.append(n)
+    return out
+
+
 def check_mentions(job, known=None):
     """(errors, warnings) for the tentacles a task names – errors stop the save"""
     known = tentacles() if known is None else known
     errors, warnings = [], []
     ro = job.get("profile", "read-only") != "standard"
-    names = mentions(job.get("prompt"))
+    names = named(job.get("prompt"), known)
     for n in names:
         t = known.get(n)
         if t is None:
@@ -292,7 +305,7 @@ def check_mentions(job, known=None):
             warnings.append(f"@{n} asks for approval ({', '.join(p for p in writes if t['parts'][p] == 'confirm')}) – "
                             "the run waits up to 10 min, at night nobody answers")
     if job.get("scope") and not names:
-        errors.append("“only the tentacles named in the task” needs at least one @name in the task")
+        errors.append("“only the tentacles named in the task” needs at least one @name (or svc call of a tentacle) in the task")
     return errors, warnings
 
 
@@ -300,7 +313,7 @@ def job_mcp_servers(job, known=None):
     """the MCP servers of a read-only or limited job: every enabled service with an mcp part (a limited job: only the
     named ones), each as svc's proxy – which offers a read-only job the reading tools only and refuses the rest"""
     known = tentacles() if known is None else known
-    names = mentions(job.get("prompt")) if job.get("scope") else sorted(known)
+    names = named(job.get("prompt"), known) if job.get("scope") else sorted(known)
     return {"mcpServers": {n: {"type": "stdio", "command": "svc", "args": ["mcp-proxy", n]} for n in names
                            if (known.get(n) or {}).get("enabled") and "mcp" in (known.get(n) or {}).get("parts", {})}}
 
@@ -324,14 +337,15 @@ def rename_mentions(old, new):
 
 def jobs_naming(name):
     """names of the jobs whose task names this tentacle (@name) – a warning when it is deleted"""
-    return [job.get("name") or jid for jid, job in load().items() if name in mentions(job.get("prompt"))]
+    return [job.get("name") or jid for jid, job in load().items()
+            if name in mentions(job.get("prompt")) or name in SVC_CALL_RE.findall(job.get("prompt") or "")]
 
 
 def mention_context(job, known=None):
     """a line per mentioned tentacle for Claude – so it doesn't search the catalog first"""
     known = tentacles() if known is None else known
     lines = []
-    for n in mentions(job.get("prompt")):
+    for n in named(job.get("prompt"), known):
         t = known.get(n)
         if t:
             parts = ", ".join(f"{p} {a}" for p, a in t["parts"].items())
@@ -754,7 +768,7 @@ def _register(run_id, job):
     act = jsonstore.load(ACTIVE) or {}
     act[run_id] = {"job": job["name"], "profile": job.get("profile", "read-only"), "started": time.time()}
     if job.get("scope"):
-        act[run_id]["allow"] = mentions(job.get("prompt"))  # svc refuses every other tentacle
+        act[run_id]["allow"] = named(job.get("prompt"))  # svc refuses every other tentacle
     jsonstore.save(ACTIVE, act, mode=0o600)
 
 
@@ -1209,7 +1223,7 @@ def reach(job, known):
     """what a job may change: (writes without asking, asks first) – from its tentacles' access, the named ones if limited"""
     if job.get("profile") != "standard":
         return [], []
-    names = mentions(job.get("prompt")) if job.get("scope") else list(known)
+    names = named(job.get("prompt"), known) if job.get("scope") else list(known)
     writes, asks = [], []
     for n in names:
         t = known.get(n)

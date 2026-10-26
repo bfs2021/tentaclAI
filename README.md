@@ -487,6 +487,8 @@ log and a faster first setup.
   SSH CA and signs a certificate per call or session, valid for minutes and limited to the host and principal it
   needs; hosts trust the CA once (`TrustedUserCAKeys`), revoking means removing the CA, and every certificate is
   in the audit log.
+- **AI Assist for jobs:** describe what a job should do and Claude drafts it in the editor – task, schedule,
+  profile, the tentacles it names and when to warn – or improves an existing one; you check and save it.
 
 ## License
 

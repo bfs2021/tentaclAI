@@ -958,3 +958,12 @@ def test_jobs_page_lists_what_the_badge_counted(client, app_module, monkeypatch,
     assert "New since your last visit" in client.get("/jobs").text
     jsonstore.save(scheduled.SEEN, {"ts": now - 1000, "since": now - 7200})  # the next visit, later
     assert "New since your last visit" not in client.get("/jobs").text
+
+
+def test_limited_job_editor_shows_what_it_may_use(client, app_module, monkeypatch, tmp_path):
+    from app import scheduled
+    monkeypatch.setattr(scheduled, "JOBS", str(tmp_path / "jobs.json"))
+    jid = scheduled.save({"name": "Mail", "prompt": "svc mail demomail list and @demoapi", "kind": "manual",
+                          "profile": "standard", "scope": "1"})
+    html = client.get(f"/jobs/{jid}").text
+    assert "This job may use: <code>demoapi</code>, <code>demomail</code>" in html
