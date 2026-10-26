@@ -1,8 +1,9 @@
 """Approvals: pending approvals (access mode "confirm") and grants; origin labels for approvals and the audit log
 (Logs → Audit, auditlog.py – network decisions are written from here, svc never sees them).
 
-svc talks to the /internal/* endpoints with the token in data/control/svc-token; approvals live in memory –
-after a restart of tentacontrol, waiting requests end as "error" and svc does not execute them (fail closed).
+svc talks to the /internal/* endpoints with the token in data/control/svc-token. Approvals and grants are kept in
+data/control/approvals.json (0600): a restart of tentacontrol keeps pending requests, decisions not used yet and grants –
+svc keeps waiting through the restart, and a decision is still used only once.
 """
 import asyncio
 import itertools
@@ -13,10 +14,14 @@ import time
 
 import tclib
 
-from . import auditlog, dockerops, notify, sshhosts, usage
+from . import auditlog, dockerops, jsonstore, notify, sshhosts, usage
 from .config import DATA_DIR, SERVICES_DIR
+from .log import get
+
+log = get("approvals")
 
 TOKEN_FILE = os.path.join(DATA_DIR, "svc-token")
+STATE_FILE = os.path.join(DATA_DIR, "approvals.json")
 TIMEOUT = 600
 GRANT_SECONDS = 15 * 60
 NO_GRANT_PARTS = ("config",)  # service files / site rules: every write is approved on its own
@@ -25,6 +30,39 @@ _ids = itertools.count(1)
 BOOT = secrets.token_hex(4)  # ids start at 1 again after a restart – the browser tells the two apart by this
 APPROVALS = {}  # id -> dict
 GRANTS = {}  # (service, part) -> {"until": ts, "by": who} – "Approve + 15 min"
+_TRANSIENT = ("event", "again")  # not kept: the event is made anew on load, "again" is read once by the route
+CID_RE = re.compile(r"[0-9a-f]{12}")
+
+
+def save():
+    """approvals and grants to STATE_FILE – never raises (it carries them across a restart; deciding works without)"""
+    try:
+        jsonstore.save(STATE_FILE, {"next": int(max(APPROVALS, key=int, default="0")) + 1,
+                                    "approvals": [{k: v for k, v in a.items() if k not in _TRANSIENT} for a in APPROVALS.values()],
+                                    "grants": [{"service": s, "part": p, **g} for (s, p), g in GRANTS.items()]},
+                       indent=None, mode=0o600)
+    except (OSError, TypeError, ValueError) as e:
+        log.warning("approvals not saved: %s", e)
+
+
+def load():
+    """at startup: the state of the last run – pending requests keep their age (TIMEOUT counts from their creation)"""
+    global _ids
+    d = jsonstore.load(STATE_FILE)
+    APPROVALS.clear()
+    GRANTS.clear()
+    for a in d.get("approvals", []):
+        if not isinstance(a, dict) or not str(a.get("id", "")).isdigit():
+            continue
+        a["event"] = asyncio.Event()
+        if a.get("status") != "pending":
+            a["event"].set()
+        APPROVALS[str(a["id"])] = a
+    for g in d.get("grants", []):
+        if isinstance(g, dict) and g.get("until", 0) > time.time():
+            GRANTS[(g.get("service", ""), g.get("part", ""))] = {"until": g["until"], "by": g.get("by", "")}
+    _ids = itertools.count(max(int(d.get("next") or 1), int(max(APPROVALS, key=int, default="0")) + 1))
+    _expire()
 
 
 def ensure_token():
@@ -52,15 +90,19 @@ def audit_network(a, decision, detail=""):
 
 
 def _expire():
-    now = time.time()
+    now, changed = time.time(), False
     for a in APPROVALS.values():
         if a["status"] == "pending" and now - a["created"] > TIMEOUT:
             a.update(status="expired", decided=now)
             a["event"].set()
+            changed = True
             audit_network(a, "expired", "no decision in time")
             notify.emit("expired", f"Approval expired: {a['service']}", a["action"], key=f"expired:{a['id']}")
     for k in [k for k, a in APPROVALS.items() if a["status"] != "pending" and now - a.get("decided", now) > 3600]:
         APPROVALS.pop(k, None)
+        changed = True
+    if changed:
+        save()
 
 
 _ORIGIN_KEYS = {"session": r"(cse_[A-Za-z0-9]{10,60}|[0-9a-f-]{36})", "entry": r"[a-z][a-z-]{0,19}", "tmux": r"[A-Za-z0-9._-]{1,40}",
@@ -124,6 +166,7 @@ def use(a):
     if a.get("used"):
         return {"status": "error", "by": "this approval was already used by another call", "approver": "", "grant": ""}
     a["used"] = True
+    save()
     return _decision(a)
 
 
@@ -163,10 +206,11 @@ def power(service, part):
     return ""
 
 
-def create(service, part, action, origin=None, review=None):
+def create(service, part, action, origin=None, review=None, cid=""):
     """new request; approved at once while a grant for this service + part is active – unless the action is risky
     (tclib.write_risks: a grant never covers those); one pending request per network target; the same request again
-    for a session that asks once more after svc handed it back (review: clean_review)"""
+    for a session that asks once more after svc handed it back (review: clean_review; cid: the correlation id of the
+    svc call, in each of its audit entries)"""
     _expire()
     if part == "network":
         same = next((a for a in APPROVALS.values() if a["status"] == "pending" and a["service"] == service and a["part"] == part), None)
@@ -180,6 +224,8 @@ def create(service, part, action, origin=None, review=None):
     rid = str(next(_ids))
     a = {"id": rid, "service": str(service)[:60], "part": str(part)[:20], "action": str(action)[:500],
          "created": time.time(), "status": "pending", "by": "", "event": asyncio.Event(), "origin": o, **(review or {})}
+    if CID_RE.fullmatch(str(cid or "")):
+        a["cid"] = cid
     a["from"] = origin_label(a["origin"])
     if part != "network":
         a["risks"] = tclib.write_risks(a["part"], a["action"])
@@ -193,6 +239,7 @@ def create(service, part, action, origin=None, review=None):
                  grant=f"until {until}")
         a["event"].set()
     APPROVALS[rid] = a
+    save()
     if a["status"] == "pending":
         notify.emit("approval", f"Approval needed: {a['service']} ({a['part']})" + (" ⚠" if a.get("flags") or a.get("risks") else ""),
                     a["action"] + (f"\nFrom: {a['from']}" if a["from"] else "")
@@ -214,6 +261,7 @@ def decide(rid, approve, who="tentacontrol", grant=False, seconds=None, reason="
         a["grant"] = f"{(seconds or GRANT_SECONDS) // 60} min"
         a["by"] = who + f" + {a['grant']}"
     a["event"].set()
+    save()
     return True
 
 
@@ -234,7 +282,9 @@ def grants():
 
 
 def revoke(service, part):
-    return GRANTS.pop((service, part), None) is not None
+    gone = GRANTS.pop((service, part), None) is not None
+    save()
+    return gone
 
 
 async def wait(rid, seconds):

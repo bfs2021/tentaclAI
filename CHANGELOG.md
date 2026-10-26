@@ -30,6 +30,14 @@ All notable changes, newest first. Every release lists **upgrade steps** from th
 - The Jobs badge and the Jobs page's refresh read the run history only when it changed.
 - Logs → Audit: the outcome is the stored decision (allowed, read, auto …) instead of a plain *ok* – searches for
   `outcome:ok` now only match entries stored as ok (use `-outcome:failed` or the green values); the colours are unchanged.
+- Approvals and *Approve + 15 min* grants survive a restart of tentacontrol (`data/control/approvals.json`, 0600): a
+  pending request stays pending, a decision is still used only once, and `svc` keeps waiting while tentacontrol is
+  away (up to 2 minutes) instead of failing.
+- Correlation id: every audit entry of one `svc` call carries the same `cid` (search `cid:<id>`; on the approval card
+  as *call …*), tentacontrol's entries the id of their web request (also the `X-Request-ID` response header).
+- tentacontrol logs through one logger: `LOG_FORMAT=text` (default) or `json` for a log shipper, `LOG_LEVEL`; each
+  line of a web request names its request id.
+- Enterprise page: the managed parts show short names – the details (e.g. *local/CLAUDE.md*) are tooltips.
 - Fix: the quota notification came again and again once a limit was passed – it was keyed by the reset time, which
   Claude Code prints to the minute, and forgotten on every restart. It now goes out once at 80 % and once at 100 % per
   limit window (state in `data/control/usage-warned.json`).
@@ -42,7 +50,11 @@ All notable changes, newest first. Every release lists **upgrade steps** from th
   *enforce* on the Network page once *Seen* has what you need.
 - The audit log gains *started* entries and an `intent` field on results; older entries are read as before. A SIEM or
   script reading `audit.jsonl` directly sees both lines – skip `"decision": "started"` entries whose id a later
-  entry names in `intent`.
+  entry names in `intent`. New entries also carry a `cid` field.
+- Optional new `.env` variables `LOG_FORMAT` (`text`, default) and `LOG_LEVEL` (`info`) – `compose.yaml` passes them to
+  tentacontrol; log lines now start with a timestamp and level (`… WARNING usage: …`). A script grepping
+  `docker logs tentacontrol` for the setup link keeps working.
+- Approvals pending while you upgrade survive the recreation of tentacontrol only from this version on.
 
 ## v0.22.0 – 2026-10-25
 

@@ -12,6 +12,9 @@ from . import jsonstore
 from .central import check_write, locked
 from .config import DATA_DIR
 from .envfile import read_env, update_env
+from .log import get
+
+log = get("notify")
 
 CONFIG = os.path.join(DATA_DIR, "notifications.json")
 
@@ -254,7 +257,7 @@ def emit(event, title, body="", key=None, link=""):
         _last[k] = time.time()
         _queue.put_nowait((event, prio, title, body + (f"\n{link}" if link else ""), [ch["id"] for ch in targets]))
     except Exception as e:  # noqa: BLE001 – a notification must never break the caller
-        print(f"notify: {e}", flush=True)
+        log.warning(f"notify: {e}")
 
 
 def send_now(cid, title, body, prio="normal"):

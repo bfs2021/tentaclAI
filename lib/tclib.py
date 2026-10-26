@@ -990,7 +990,7 @@ AUDIT_CATEGORIES = ("service", "tool", "network", "admin", "auth", "job", "syste
 AUDIT_ACTORS = ("claude", "job", "user", "system")
 SEVERITY = {"err": 3, "warning": 4, "notice": 5, "info": 6}
 AUDIT_ORIGIN = ("session", "entry", "tmux", "by", "job")  # origin_<key>: where a call came from (svc's origin())
-_AUDIT_LIMITS = {"action": 500, "detail": 300, "error": 1000, "service": 120, "part": 20, "mode": 20, "ip": 64, "user": 32, "approver": 40, "grant": 40, "reason": 200}
+_AUDIT_LIMITS = {"action": 500, "detail": 300, "error": 1000, "service": 120, "part": 20, "mode": 20, "ip": 64, "user": 32, "approver": 40, "grant": 40, "reason": 200, "cid": 64}
 
 
 def audit_ts(t=None):
@@ -1138,7 +1138,7 @@ def audit_lines(data_dir, cutoff=0, settled=False):
 
 
 AUDIT_SEARCH = ("action", "service", "part", "detail", "error", "excerpts", "ip", "reason")  # the stored fields words are searched in
-AUDIT_RAW = ("action", "target", "decision", "mode", "ip", "user", "reason")  # search keys whose value is stored as it is
+AUDIT_RAW = ("action", "target", "decision", "mode", "ip", "user", "reason", "cid")  # search keys whose value is stored as it is
 
 
 def _audit_raw_tests(terms):
@@ -1195,10 +1195,10 @@ AUDIT_OUTCOMES = ("ok", "approved", "started", "flagged", "denied", "blocked", "
 AUDIT_FIELDS = ("outcome", "actor", "type", "target", "source", "user", "approver")  # the facets, in this order
 AUDIT_KEYS = {"actor": "actor", "user": "user", "source": "source", "type": "type", "target": "target",
               "action": "action", "outcome": "outcome", "decision": "decision", "mode": "mode", "ip": "ip", "approver": "approver", "grant": "grant",
-              "reason": "reason",
+              "reason": "reason", "cid": "cid",
               "category": "type", "service": "target"}  # search keys (category/service: the stored names)
 AUDIT_SEARCH_KEYS = ("actor", "user", "source", "type", "target", "action", "outcome", "decision", "mode", "ip", "approver",
-                     "grant", "reason")  # the search keys to name in a hint (without the stored aliases)
+                     "grant", "reason", "cid")  # the search keys to name in a hint (without the stored aliases)
 _AUDIT_TOKEN = re.compile(r'(-?)([A-Za-z_]+):"([^"]*)"|(-?)([A-Za-z_]+):(\S+)|(-?)"([^"]*)"|(-?)(\S+)')
 
 
@@ -1257,12 +1257,13 @@ def audit_approval(e):
 
 def audit_view(e, source=None):
     """the fields of the page and the CSV: time, actor, user, source, type, target, action, outcome (+ approver, grant,
-    the reason of a denial)"""
+    the reason of a denial, cid – the correlation id: one svc call, or one request in tentacontrol)"""
     approver, grant = audit_approval(e)
     return {"approver": approver, "grant": grant, "time": e.get("ts", ""), "actor": e.get("actor", ""), "user": e.get("user", ""),
             "source": (source or audit_source)(e) or "", "type": AUDIT_TYPES.get(e.get("category"), e.get("category", "")),
             "target": str(e.get("service", "")), "action": str(e.get("action", "")), "outcome": audit_outcome(e),
-            "decision": e.get("decision", ""), "mode": e.get("mode", ""), "ip": e.get("ip", ""), "reason": e.get("reason", "")}
+            "decision": e.get("decision", ""), "mode": e.get("mode", ""), "ip": e.get("ip", ""), "reason": e.get("reason", ""),
+            "cid": e.get("cid", "")}
 
 
 def audit_query(text):

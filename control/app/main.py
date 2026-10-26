@@ -16,6 +16,9 @@ from .config import SSH_DIR
 from .envfile import read_env
 from .routes import backup, central as central_routes, claude, jobs, network, settings, ssh, system, tentacles
 from .web import BASE, TC_VERSION, page, templates
+from .log import REQUEST_ID, get, request_id
+
+log = get("main")
 
 
 @contextlib.asynccontextmanager
@@ -115,16 +118,27 @@ async def secure_cookie(request: Request, call_next):
     return response
 
 
+@app.middleware("http")
+async def tag_request(request: Request, call_next):
+    """outermost (added last): the request id for the log lines and the audit entries of this request (cid), sent back as X-Request-ID"""
+    rid = request_id(request.headers.get("x-request-id", ""))
+    token = REQUEST_ID.set(rid)
+    try:
+        response = await call_next(request)
+    finally:
+        REQUEST_ID.reset(token)
+    response.headers["X-Request-ID"] = rid
+    return response
+
+
 async def migrate():
     """one-time adjustments of an existing installation"""
     if auth.migrate():
-        print("migration: admin password → account (data/control/users.json) – set username and email at the next sign-in",
-              flush=True)
+        log.info("migration: admin password → account (data/control/users.json) – set username and email at the next sign-in")
     services = services_store.migrate_access()
     hosts = tclib.ssh_migrate_access(os.path.join(SSH_DIR, "config.d"))
     if services or hosts:
-        print(f"migration: access ro/rw → read/write in {', '.join(services + hosts)} (backups: *.bak-*-access)",
-              flush=True)
+        log.info(f"migration: access ro/rw → read/write in {', '.join(services + hosts)} (backups: *.bak-*-access)")
 
 
 async def refresh_builtin_jobs():
@@ -132,14 +146,15 @@ async def refresh_builtin_jobs():
     try:
         updated = await asyncio.to_thread(scheduled.refresh_builtins)
     except (ValueError, OSError) as e:
-        print(f"built-in jobs: {e}", flush=True)
+        log.warning(f"built-in jobs: {e}")
         return
     if updated:
-        print(f"built-in jobs: task updated – {', '.join(updated)}", flush=True)
+        log.info(f"built-in jobs: task updated – {', '.join(updated)}")
 
 
 async def prepare_activity():
     activity.ensure_token()
+    activity.load()
 
 
 async def start_audit():
@@ -194,7 +209,7 @@ async def start_notifications():
                     notify.emit("update", f"tentaclAI {up['latest']} is available", up.get("url", ""), key=f"update:{up['latest']}")
                     state["update"] = up.get("latest")
             except Exception as e:  # noqa: BLE001
-                print(f"notify watch: {e}", flush=True)
+                log.warning(f"notify watch: {e}")
             await asyncio.sleep(60)
     loop.create_task(watch())
 
@@ -215,7 +230,7 @@ async def start_notifications():
                         notify.emit("quota", f"Claude {name}: {lim['percent']} % used", f"Resets {lim['resets']}.",
                                     key=f"quota:{lim['window']}:{lim['scope']}:{lim['percent'] >= 100}", link=notify.control_link("/usage"))
             except Exception as e:  # noqa: BLE001
-                print(f"usage: {e}", flush=True)
+                log.warning(f"usage: {e}")
             n += 1
             await asyncio.sleep(300)
     loop.create_task(usage_loop())
@@ -255,7 +270,7 @@ async def start_extensions():
                         else:
                             await asyncio.to_thread(t["fn"])
                     except Exception as e:  # noqa: BLE001
-                        print(f"extension {t['ext']}: task {getattr(t['fn'], '__name__', '?')}: {e}", flush=True)
+                        log.warning(f"extension {t['ext']}: task {getattr(t['fn'], '__name__', '?')}: {e}")
                 await asyncio.sleep(t["every"])
         return task()
     for t in extensions.tasks():

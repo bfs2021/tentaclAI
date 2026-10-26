@@ -282,7 +282,10 @@ backup) and only writes the new ones. An unknown value counts as `read`.
 Everything lands in the **audit log** (tentacontrol → Logs → Audit, or `svc audit` in the sandbox): Claude's tool calls,
 every `svc` command (reads and writes, approvals, blocked attempts), network connections, jobs, your changes and
 sign-ins in tentacontrol – with a search line (`actor:claude outcome:denied docker`), filters with counts per field,
-a histogram over time, details per entry and CSV / JSON-lines export; secrets are never logged.
+a histogram over time, details per entry and CSV / JSON-lines export; secrets are never logged. Every entry carries a
+correlation id (`cid`): all entries of one `svc` call (its *started* entry, the result, the approval card) share one,
+and so do all entries of one request in tentacontrol – `cid:<id>` finds them. Pending approvals and grants survive a
+restart of tentacontrol (`data/control/approvals.json`); a waiting `svc` call keeps waiting through it.
 
 A part stays inactive while one of its `${VAR}`s is empty; `"enabled": false` parks the whole service.
 
@@ -315,6 +318,7 @@ SSH hosts: tentacontrol → Tentacles → SSH hosts, or `./ssh-host.sh list|add|
 | `CLAUDE_TELEMETRY` | `true` allows Claude Code's telemetry, error reports and `/bug` (default: off) |
 | `UPDATE_CHECK`, `UPDATE_REPO` | release check every 6 h (`false` = no requests), repository to check (default `mwaldegg/tentaclai`) |
 | `NOTIFY_URL_<ID>` | URL of a notification channel (written by Settings → Notifications) |
+| `LOG_FORMAT`, `LOG_LEVEL` | tentacontrol's container log: `text` (default) or `json` (one object per line with `ts`, `level`, `logger`, `msg`, `request_id` – for a log shipper); `info` (default), `debug`, `warning`, `error`. Each web request gets an id (the proxy's `X-Request-ID`, or a new one), sent back as `X-Request-ID` and stored as `cid` in its audit entries |
 | everything else | service credentials, referenced as `${VAR}` |
 
 <details>

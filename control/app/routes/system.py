@@ -13,6 +13,9 @@ from ..config import CLAUDE_SERVICE, COMPOSE, LOG_CONTAINERS
 from ..envfile import read_env, update_env
 from ..terminal import PROFILES, bridge, onboard_cmd
 from ..web import BASE, TC_VERSION, client_ip, page, respond, templates, toast
+from ..log import get
+
+log = get("system")
 import tclib  # noqa: E402  shared with the sandbox tools
 
 router = APIRouter()
@@ -59,7 +62,7 @@ async def setup_save(request: Request, token: str = Form(""), username: str = Fo
     try:  # a new installation: the built-in jobs (paused) – an existing one is never given jobs on an update
         await asyncio.to_thread(scheduled.create_builtins)
     except (ValueError, OSError) as e:
-        print(f"built-in jobs not created: {e}", flush=True)
+        log.warning(f"built-in jobs not created: {e}")
     return RedirectResponse("/", status_code=303)
 
 

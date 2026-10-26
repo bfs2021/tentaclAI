@@ -25,6 +25,9 @@ import tclib
 from . import auditlog, dockerops, jsonstore, knowledge, models, notify
 from .central import check_write
 from .config import CLAUDE_CONTAINER, DATA_DIR
+from .log import get
+
+log = get("jobs")
 
 JOBS = os.path.join(DATA_DIR, "jobs.json")
 HISTORY = os.path.join(DATA_DIR, "job-history.json")
@@ -1006,7 +1009,7 @@ async def worker():
         try:
             await asyncio.to_thread(execute, run_id, jid)
         except Exception as e:  # noqa: BLE001 – one broken run must not stop the runner
-            print(f"jobs: {e}", flush=True)
+            log.warning(f"jobs: {e}")
             _update_run(run_id, status="failed", error=str(e)[:300], ended=time.time())
 
 
@@ -1052,7 +1055,7 @@ async def scheduler():
                     except ValueError as e:
                         _skip(jid, str(e))
         except Exception as e:  # noqa: BLE001
-            print(f"jobs scheduler: {e}", flush=True)
+            log.warning(f"jobs scheduler: {e}")
         await asyncio.sleep(30)
 
 

@@ -18,7 +18,9 @@ tentaclAI = sandbox + service gateway for Claude Code. Three containers (`compos
   In both networks; network rules in `data/control/egress-rules.json` (`control/app/egress.py`). `main.py` holds the
   app, middleware and background loops; pages and endpoints live in `routes/` (one router per area: `system`,
   `tentacles`, `ssh`, `network`, `settings`, `backup`, `claude`, `jobs`), shared helpers (`page`, `respond`, the *Apply now* hint) in `web.py`,
-  small JSON state files go through `jsonstore.py`. Accounts (`data/control/users.json`: username, email, name, bcrypt
+  small JSON state files go through `jsonstore.py`. Log lines go through `log.get("<area>")` (`log.py`: text or JSON
+  per `LOG_FORMAT`, with the request id), never `print` – except the setup link, which scripts grep for. Approvals and
+  grants (`activity.py`) are kept in `data/control/approvals.json` – call `save()` after every change of them. Accounts (`data/control/users.json`: username, email, name, bcrypt
   hash, role; Community has one admin, the list leaves room for more) and sessions are `auth.py` – the session holds the
   account's id, `auth.username(request)` names the user in the audit log and on approvals. The audit log: format, files, rotation, search, export and the RFC 5424
   formatter, and the search (`audit_query`, `audit_view` – the field names of page, facets and CSV –, `audit_facets`,
@@ -69,7 +71,8 @@ architecture and `CONTRIBUTING.md` for the ground rules.
 - **Guard rails stay intact:** `svc` enforces `read`/`write`/`confirm`, secrets never go into argv, logs, the UI or Claude's context.
   Every write goes through `guarded()` in svc: it logs *started* (`audit(…, strict=True)` – fail closed) before the
   write and the result with `intent=<that id>`; readers use `tclib.audit_read`/`audit_lines(settled=True)`, which hide
-  a settled *started* entry. Risk hints for approvals are `tclib.write_risks` – a grant never covers a risky write.
+  a settled *started* entry. Every entry of one svc call carries its `cid` (`CID` in svc, also sent with the approval
+  request); tentacontrol's entries get the request id (`auditlog.write`). Risk hints for approvals are `tclib.write_risks` – a grant never covers a risky write.
 - **Privilege separation:** Claude runs as user `claude`, `svc`/`tc-scan` as root via sudo, client tools as `tcrun`
   (`runner()` in svc). Code running as root must never read, write or run git in paths Claude controls (workspace, its
   home) – hand files over as the other user (`as_user`, `write_as_claude`, staging dirs) and never pass Claude's

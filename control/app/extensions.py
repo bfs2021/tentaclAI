@@ -28,6 +28,9 @@ from jinja2 import ChoiceLoader, FileSystemLoader, PrefixLoader
 from . import jsonstore
 from .central import check_write
 from .config import DATA_DIR, STACK_DIR
+from .log import get
+
+log = get("extensions")
 
 API_VERSION = 1
 NAME_RE = re.compile(r"^[a-z][a-z0-9_]{1,40}$")
@@ -132,17 +135,17 @@ def _manifest(path, name, origin_):
     return info
 
 
-def _discover(log=False, packages_too=True):
+def _discover(say=False, packages_too=True):
     """builtin, package and local extensions by their manifests – first one wins: builtin, then installed packages
-    (checked: signed or not, unchanged), then local/extensions (log: say so)"""
+    (checked: signed or not, unchanged), then local/extensions (say: log what is ignored)"""
     from . import packages
     out = {}
     for origin_, base in (("builtin", BUILTIN_DIR), ("package", packages.PACKAGES_DIR), ("local", LOCAL_DIR)):
         if origin_ == "package":
             for name in packages.names() if packages_too else ():
                 if name in out:
-                    if log:
-                        print(f"tentacontrol: package {name} ignored – a built-in module has that name", flush=True)
+                    if say:
+                        log.warning(f"package {name} ignored – a built-in module has that name")
                     continue
                 v = packages.verify_installed(name)
                 info = _manifest(v["path"], name, "signed" if v["signed"] else "local")
@@ -160,8 +163,8 @@ def _discover(log=False, packages_too=True):
             if not os.path.isdir(path) or name.startswith((".", "_")) or name == "__pycache__":
                 continue
             if name in out:
-                if log:
-                    print(f"tentacontrol: extension {name} in {base} ignored – a built-in one or a package has that name", flush=True)
+                if say:
+                    log.warning(f"extension {name} in {base} ignored – a built-in one or a package has that name")
                 continue
             info = _manifest(path, name, origin_)
             if not NAME_RE.match(name):
@@ -408,7 +411,7 @@ def load(app, templates):
                 FAILED[name] = f"import failed: {e}"
                 _exts[name] = {"name": name, "origin": "configured", "title": name, "description": "", "version": "",
                                "author": "", "homepage": "", "path": ""}
-                print(f"tentacontrol: extension {name} failed to import: {e}", flush=True)
+                log.warning(f"extension {name} failed to import: {e}")
                 _audit(name, f"extension not loaded: import failed: {e}"[:300], "failed")
             continue
         _exts[name] = {"name": name, "origin": "configured", "title": getattr(mod, "TITLE", name),
@@ -416,9 +419,9 @@ def load(app, templates):
                        "author": "", "homepage": "", "path": os.path.dirname(getattr(mod, "__file__", "") or "")}
         _load_one(app, templates, name, "configured", lambda m=mod: m)
     on = enabled()
-    for name, info in _discover(log=True).items():
+    for name, info in _discover(say=True).items():
         if origin(name) == "configured":
-            print(f"tentacontrol: extension {name} skipped – an extension from TC_EXTENSIONS has that name", flush=True)
+            log.warning(f"extension {name} skipped – an extension from TC_EXTENSIONS has that name")
             continue
         if name in LOADED:
             continue
@@ -430,7 +433,7 @@ def load(app, templates):
             continue  # a package that fails its check is reported even when it is off
         if info["error"]:
             FAILED[name] = info["error"]
-            print(f"tentacontrol: extension {name} not loaded: {info['error']}", flush=True)
+            log.warning(f"extension {name} not loaded: {info['error']}")
             _audit(name, f"extension not loaded: {info['error']}"[:300], "failed")
             continue
         _load_one(app, templates, name, info["origin"], lambda n=name, p=info["path"]: _import_package(n, p))
@@ -442,11 +445,11 @@ def _load_one(app, templates, name, origin_, importer):
         _register(app, templates, name, origin_, mod)
     except Exception as e:  # noqa: BLE001 – a broken extension must not take tentacontrol down
         FAILED[name] = str(e) if isinstance(e, ExtensionError) else f"{type(e).__name__}: {e}"
-        print(f"tentacontrol: extension {name} failed to register:\n{traceback.format_exc()}", flush=True)
+        log.warning(f"extension {name} failed to register:\n{traceback.format_exc()}")
         _audit(name, f"extension not loaded: {FAILED[name]}"[:300], "failed")
         return
     LOADED.append(name)
-    print(f"tentacontrol: extension {name} loaded ({origin_})", flush=True)
+    log.info(f"extension {name} loaded ({origin_})")
     _audit(name, f"extension loaded ({ORIGINS[origin_]})")
 
 
@@ -505,7 +508,7 @@ def banners(request):
         try:
             r = b["fn"](request)
         except Exception as e:  # noqa: BLE001
-            print(f"extension {b['ext']}: banner: {e}", flush=True)
+            log.warning(f"extension {b['ext']}: banner: {e}")
             continue
         if isinstance(r, dict) and r.get("text"):
             out.append({"text": str(r["text"]), "kind": r.get("kind") if r.get("kind") in ("info", "warn", "err") else "info",

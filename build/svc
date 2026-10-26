@@ -265,6 +265,7 @@ def stage_dir(owner=None):
 # ---------- loading ----------
 
 ENV = {}  # values for ${VAR}: the container environment, overridden by the stack's .env
+CID = os.urandom(6).hex()  # correlation id of this call: in each of its audit entries and its approval request
 
 
 def load_env_file():
@@ -2294,7 +2295,7 @@ def audit(service, part, mode, action, decision, rc=None, duration=None, detail=
     entry = tclib.audit_entry(category, service, action, decision, part=part, mode=mode, origin=origin(),
                               exit=rc, seconds=None if duration is None else round(duration, 1), detail=detail, error=error,
                               excerpts=[{"reason": r, "text": x} for r, x in (excerpts or [])], approver=approver, grant=grant,
-                              reason=reason, intent=intent)
+                              reason=reason, intent=intent, cid=CID)
     try:
         tclib.audit_write(AUDIT_DIR, entry)
     except OSError as e:
@@ -2319,6 +2320,7 @@ def _control(method, path, payload=None, timeout=40):
         return json.load(r)
 
 
+CONTROL_GONE = 120  # seconds svc keeps waiting for an approval while tentacontrol does not answer (a restart)
 HANDOFF_EXIT = 75  # EX_TEMPFAIL: the approval is still pending, run the same command again to keep waiting
 
 
@@ -2330,7 +2332,7 @@ def request_approval(service, part, action, interactive=False, review=None):
     same request back to the same session (pending, or decided and not used yet)."""
     try:
         res = _control("POST", "/internal/approvals", {"service": service, "part": part, "action": action, "origin": origin(),
-                                                      **(review or {})})
+                                                      "cid": CID, **(review or {})})
         rid = res["id"]
     except Exception as e:  # noqa: BLE001
         return "error", f"tentacontrol not reachable: {e}", {}
@@ -2346,7 +2348,7 @@ def request_approval(service, part, action, interactive=False, review=None):
               file=sys.stderr, flush=True)
     start = time.time()
     end = start + APPROVAL_TIMEOUT + 30
-    reminded = start
+    reminded, lost = start, 0
     while time.time() < end:
         if handoff and not res.get("again") and time.time() - start >= handoff:
             return "handoff", where, {}
@@ -2356,8 +2358,13 @@ def request_approval(service, part, action, interactive=False, review=None):
         try:
             st = _control("GET", f"/internal/approvals/{rid}?wait={min(25, handoff) if handoff and not res.get('again') else 25}",
                           timeout=40)
-        except Exception as e:  # noqa: BLE001
-            return "error", f"tentacontrol not reachable: {e}", {}
+            lost = 0
+        except Exception as e:  # noqa: BLE001 – tentacontrol restarting: it keeps the request, keep asking for a while
+            lost = lost or time.time()
+            if time.time() - lost > CONTROL_GONE:
+                return "error", f"tentacontrol not reachable: {e}", {}
+            time.sleep(3)
+            continue
         if st.get("status") != "pending":
             return st.get("status", "error"), st.get("by", ""), _who(st)
     return "expired", "", {}

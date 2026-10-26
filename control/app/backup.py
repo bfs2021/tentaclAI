@@ -17,6 +17,9 @@ from . import claude_files, egress, extensions, jsonstore, notify, scheduled, se
 from .central import check_write
 from .config import DATA_DIR, SERVICES_DIR, SETTINGS_GROUPS, STACK_DIR, SYSTEMS_DIR, is_secret
 from .envfile import read_env, update_env
+from .log import get
+
+log = get("backup")
 
 FORMAT, VERSION = "tentaclai-export", 1
 MAX_SIZE = 2 * 1024 * 1024
@@ -127,7 +130,7 @@ def export(parts=None):
             try:
                 doc[sid] = p["export"]()
             except Exception as e:  # noqa: BLE001 – an extension's part must not break the export
-                print(f"extension {p['ext']}: backup export: {e}", flush=True)
+                log.warning(f"extension {p['ext']}: backup export: {e}")
     needed = set()
     for data in doc.get("services", {}).values():
         needed |= tclib.variables({k: v for k, v in data.items() if k in tclib.PARTS})

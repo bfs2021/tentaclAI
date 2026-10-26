@@ -13,18 +13,23 @@ import tclib
 from . import jsonstore
 from .config import DATA_DIR
 from .envfile import read_env
+from .log import REQUEST_ID, get
+
+log = get("audit")
 
 FLAGS_SEEN = os.path.join(DATA_DIR, "flags-seen.json")
 PAGE = 200
 
 
 def write(category, service, action, decision="ok", actor="", part="", mode="", origin=None, **extra):
-    """one entry from tentacontrol – never raises (the audit must not break what it records)"""
+    """one entry from tentacontrol – never raises (the audit must not break what it records); cid: the id of the web
+    request it belongs to, unless given"""
+    extra.setdefault("cid", REQUEST_ID.get())
     try:
         tclib.audit_write(DATA_DIR, tclib.audit_entry(category, service, action, decision, actor=actor, part=part, mode=mode,
                                                       origin=origin, **extra))
     except Exception as e:  # noqa: BLE001
-        print(f"audit log not writable: {e}", flush=True)
+        log.warning(f"audit log not writable: {e}")
 
 
 def user(request, category, service, action, decision="ok", user=None, **extra):
@@ -191,7 +196,7 @@ def prune():
     days = max(tclib.audit_retention(read_env()), central.retention_floor())  # keep what the central server lacks
     n = tclib.audit_prune(DATA_DIR, days)
     if n:
-        print(f"audit log: {n} archive file(s) older than the retention removed", flush=True)
+        log.info(f"audit log: {n} archive file(s) older than the retention removed")
 
 
 class Follower:
@@ -270,7 +275,7 @@ async def follow_loop(hooks, every=2):
                 try:
                     fn(dict(e))
                 except Exception as err:  # noqa: BLE001
-                    print(f"extension {name}: on_audit: {err}", flush=True)
+                    log.warning(f"extension {name}: on_audit: {err}")
     f = Follower()
     while True:
         try:
@@ -278,7 +283,7 @@ async def follow_loop(hooks, every=2):
             if entries:
                 await asyncio.to_thread(deliver, entries)
         except Exception as e:  # noqa: BLE001
-            print(f"audit follower: {e}", flush=True)
+            log.warning(f"audit follower: {e}")
         await asyncio.sleep(every)
 
 
@@ -287,5 +292,5 @@ async def prune_loop():
         try:
             await asyncio.to_thread(prune)
         except Exception as e:  # noqa: BLE001
-            print(f"audit prune: {e}", flush=True)
+            log.warning(f"audit prune: {e}")
         await asyncio.sleep(6 * 3600)

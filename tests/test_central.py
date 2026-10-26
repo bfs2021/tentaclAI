@@ -121,6 +121,7 @@ def test_enroll_and_leave(fc, client):
         central.enroll(fc.code("tok-1"), "x", [])
     html = client.get("/central").text
     assert "Test Central" in html and "A-0001" in html and "Leave" in html and "connected" in html
+    assert "Features (hide" not in html and "(local/CLAUDE.md)" not in html and 'title="hide parts of tentacontrol"' in html  # details as tooltips
     nav = client.get("/settings").text
     assert 'title="Managed by Test Central"' in nav and "dot ok nav-dot" in nav and 'href="/central" class="active' not in nav
     assert 'class="edition ee"' in nav and "★ Enterprise" in nav and 'class="edition cm"' not in nav and "Long arms" not in nav

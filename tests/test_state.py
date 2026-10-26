@@ -228,3 +228,59 @@ def test_rename_follows_mail_calls(app_module):
         for n in ("mbox", "mbox_home"):
             if os.path.exists(services_store.path_of(n)):
                 os.remove(services_store.path_of(n))
+
+
+def test_approvals_survive_a_restart(app_module, monkeypatch):
+    """pending requests, their correlation id, a decision not used yet and grants come back after a restart (load);
+    a used decision stays used, ids go on counting"""
+    import asyncio
+    from app import activity
+    monkeypatch.setattr(activity, "APPROVALS", {})
+    monkeypatch.setattr(activity, "GRANTS", {})
+    waiting = activity.create("demohost", "docker", "docker restart x", cid="0123456789ab")
+    decided = activity.create("demohost", "docker", "docker restart y", cid="not a cid")
+    activity.decide(decided, True, who="admin", grant=True)
+    used = activity.create("demohost", "ssh", "reboot")
+    activity.decide(used, True)
+    activity.use(activity.APPROVALS[used])
+    activity.APPROVALS.clear()
+    activity.GRANTS.clear()
+    activity.load()
+    assert activity.APPROVALS[waiting]["status"] == "pending" and activity.APPROVALS[waiting]["cid"] == "0123456789ab"
+    assert "cid" not in activity.APPROVALS[decided]
+    assert asyncio.run(activity.wait(decided, 1))["status"] == "approved"
+    assert asyncio.run(activity.wait(used, 1))["status"] == "error"  # used before the restart – runs nothing
+    assert activity.active_grant("demohost", "docker")["by"] == "admin"
+    assert int(activity.create("demohost", "docker", "docker restart z")) > int(used)
+    assert oct(os.stat(activity.STATE_FILE).st_mode & 0o777) == "0o600"
+
+
+def test_log_lines_carry_the_request_id(app_module, client):
+    import json
+    import logging
+    from app import log
+    rec = logging.LogRecord("tentacontrol.demo", logging.WARNING, "", 0, "something %s", ("broke",), None)
+    tok = log.REQUEST_ID.set("abcdef123456")
+    try:
+        line = json.loads(log.Formatter(as_json=True).format(rec))
+        text = log.Formatter().format(rec)
+    finally:
+        log.REQUEST_ID.reset(tok)
+    assert (line["level"], line["logger"], line["msg"], line["request_id"]) == ("warning", "tentacontrol.demo", "something broke", "abcdef123456")
+    assert "WARNING demo: something broke [req abcdef123456]" in text
+    assert log.request_id("bad id!") != "bad id!" and log.request_id("proxy-1234-abcd") == "proxy-1234-abcd"
+    r = client.get("/healthz", headers={"X-Request-ID": "proxy-1234-abcd"})
+    assert r.headers["x-request-id"] == "proxy-1234-abcd"
+
+
+def test_admin_entries_carry_the_request_id(app_module):
+    from app import auditlog, log
+    tok = log.REQUEST_ID.set("feedbeef0001")
+    try:
+        auditlog.write("admin", "demo", "test entry", actor="user")
+    finally:
+        log.REQUEST_ID.reset(tok)
+    import tclib
+    from app.config import DATA_DIR
+    e = [x for x in tclib.audit_read(DATA_DIR, query="cid:feedbeef0001")[0]]
+    assert e and e[0]["action"] == "test entry"

@@ -15,6 +15,7 @@ import contextlib
 import hashlib
 import json
 import os
+import re
 import secrets
 import socket
 import ssl
@@ -28,6 +29,9 @@ from cryptography.exceptions import InvalidSignature
 
 from . import jsonstore
 from .config import DATA_DIR
+from .log import get
+
+log = get("central")
 
 DIR = os.path.join(DATA_DIR, "central")
 KEY_FILE = os.path.join(DIR, "agent.key")
@@ -70,11 +74,25 @@ def canonical(obj):
     return json.dumps(obj, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode()
 
 
-def areas():
-    """what a server may manage: the parts of the export, modules, and which features of tentacontrol show"""
+def _areas():
     from .backup import SECTIONS
-    return dict(SECTIONS, modules="Modules", features="Features (hide parts of tentacontrol)",
-                signin="Sign-in")
+    return dict(SECTIONS, modules="Modules", features="Features (hide parts of tentacontrol)", signin="Sign-in")
+
+
+def short_label(label):
+    """("Site rules", "local/CLAUDE.md") from "Site rules (local/CLAUDE.md)" – the part in brackets is a tooltip"""
+    m = re.fullmatch(r"(.+?) \((.+)\)", label)
+    return (m.group(1), m.group(2)) if m else (label, "")
+
+
+def areas():
+    """what a server may manage: the parts of the export, modules, and which features of tentacontrol show – short labels
+    (the details: area_hints)"""
+    return {k: short_label(v)[0] for k, v in _areas().items()}
+
+
+def area_hints():
+    return {k: short_label(v)[1] for k, v in _areas().items() if short_label(v)[1]}
 
 
 # features a profile can hide here: label, the paths they live under (the page, its actions, its partials)
@@ -881,7 +899,7 @@ async def loop():
             except CentralError:
                 pass
             except Exception as e:  # noqa: BLE001 – never end the loop
-                print(f"central: sync failed: {e}", flush=True)
+                log.warning(f"central: sync failed: {e}")
                 _update(last_error=f"internal error: {e}")
         await asyncio.sleep(INTERVAL)
 
@@ -923,9 +941,9 @@ def view():
         return time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(ts)) if ts else ""
     _, waiting = _unsent(1) if st.get("agent_id") else ([], False)
     return {"enrolled": bool(st.get("agent_id")), "revoked": bool(st.get("revoked")), "st": st, "profile": prof,
-            "locks": sorted(locks()), "areas": areas(), "ca": os.path.isfile(CA_FILE), "nav": nav_status(),
+            "locks": sorted(locks()), "areas": areas(), "area_hints": area_hints(), "ca": os.path.isfile(CA_FILE), "nav": nav_status(),
             "last_ok": fmt(st.get("last_ok")), "enrolled_at": fmt(st.get("enrolled")), "profile_at": fmt(st.get("profile_at")),
             "audit_waiting": bool(waiting), "jobs": sorted(managed_jobs()) if st.get("agent_id") else [],
-            "hidden": [FEATURES[k][0] for k in sorted(hidden_features())], "banner": banner(),
+            "hidden": [short_label(FEATURES[k][0]) for k in sorted(hidden_features())], "banner": banner(),
             "protected": tamper_protected(), "areas_locked": areas_locked(), "areas_all": areas_all(),
             "sign_in_policy": sign_in_policy(), "control_url": _control_url(), "breakglass_until": fmt(bg)}

@@ -18,7 +18,7 @@ router = APIRouter()
 async def internal_approval_create(request: Request):
     data = await request.json()
     rid = activity.create(data.get("service", "?"), data.get("part", "?"), data.get("action", "?"), data.get("origin"),
-                          activity.clean_review(data.get("diff", ""), data.get("flags")))
+                          activity.clean_review(data.get("diff", ""), data.get("flags")), cid=data.get("cid", ""))
     a = activity.APPROVALS[rid]
     again = a.pop("again", False)
     return JSONResponse({"id": rid, **activity.use(a), "again": again})

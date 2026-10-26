@@ -112,6 +112,8 @@ services:
       TZ: ${TZ:-UTC}
       STACK_DIR: ${TC_DIR:?TC_DIR not set – run ./tentaclai.sh init}
       DATA_DIR: /data
+      LOG_FORMAT: ${LOG_FORMAT:-text}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
     ports:
       # default: only reachable from the host itself; expose via reverse proxy (see compose.override.example.yaml)
       - "${CONTROL_BIND:-127.0.0.1}:${CONTROL_PORT:-8484}:8080"

@@ -378,6 +378,7 @@ def test_write_logs_started_first_and_its_result_names_it(monkeypatch, tmp_path)
     started, result = [json.loads(x) for x in (tmp_path / "audit.jsonl").read_text().splitlines()]
     assert started["decision"] == "started" and started["id"] in seen[0]  # on disk before the write ran
     assert result["decision"] == "auto" and result["intent"] == started["id"] and result["exit"] == 0
+    assert len(started["cid"]) == 12 and result["cid"] == started["cid"]  # one svc call: one correlation id
     got, _ = svc.tclib.audit_read(str(tmp_path))
     assert [e["decision"] for e in got] == ["auto"]  # the settled "started" entry is not shown
 
