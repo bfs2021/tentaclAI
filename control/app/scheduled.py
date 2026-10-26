@@ -305,6 +305,28 @@ def job_mcp_servers(job, known=None):
                            if (known.get(n) or {}).get("enabled") and "mcp" in (known.get(n) or {}).get("parts", {})}}
 
 
+def rename_mentions(old, new):
+    """a service or SSH host renamed: @old and `svc … old` in every job's task follow → names of the jobs changed"""
+    at = re.compile(r"(?<![\w@.])@" + re.escape(old) + r"(?![\w-])")
+    call = re.compile(r"(\bsvc\s+(?:(?:docker|compose|db|web|files|mail|info|test|ssh|git\s+[a-z]+)\s+)?)"
+                      + re.escape(old) + r"(?![\w-])")
+    jobs, changed = load(), []
+    for jid, job in jobs.items():
+        prompt = job.get("prompt") or ""
+        new_prompt = call.sub(lambda m: m.group(1) + new, at.sub("@" + new, prompt))
+        if new_prompt != prompt:
+            job["prompt"] = new_prompt
+            changed.append(job.get("name") or jid)
+    if changed:
+        jsonstore.save(JOBS, jobs)
+    return changed
+
+
+def jobs_naming(name):
+    """names of the jobs whose task names this tentacle (@name) – a warning when it is deleted"""
+    return [job.get("name") or jid for jid, job in load().items() if name in mentions(job.get("prompt"))]
+
+
 def mention_context(job, known=None):
     """a line per mentioned tentacle for Claude – so it doesn't search the catalog first"""
     known = tentacles() if known is None else known
@@ -1193,7 +1215,8 @@ def overview():
     for jid, job in sorted(load().items(), key=lambda kv: kv[1]["name"].lower()):
         runs = [r for r in h if r.get("job") == jid]
         writes, asks = reach(job, known)
-        rows.append(dict(job, id=jid, when=describe(job["schedule"]), changed=job.get("builtin") and job.get("prompt") != job.get("builtin_prompt"), last_run=runs[-1] if runs else None, writes=writes, asks=asks,
+        unknown = [n for n in mentions(job.get("prompt")) if n not in known]  # renamed or removed since
+        rows.append(dict(job, id=jid, unknown=unknown, when=describe(job["schedule"]), changed=job.get("builtin") and job.get("prompt") != job.get("builtin_prompt"), last_run=runs[-1] if runs else None, writes=writes, asks=asks,
                          runs=list(reversed(runs[-10:])), busy=jid in _current.values() or any(r["status"] in ("queued", "running") for r in runs)
                          or any(x.get("state") in ("queued", "running") for r in runs for x in r.get("actions") or [])))
     return rows

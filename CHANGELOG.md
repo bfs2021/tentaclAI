@@ -52,6 +52,11 @@ All notable changes, newest first. Every release lists **upgrade steps** from th
   the `PostToolUse` hook no longer adds a second *tool* entry for it (claude.ai connectors are logged as before).
 - MCP `insecure_tls` now applies to every http MCP server (svc makes the connection); the transport `sse` can't be
   proxied – use `http` (Streamable HTTP).
+- Renaming a service or SSH host also updates the job tasks that name it (`@name`, `svc … name`); deleting one a
+  job names warns, and Jobs marks a job whose task names a tentacle that no longer exists – before, the job only
+  failed when it ran.
+- Fix: `svc list` (and `svc systems <name>`) ran a long service name into its type column – the columns now fit
+  the longest entry.
 - Enterprise page: the managed parts show short names – the details (e.g. *local/CLAUDE.md*) are tooltips.
 - Fix: the quota notification came again and again once a limit was passed – it was keyed by the reset time, which
   Claude Code prints to the minute, and forgotten on every restart. It now goes out once at 80 % and once at 100 % per

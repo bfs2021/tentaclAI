@@ -358,3 +358,24 @@ def test_reach(sj):
     w, a = sj.reach({"profile": "standard", "prompt": "x"}, known)
     assert "mailrelay" in w and "nas" in w and "n8n" not in w and "slow" in a and "slowmail" in a  # n8n is disabled
     assert sj.reach({"profile": "standard", "scope": True, "prompt": "@mailrelay and @imap_x"}, known) == (["mailrelay"], [])
+
+
+def test_rename_follows_into_job_tasks(sj, monkeypatch, tmp_path):
+    monkeypatch.setattr(sj, "JOBS", str(tmp_path / "jobs.json"))
+    json.dump({"a": {"name": "Mail check", "prompt": "check @mailbox and run svc mail mailbox list; mail me@mailbox.org"},
+               "b": {"name": "Other", "prompt": "check @mailbox2 and svc mailbox-x GET /"}}, open(tmp_path / "jobs.json", "w"))
+    assert sj.jobs_naming("mailbox") == ["Mail check"]
+    assert sj.rename_mentions("mailbox", "inbox") == ["Mail check"]
+    jobs = json.load(open(tmp_path / "jobs.json"))
+    assert jobs["a"]["prompt"] == "check @inbox and run svc mail inbox list; mail me@mailbox.org"
+    assert jobs["b"]["prompt"] == "check @mailbox2 and svc mailbox-x GET /"  # other names that start alike stay
+    assert sj.rename_mentions("nothing", "x") == []
+
+
+def test_overview_flags_names_that_no_longer_exist(sj, monkeypatch, tmp_path):
+    monkeypatch.setattr(sj, "JOBS", str(tmp_path / "jobs.json"))
+    monkeypatch.setattr(sj, "tentacles", lambda: KNOWN)
+    monkeypatch.setattr(sj, "history", lambda: [])
+    json.dump({"a": {"name": "A", "prompt": "check @mailrelay and @gone", "schedule": {"kind": "manual"}, "profile": "read-only"}},
+              open(tmp_path / "jobs.json", "w"))
+    assert sj.overview()[0]["unknown"] == ["gone"]

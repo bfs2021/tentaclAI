@@ -8,7 +8,7 @@ import time
 from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse, RedirectResponse
 
-from .. import connectors, dockerops, jsonstore, services_store, sshhosts, systems_store, topology
+from .. import connectors, dockerops, jsonstore, scheduled, services_store, sshhosts, systems_store, topology
 from ..config import DATA_DIR, RESTART_VARS
 from ..envfile import read_env, update_env
 from ..web import mark_restart, not_applied, page, respond, sync_services
@@ -282,6 +282,10 @@ async def service_delete(request: Request, name: str):
     except (FileNotFoundError, ValueError) as e:
         return respond(request, str(e), "err")
     await sync_services()
+    jobs = scheduled.jobs_naming(name)
+    if jobs:
+        return respond(request, f"{name} deleted – the task of {', '.join(jobs)} still names @{name}: edit the job", "warn",
+                       redirect="/services")
     return respond(request, f"{name} deleted", redirect="/services")
 
 
@@ -306,8 +310,10 @@ async def service_rename(request: Request, name: str, new: str = Form("")):
         if not git.get("path"):
             await asyncio.to_thread(dockerops.run, mv + [f"/workspace/repos/{name}", f"/workspace/repos/{new}"], user=dockerops.CLAUDE_USER)
             moved = f", repo now in /workspace/repos/{new}"
+    jobs = scheduled.rename_mentions(name, new)
     await sync_services()
-    return respond(request, f"Renamed {name} → {new}{moved} – Claude calls it svc {new} now", redirect=f"/services/{new}")
+    return respond(request, f"Renamed {name} → {new}{moved} – Claude calls it svc {new} now"
+                   + (f"; updated the task of {', '.join(jobs)}" if jobs else ""), redirect=f"/services/{new}")
 
 
 @router.post("/services/{name}/test", response_class=HTMLResponse)

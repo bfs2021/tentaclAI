@@ -10,7 +10,7 @@ import tclib
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
 
-from .. import dockerops, services_store, sshhosts, sshops
+from .. import dockerops, scheduled, services_store, sshhosts, sshops
 from ..envfile import read_env
 from ..web import page, respond, sync_services, templates
 
@@ -165,7 +165,9 @@ async def ssh_edit_save(request: Request, alias: str):
     if f["alias"] != alias:
         refs = sshops.references(alias)
         await asyncio.to_thread(sshops.rename_references, alias, f["alias"])
-        results.append((True, f"Renamed {alias} → {f['alias']}" + (f", updated {len(refs)} reference(s)" if refs else "")))
+        jobs = scheduled.rename_mentions(alias, f["alias"])
+        results.append((True, f"Renamed {alias} → {f['alias']}" + (f", updated {len(refs)} reference(s)" if refs else "")
+                        + (f", the task of {', '.join(jobs)}" if jobs else "")))
     test, hostkey = await _ssh_test_results(f["alias"])
     await sync_services()
     return _ssh_dialog(request, "result", title=f"{f['alias']} saved", results=results + test,

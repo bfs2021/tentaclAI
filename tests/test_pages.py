@@ -909,3 +909,26 @@ def test_denial_reason_in_the_audit_log(client, app_module, tmp_path, monkeypatc
     html = client.get("/logs?q=reason:\"only at night\"").text
     assert "“only at night”" in html and "docker restart web" in html
     assert "“only at night”" in client.get("/partials/approvals-recent").text  # Recent requests
+
+
+def test_rename_and_delete_keep_jobs_in_the_picture(client, app_module, monkeypatch, tmp_path):
+    from app import jsonstore, scheduled, services_store
+    monkeypatch.setattr(scheduled, "JOBS", str(tmp_path / "jobs.json"))
+    monkeypatch.setattr(scheduled, "HISTORY", str(tmp_path / "hist.json"))
+    jsonstore.save(scheduled.JOBS, {"j1": {"name": "DB check", "prompt": "count rows with @demodb", "profile": "read-only",
+                                          "schedule": {"kind": "manual"}, "notify": "findings"}})
+    before = services_store.read_raw("demodb")
+    try:
+        client.post("/services/demodb/rename", data={"new": "demodb3"}, headers={"HX-Request": "true"})
+        assert "updated the task of DB check" in client.get("/services/demodb3").text  # the flash message
+        assert scheduled.get("j1")["prompt"] == "count rows with @demodb3"
+        client.post("/services/demodb3/delete", headers={"HX-Request": "true"})
+        assert "the task of DB check still names @demodb3" in client.get("/services").text
+        assert "the task names @demodb3, which no longer exists" in client.get("/jobs").text
+    finally:
+        for n in ("demodb3",):
+            try:
+                services_store.delete(n)
+            except FileNotFoundError:
+                pass
+        services_store.save_raw("demodb", before)

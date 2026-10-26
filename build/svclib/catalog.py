@@ -18,8 +18,10 @@ def cmd_systems(services, name=None):
         if s.get("ssh_host"):
             sudo = core.ssh_sudo(s["ssh_host"])
             print(f"SSH:  ssh {s['ssh_host']}" + (f"  (privileged: {sudo} <cmd>)" if sudo else ""))
-        for n in core.members(services, name):
-            print(f"  - {n:<16}{core.kinds(services[n]):<14}{core.status(services[n])}  {services[n].get('description', '')}")
+        rows = [(n, core.kinds(services[n]), core.status(services[n]), services[n].get("description", ""))
+                for n in core.members(services, name)]
+        for line in columns(rows):
+            print(f"  - {line}")
         for note in s.get("notes", []):
             print(f"  ! {note}")
         return 0
@@ -101,10 +103,16 @@ def cmd_test(services, name):
 
 # ---------- info / list / sync ----------
 
+def columns(rows):
+    """rows of cells as lines – each column as wide as its longest cell plus two spaces, the last one unpadded"""
+    widths = [max(len(r[i]) for r in rows) + 2 for i in range(len(rows[0]) - 1)] if rows else []
+    return ["".join(c.ljust(w) for c, w in zip(r, widths)) + r[-1] for r in rows]
+
+
 def cmd_list(services):
-    print(f"{'Name':<18}{'Type':<14}{'System':<14}Status")
-    for name, svc in services.items():
-        print(f"{name:<18}{core.kinds(svc):<14}{svc.get('system') or '–':<14}{core.status(svc)}")
+    rows = [("Name", "Type", "System", "Status")] + [
+        (name, core.kinds(svc), svc.get("system") or "–", core.status(svc)) for name, svc in services.items()]
+    print("\n".join(columns(rows)))
 
 
 def cmd_info_json(services, name):

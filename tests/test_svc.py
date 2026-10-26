@@ -764,3 +764,14 @@ def test_mcp_bridge_gates_tool_calls(monkeypatch, capsys, tmp_path, mcp_gate):
     assert [t["name"] for t in got[2]["result"]["tools"]] == ["get"]  # read: set hidden
     assert got[3]["result"]["isError"] and "denied" in got[3]["result"]["content"][0]["text"]
     assert [s[0] for s in seen] == ["initialize", "tools/list"] and seen[0][1] == "Bearer t"  # wipe never sent
+
+
+def test_svc_list_columns_fit_long_names(monkeypatch, capsys):
+    monkeypatch.setattr(svc, "status", lambda s: "active")
+    services = {"short": {"api": {}}, "mail_root_example_org_x": {"imap": {}, "system": "origin"}}
+    svc.cmd_list(services)
+    out = capsys.readouterr().out.splitlines()
+    assert out[2].split() == ["mail_root_example_org_x", "imap", "origin", "active"]  # name and type apart
+    starts = {line.index(word) for line, word in zip(out, ("Type", "api", "imap"))}
+    assert len(starts) == 1  # one column start for every row
+    assert svc.columns([]) == []

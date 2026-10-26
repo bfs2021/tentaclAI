@@ -116,7 +116,7 @@
       </table>
       <ul>
         <li><strong>Test path</strong> (<code>"test_path"</code>): the endpoint <code>svc test</code> calls for the API – pick one that needs the token, so a wrong token shows up. Without it <code>GET /</code> is used; the service page warns and suggests the template's path (<em>Save as test path</em>).</li>
-        <li><strong>Rename</strong> on the service page: the file, <code>svc &lt;name&gt;</code> calls in examples and notes, and for git services the mirror and <code>/workspace/repos/&lt;name&gt;</code> move together; tokens, system and rules stay.</li>
+        <li><strong>Rename</strong> on the service page: the file, <code>svc &lt;name&gt;</code> calls in examples and notes, <code>@name</code> and <code>svc … name</code> in job tasks, and for git services the mirror and <code>/workspace/repos/&lt;name&gt;</code> move together; tokens, system and rules stay. Deleting a service a job's task names warns, and Jobs marks such a job.</li>
         <li><strong>Token variables</strong>: a second service from the same template gets its own variables (<code>&lt;NAME&gt;_…</code>) instead of sharing the first one's tokens. If services do share a variable, the <em>Tokens &amp; variables</em> card says so.</li>
         <li>Template addresses use the placeholder <code>example.com</code> – the service page reminds you as long as it is there.</li>
       </ul>
@@ -346,7 +346,7 @@
         <li><strong>Authorize tentaclAI</strong> – enter the user's password once (passed to <code>sshpass</code> via stdin, never stored or logged), or add the key by hand with the shown command.</li>
         <li>The host is saved and tested (login, sudo).</li>
       </ol>
-      <p><strong>Edit</strong> changes host, user, port, jump host, sudo and the alias – a rename also updates docker/files services, systems and other hosts that jump through it. If a host key changed, <em>Check host key</em> fetches and confirms the new one. <strong>Remove</strong> can also take tentaclAI's key off the host. On the command line: <code>./ssh-host.sh list|add|sudo|hostkey|remove|test</code> – same logic as this page.</p>
+      <p><strong>Edit</strong> changes host, user, port, jump host, sudo and the alias – a rename also updates docker/files services, systems, other hosts that jump through it and job tasks that name it. If a host key changed, <em>Check host key</em> fetches and confirms the new one. <strong>Remove</strong> can also take tentaclAI's key off the host. On the command line: <code>./ssh-host.sh list|add|sudo|hostkey|remove|test</code> – same logic as this page.</p>
       <h4>Hosts without root login: sudo</h4>
       <p>If the SSH user is not root, enable <strong>use sudo</strong> (when adding the host, or later in the <em>sudo</em> column). The prefix (default <code>sudo -n</code>, also e.g. <code>doas</code>) is stored as <code># tentaclai: sudo=…</code> in the host's block. <code>svc docker</code>/<code>svc compose</code> and <code>tc-scan</code> use it automatically, and Claude's instructions list it per host for admin commands.</p>
       <p>It is non-interactive: the user needs passwordless sudo, ideally limited, e.g. <code>/etc/sudoers.d/tentaclai</code>: <code>deploy ALL=(root) NOPASSWD: /usr/bin/docker</code>. “Test” checks login and sudo.</p>
