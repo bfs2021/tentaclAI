@@ -26,7 +26,6 @@ All notable changes, newest first. Every release lists **upgrade steps** from th
   correct the server's marks. The service page lists the tools with their kind. Jobs: a read-only job now gets the MCP
   servers of the services with only their reading tools, a job limited to its tentacles the MCP servers of the named
   ones (before: no MCP server at all; claude.ai connectors stay off in both).
-
 - **Faster first setup:** `./tentaclai.sh init` asks one question (how to reach tentacontrol – default now the LAN
   on port 8484) and builds and starts everything; the rest has defaults (Settings, or `init --advanced` for every
   question). **Add host** has *This host* and a *Docker host* box (on by default): after the login it checks Docker,
