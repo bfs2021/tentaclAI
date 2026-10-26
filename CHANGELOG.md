@@ -37,6 +37,9 @@ All notable changes, newest first. Every release lists **upgrade steps** from th
   as *call …*), tentacontrol's entries the id of their web request (also the `X-Request-ID` response header).
 - tentacontrol logs through one logger: `LOG_FORMAT=text` (default) or `json` for a log shipper, `LOG_LEVEL`; each
   line of a web request names its request id.
+- `svc` is split into a package (`build/svclib/`, installed to `/usr/local/lib/tentaclai/svclib`): `core`, `gate`
+  (access, audit, approvals), `safeguards`, one module per service part, `catalog`, `cli` – `build/svc` is only the entry
+  point. No change in behaviour.
 - Enterprise page: the managed parts show short names – the details (e.g. *local/CLAUDE.md*) are tooltips.
 - Fix: the quota notification came again and again once a limit was passed – it was keyed by the reset time, which
   Claude Code prints to the minute, and forgotten on every restart. It now goes out once at 80 % and once at 100 % per
@@ -55,6 +58,8 @@ All notable changes, newest first. Every release lists **upgrade steps** from th
   tentacontrol; log lines now start with a timestamp and level (`… WARNING usage: …`). A script grepping
   `docker logs tentacontrol` for the setup link keeps working.
 - Approvals pending while you upgrade survive the recreation of tentacontrol only from this version on.
+- `svc` now lives in `build/svclib/` as well – rebuild the `claude` image (`docker compose build claude`); a fork that
+  copies `build/svc` alone into its own image must copy `build/svclib/` to `/usr/local/lib/tentaclai/svclib/` too.
 
 ## v0.22.0 – 2026-10-25
 

@@ -33,6 +33,8 @@ RUN echo "cache bust: ${CACHE_BUST}" && npm install -g @anthropic-ai/claude-code
 
 COPY build/entrypoint.sh build/start.sh build/rc-loop build/cc build/svc build/claude-instructions build/tc-scan build/tc-statusline build/tc-connect build/tc-guard /usr/local/bin/
 COPY lib/tclib.py /usr/local/lib/tentaclai/tclib.py
+COPY build/svclib/ /usr/local/lib/tentaclai/svclib/
+RUN python3 -m compileall -q /usr/local/lib/tentaclai
 COPY build/svc-completion.bash /etc/bash_completion.d/svc
 COPY VERSION /etc/tentaclai/VERSION
 COPY build/CLAUDE.base.md /etc/tentaclai/CLAUDE.base.md

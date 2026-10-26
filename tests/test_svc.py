@@ -1,18 +1,44 @@
-"""svc (the sandbox's service gateway) – pure functions, loaded from build/svc without running it."""
-import importlib.machinery
-import importlib.util
+"""svc (the sandbox's service gateway) – pure functions of build/svclib, without running svc."""
+import importlib
 import json
 import os
+import pkgutil
 import subprocess
 import sys
 
 import pytest
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-_loader = importlib.machinery.SourceFileLoader("svc", os.path.join(ROOT, "build", "svc"))
-_spec = importlib.util.spec_from_loader("svc", _loader)
-svc = importlib.util.module_from_spec(_spec)
-_loader.exec_module(svc)
+sys.path.insert(0, os.path.join(ROOT, "build"))
+import svclib  # noqa: E402
+
+_MODULES = [importlib.import_module(f"svclib.{m.name}") for m in pkgutil.iter_modules(svclib.__path__)]
+
+
+class _Svc:
+    """svc.<name> is the name in the module that defines it – reading and monkeypatching there, so every module that
+    uses it (as core.<name>, gate.<name> …) sees the patch"""
+
+    def _home(self, name):
+        for m in _MODULES:
+            if name in vars(m) and not isinstance(vars(m)[name], type(svclib)):
+                return m
+        for m in _MODULES:  # an imported module (tclib, os, sys): the same object in every module
+            if name in vars(m):
+                return m
+        raise AttributeError(name)
+
+    def __getattr__(self, name):
+        return getattr(self._home(name), name)
+
+    def __setattr__(self, name, value):
+        setattr(self._home(name), name, value)
+
+    def __delattr__(self, name):
+        delattr(self._home(name), name)
+
+
+svc = _Svc()
 
 
 @pytest.mark.parametrize("text,hidden,kept", [

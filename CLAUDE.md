@@ -8,6 +8,12 @@ that one is generated from `build/CLAUDE.base.md` by `build/claude-instructions`
 tentaclAI = sandbox + service gateway for Claude Code. Three containers (`compose.yaml`):
 
 - `claude` → container **tentaclai** (`build/`): Claude Code, `svc` (service gateway), `tc-scan`, remote control loop.
+  `build/svc` is only the entry point; svc's code is the package `build/svclib/` (→ `/usr/local/lib/tentaclai/svclib`,
+  layout in its `__init__.py`): `core` (imports no other part), `gate` (lookup with the job limit, audit, approvals,
+  `guarded()`), `safeguards` (redaction, untrusted framing, injection scan), one `*_part` module per command family,
+  `catalog`, `cli`. Modules use each other only as modules (`core.ENV`, `gate.audit(…)`), never `from .x import name` –
+  a value set or patched in one place must be the same everywhere; at import time only `core` may be used. Tests reach
+  every name as `svc.<name>` (a proxy to its home module in `tests/test_svc.py`).
   Only in the `internal` network `sandbox` – no route out except through the egress gateway.
 - `egress` → container **tentaclai-egress** (`egress/gw.py`): forward proxy (CONNECT any port, plain HTTP, no TLS
   interception). Gets its policy from tentacontrol (`/internal/egress/*`, cached in its volume), records every
@@ -69,7 +75,7 @@ architecture and `CONTRIBUTING.md` for the ground rules.
   never commit them, nor tokens, hostnames or IPs of a real installation.
 - **English** for code, UI, messages, docs, templates and commit messages.
 - **Guard rails stay intact:** `svc` enforces `read`/`write`/`confirm`, secrets never go into argv, logs, the UI or Claude's context.
-  Every write goes through `guarded()` in svc: it logs *started* (`audit(…, strict=True)` – fail closed) before the
+  Every write goes through `guarded()` in svc (`svclib/gate.py`): it logs *started* (`audit(…, strict=True)` – fail closed) before the
   write and the result with `intent=<that id>`; readers use `tclib.audit_read`/`audit_lines(settled=True)`, which hide
   a settled *started* entry. Every entry of one svc call carries its `cid` (`CID` in svc, also sent with the approval
   request); tentacontrol's entries get the request id (`auditlog.write`). Risk hints for approvals are `tclib.write_risks` – a grant never covers a risky write.
