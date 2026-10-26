@@ -4,7 +4,7 @@
 {% for e in entries %}{% set v = e._view %}
 <tr class="audit-row sev-{{ e.severity }}" data-audit-row tabindex="0" aria-expanded="false">
   <td class="mono small nowrap" title="{{ e.ts }}">{{ e.ts[11:19] }}<div class="faint">{{ e.ts[5:10] }}</div></td>
-  <td class="small nowrap audit-actor">{% if v.actor == 'user' and v.user %}<span class="actor actor-user">{{ val('user', v.user) }}</span>{% else %}<span class="actor actor-{{ v.actor }}">{{ val('actor', v.actor) }}</span>{% endif %}</td>
+  <td class="small nowrap audit-actor">{% if v.actor == 'user' and v.user %}<span class="actor actor-user">{{ val('user', v.user) }}</span>{% else %}<span class="actor actor-{{ v.actor }}">{{ val('actor', v.actor) }}</span>{% endif %}{% if v.source %}<div class="faint audit-source" title="source – where it came from">{{ val('source', v.source) }}</div>{% endif %}</td>
   <td><span class="tag" data-type="{{ v.type }}">{{ val('type', v.type) }}</span></td>
   <td class="audit-target small">{{ val('target', v.target) }}</td>
   <td class="mono small audit-action">{{ v.action }}{% if e.count and e.count > 1 %} <span class="faint">· {{ e.count }}×</span>{% endif %}</td>

@@ -978,3 +978,13 @@ def test_network_approval_card_shows_the_process(client, app_module, monkeypatch
     html = client.get("/partials/approvals").text
     assert '<span class="mono">.venv/bin/python worker.py (claude)</span> · 2 connections waiting' in html
     activity.decide(rid, False)
+
+
+def test_audit_rows_show_the_source(client, app_module):
+    from app import auditlog
+    auditlog.write("network", "telemetry.example.com:443", "connect", "approved", actor="claude",
+                   origin={"tmux": "claude-rc", "session": "5e194a13-8b1b-524e-b29e-bba2b7263ff2"})
+    html = client.get("/logs?q=telemetry.example.com").text
+    row = html[html.index('data-audit-row'):]
+    row = row[:row.index("audit-detail")]
+    assert 'class="faint audit-source"' in row and "source%3A" in row and "5e194a13" in row  # tentacontrol's own label

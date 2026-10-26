@@ -407,6 +407,7 @@ table.audit .tag { white-space: nowrap; }
 .tag[data-type="tool"] { --c: var(--t-tool); } .tag[data-type="svc"] { --c: var(--t-svc); } .tag[data-type="network"] { --c: var(--t-network); }
 .tag[data-type="job"] { --c: var(--t-job); } .tag[data-type="admin"] { --c: var(--t-admin); } .tag[data-type="sign-in"] { --c: var(--t-signin); }
 .tag[data-type="system"] { background: var(--panel-2); }
+.audit-source { max-width: 26ch; overflow: hidden; text-overflow: ellipsis; } .audit-source .audit-val { color: inherit; }
 tr.audit-row { cursor: pointer; } tr.audit-row:hover td, tr.audit-row.open td { background: var(--panel-2); }
 tr.audit-row:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 .audit-action { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } tr.audit-row.open .audit-action { white-space: pre-wrap; }
