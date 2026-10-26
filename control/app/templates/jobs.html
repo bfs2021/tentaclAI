@@ -116,7 +116,8 @@
 {% else %}
 {% if new %}
 <div class="card" style="margin-bottom:14px">
-  <h2 style="margin:0 0 6px">New since your last visit</h2>
+  <div class="between"><h2 style="margin:0 0 6px">New since your last visit</h2>
+    <button class="btn sm ghost" hx-post="/jobs/seen" title="hide this list – the runs stay in each job's history">{{ icon('check') }}Mark all seen</button></div>
   {% for r in new %}{% set res = r.get('result') or {} %}
   <div class="row small" style="gap:8px;margin-top:4px">{{ light(r) }}<a href="#run-{{ r.id }}"><strong>{{ r.job_name }}</strong> – {{ res.get('title') or r.get('error') or r.status }}</a><span class="faint">{{ fmt(r.get('ended')) }}</span></div>
   {% endfor %}

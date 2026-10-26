@@ -952,5 +952,9 @@ def test_jobs_page_lists_what_the_badge_counted(client, app_module, monkeypatch,
     assert 'href="#run-new1"' in box and "Disk space</strong> – 90 % on /" in box and "seen before" not in box and "fine again" not in box
     assert '<details class="job-history" open>' in html and '<details class="mem-entry" id="run-new1" open>' in html
     assert "New since your last visit" in client.get("/jobs").text  # a reload (auto refresh) still shows it
+    r = client.post("/jobs/seen", headers={"HX-Request": "true"})
+    assert r.headers.get("HX-Refresh") == "true" and "New since your last visit" not in client.get("/jobs").text
+    jsonstore.save(scheduled.SEEN, {"ts": now - 7200})
+    assert "New since your last visit" in client.get("/jobs").text
     jsonstore.save(scheduled.SEEN, {"ts": now - 1000, "since": now - 7200})  # the next visit, later
     assert "New since your last visit" not in client.get("/jobs").text

@@ -56,7 +56,7 @@ All notable changes, newest first. Every release lists **upgrade steps** from th
   job names warns, and Jobs marks a job whose task names a tentacle that no longer exists – before, the job only
   failed when it ran.
 - Jobs: the runs the sidebar badge counted are listed on top of the page (*New since your last visit*, with a link to
-  each run – also older runs, whose history opens with them marked *new*); before, only each job's latest run was in
+  each run – also older runs, whose history opens with them marked *new*; *Mark all seen* clears it); before, only each job's latest run was in
   sight.
 - Fix: `svc list` (and `svc systems <name>`) ran a long service name into its type column – the columns now fit
   the longest entry.

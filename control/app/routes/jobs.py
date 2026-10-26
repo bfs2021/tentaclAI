@@ -84,6 +84,12 @@ async def jobs_page(request: Request):
                 fmt=lambda ts: time.strftime("%Y-%m-%d %H:%M", time.localtime(ts)) if ts else "–")
 
 
+@router.post("/jobs/seen")
+async def jobs_seen(request: Request):
+    scheduled.dismiss_new()
+    return respond(request, "Marked as seen", refresh=True)
+
+
 @router.get("/jobs/new", response_class=HTMLResponse)
 async def job_new(request: Request, template: int = -1):
     presets = scheduled.templates()

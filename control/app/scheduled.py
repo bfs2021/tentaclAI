@@ -1185,6 +1185,12 @@ def use_prompt(run_id, use=True):
     return run["job"]
 
 
+def dismiss_new():
+    """"Mark all seen" on the Jobs page: nothing counts as new any more"""
+    now = time.time()
+    jsonstore.save(SEEN, {"ts": now, "since": now})
+
+
 SEEN_VISIT = 900  # a reload within this time (the page refreshes itself) still marks what was new at the first one
 
 
