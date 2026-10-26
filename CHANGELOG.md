@@ -2,7 +2,7 @@
 
 All notable changes, newest first. Every release lists **upgrade steps** from the previous one.
 
-## Unreleased
+## v0.23.0 – 2026-10-26
 
 ### Highlights
 - **Writes are logged before they run (fail closed):** `svc` writes a *started* entry before every write of a `write` or
