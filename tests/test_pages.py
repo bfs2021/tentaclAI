@@ -976,7 +976,7 @@ def test_network_approval_card_shows_the_process(client, app_module, monkeypatch
     activity.create("telemetry.example.com:443", "network", "connect")
     activity.set_process(rid, {"command": ".venv/bin/python worker.py", "user": "claude", "origin": {"tmux": "claude-rc"}})
     html = client.get("/partials/approvals").text
-    assert '<span class="mono">.venv/bin/python worker.py (claude)</span> · 2 connections waiting' in html
+    assert '<span class="mono">.venv/bin/python worker.py (claude)</span>' in html and "2 connections waiting" in html
     activity.decide(rid, False)
 
 

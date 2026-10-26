@@ -801,8 +801,9 @@ def _fake_proc(tmp_path, port=41000):
 
 def test_port_process_finds_the_connection_owner(tmp_path):
     proc = _fake_proc(tmp_path)
-    assert svc.port_process(41000, proc) == 30
-    assert svc.port_process(41001, proc) is None
+    inode, uid = svc.port_socket(41000, proc)
+    assert (inode, uid) == ("777", 1000) and svc.socket_pid(inode, proc) == 30
+    assert svc.port_socket(41001, proc) is None
     found = svc.process_origin(30, proc)
     assert found["command"] == ".venv/bin/python worker.py"
     assert found["origin"] == {"session": "6576389e-0000-4000-8000-000000000001", "entry": "cli"}  # from the ancestor

@@ -184,10 +184,16 @@ async def internal_egress_ask(request: Request):
     except (ValueError, TypeError):
         return JSONResponse({"error": "bad target"}, status_code=400)
     rid = activity.create(f"{host}:{port}", "network", "connect")
-    client = data.get("client_port")
-    if isinstance(client, int) and 0 < client < 65536 and not activity.APPROVALS[rid].get("process"):
-        asyncio.get_running_loop().create_task(_find_process(rid, client))  # the gateway holds the connection meanwhile
+    a, client = activity.APPROVALS[rid], data.get("client_port")
+    if isinstance(client, int) and 0 < client < 65536 and not a.get("lookup"):
+        a["lookup"] = True  # once per request – further connections to the same target wait for the same decision
+        task = asyncio.get_running_loop().create_task(_find_process(rid, client))  # the gateway holds the connection meanwhile
+        _LOOKUPS.add(task)
+        task.add_done_callback(_LOOKUPS.discard)
     return JSONResponse({"id": rid})
+
+
+_LOOKUPS = set()  # running lookups – the event loop keeps only weak references to tasks
 
 
 async def _find_process(rid, client_port):

@@ -82,18 +82,7 @@ def job():
     global _job
     if _job is not None:
         return _job or None
-    found, pid = [], os.getppid()
-    for _ in range(64):
-        if pid <= 1:
-            break
-        try:
-            with open(f"/proc/{pid}/cmdline", "rb") as f:
-                args = f.read().split(b"\0")
-            with open(f"/proc/{pid}/stat") as f:
-                pid = int(f.read().rsplit(")", 1)[1].split()[1])
-        except (OSError, ValueError, IndexError):
-            break
-        found += [a[7:].decode(errors="replace") for a in args if a.startswith(b"tc-job=")]
+    found = [m for _, args in _ancestors(os.getppid()) for m in _job_marks(args)]
     if not found:
         _job = {}
         return None
@@ -110,6 +99,26 @@ def job():
     _job = {"run": first if JOB_RE.match(first) else "", "read_only": ro,
             "allow": set.intersection(*allows) if allows else None}
     return _job
+
+
+def _ancestors(pid, proc="/proc"):
+    """(pid, argv as bytes) of a process and its ancestors, nearest first – cmdline and stat are readable for any user"""
+    for _ in range(64):
+        if pid <= 1:
+            return
+        try:
+            with open(os.path.join(proc, str(pid), "cmdline"), "rb") as f:
+                args = f.read().split(b"\0")
+            with open(os.path.join(proc, str(pid), "stat")) as f:
+                parent = int(f.read().rsplit(")", 1)[1].split()[1])
+        except (OSError, ValueError, IndexError):
+            return
+        yield pid, args
+        pid = parent
+
+
+def _job_marks(args):
+    return [a[7:].decode(errors="replace") for a in args if a.startswith(b"tc-job=")]
 
 
 def job_read_only():
@@ -136,15 +145,19 @@ def origin():
     else:
         if job() and job()["run"]:
             o["job"] = job()["run"]
-        sid = os.environ.get("CLAUDE_CODE_SESSION_ID", "")
-        if SESSION_ID_RE.match(sid):
-            o["session"] = sid
-        entry = os.environ.get("CLAUDE_CODE_ENTRYPOINT", "")
-        if re.fullmatch(r"[a-z][a-z-]{0,19}", entry):
-            o["entry"] = entry
-        o.update(_tmux(os.environ))
+        o.update(_session(os.environ))
     _origin = o
     return o
+
+
+def _session(env):
+    """the Claude session, entry point and tmux session named by a process environment – each value checked strictly"""
+    o = {}
+    if SESSION_ID_RE.match(env.get("CLAUDE_CODE_SESSION_ID", "")):
+        o["session"] = env["CLAUDE_CODE_SESSION_ID"]
+    if re.fullmatch(r"[a-z][a-z-]{0,19}", env.get("CLAUDE_CODE_ENTRYPOINT", "")):
+        o["entry"] = env["CLAUDE_CODE_ENTRYPOINT"]
+    return {**o, **_tmux(env)}
 
 
 def _tmux(env):
@@ -193,11 +206,6 @@ def socket_pid(inode, proc="/proc"):
     return None
 
 
-def port_process(port, proc="/proc"):
-    found = port_socket(port, proc)
-    return socket_pid(found[0], proc) if found else None
-
-
 def as_uid(uid, fn):
     """fn() in a child process running as uid (root stays root) → its JSON-able result, None on failure"""
     if uid == 0 or not privileged():
@@ -231,41 +239,29 @@ def as_uid(uid, fn):
 
 
 def process_origin(pid, proc="/proc"):
-    """who started a process: the command, its user and – from the nearest ancestor that has them – the Claude
-    session, entry point and tmux session, or the job (tc-job marker). A hint like origin(): Claude controls its own
-    processes' environment and names"""
-    out, o, chain = {}, {}, pid
+    """who started a process: its command and user and – from the nearest ancestor that has them – the Claude session,
+    entry point and tmux session, or the job (the outermost tc-job marker, like job()). A hint like origin(): Claude
+    controls its own processes' environment and names"""
     try:
-        with open(os.path.join(proc, str(pid), "cmdline"), "rb") as f:
-            out["command"] = " ".join(a.decode(errors="replace") for a in f.read().split(b"\0") if a)[:200]
-        uid = os.stat(os.path.join(proc, str(pid))).st_uid
-        out["user"] = pwd.getpwuid(uid).pw_name
+        user = pwd.getpwuid(os.stat(os.path.join(proc, str(pid))).st_uid).pw_name
     except (OSError, KeyError):
         return {}
-    for _ in range(64):
-        if chain <= 1:
-            break
-        try:
-            with open(os.path.join(proc, str(chain), "cmdline"), "rb") as f:
-                args = f.read().split(b"\0")
-            marks = [a[7:].decode(errors="replace") for a in args if a.startswith(b"tc-job=")]
-            if marks and JOB_RE.match(marks[0]):
-                o = {"job": marks[0]}  # the outermost marker wins (tentacontrol's wrapper)
-            if not o.get("job") and "session" not in o:
-                try:  # another user's environment is unreadable (sudo, docker exec) – go on with its parent
-                    with open(os.path.join(proc, str(chain), "environ"), "rb") as f:
-                        env = dict(x.decode(errors="replace").split("=", 1) for x in f.read().split(b"\0") if b"=" in x)
-                except OSError:
-                    env = {}
-                if SESSION_ID_RE.match(env.get("CLAUDE_CODE_SESSION_ID", "")):
-                    o["session"] = env["CLAUDE_CODE_SESSION_ID"]
-                    if re.fullmatch(r"[a-z][a-z-]{0,19}", env.get("CLAUDE_CODE_ENTRYPOINT", "")):
-                        o["entry"] = env["CLAUDE_CODE_ENTRYPOINT"]
-                    o.update(_tmux(env))
-            with open(os.path.join(proc, str(chain), "stat")) as f:
-                chain = int(f.read().rsplit(")", 1)[1].split()[1])
-        except (OSError, ValueError, IndexError):
-            break
+    out, o = {"user": user}, {}
+    for chain, args in _ancestors(pid, proc):
+        out.setdefault("command", " ".join(a.decode(errors="replace") for a in args if a)[:200])
+        marks = [m for m in _job_marks(args) if JOB_RE.match(m)]
+        if marks:
+            o = {"job": marks[0]}
+        elif not o:
+            try:  # another user's environment is unreadable (sudo, docker exec) – go on with its parent
+                with open(os.path.join(proc, str(chain), "environ"), "rb") as f:
+                    env = dict(x.decode(errors="replace").split("=", 1) for x in f.read().split(b"\0") if b"=" in x)
+            except OSError:
+                env = {}
+            found = _session(env)
+            o = found if "session" in found else {}
+    if "command" not in out:
+        return {}
     out["origin"] = o
     return out
 

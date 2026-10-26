@@ -30,7 +30,8 @@ _ids = itertools.count(1)
 BOOT = secrets.token_hex(4)  # ids start at 1 again after a restart – the browser tells the two apart by this
 APPROVALS = {}  # id -> dict
 GRANTS = {}  # (service, part) -> {"until": ts, "by": who} – "Approve + 15 min"
-_TRANSIENT = ("event", "again")  # not kept: the event is made anew on load, "again" is read once by the route
+_TRANSIENT = ("event", "again", "lookup")  # not kept: the event is made anew on load, "again" is read once by the route,
+# "lookup" marks a network request whose process is being looked up
 CID_RE = re.compile(r"[0-9a-f]{12}")
 
 
@@ -87,7 +88,8 @@ def audit_network(a, decision, detail=""):
     if a.get("part") == "network":
         auditlog.write("network", a["service"], a["action"], decision, actor="claude", mode="confirm", detail=detail,
                        approver=a.get("approver", ""), grant=a.get("grant", ""), origin=a.get("origin") or None,
-                       process=a.get("process", ""), requested=tclib.audit_ts(a["created"]), attempts=a.get("attempts", 1))
+                       process=a.get("process", ""), process_user=a.get("process_user", ""), requested=tclib.audit_ts(a["created"]),
+                       attempts=a["attempts"] if a.get("attempts", 1) > 1 else None)
 
 
 def _expire():
@@ -197,8 +199,8 @@ def set_process(rid, found):
     a = APPROVALS.get(rid)
     if not a or not isinstance(found, dict) or not found.get("command"):
         return
-    user = re.sub(r"[^a-z0-9_-]", "", str(found.get("user", "")))[:32]
-    a["process"] = re.sub(r"[\x00-\x1f\x7f]+", " ", str(found["command"])).strip()[:200] + (f" ({user})" if user else "")
+    a["process"] = clean_reason(found["command"])
+    a["process_user"] = re.sub(r"[^a-z0-9_-]", "", str(found.get("user", "")))[:32]
     o = clean_origin(found.get("origin"))
     if o:
         a["origin"], a["from"] = o, origin_label(o)
@@ -234,8 +236,7 @@ def create(service, part, action, origin=None, review=None, cid=""):
     if part == "network":
         same = next((a for a in APPROVALS.values() if a["status"] == "pending" and a["service"] == service and a["part"] == part), None)
         if same:
-            same["attempts"] = same.get("attempts", 1) + 1  # another connection waits for the same decision
-            save()
+            same["attempts"] = same.get("attempts", 1) + 1  # another connection waits for the same decision (saved with the next change)
             return same["id"]
     o = clean_origin(origin)
     same = _again(str(service)[:60], str(part)[:20], str(action)[:500], o)

@@ -990,7 +990,7 @@ AUDIT_CATEGORIES = ("service", "tool", "network", "admin", "auth", "job", "syste
 AUDIT_ACTORS = ("claude", "job", "user", "system")
 SEVERITY = {"err": 3, "warning": 4, "notice": 5, "info": 6}
 AUDIT_ORIGIN = ("session", "entry", "tmux", "by", "job")  # origin_<key>: where a call came from (svc's origin())
-_AUDIT_LIMITS = {"action": 500, "detail": 300, "error": 1000, "service": 120, "part": 20, "mode": 20, "ip": 64, "user": 32, "approver": 40, "grant": 40, "reason": 200, "cid": 64, "process": 220, "requested": 40}
+_AUDIT_LIMITS = {"action": 500, "detail": 300, "error": 1000, "service": 120, "part": 20, "mode": 20, "ip": 64, "user": 32, "approver": 40, "grant": 40, "reason": 200, "cid": 64, "process": 200, "process_user": 32, "requested": 40}
 
 
 def audit_ts(t=None):
@@ -1264,7 +1264,7 @@ def audit_view(e, source=None):
             "source": (source or audit_source)(e) or "", "type": AUDIT_TYPES.get(e.get("category"), e.get("category", "")),
             "target": str(e.get("service", "")), "action": str(e.get("action", "")), "outcome": audit_outcome(e),
             "decision": e.get("decision", ""), "mode": e.get("mode", ""), "ip": e.get("ip", ""), "reason": e.get("reason", ""),
-            "cid": e.get("cid", ""), "process": e.get("process", ""), "requested": e.get("requested", ""),
+            "cid": e.get("cid", ""), "process": e.get("process", "") + (f" ({e['process_user']})" if e.get("process") and e.get("process_user") else ""), "requested": e.get("requested", ""),
             "attempts": e.get("attempts", "") if isinstance(e.get("attempts"), int) and e["attempts"] > 1 else ""}
 
 

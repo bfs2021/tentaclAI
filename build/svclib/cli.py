@@ -28,6 +28,8 @@ def main(argv):
         core.ORIG_CWD = "/"
     if core.privileged():
         os.chdir("/")  # nothing running as root reads files from Claude's current directory
+    if argv[1:2] == ["origin-of"] and len(argv) == 3:
+        return cmd_origin_of(argv[2])  # before .env and the services are loaded – a /proc lookup needs neither
     core.load_env_file()
     services = core.load()
     SERVICE_NAMES.update(services)
@@ -55,8 +57,6 @@ def main(argv):
         return git_part.cmd_git_list(services)
     if cmd == "ssh":
         return ssh_part.cmd_ssh(argv[2:])
-    if cmd == "origin-of" and len(argv) == 3:
-        return cmd_origin_of(argv[2])
     if cmd == "mcp-proxy" and len(argv) == 3:
         return mcp_part.cmd_mcp_proxy(services, argv[2])
     if cmd == "rc-env":
@@ -102,11 +102,15 @@ def cmd_origin_of(port):
         sys.exit("svc: origin-of is for tentacontrol only")
     if not port.isdigit() or not 0 < int(port) < 65536:
         sys.exit("svc: origin-of <port>")
-    found = core.port_socket(int(port))
+    found, res = core.port_socket(int(port)), {}
     if found:  # looked up as the socket's owner: only it may read its processes' fds and environment
         inode, uid = found
-        res = core.as_uid(uid, lambda: (lambda pid: core.process_origin(pid) if pid else {})(core.socket_pid(inode)))
-    print(json.dumps(res if found and isinstance(res, dict) else {}))
+
+        def lookup():
+            pid = core.socket_pid(inode)
+            return core.process_origin(pid) if pid else {}
+        res = core.as_uid(uid, lookup) or {}
+    print(json.dumps(res))
     return 0
 
 

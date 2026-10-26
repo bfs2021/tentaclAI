@@ -535,7 +535,7 @@ def test_audit_unknown_keys():
 
 
 def test_audit_view_network_process():
-    e = tclib.audit_entry("network", "x.example.com:443", "connect", "approved", actor="claude", process="python w.py (claude)",
+    e = tclib.audit_entry("network", "x.example.com:443", "connect", "approved", actor="claude", process="python w.py", process_user="claude",
                           requested="2026-10-26T21:28:40.000+01:00", attempts=12, origin={"tmux": "claude-rc"})
     v = tclib.audit_view(e)
     assert v["process"] == "python w.py (claude)" and v["attempts"] == 12 and v["source"] == "claude-rc"

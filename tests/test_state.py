@@ -337,12 +337,12 @@ def test_network_request_names_its_process(app_module, monkeypatch):
     activity.set_process(rid, {"command": ".venv/bin/python worker.py\n", "user": "claude",
                                "origin": {"session": "6576389e-0000-4000-8000-000000000001", "tmux": "claude-rc", "x": "y"}})
     a = activity.APPROVALS[rid]
-    assert a["process"] == ".venv/bin/python worker.py (claude)" and a["attempts"] == 2
+    assert (a["process"], a["process_user"], a["attempts"]) == (".venv/bin/python worker.py", "claude", 2)
     assert a["origin"] == {"session": "6576389e-0000-4000-8000-000000000001", "tmux": "claude-rc"} and a["from"]
     activity.set_process(rid, {})  # nothing found (the process ended): keeps what is there
     assert a["process"].startswith(".venv")
     activity.decide(rid, True, who="admin")
     activity.audit_network(a, "approved")
     (args, kw), = logged
-    assert kw["process"] == ".venv/bin/python worker.py (claude)" and kw["attempts"] == 2
+    assert (kw["process"], kw["process_user"], kw["attempts"]) == (".venv/bin/python worker.py", "claude", 2)
     assert kw["origin"]["tmux"] == "claude-rc" and kw["requested"].startswith(time.strftime("%Y-"))
