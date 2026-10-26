@@ -1185,8 +1185,18 @@ def use_prompt(run_id, use=True):
     return run["job"]
 
 
+SEEN_VISIT = 900  # a reload within this time (the page refreshes itself) still marks what was new at the first one
+
+
 def mark_seen():
-    jsonstore.save(SEEN, {"ts": time.time()})
+    """the Jobs page was opened: the badge starts again from now → the runs with a finding that are new to the user
+    (ended since the visit before – reloads during one visit keep showing the same ones), newest first"""
+    st, now = jsonstore.load(SEEN) or {}, time.time()
+    ts = st.get("ts", 0)
+    since = st.get("since", ts) if now - ts < SEEN_VISIT else ts
+    jsonstore.save(SEEN, {"ts": now, "since": since})
+    return sorted((r for r in _history_view() if finding(r) and (r.get("ended") or 0) > since),
+                  key=lambda r: r.get("ended") or 0, reverse=True)
 
 
 def reach(job, known):

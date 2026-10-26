@@ -76,8 +76,10 @@ async def jobs_state(v: str = ""):
 
 @router.get("/jobs", response_class=HTMLResponse)
 async def jobs_page(request: Request):
-    scheduled.mark_seen()
-    return page(request, "jobs.html", rows=scheduled.overview(), templates=scheduled.templates(), token=scheduled.state_token(), now=time.time(),
+    new = scheduled.mark_seen()
+    names = {jid: j.get("name", jid) for jid, j in scheduled.load().items()}
+    return page(request, "jobs.html", rows=scheduled.overview(), new=[dict(r, job_name=names.get(r.get("job"), r.get("name", "?"))) for r in new],
+                new_ids={r["id"] for r in new}, templates=scheduled.templates(), token=scheduled.state_token(), now=time.time(),
                 issue_url=lambda x, r=None: knowledge.issue_url(x, TC_VERSION, run=r, edition=extensions.edition()),
                 fmt=lambda ts: time.strftime("%Y-%m-%d %H:%M", time.localtime(ts)) if ts else "–")
 

@@ -932,3 +932,25 @@ def test_rename_and_delete_keep_jobs_in_the_picture(client, app_module, monkeypa
             except FileNotFoundError:
                 pass
         services_store.save_raw("demodb", before)
+
+
+def test_jobs_page_lists_what_the_badge_counted(client, app_module, monkeypatch, tmp_path):
+    """the badge counts findings of every run since the last visit – the page shows those runs, also from the history"""
+    import time
+    from app import jsonstore, scheduled
+    for k, f in (("JOBS", "j.json"), ("HISTORY", "h.json"), ("SEEN", "s.json")):
+        monkeypatch.setattr(scheduled, k, str(tmp_path / f))
+    jid = scheduled.save({"name": "Disk space", "prompt": "df", "kind": "daily", "time": "06:30"})
+    now = time.time()
+    jsonstore.save(scheduled.SEEN, {"ts": now - 7200})
+    jsonstore.save(scheduled.HISTORY, [
+        {"id": "old1", "job": jid, "status": "done", "queued": now - 9000, "ended": now - 9000, "result": {"status": "alert", "title": "seen before"}},
+        {"id": "new1", "job": jid, "status": "done", "queued": now - 3600, "ended": now - 3600, "result": {"status": "warn", "title": "90 % on /"}},
+        {"id": "new2", "job": jid, "status": "done", "queued": now - 60, "ended": now - 60, "result": {"status": "ok", "title": "fine again"}}])
+    html = client.get("/jobs").text
+    box = html[html.index("New since your last visit"):html.index("job-card")]
+    assert 'href="#run-new1"' in box and "Disk space</strong> – 90 % on /" in box and "seen before" not in box and "fine again" not in box
+    assert '<details class="job-history" open>' in html and '<details class="mem-entry" id="run-new1" open>' in html
+    assert "New since your last visit" in client.get("/jobs").text  # a reload (auto refresh) still shows it
+    jsonstore.save(scheduled.SEEN, {"ts": now - 1000, "since": now - 7200})  # the next visit, later
+    assert "New since your last visit" not in client.get("/jobs").text

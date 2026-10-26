@@ -55,6 +55,9 @@ All notable changes, newest first. Every release lists **upgrade steps** from th
 - Renaming a service or SSH host also updates the job tasks that name it (`@name`, `svc … name`); deleting one a
   job names warns, and Jobs marks a job whose task names a tentacle that no longer exists – before, the job only
   failed when it ran.
+- Jobs: the runs the sidebar badge counted are listed on top of the page (*New since your last visit*, with a link to
+  each run – also older runs, whose history opens with them marked *new*); before, only each job's latest run was in
+  sight.
 - Fix: `svc list` (and `svc systems <name>`) ran a long service name into its type column – the columns now fit
   the longest entry.
 - Enterprise page: the managed parts show short names – the details (e.g. *local/CLAUDE.md*) are tooltips.

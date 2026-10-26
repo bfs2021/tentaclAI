@@ -78,8 +78,8 @@
 {% set pend = r.actions and (r.actions_until or 0) > now and (r.actions | selectattr('state', 'in', ['proposed', 'queued', 'running']) | list | length) > 0 %}
 {% set pend_learned = r.knowledge and (r.knowledge | selectattr('state', 'equalto', 'proposed') | list | length) > 0 %}
 {% set pend_prompt = r.prompt_suggestion and r.prompt_suggestion.state == 'proposed' %}
-<details class="mem-entry" id="run-{{ r.id }}">
-  <summary>{{ light(r) }} <span>{% if r.status == 'running' %}<span class="muted">Claude is working – <span class="elapsed" data-since="{{ r.started or r.queued }}"></span></span>{% elif r.status == 'queued' %}<span class="muted">waiting for the run before it</span>{% else %}{{ res.get('title') or r.get('error') or '' }}{% endif %}</span><span class="faint small">{{ fmt(r.get('started') or r.queued) }}{% if r.seconds %} · {{ r.seconds }} s{% endif %}{% if r.cost %} · ${{ '%.2f' % r.cost }}{% endif %}{% if r.trigger == 'manual' %} · manual{% endif %}</span></summary>
+<details class="mem-entry" id="run-{{ r.id }}"{% if r.id in new_ids %} open{% endif %}>
+  <summary>{{ light(r) }}{% if r.id in new_ids %} <span class="pill accent" title="ended since your last visit">new</span>{% endif %} <span>{% if r.status == 'running' %}<span class="muted">Claude is working – <span class="elapsed" data-since="{{ r.started or r.queued }}"></span></span>{% elif r.status == 'queued' %}<span class="muted">waiting for the run before it</span>{% else %}{{ res.get('title') or r.get('error') or '' }}{% endif %}</span><span class="faint small">{{ fmt(r.get('started') or r.queued) }}{% if r.seconds %} · {{ r.seconds }} s{% endif %}{% if r.cost %} · ${{ '%.2f' % r.cost }}{% endif %}{% if r.trigger == 'manual' %} · manual{% endif %}</span></summary>
   <div class="small" style="margin-top:8px">
     {% if res.get('summary') %}<p style="margin:0 0 6px">{{ res.summary }}</p>{% endif %}
     {% if res.get('details') %}<pre class="rc" style="max-height:340px">{{ res.details }}</pre>{% endif %}
@@ -114,6 +114,14 @@
   </div>
 </div>
 {% else %}
+{% if new %}
+<div class="card" style="margin-bottom:14px">
+  <h2 style="margin:0 0 6px">New since your last visit</h2>
+  {% for r in new %}{% set res = r.get('result') or {} %}
+  <div class="row small" style="gap:8px;margin-top:4px">{{ light(r) }}<a href="#run-{{ r.id }}"><strong>{{ r.job_name }}</strong> – {{ res.get('title') or r.get('error') or r.status }}</a><span class="faint">{{ fmt(r.get('ended')) }}</span></div>
+  {% endfor %}
+</div>
+{% endif %}
 {% for j in rows %}
 <div class="card job-card{{ ' paused' if not j.enabled and j.schedule.kind != 'manual' }}" style="margin-bottom:14px">
   <div class="between" style="align-items:flex-start;gap:12px">
@@ -134,7 +142,7 @@
   <div style="margin-top:12px">
     {{ run_row(j.runs[0]) }}
     {% if j.runs | length > 1 %}
-    <details class="job-history">
+    <details class="job-history"{% if j.runs[1:] | selectattr('id', 'in', new_ids) | list %} open{% endif %}>
       <summary class="small muted">History ({{ j.runs | length - 1 }} earlier run{{ '' if j.runs | length == 2 else 's' }})</summary>
       {% for r in j.runs[1:] %}{{ run_row(r) }}{% endfor %}
     </details>
