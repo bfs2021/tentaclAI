@@ -358,6 +358,68 @@ def migrate_access(data):
 
 META = re.compile(r"^\s*#\s*tentaclai:\s*(sudo|access)\s*=\s*(.*?)\s*$")
 SSH_ACCESS_DEFAULT = "confirm"
+
+
+# ---- risk of a write (approvals): what makes a single action dangerous – shown in red, never covered by a grant
+_RISK_DOCKER = (
+    (r"(^|\s)--privileged\b", "privileged container – full access to the host"),
+    (r"(^|\s)(-v|--volume)[ =]/:|(^|\s)--mount[ =]\S*(src|source)=/(,|\s|$)", "mounts the host's root file system"),
+    (r"(^|\s)(-v|--volume|--mount)[ =]\S*docker\.sock", "mounts the Docker socket – control of the host"),
+    (r"(^|\s)--(pid|network|net|ipc|uts|userns)[ =]host\b", "shares a host namespace"),
+    (r"(^|\s)--cap-add\b", "adds kernel capabilities"),
+    (r"^docker (rm|rmi|kill)\b|^docker (container|image|volume|network) (rm|remove|prune)\b", "deletes"),
+    (r"^docker (system|volume|image|container|network|builder) prune\b", "prunes"),
+    (r"^docker exec\b", "runs a command inside a container"),
+    (r"^compose \S+ down\b.*\s(-v|--volumes)\b", "removes the stack with its volumes – data is lost"),
+    (r"^compose \S+ down\b", "stops and removes the stack"),
+    (r"^compose \S+ (exec|run)\b", "runs a command inside a container"),
+)
+_RISK_SHELL = (
+    (r"\brm\s+(-\w*[rf]\w*\s+)+", "deletes files recursively or forced"),
+    (r"\b(mkfs|fdisk|parted|wipefs|dd)\b", "writes to disks"),
+    (r"\b(shutdown|reboot|poweroff|halt)\b", "shuts down or reboots the host"),
+    (r"\bsystemctl\s+(stop|restart|disable|mask|kill)\b", "stops or restarts a system service"),
+    (r"\b(iptables|nft|ufw)\b", "changes the firewall"),
+    (r"\b(chmod|chown)\s+-\w*R", "changes permissions recursively"),
+    (r"\b(userdel|passwd|usermod)\b|authorized_keys", "changes accounts or SSH keys"),
+    (r">\s*/(etc|boot|dev)/", "overwrites a system file"),
+    (r"\bcurl\b[^|]*\|\s*(sudo\s+)?(ba|z)?sh\b|\bwget\b[^|]*\|\s*(sudo\s+)?(ba|z)?sh\b", "runs a script from the internet"),
+)
+_RISK_SQL = (
+    (r"\b(drop|truncate)\s+(table|database|schema)\b|\btruncate\b", "drops or empties tables"),
+    (r"\b(delete\s+from|update)\s+(?:(?!\bwhere\b).)*$", "changes every row (no WHERE)"),
+    (r"\balter\s+(table|database|user|role)\b", "changes the schema or a role"),
+    (r"\b(grant|revoke)\b", "changes permissions"),
+)
+
+
+def write_risks(part, action):
+    """the reasons a write is dangerous (empty: an ordinary write) – a hint for the approver, matched on svc's action
+    text ("docker …", "compose <stack> …", "ssh …", "SQL: …", "push …", "DELETE /path")"""
+    a = str(action or "").strip()
+    found = []
+
+    def scan(rules, text, flags=0):
+        for pat, why in rules:
+            if re.search(pat, text, flags) and why not in found:
+                found.append(why)
+    if part == "docker":
+        scan(_RISK_DOCKER, a)
+        if a.startswith("compose ") and " down" in a and "removes the stack with its volumes – data is lost" in found:
+            found.remove("stops and removes the stack")
+    elif part == "ssh":
+        if a == "ssh (interactive shell)":
+            found.append("interactive shell – every command runs without a further approval")
+        scan(_RISK_SHELL, a)
+    elif part == "db":
+        if a == "interactive SQL shell":
+            found.append("interactive SQL shell – every statement runs without a further approval")
+        scan(_RISK_SQL, a[5:] if a.startswith("SQL: ") else a, re.I | re.S)
+    elif part == "git" and re.search(r"(^|\s)(--force\b|-f\b|--force-with-lease\b|\+\S)", a):
+        found.append("force push – rewrites the remote history")
+    elif part == "api" and a.upper().startswith("DELETE "):
+        found.append("deletes")
+    return found[:4]
 SUDO_RE = re.compile(r"^[A-Za-z0-9 ._/=-]{1,60}$")
 ALIAS_RE = re.compile(r"^[A-Za-z0-9._-]{1,40}$")
 HOST_RE = re.compile(r"^[A-Za-z0-9.-]{1,253}$")
@@ -1024,15 +1086,29 @@ def _audit_files(data_dir, cutoff=0):
     return files
 
 
-def audit_lines(data_dir, cutoff=0):
-    """raw lines, newest first, across the active file and the archives"""
+_AUDIT_INTENT = re.compile(r'"intent": "([0-9a-f]+)"')
+_AUDIT_STARTED = '"decision": "started"'
+_AUDIT_ID = re.compile(r'"id": "([0-9a-f]+)"')
+
+
+def audit_lines(data_dir, cutoff=0, settled=False):
+    """raw lines, newest first, across the active file and the archives. settled: without the "started" entry of a
+    write whose result is logged (the result names it in "intent") – a "started" entry stays when the write never
+    finished (svc killed, timeout) or is still running"""
+    done = set()
     for path in _audit_files(data_dir, cutoff):
         try:
             with open(path, encoding="utf-8", errors="replace") as f:
                 lines = f.read().splitlines()
         except OSError:
             continue
-        yield from reversed(lines)
+        for line in reversed(lines):
+            if settled:
+                if m := _AUDIT_INTENT.search(line):
+                    done.add(m.group(1))
+                elif _AUDIT_STARTED in line and (m := _AUDIT_ID.search(line)) and m.group(1) in done:
+                    continue
+            yield line
 
 
 AUDIT_SEARCH = ("action", "service", "part", "detail", "error", "excerpts", "ip", "reason")  # the stored fields words are searched in
@@ -1055,7 +1131,7 @@ def audit_read(data_dir, limit=200, since=0, until=0, after="", query=None, sour
     terms = audit_query(query) if isinstance(query, str) else list(query or [])
     raw = _audit_raw_tests(terms)
     out, skipping = [], bool(after)
-    for line in audit_lines(data_dir, since):
+    for line in audit_lines(data_dir, since, settled=True):
         if raw and not all(w in line.lower() for w in raw):
             continue  # quick test on the raw line first; the fields are checked below
         try:
@@ -1089,7 +1165,7 @@ def audit_read(data_dir, limit=200, since=0, until=0, after="", query=None, sour
 
 AUDIT_TYPES = {"service": "svc", "tool": "tool", "network": "network", "admin": "admin", "auth": "sign-in", "job": "job",
                "system": "system"}  # category → the word shown as type
-AUDIT_OUTCOMES = ("ok", "approved", "flagged", "denied", "blocked", "expired", "failed")
+AUDIT_OUTCOMES = ("ok", "approved", "started", "flagged", "denied", "blocked", "expired", "failed")
 AUDIT_FIELDS = ("outcome", "actor", "type", "target", "source", "user", "approver")  # the facets, in this order
 AUDIT_KEYS = {"actor": "actor", "user": "user", "source": "source", "type": "type", "target": "target",
               "action": "action", "outcome": "outcome", "decision": "decision", "mode": "mode", "ip": "ip", "approver": "approver", "grant": "grant",
@@ -1101,6 +1177,7 @@ _AUDIT_TOKEN = re.compile(r'(-?)([A-Za-z_]+):"([^"]*)"|(-?)([A-Za-z_]+):(\S+)|(-
 
 
 AUDIT_TONES = {"ok": "ok", "allowed": "ok", "read": "ok", "auto": "ok", "approved": "ok", "flagged": "flagged", "warn": "flagged",
+               "started": "flagged",
                "blocked": "denied", "expired": "denied", "denied": "denied", "failed": "failed"}  # outcome → colour / histogram
 
 

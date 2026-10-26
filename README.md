@@ -132,7 +132,8 @@ The stack consists of **three containers** and one **stack directory**:
 ## Getting started
 
 Requirements: a Linux host with Docker (compose plugin) and a claude.ai account (Remote Control needs a claude.ai login,
-an API key is not enough).
+an API key is not enough). A tentaclAI installation runs Claude with **one person's** account – yours; in a team, each
+person runs their own installation with their own account.
 
 ```bash
 git clone https://github.com/mwaldegg/tentaclai.git /srv/stacks/tentaclai
@@ -306,7 +307,7 @@ SSH hosts: tentacontrol → Tentacles → SSH hosts, or `./ssh-host.sh list|add|
 | `GH_TOKEN` | example token variable for the GitHub templates (`${GH_TOKEN}`) – no longer handed to `gh` in the sandbox |
 | `RC_ENABLED`, `RC_NAME`, `RC_WORKDIR`, `RC_EXTRA_ARGS`, `RC_RESTART_DELAY` | Remote Control – re-read on every restart of the session |
 | `JOB_READONLY_HELPERS` | text tools a read-only job may chain with `svc` (empty = the defaults: echo, head, tail, grep, jq, sort, uniq, wc, cut, tr, date, sleep) – shells, interpreters, awk/sed/find/xargs, network and write tools are refused |
-| `EGRESS_MODE`, `EGRESS_DIRECT_IP` | egress gateway: `permissive` (default) or `enforce`; bare IP targets in enforce mode `block` (default) or `ask` – see [Network control](#network-control) |
+| `EGRESS_MODE`, `EGRESS_LEARN_MINUTES`, `EGRESS_DIRECT_IP` | egress gateway: `learn` (in `.env.example`, length `EGRESS_LEARN_MINUTES`, 60), `permissive` (default when unset) or `enforce`; bare IP targets in enforce mode `block` (default) or `ask` – see [Network control](#network-control) |
 | `INJECTION_GUARD` | prompt-injection safeguards (default on): untrusted markers and hidden-text cleaning for mail/web, scanning in `svc` and the `tc-guard` hook – `false` turns them off, see [Security](#security) |
 | `CLAUDE_TELEMETRY` | `true` allows Claude Code's telemetry, error reports and `/bug` (default: off) |
 | `UPDATE_CHECK`, `UPDATE_REPO` | release check every 6 h (`false` = no requests), repository to check (default `mwaldegg/tentaclai`) |
@@ -356,7 +357,8 @@ All traffic of the sandbox leaves through the egress gateway; tentacontrol → *
 
 | Mode | Unknown destination |
 |---|---|
-| `permissive` (default) | allowed and recorded – use it to learn what the sandbox needs |
+| `learn` (new installations) | `permissive` for `EGRESS_LEARN_MINUTES` (60) from the sandbox's first connection, then `enforce` – the destinations seen meanwhile without a rule are offered on the Network page (*Allow all*, or one by one) |
+| `permissive` (default when `EGRESS_MODE` is not set) | allowed and recorded |
 | `enforce` | held for up to 60 s while you decide in **Approvals** (*Allow 10 min*, *Allow 1 h*, *Always*, *Deny*, *Block*); refused if nobody answers. *Recent requests* notes *Always* and *Block* under *Decided by* |
 
 **IP targets** – connections to a bare IP address instead of a name (`curl https://93.184.215.14`). Normal programs
@@ -410,7 +412,12 @@ Writing one: [docs/extensions.md](docs/extensions.md) (Extension API v1), exampl
 What tentaclAI does:
 
 - Claude reaches only what you connect; `svc` enforces `read`/`write`/`confirm` per service (docker/compose sub-commands, read-only DB
-  sessions, blocked git push, no file push, same-host web fetches) and logs every write in the audit log.
+  sessions, blocked git push, no file push, same-host web fetches) and logs every write in the audit log – **before**
+  it runs: a write that can't be logged is not executed (the entry *started*, then its result; a *started* entry
+  without a result means the call was interrupted).
+- **Risky writes are marked:** Approvals flags actions like `docker run --privileged` or a mounted `/`, `compose down -v`,
+  `rm -rf`, `DROP TABLE`, `DELETE` without `WHERE` or a force push in red and says what approving gives (Docker on a host =
+  root there). *Approve + 15 min* never covers a risky write – it is asked for on its own.
 - Credentials are injected at call time via environment or 0600 files on tmpfs – never in command lines, never shown in the UI.
 - Claude's own permission prompts stay active in sessions; its rules tell it to ask before restarts, updates and deletions.
   Scheduled jobs run unattended: *read-only* jobs are locked down twice (Claude Code's tool rules and `svc`, which treats
@@ -447,8 +454,8 @@ What it does **not** (yet) do – keep it in mind:
 - `tcrun` holds one secret at a time while a client runs: a shell escape in the interactive SQL shell (`\!`, approved
   separately in `confirm` mode) gets that user, its database password and the web cookie jars – not `.env` or the SSH key.
 - **Egress gateway:** the sandbox has no route to the outside; all traffic goes through `tentaclai-egress`. `permissive`
-  (default) allows and records everything; `enforce` allows only the built-in list, your tentacles and your allowlist and
-  asks you about the rest. Allowed destinations are still ways out – what Claude may *do* there is up to `svc`.
+  allows and records everything; `enforce` allows only the built-in list, your tentacles and your allowlist and
+  asks you about the rest; `learn` (new installations) starts permissive and switches to `enforce` after an hour. Allowed destinations are still ways out – what Claude may *do* there is up to `svc`.
 - DNS: the sandbox resolves only the stack's own containers – names outside are looked up by the egress gateway, so
   DNS is no way out either.
 - tentacontrol holds the host's Docker socket – protect it with a strong password and keep it off the internet.

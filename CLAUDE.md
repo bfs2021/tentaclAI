@@ -12,7 +12,8 @@ tentaclAI = sandbox + service gateway for Claude Code. Three containers (`compos
 - `egress` → container **tentaclai-egress** (`egress/gw.py`): forward proxy (CONNECT any port, plain HTTP, no TLS
   interception). Gets its policy from tentacontrol (`/internal/egress/*`, cached in its volume), records every
   destination. Order: built-in list (`lib/egress-default.txt`, never blockable) → blocklist → own allowlist → tentacles
-  (`tclib.reach_hosts`, derived live) → grants → `EGRESS_MODE` permissive/enforce (+ `EGRESS_DIRECT_IP` for IP targets).
+  (`tclib.reach_hosts`, derived live) → grants → `EGRESS_MODE` permissive/enforce (+ `EGRESS_DIRECT_IP` for IP targets);
+  `learn` is resolved by tentacontrol (`egress.mode()`: permissive, then enforce in `.env`) – the gateway only sees the two.
 - `control` → container **tentacontrol** (`control/`): web admin, FastAPI + Jinja + HTMX, vendored JS (no CDN at runtime).
   In both networks; network rules in `data/control/egress-rules.json` (`control/app/egress.py`). `main.py` holds the
   app, middleware and background loops; pages and endpoints live in `routes/` (one router per area: `system`,
@@ -66,6 +67,9 @@ architecture and `CONTRIBUTING.md` for the ground rules.
   never commit them, nor tokens, hostnames or IPs of a real installation.
 - **English** for code, UI, messages, docs, templates and commit messages.
 - **Guard rails stay intact:** `svc` enforces `read`/`write`/`confirm`, secrets never go into argv, logs, the UI or Claude's context.
+  Every write goes through `guarded()` in svc: it logs *started* (`audit(…, strict=True)` – fail closed) before the
+  write and the result with `intent=<that id>`; readers use `tclib.audit_read`/`audit_lines(settled=True)`, which hide
+  a settled *started* entry. Risk hints for approvals are `tclib.write_risks` – a grant never covers a risky write.
 - **Privilege separation:** Claude runs as user `claude`, `svc`/`tc-scan` as root via sudo, client tools as `tcrun`
   (`runner()` in svc). Code running as root must never read, write or run git in paths Claude controls (workspace, its
   home) – hand files over as the other user (`as_user`, `write_as_claude`, staging dirs) and never pass Claude's

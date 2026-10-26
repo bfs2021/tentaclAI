@@ -348,6 +348,24 @@ def test_same_session_asks_again_for_the_same_request(client, app_module, monkey
     assert activity.create("demohost", "docker", "docker restart x", me) != rid  # the next identical write asks anew
 
 
+def test_risky_write_is_not_covered_by_a_grant(client, app_module, monkeypatch):
+    """a grant ("Approve + 15 min") approves ordinary writes at once – a risky one still waits, marked in red, and
+    a Docker approval says it is as much as root on that host"""
+    from app import activity
+    monkeypatch.setattr(activity, "APPROVALS", {})
+    monkeypatch.setattr(activity, "GRANTS", {})
+    first = activity.create("demohost", "docker", "docker restart web")
+    activity.decide(first, True, grant=True)
+    ok = activity.APPROVALS[activity.create("demohost", "docker", "docker restart db")]
+    assert ok["status"] == "approved" and ok["grant"].startswith("until") and ok["risks"] == []
+    risky = activity.APPROVALS[activity.create("demohost", "docker", "docker run --privileged -v /:/host alpine")]
+    assert risky["status"] == "pending" and risky["grant_skipped"] and len(risky["risks"]) == 2
+    assert risky["power"].startswith("Docker on ") and "root" in risky["power"]
+    html = client.get("/partials/approvals").text
+    assert "⚠ Risky: privileged container" in html and "asked although a grant is active" in html and "same as root" in html
+    assert "⚠ risky" in client.get("/partials/approval-banner").text
+
+
 def test_network_decision_reaches_every_waiting_connection(app_module, monkeypatch):
     """the gateway's connections to one target share a request – each of them learns the decision, again and again"""
     import asyncio
@@ -650,6 +668,36 @@ def test_network_seen_table_is_sortable(client, monkeypatch):
         assert f'data-sort="{key}"' in html
     assert 'aria-sort="descending"' in html  # newest first, as the server sorts
     assert 'data-count="7" data-last="200"' in html and 'data-rule="0"' in html and 'data-rule="2demo"' in html
+
+
+def test_network_learning_phase(client, monkeypatch, tmp_path):
+    """EGRESS_MODE=learn: permissive until the phase (from the first reported connection) is over, then enforce in .env,
+    a notification, and the destinations seen meanwhile without a rule offered for the allowlist"""
+    import time
+    from app import egress, notify
+    env = {"EGRESS_MODE": "learn"}
+    monkeypatch.setattr(egress, "read_env", lambda: env)
+    monkeypatch.setattr(egress, "LEARN", str(tmp_path / "egress-learn.json"))
+    monkeypatch.setattr("app.envfile.update_env", lambda ch: env.update(ch))
+    sent, allowed = [], []
+    monkeypatch.setattr(notify, "emit", lambda *a, **k: sent.append(a[0]))
+    monkeypatch.setattr(egress, "add", lambda kind, e: allowed.append((kind, e)))
+    now = time.time()
+    rows = [{"host": "odd.example.net", "port": "443", "kind": "unknown", "label": "", "decision": "unlisted", "count": 2,
+             "first": now - 100, "last": now - 50},
+            {"host": "api.example.com", "port": "443", "kind": "tentacle", "label": "demo", "decision": "tentacle", "count": 1,
+             "first": now - 100, "last": now - 50}]
+    monkeypatch.setattr(egress, "seen_rows", lambda: [dict(r) for r in rows])
+    assert egress.mode() == "permissive" and "first connection" in client.get("/network").text
+    egress.learn_start()
+    assert egress.mode() == "permissive" and "allowed and recorded until" in client.get("/network").text
+    egress.jsonstore.save(egress.LEARN, {"started": now - 3700})  # the hour is over
+    assert egress.mode() == "enforce" and env["EGRESS_MODE"] == "enforce" and sent == ["learned"]
+    assert egress.mode() == "enforce" and sent == ["learned"]  # once
+    html = client.get("/network").text
+    assert "Learning phase over – 1 destination without a rule" in html and "odd.example.net:443" in html and "Allow all" in html
+    assert egress.learned_allow() == 1 and allowed == [("allow", "odd.example.net:443")]
+    assert egress.learned() == [] and "Learning phase over" not in client.get("/network").text
 
 
 def test_audit_rows_have_details(client, app_module, tmp_path, monkeypatch):

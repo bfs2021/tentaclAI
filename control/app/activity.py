@@ -11,9 +11,10 @@ import re
 import secrets
 import time
 
+import tclib
 
-from . import auditlog, dockerops, notify, usage
-from .config import DATA_DIR
+from . import auditlog, dockerops, notify, sshhosts, usage
+from .config import DATA_DIR, SERVICES_DIR
 
 TOKEN_FILE = os.path.join(DATA_DIR, "svc-token")
 TIMEOUT = 600
@@ -147,9 +148,25 @@ def clean_reason(text):
     return re.sub(r"\s+", " ", re.sub(r"[\x00-\x1f\x7f]", " ", str(text or ""))).strip()[:200]
 
 
+def power(service, part):
+    """what approving gives, in plain words – Docker on a host is as much as root there; a shell runs as its SSH user"""
+    try:
+        if part == "docker":
+            d = (tclib.load_services(SERVICES_DIR).get(service) or {}).get("docker") or {}
+            return f"Docker on {d.get('ssh_host') or service}: control of every container there – the same as root on that host"
+        if part == "ssh":
+            h = sshhosts.get(service) or {}
+            user = "root" if h.get("sudo") else (h.get("user") or "root")
+            return f"Shell on {service} as {user}" + (" (sudo)" if h.get("sudo") else "")
+    except Exception:  # noqa: BLE001 – a hint only, never in the way of an approval
+        pass
+    return ""
+
+
 def create(service, part, action, origin=None, review=None):
-    """new request; approved at once while a grant for this service + part is active; one pending request per network
-    target; the same request again for a session that asks once more after svc handed it back (review: clean_review)"""
+    """new request; approved at once while a grant for this service + part is active – unless the action is risky
+    (tclib.write_risks: a grant never covers those); one pending request per network target; the same request again
+    for a session that asks once more after svc handed it back (review: clean_review)"""
     _expire()
     if part == "network":
         same = next((a for a in APPROVALS.values() if a["status"] == "pending" and a["service"] == service and a["part"] == part), None)
@@ -164,16 +181,22 @@ def create(service, part, action, origin=None, review=None):
     a = {"id": rid, "service": str(service)[:60], "part": str(part)[:20], "action": str(action)[:500],
          "created": time.time(), "status": "pending", "by": "", "event": asyncio.Event(), "origin": o, **(review or {})}
     a["from"] = origin_label(a["origin"])
+    if part != "network":
+        a["risks"] = tclib.write_risks(a["part"], a["action"])
+        a["power"] = power(a["service"], a["part"])
     g = active_grant(a["service"], a["part"])
-    if g:
+    if g and a.get("risks"):
+        a["grant_skipped"] = True  # asked despite the grant: a risky action is approved on its own
+    elif g:
         until = time.strftime('%H:%M', time.localtime(g['until']))
         a.update(status="approved", decided=time.time(), by=f"grant until {until} ({g['by']})", approver=g["by"],
                  grant=f"until {until}")
         a["event"].set()
     APPROVALS[rid] = a
     if a["status"] == "pending":
-        notify.emit("approval", f"Approval needed: {a['service']} ({a['part']})" + (" ⚠" if a.get("flags") else ""),
+        notify.emit("approval", f"Approval needed: {a['service']} ({a['part']})" + (" ⚠" if a.get("flags") or a.get("risks") else ""),
                     a["action"] + (f"\nFrom: {a['from']}" if a["from"] else "")
+                    + (f"\n⚠ risky: {'; '.join(a['risks'])}" if a.get("risks") else "")
                     + (f"\n⚠ possible prompt injection: {'; '.join(a['flags'])}" if a.get("flags") else ""), key=f"approval:{rid}",
                     link=notify.control_link("/approvals"))
     return rid

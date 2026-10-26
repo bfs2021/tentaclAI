@@ -24,6 +24,19 @@
   {% for v, t in (('ask', 'ask'), ('block', 'block')) %}{% if direct_ip == v %}<span class="seg-on {{ 'ok' if v == 'block' else 'warn' }}" role="radio" aria-checked="true">{{ t }}</span>{% else %}<button role="radio" aria-checked="false" hx-post="/network/direct-ip">{{ t }}</button>{% endif %}{% endfor %}
 </div>
 </div>
+{% if learn and not learn.get('ended') %}
+<div class="banner info small learn-banner" style="margin:-8px 0 18px"><div><strong>Learning phase.</strong>
+  {% if learn.started %}Every destination is allowed and recorded until {{ learn_at(learn.until) }} – then <strong>enforce</strong> is on and unknown destinations wait for your approval. You get the destinations without a rule to review.
+  {% else %}It starts with the sandbox's first connection: for a while every destination is allowed and recorded, then <strong>enforce</strong> is on and you review what was seen.{% endif %}</div></div>
+{% elif learned %}
+<div class="banner small learn-banner" style="margin:-8px 0 18px"><div><strong>Learning phase over – {{ learned | length }} destination{{ 's' if learned | length != 1 }} without a rule:</strong>
+  <span class="mono">{% for r in learned[:8] %}{{ r.host }}:{{ r.port }}{{ ', ' if not loop.last }}{% endfor %}{{ ' …' if learned | length > 8 }}</span>.
+  Allow them all, or decide one by one below – in enforce mode each of them otherwise waits for your approval.</div>
+  <div class="row" style="gap:6px;flex-wrap:nowrap">
+    <form class="inline" hx-post="/network/learned"><input type="hidden" name="op" value="allow"><button class="btn sm primary">Allow all</button></form>
+    <form class="inline" hx-post="/network/learned"><input type="hidden" name="op" value="dismiss"><button class="btn sm ghost">Dismiss</button></form>
+  </div></div>
+{% endif %}
 <nav class="conn-tabs" aria-label="Network">
   <a href="/network?tab=seen" class="{{ 'active' if tab == 'seen' }}">{{ icon('activity') }}Seen</a>
   <a href="/network?tab=allow" class="{{ 'active' if tab == 'allow' }}">{{ icon('check') }}Allowlist</a>

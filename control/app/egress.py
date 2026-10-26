@@ -1,7 +1,11 @@
 """Network rules of the egress gateway: own allow/block lists (data/control/egress-rules.json), the shipped default
-list and the tentacles (derived live from services and SSH hosts – never stored, so they can't go stale)."""
+list and the tentacles (derived live from services and SSH hosts – never stored, so they can't go stale).
+
+EGRESS_MODE=learn (new installations): permissive for EGRESS_LEARN_MINUTES (60) from the first reported connection,
+then enforce – the destinations seen meanwhile without a rule are offered for the allowlist (data/control/egress-learn.json)."""
 import os
 import re
+import time
 
 import tclib
 
@@ -11,6 +15,7 @@ from .config import DATA_DIR, SERVICES_DIR, STACK_DIR
 from .envfile import read_env
 
 RULES = os.path.join(DATA_DIR, "egress-rules.json")
+LEARN = os.path.join(DATA_DIR, "egress-learn.json")  # {started, ended, dismissed} of the learning phase
 CLEARED = os.path.join(DATA_DIR, "egress-cleared")  # time of the last "Clear" – the gateway empties its list after it
 SEEN = "/egress/egress-seen.json"
 DEFAULT_FILE = "/app/egress-default.txt"
@@ -89,9 +94,77 @@ def clear_seen():
         f.write(str(time.time()))
 
 
-def mode():
+def configured():
+    """EGRESS_MODE as set: permissive, enforce or learn"""
     m = (read_env().get("EGRESS_MODE") or "permissive").strip().lower()
-    return m if m in ("permissive", "enforce") else "permissive"
+    return m if m in ("permissive", "enforce", "learn") else "permissive"
+
+
+def learn_seconds():
+    try:
+        return max(1, int(read_env().get("EGRESS_LEARN_MINUTES") or 60)) * 60
+    except ValueError:
+        return 3600
+
+
+def learning():
+    """the learning phase: {started, until, ended, dismissed} – started 0 while no connection came yet; {} when the
+    mode was never learn"""
+    st = jsonstore.load(LEARN)
+    if configured() != "learn" and not st:
+        return {}
+    started = float(st.get("started") or 0)
+    return dict(st, started=started, until=started + learn_seconds() if started else 0)
+
+
+def learn_start():
+    """the first connection the gateway reports in learn mode starts the clock"""
+    if configured() == "learn" and not jsonstore.load(LEARN).get("started"):
+        jsonstore.save(LEARN, {"started": time.time()})
+
+
+def mode():
+    """the mode the gateway applies: learn is permissive until the phase is over – then .env says enforce"""
+    m = configured()
+    if m != "learn":
+        return m
+    st = learning()
+    if not st["started"] or time.time() < st["until"]:
+        return "permissive"
+    try:
+        from .envfile import update_env
+        update_env({"EGRESS_MODE": "enforce"})
+    except Exception:  # noqa: BLE001 – a setting the central enforces: it decides the mode
+        return "permissive"
+    jsonstore.save(LEARN, {"started": st["started"], "ended": time.time()})
+    from . import notify
+    n = len(learned())
+    notify.emit("learned", "Network: learning phase over – enforce is on",
+                f"{n} destination{'s' if n != 1 else ''} without a rule to review on the Network page" if n else
+                "Every destination had a rule.", key="learned", link=notify.control_link("/network"))
+    return "enforce"
+
+
+def learned():
+    """destinations first seen during the learning phase that still have no rule – offered for the allowlist"""
+    st = learning()
+    if not st.get("started") or st.get("dismissed"):
+        return []
+    end = st.get("ended") or st["until"]
+    return [r for r in seen_rows() if r["kind"] == "unknown" and st["started"] - 60 <= r.get("first", 0) <= end]
+
+
+def learned_allow():
+    """every learned destination onto the allowlist → how many"""
+    rows = learned()
+    for r in rows:
+        add("allow", f"{r['host']}:{r['port']}")
+    learned_dismiss()
+    return len(rows)
+
+
+def learned_dismiss():
+    jsonstore.save(LEARN, dict(jsonstore.load(LEARN), dismissed=time.time()))
 
 
 def tentacles():

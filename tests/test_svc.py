@@ -368,6 +368,36 @@ def test_audit_keeps_excerpts(monkeypatch, tmp_path):
     assert e["category"] == "tool" and e["actor"] == "claude" and e["severity"] == 4 and e["origin_tmux"] == "claude-workspace"
 
 
+def test_write_logs_started_first_and_its_result_names_it(monkeypatch, tmp_path):
+    monkeypatch.setattr(svc, "_job", {})
+    monkeypatch.setattr(svc, "AUDIT_DIR", str(tmp_path))
+    monkeypatch.setattr(svc, "origin", lambda: {})
+    seen = []
+    assert svc.guarded("demo", "docker", "write", "docker restart web",
+                       lambda: seen.append((tmp_path / "audit.jsonl").read_text()) or 0) == 0
+    started, result = [json.loads(x) for x in (tmp_path / "audit.jsonl").read_text().splitlines()]
+    assert started["decision"] == "started" and started["id"] in seen[0]  # on disk before the write ran
+    assert result["decision"] == "auto" and result["intent"] == started["id"] and result["exit"] == 0
+    got, _ = svc.tclib.audit_read(str(tmp_path))
+    assert [e["decision"] for e in got] == ["auto"]  # the settled "started" entry is not shown
+
+
+def test_write_is_not_run_when_the_audit_log_is_not_writable(monkeypatch, tmp_path):
+    monkeypatch.setattr(svc, "_job", {})
+    monkeypatch.setattr(svc, "origin", lambda: {})
+    reported = []
+    monkeypatch.setattr(svc, "report", lambda *a, **k: reported.append(a[0]))
+
+    def broken(*a):
+        raise OSError("No space left on device")
+    monkeypatch.setattr(svc.tclib, "audit_write", broken)
+    ran = []
+    with pytest.raises(SystemExit) as ex:
+        svc.guarded("demo", "docker", "write", "docker rm -f web", lambda: ran.append(1))
+    assert not ran and "not executed" in str(ex.value) and reported == ["audit"]
+    svc.audit("demo", "docker", "read", "docker ps", "read")  # reads still go on, with a warning
+
+
 def test_read_entry_for_calls_that_logged_nothing(monkeypatch):
     logged = []
     monkeypatch.setattr(svc, "audit", lambda *a, **k: logged.append((a, k)))

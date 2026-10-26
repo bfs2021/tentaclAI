@@ -1,5 +1,5 @@
 {% from "_icons.html" import icon %}
-{% macro access(part, mode) %}{% set m = {'ro': 'read', 'rw': 'write'}.get(mode, mode) %}{% set m = m if m in ('read', 'write', 'confirm') else 'read' %}<span class="pill {{ {'write': 'accent', 'confirm': 'warn'}.get(m, 'info') }}" title="{{ {'read': 'read only', 'write': 'read and write', 'confirm': 'every write waits for approval'}[m] }}">{{ part }} · {{ m }}</span>{% endmacro %}
+{% macro access(part, mode) %}{% set m = {'ro': 'read', 'rw': 'write'}.get(mode, mode) %}{% set m = m if m in ('read', 'write', 'confirm') else 'read' %}<span class="pill {{ {'write': 'accent', 'confirm': 'warn'}.get(m, 'info') }}" title="{{ {'read': 'read only', 'write': 'read and write', 'confirm': 'every write waits for approval'}[m] }}{{ ' – Docker on a host is as much as root there' if part == 'docker' and m != 'read' }}">{{ part }} · {{ m }}</span>{% endmacro %}
 {% macro service_card(s, systems=[]) %}
   {% set targets = [s.base_url, s.docker.stacks_dir if s.docker, s.git.url if s.git, s.db.target if s.db,
                     s.data.smtp.host if s.data.smtp, s.data.imap.host if s.data.imap, s.web.url if s.web, s.files.target if s.files]

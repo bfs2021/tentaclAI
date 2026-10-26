@@ -1,8 +1,8 @@
 {# shared bits of Logs → Audit and Approvals → Recent requests #}
 {% macro outcome(v, e) -%}
-{%- set pills = {'ok': 'ok', 'allowed': 'ok', 'read': 'ok', 'auto': 'ok', 'approved': 'ok', 'flagged': 'warn', 'warn': 'warn', 'denied': 'err', 'blocked': 'warn', 'expired': 'off', 'failed': 'err'} -%}
+{%- set pills = {'ok': 'ok', 'allowed': 'ok', 'read': 'ok', 'auto': 'ok', 'approved': 'ok', 'started': 'warn', 'flagged': 'warn', 'warn': 'warn', 'denied': 'err', 'blocked': 'warn', 'expired': 'off', 'failed': 'err'} -%}
 <span class="pill {{ pills.get(v.outcome, 'off') }}"{% if e.error %} title="{{ e.error[:200] }}"{% endif %}>{{ v.outcome }}</span>
-{%- set how = grant_label(v.grant) if v.grant else ('no decision in time' if v.outcome == 'expired' else '') %}
+{%- set how = grant_label(v.grant) if v.grant else ('no decision in time' if v.outcome == 'expired' else 'no result logged – still running or interrupted' if v.outcome == 'started' else '') %}
 {%- if how %}<div class="small faint audit-how">{{ how }}</div>{% endif %}
 {%- if v.reason %}<div class="small muted audit-reason" title="the reason given for the denial">“{{ v.reason }}”</div>{% endif %}
 {%- endmacro %}

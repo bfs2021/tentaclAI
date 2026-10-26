@@ -47,6 +47,8 @@ async def internal_egress_event(request: Request):
 async def internal_egress_audit(request: Request):
     """the gateway's connections, counted per destination and window – one audit entry each"""
     d = await request.json()
+    if d.get("entries"):
+        await asyncio.to_thread(egress.learn_start)
     for e in (d.get("entries") or [])[:1000]:
         host, reason = str(e.get("host", ""))[:200], re.sub(r"[^a-z-]", "", str(e.get("reason", "")))[:20]
         try:
@@ -227,8 +229,17 @@ async def network_direct_ip(request: Request):
 @router.post("/network/mode", response_class=HTMLResponse)
 async def network_mode(request: Request):
     new = "enforce" if egress.mode() == "permissive" else "permissive"
-    update_env({"EGRESS_MODE": new})
+    update_env({"EGRESS_MODE": new})  # also ends a learning phase early
     return respond(request, f"Network mode: {new} (the gateway applies it within 15 s)", refresh=True)
+
+
+@router.post("/network/learned", response_class=HTMLResponse)
+async def network_learned(request: Request, op: str = Form("allow")):
+    if op == "dismiss":
+        await asyncio.to_thread(egress.learned_dismiss)
+        return respond(request, "Learned destinations dismissed – they stay on the Seen list", refresh=True)
+    n = await asyncio.to_thread(egress.learned_allow)
+    return respond(request, f"{n} destination{'s' if n != 1 else ''} added to the allowlist", refresh=True)
 
 
 @router.get("/network", response_class=HTMLResponse)
@@ -239,8 +250,11 @@ async def network_page(request: Request, tab: str = "seen"):
     for r in rows:
         r["first_s"], r["last_s"] = fmt(r.get("first")), fmt(r.get("last"))
     tent = await asyncio.to_thread(egress.tentacles)
-    return page(request, "network.html", tab=tab if tab in ("seen", "allow", "block") else "seen", rows=rows, mode=egress.mode(),
-                direct_ip=egress.direct_ip(),
+    mode = await asyncio.to_thread(egress.mode)
+    learn, learned = await asyncio.to_thread(egress.learning), await asyncio.to_thread(egress.learned)
+    return page(request, "network.html", tab=tab if tab in ("seen", "allow", "block") else "seen", rows=rows, mode=mode,
+                direct_ip=egress.direct_ip(), learn=learn if egress.configured() == "learn" or learn.get("ended") else {},
+                learned=learned, learn_at=lambda ts: time.strftime("%H:%M", time.localtime(ts)) if ts else "",
                 rules=egress.rules(), default=egress.default_list(),
                 tentacles=sorted((f"{h}:{p}" if p else h, n) for (h, p), n in tent.items()),
                 counts={k: sum(1 for r in rows if r["kind"] == k) for k in ("tentacle", "default", "allow", "unknown", "blocked")})

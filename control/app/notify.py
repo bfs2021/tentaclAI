@@ -19,6 +19,8 @@ CONFIG = os.path.join(DATA_DIR, "notifications.json")
 EVENTS = {
     "approval":   ("Approval needed", "high", "a write of a confirm service or an unknown network destination waits for you"),
     "expired":    ("Approval expired", "normal", "nobody decided within 10 minutes – the action was not run"),
+    "audit":      ("Audit log not writable", "high", "a write was not run because the audit log could not record it"),
+    "learned":    ("Network learning over", "normal", "the learning phase ended – enforce is on, new destinations need your approval"),
     "blocked":    ("Blocked", "normal", "a write on a read-only service, a blocklisted destination or an IP target was refused"),
     "rc_down":    ("Remote Control down", "high", "remote control has not been connected for 3 minutes"),
     "logged_out": ("Claude signed out", "high", "the sandbox is no longer signed in to Claude"),

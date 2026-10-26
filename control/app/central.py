@@ -678,6 +678,8 @@ def _unsent(limit=AUDIT_BATCH):
             continue
         if not isinstance(e, dict):
             continue
+        if e.get("decision") == "started":
+            continue  # the "started" entry of a write (svc, fail closed) – the central gets its result
         if after and e.get("id") == after:
             break
         t = tclib.audit_epoch(e.get("ts"))

@@ -2284,20 +2284,26 @@ def access_mode(part, default="read"):
 
 
 def audit(service, part, mode, action, decision, rc=None, duration=None, detail="", error="", excerpts=None, category=None,
-          approver="", grant="", reason=""):
-    """append one line to the audit log (format: tclib.audit_entry) – never lets the command fail; part "claude" is
-    one of Claude's own tools (tc-guard), everything else a tentacle"""
+          approver="", grant="", reason="", intent=None, strict=False):
+    """append one line to the audit log (format: tclib.audit_entry) → the entry's id; part "claude" is one of Claude's
+    own tools (tc-guard), everything else a tentacle. Never lets the command fail – except strict (the "started" entry
+    of a write): then an unwritable log ends svc before anything is executed (fail closed)"""
     global AUDITED
     AUDITED = True
     category = category or ("tool" if part == "claude" else "service")
     entry = tclib.audit_entry(category, service, action, decision, part=part, mode=mode, origin=origin(),
                               exit=rc, seconds=None if duration is None else round(duration, 1), detail=detail, error=error,
                               excerpts=[{"reason": r, "text": x} for r, x in (excerpts or [])], approver=approver, grant=grant,
-                              reason=reason)
+                              reason=reason, intent=intent)
     try:
         tclib.audit_write(AUDIT_DIR, entry)
     except OSError as e:
+        if strict:
+            report("audit", f"Not executed: audit log not writable ({service})", f"{action[:200]}\n{e}")
+            sys.exit(f"svc: {service}: {action[:80]} – not executed: the audit log is not writable ({e}). "
+                     "Writes only run when they can be logged – tell the user.")
         print(f"svc: audit log not writable ({e})", file=sys.stderr)
+    return entry["id"]
 
 
 def _control(method, path, payload=None, timeout=40):
@@ -2539,10 +2545,12 @@ def guarded(service, part, mode, action, run, interactive=False, review=None):
                      + (f"\nReason given by the user: “{reason}” – if it states a lasting rule, propose it as a note "
                         "where it belongs (Learn where it belongs)." if reason else ""))
         print(f"svc: ✓ approved{' – ' + by if by.startswith('grant') else ''}", file=sys.stderr, flush=True)
+    detail = "" if who.get("approver") else by
+    started = audit(service, part, mode, action, "started", detail=detail, strict=True, **who)  # no entry, no write
     t = time.time()
     rc, err = (run(), "") if interactive else run_teed(run)
-    audit(service, part, mode, action, decision, rc=rc, duration=time.time() - t, detail="" if who.get("approver") else by,
-          error=error_tail(err) if rc else "", **who)
+    audit(service, part, mode, action, decision, rc=rc, duration=time.time() - t, detail=detail,
+          error=error_tail(err) if rc else "", intent=started, **who)
     return rc
 
 

@@ -4,6 +4,21 @@ All notable changes, newest first. Every release lists **upgrade steps** from th
 
 ## Unreleased
 
+### Highlights
+- **Writes are logged before they run (fail closed):** `svc` writes a *started* entry before every write of a `write` or
+  `confirm` tentacle and only runs it when that worked; the result follows with a link to it. A write that can't be
+  logged (full disk, broken permissions) is refused with a clear message and a notification (*Audit log not writable*,
+  priority high). Logs → Audit shows one entry per write – a *started* entry is only left when the call never finished
+  (interrupted, timed out, still running).
+- **Risky writes stand out:** Approvals and the approval banner mark actions like a privileged container, a mounted
+  `/` or Docker socket, host namespaces, `docker rm`/`prune`, `compose down (-v)`, `exec`, `rm -rf`, disk tools,
+  reboots, firewall or account changes, `curl … | sh`, `DROP`/`TRUNCATE`, `DELETE`/`UPDATE` without `WHERE` and force
+  pushes in red with the reason, and say what approving gives (Docker on a host = root there; a shell's user).
+  **Approve + 15 min no longer covers risky writes** – they are asked for one by one.
+- **Network learning phase for new installations:** `.env.example` now sets `EGRESS_MODE=learn` – permissive for
+  `EGRESS_LEARN_MINUTES` (60) from the sandbox's first connection, then `enforce`; the Network page offers the
+  destinations seen meanwhile without a rule (*Allow all*, or one by one), plus a notification (*Network learning over*).
+
 ### Changes / fixes
 - Settings → Account: a user signed in through tentaclAI Enterprise gets a page of their own (no password or
   two-factor forms); whether a local profile still needs username and email is asked about the signed-in user.
@@ -12,9 +27,14 @@ All notable changes, newest first. Every release lists **upgrade steps** from th
   `outcome:ok` now only match entries stored as ok (use `-outcome:failed` or the green values); the colours are unchanged.
 
 ### Upgrade
-- `git pull`, `docker compose build control`, `docker compose up -d control` – the sandbox keeps running.
-- Optional: `svc audit` in the sandbox shows the same outcome words after `docker compose build claude` and
-  `docker compose up -d claude` (recreating `tentaclai` ends running sessions and Remote Control).
+- `git pull`, `docker compose build`, `docker compose up -d` – the fail-closed audit is in `svc`, so the sandbox image
+  changes too: recreating `tentaclai` ends running sessions and Remote Control.
+- Existing installations keep their network mode (`EGRESS_MODE` in `.env` stays as it is). To get the learning phase,
+  set `EGRESS_MODE=learn` (optional `EGRESS_LEARN_MINUTES=60`) and `docker compose up -d control` – or switch to
+  *enforce* on the Network page once *Seen* has what you need.
+- The audit log gains *started* entries and an `intent` field on results; older entries are read as before. A SIEM or
+  script reading `audit.jsonl` directly sees both lines – skip `"decision": "started"` entries whose id a later
+  entry names in `intent`.
 
 ## v0.22.0 – 2026-10-25
 
