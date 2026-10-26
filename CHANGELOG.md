@@ -2,6 +2,21 @@
 
 All notable changes, newest first. Every release lists **upgrade steps** from the previous one.
 
+## Unreleased
+
+### Highlights
+- **Network approvals name the process:** while the gateway holds a connection to an unknown destination, tentacontrol
+  asks the sandbox (`svc origin-of`, root) which process holds it – the card shows its command and user, the Claude
+  session (or job) and terminal it belongs to, and how many connections wait for the same decision. The audit entry of
+  the decision keeps them, plus when it was first requested (`requested` – the entry's time is your decision).
+
+### Changes / fixes
+- Logs → Audit CSV export: new columns at the end – `cid`, `process`, `requested`, `attempts`.
+
+### Upgrade
+- `git pull`, `docker compose build`, `docker compose up -d` – all three images change (gateway, svc, tentacontrol):
+  recreating `tentaclai` ends running sessions and Remote Control. Nothing else to do.
+
 ## v0.23.0 – 2026-10-26
 
 ### Highlights

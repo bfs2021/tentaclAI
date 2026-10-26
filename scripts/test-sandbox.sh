@@ -359,6 +359,8 @@ check "built-in list (github.com)" "$($C curl -s -m 15 -o /dev/null -w '%{http_c
 ( $C curl -s -m 70 -o /dev/null -w '%{http_code}' https://example.com > "$T/o.txt" 2>&1 || true ) &
 wait_for 30 pending example.com:443 || true
 check "unknown destination waits for approval" "$($C svc pending 2>/dev/null | grep -c 'example.com:443' || true)" "1"
+wait_for 15 sh -c "curl -s -b '$J' http://$IP:8080/partials/approvals | grep -q 'curl -s -m 70'" || true
+check "… the approval names the process that opened it" "$(curl -s -b "$J" "http://$IP:8080/partials/approvals" | grep -c 'curl -s -m 70 -o /dev/null -w %{http_code} https://example.com (claude)' || true)" "1"
 decide net10; wait
 check "Allow 10 min lets it through" "$(cat "$T/o.txt")" "200"
 check "grant covers the next connection" "$($C curl -s -m 10 -o /dev/null -w '%{http_code}' https://example.com || true)" "200"

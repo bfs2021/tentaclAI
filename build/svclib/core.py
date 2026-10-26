@@ -142,18 +142,132 @@ def origin():
         entry = os.environ.get("CLAUDE_CODE_ENTRYPOINT", "")
         if re.fullmatch(r"[a-z][a-z-]{0,19}", entry):
             o["entry"] = entry
-        pane, sock = os.environ.get("TMUX_PANE", ""), os.environ.get("TMUX", "").split(",")[0]
-        if re.fullmatch(r"%\d{1,5}", pane) and re.fullmatch(r"/tmp/tmux-\d+/[A-Za-z0-9_.-]+", sock):
-            try:  # asked as Claude – it's Claude's tmux server
-                r = subprocess.run(["tmux", "-S", sock, "display-message", "-p", "-t", pane, "#S"], capture_output=True,
-                                   text=True, timeout=3, **as_user(CLAUDE_USER))
-                name = r.stdout.strip()
-                if r.returncode == 0 and re.fullmatch(r"[A-Za-z0-9._-]{1,40}", name):
-                    o["tmux"] = name
-            except (OSError, subprocess.SubprocessError):
-                pass
+        o.update(_tmux(os.environ))
     _origin = o
     return o
+
+
+def _tmux(env):
+    """{"tmux": session name} from a process's TMUX/TMUX_PANE – asked as Claude, it's Claude's tmux server"""
+    pane, sock = env.get("TMUX_PANE", ""), env.get("TMUX", "").split(",")[0]
+    if re.fullmatch(r"%\d{1,5}", pane) and re.fullmatch(r"/tmp/tmux-\d+/[A-Za-z0-9_.-]+", sock):
+        try:
+            r = subprocess.run(["tmux", "-S", sock, "display-message", "-p", "-t", pane, "#S"], capture_output=True,
+                               text=True, timeout=3, **as_user(CLAUDE_USER))
+            name = r.stdout.strip()
+            if r.returncode == 0 and re.fullmatch(r"[A-Za-z0-9._-]{1,40}", name):
+                return {"tmux": name}
+        except (OSError, subprocess.SubprocessError):
+            pass
+    return {}
+
+
+def port_socket(port, proc="/proc"):
+    """the sandbox's TCP connection from local port `port` (to the egress gateway) → (socket inode, owner uid) or None"""
+    for f in ("tcp", "tcp6"):
+        try:
+            with open(os.path.join(proc, "net", f)) as fh:
+                rows = fh.read().splitlines()[1:]
+        except OSError:
+            continue
+        for row in rows:
+            col = row.split()
+            if len(col) > 9 and col[3] != "0A" and int(col[1].rsplit(":", 1)[1], 16) == port and col[9] != "0":
+                return col[9], int(col[7])  # 0A = LISTEN: a server on the same number is not it
+    return None
+
+
+def socket_pid(inode, proc="/proc"):
+    """the process with an fd on that socket → pid or None (only readable for the process's own user – root in the
+    sandbox has no CAP_SYS_PTRACE)"""
+    want = f"socket:[{inode}]"
+    for d in os.listdir(proc):
+        if not d.isdigit():
+            continue
+        try:
+            for fd in os.listdir(os.path.join(proc, d, "fd")):
+                if os.readlink(os.path.join(proc, d, "fd", fd)) == want:
+                    return int(d)
+        except OSError:
+            continue
+    return None
+
+
+def port_process(port, proc="/proc"):
+    found = port_socket(port, proc)
+    return socket_pid(found[0], proc) if found else None
+
+
+def as_uid(uid, fn):
+    """fn() in a child process running as uid (root stays root) → its JSON-able result, None on failure"""
+    if uid == 0 or not privileged():
+        return fn()
+    try:
+        pw = pwd.getpwuid(uid)
+    except KeyError:
+        return None
+    r, w = os.pipe()
+    pid = os.fork()
+    if pid == 0:  # the child: drop to the user, answer through the pipe, never return into svc. Changing the uid makes
+        # it non-dumpable – that user can't attach to it or read its memory (svc's .env values are in there)
+        try:
+            os.close(r)
+            os.setgroups([])
+            os.setgid(pw.pw_gid)
+            os.setuid(uid)
+            os.write(w, json.dumps(fn()).encode())
+        finally:
+            os._exit(0)
+    os.close(w)
+    out = b""
+    while chunk := os.read(r, 65536):
+        out += chunk
+    os.close(r)
+    os.waitpid(pid, 0)
+    try:
+        return json.loads(out) if out else None
+    except ValueError:
+        return None
+
+
+def process_origin(pid, proc="/proc"):
+    """who started a process: the command, its user and – from the nearest ancestor that has them – the Claude
+    session, entry point and tmux session, or the job (tc-job marker). A hint like origin(): Claude controls its own
+    processes' environment and names"""
+    out, o, chain = {}, {}, pid
+    try:
+        with open(os.path.join(proc, str(pid), "cmdline"), "rb") as f:
+            out["command"] = " ".join(a.decode(errors="replace") for a in f.read().split(b"\0") if a)[:200]
+        uid = os.stat(os.path.join(proc, str(pid))).st_uid
+        out["user"] = pwd.getpwuid(uid).pw_name
+    except (OSError, KeyError):
+        return {}
+    for _ in range(64):
+        if chain <= 1:
+            break
+        try:
+            with open(os.path.join(proc, str(chain), "cmdline"), "rb") as f:
+                args = f.read().split(b"\0")
+            marks = [a[7:].decode(errors="replace") for a in args if a.startswith(b"tc-job=")]
+            if marks and JOB_RE.match(marks[0]):
+                o = {"job": marks[0]}  # the outermost marker wins (tentacontrol's wrapper)
+            if not o.get("job") and "session" not in o:
+                try:  # another user's environment is unreadable (sudo, docker exec) – go on with its parent
+                    with open(os.path.join(proc, str(chain), "environ"), "rb") as f:
+                        env = dict(x.decode(errors="replace").split("=", 1) for x in f.read().split(b"\0") if b"=" in x)
+                except OSError:
+                    env = {}
+                if SESSION_ID_RE.match(env.get("CLAUDE_CODE_SESSION_ID", "")):
+                    o["session"] = env["CLAUDE_CODE_SESSION_ID"]
+                    if re.fullmatch(r"[a-z][a-z-]{0,19}", env.get("CLAUDE_CODE_ENTRYPOINT", "")):
+                        o["entry"] = env["CLAUDE_CODE_ENTRYPOINT"]
+                    o.update(_tmux(env))
+            with open(os.path.join(proc, str(chain), "stat")) as f:
+                chain = int(f.read().rsplit(")", 1)[1].split()[1])
+        except (OSError, ValueError, IndexError):
+            break
+    out["origin"] = o
+    return out
 
 
 def _account(user):

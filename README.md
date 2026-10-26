@@ -371,7 +371,7 @@ All traffic of the sandbox leaves through the egress gateway; tentacontrol → *
 |---|---|
 | `learn` (new installations) | `permissive` for `EGRESS_LEARN_MINUTES` (60) from the sandbox's first connection, then `enforce` – the destinations seen meanwhile without a rule are offered on the Network page (*Allow all*, or one by one) |
 | `permissive` (default when `EGRESS_MODE` is not set) | allowed and recorded |
-| `enforce` | held for up to 60 s while you decide in **Approvals** (*Allow 10 min*, *Allow 1 h*, *Always*, *Deny*, *Block*); refused if nobody answers. *Recent requests* notes *Always* and *Block* under *Decided by* |
+| `enforce` | held for up to 60 s while you decide in **Approvals** (*Allow 10 min*, *Allow 1 h*, *Always*, *Deny*, *Block*); refused if nobody answers. The card names the process in the sandbox that opened the connection and the Claude session or job it belongs to (looked up while the connection is held – a hint, like every origin), and how many connections wait for the same decision; the audit entry keeps both and when it was first requested. *Recent requests* notes *Always* and *Block* under *Decided by* |
 
 **IP targets** – connections to a bare IP address instead of a name (`curl https://93.184.215.14`). Normal programs
 almost always use names, so in `enforce` mode such a connection without a rule is blocked (`block`, default) or asked

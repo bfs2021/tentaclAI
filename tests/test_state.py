@@ -322,3 +322,27 @@ def test_mcp_risks_from_svc_reach_the_approval(app_module):
         assert activity.APPROVALS[rid]["risks"] == ["destructive tool"]
     finally:
         activity.decide(rid, False)
+
+
+def test_network_request_names_its_process(app_module, monkeypatch):
+    """the gateway's request gets the process svc found (origin-of) and counts the connections waiting for it; the
+    audit entry of the decision carries both and the time it was first requested"""
+    import time
+    from app import activity, auditlog
+    monkeypatch.setattr(activity, "APPROVALS", {})
+    logged = []
+    monkeypatch.setattr(auditlog, "write", lambda *a, **k: logged.append((a, k)))
+    rid = activity.create("mobile.events.example.com:443", "network", "connect")
+    assert activity.create("mobile.events.example.com:443", "network", "connect") == rid
+    activity.set_process(rid, {"command": ".venv/bin/python worker.py\n", "user": "claude",
+                               "origin": {"session": "6576389e-0000-4000-8000-000000000001", "tmux": "claude-rc", "x": "y"}})
+    a = activity.APPROVALS[rid]
+    assert a["process"] == ".venv/bin/python worker.py (claude)" and a["attempts"] == 2
+    assert a["origin"] == {"session": "6576389e-0000-4000-8000-000000000001", "tmux": "claude-rc"} and a["from"]
+    activity.set_process(rid, {})  # nothing found (the process ended): keeps what is there
+    assert a["process"].startswith(".venv")
+    activity.decide(rid, True, who="admin")
+    activity.audit_network(a, "approved")
+    (args, kw), = logged
+    assert kw["process"] == ".venv/bin/python worker.py (claude)" and kw["attempts"] == 2
+    assert kw["origin"]["tmux"] == "claude-rc" and kw["requested"].startswith(time.strftime("%Y-"))

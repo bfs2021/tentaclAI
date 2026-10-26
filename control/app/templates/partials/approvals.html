@@ -10,6 +10,8 @@
           <div class="row" style="gap:8px"><strong>{{ a.service }}</strong><span class="tag">{{ a.part }}</span>
             <span class="small faint">#{{ a.id }} · {{ ((now - a.created) // 60) | int }} min ago · expires in {{ ((600 - (now - a.created)) // 60) | int }} min{% if a.get('cid') %} · <a class="mono" href="/logs?q=cid:{{ a.cid }}&amp;range=24h" title="every audit entry of this svc call">call {{ a.cid }}</a>{% endif %}</span></div>
           {% if a.get('from') %}<div class="small muted" title="reported by the requesting session – a hint, not proof">from {{ a['from'] }}</div>{% endif %}
+          {% if a.get('process') %}<div class="small muted" title="the process in the sandbox that opened the connection – a hint, not proof">process <span class="mono">{{ a.process }}</span>{% if a.get('attempts', 1) > 1 %} · {{ a.attempts }} connections waiting{% endif %}</div>
+          {% elif a.part == 'network' and a.get('attempts', 1) > 1 %}<div class="small muted">{{ a.attempts }} connections waiting</div>{% endif %}
           <pre class="rc approval-action">{{ a.action }}</pre>
           {% if a.get('power') %}<div class="small muted approval-power">{{ a.power }}</div>{% endif %}
           {% if a.get('risks') %}<div class="banner err small approval-risks">⚠ Risky: {{ a.risks | join('; ') }}{% if a.get('grant_skipped') %} – asked although a grant is active: risky writes are approved one by one{% endif %}</div>{% endif %}

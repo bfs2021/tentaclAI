@@ -532,3 +532,11 @@ def test_audit_unknown_keys():
     assert tclib.audit_unknown_keys("status:denied outcome:ok Status:x docker") == ["status"]
     assert tclib.audit_unknown_keys('-foo:"a b" https://example.com service:x category:job') == ["foo"]
     assert tclib.audit_unknown_keys("") == []
+
+
+def test_audit_view_network_process():
+    e = tclib.audit_entry("network", "x.example.com:443", "connect", "approved", actor="claude", process="python w.py (claude)",
+                          requested="2026-10-26T21:28:40.000+01:00", attempts=12, origin={"tmux": "claude-rc"})
+    v = tclib.audit_view(e)
+    assert v["process"] == "python w.py (claude)" and v["attempts"] == 12 and v["source"] == "claude-rc"
+    assert tclib.audit_view(dict(e, attempts=1))["attempts"] == ""

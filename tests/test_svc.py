@@ -775,3 +775,48 @@ def test_svc_list_columns_fit_long_names(monkeypatch, capsys):
     starts = {line.index(word) for line, word in zip(out, ("Type", "api", "imap"))}
     assert len(starts) == 1  # one column start for every row
     assert svc.columns([]) == []
+
+
+def _fake_proc(tmp_path, port=41000):
+    """a /proc with: pid 10 (claude, session env) → 20 (bash) → 30 (python worker.py, holds the socket of `port`)"""
+    proc = tmp_path / "proc"
+    (proc / "net").mkdir(parents=True)
+    head = "  sl  local_address rem_address   st tx_queue rx_queue tr tm->when retrnsmt   uid  timeout inode\n"
+    (proc / "net" / "tcp").write_text(head + f"   0: 0A00000A:{port:04X} 0300000A:0C38 01 00000000:00000000 00:00000000 00000000  1000 0 777\n"
+                                      f"   1: 0100007F:{port:04X} 00000000:0000 0A 00000000:00000000 00:00000000 00000000  1000 0 888\n")
+    for pid, ppid, cmd, env in ((10, 1, ["claude"], {"CLAUDE_CODE_SESSION_ID": "6576389e-0000-4000-8000-000000000001",
+                                                     "CLAUDE_CODE_ENTRYPOINT": "cli"}),
+                                (20, 10, ["/bin/bash", "-c", "run.sh"], {}),
+                                (30, 20, [".venv/bin/python", "worker.py"], {"PATH": "/usr/bin"})):
+        d = proc / str(pid)
+        (d / "fd").mkdir(parents=True)
+        (d / "cmdline").write_bytes(b"\0".join(c.encode() for c in cmd) + b"\0")
+        (d / "environ").write_bytes(b"".join(f"{k}={v}".encode() + b"\0" for k, v in env.items()))
+        (d / "stat").write_text(f"{pid} ({cmd[0]}) S {ppid} 0 0")
+    os.symlink("socket:[777]", proc / "30" / "fd" / "5")
+    os.symlink("socket:[888]", proc / "20" / "fd" / "3")  # the listening socket on the same number – not it
+    os.symlink("/dev/null", proc / "30" / "fd" / "0")
+    return str(proc)
+
+
+def test_port_process_finds_the_connection_owner(tmp_path):
+    proc = _fake_proc(tmp_path)
+    assert svc.port_process(41000, proc) == 30
+    assert svc.port_process(41001, proc) is None
+    found = svc.process_origin(30, proc)
+    assert found["command"] == ".venv/bin/python worker.py"
+    assert found["origin"] == {"session": "6576389e-0000-4000-8000-000000000001", "entry": "cli"}  # from the ancestor
+    assert svc.process_origin(99, proc) == {}
+
+
+def test_process_origin_names_the_job(tmp_path):
+    proc = _fake_proc(tmp_path)
+    (tmp_path / "proc" / "20" / "cmdline").write_bytes(b"sh\0-c\0claude -p x\0tc-job=abc123def\0")
+    assert svc.process_origin(30, proc)["origin"] == {"job": "abc123def"}
+
+
+def test_origin_of_is_not_for_claude(monkeypatch):
+    monkeypatch.setattr(svc, "via_sudo", lambda: True)
+    monkeypatch.setattr(svc, "privileged", lambda: True)
+    with pytest.raises(SystemExit, match="tentacontrol only"):
+        svc.cmd_origin_of("41000")

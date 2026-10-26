@@ -1,12 +1,13 @@
 """Approvals (pending requests, grants, recent requests), svc's and the gateway's internal endpoints, and the Network page."""
 import asyncio
+import json
 import re
 import time
 
 from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse, RedirectResponse
 
-from .. import activity, auditlog, auth, egress, notify
+from .. import activity, auditlog, auth, dockerops, egress, notify
 from ..envfile import update_env
 from ..web import page, respond, templates, toast
 import tclib  # noqa: E402  shared with the sandbox tools
@@ -183,7 +184,20 @@ async def internal_egress_ask(request: Request):
     except (ValueError, TypeError):
         return JSONResponse({"error": "bad target"}, status_code=400)
     rid = activity.create(f"{host}:{port}", "network", "connect")
+    client = data.get("client_port")
+    if isinstance(client, int) and 0 < client < 65536 and not activity.APPROVALS[rid].get("process"):
+        asyncio.get_running_loop().create_task(_find_process(rid, client))  # the gateway holds the connection meanwhile
     return JSONResponse({"id": rid})
+
+
+async def _find_process(rid, client_port):
+    """which process of the sandbox opened the connection – asked in the sandbox as root (svc origin-of)"""
+    code, out = await asyncio.to_thread(dockerops.run, ["svc", "origin-of", str(client_port)])
+    try:
+        found = json.loads(out.strip().splitlines()[-1]) if code == 0 and out.strip() else {}
+    except (ValueError, IndexError):
+        found = {}
+    activity.set_process(rid, found)
 
 
 @router.get("/internal/egress/wait/{rid}")

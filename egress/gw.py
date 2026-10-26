@@ -115,10 +115,11 @@ async def resolve(host, port):
     return sorted(dict.fromkeys(i[4][0] for i in infos), key=lambda a: ":" in a)  # IPv4 first
 
 
-async def ask(host, port):
-    """enforce: request an approval in tentacontrol and hold the connection up to HOLD seconds"""
+async def ask(host, port, client_port=0):
+    """enforce: request an approval in tentacontrol and hold the connection up to HOLD seconds (client_port: the
+    sandbox's end of this connection – tentacontrol looks up which process holds it while it is held)"""
     try:
-        rid = (await asyncio.to_thread(control, "/internal/egress/ask", {"host": host, "port": port}))["id"]
+        rid = (await asyncio.to_thread(control, "/internal/egress/ask", {"host": host, "port": port, "client_port": client_port}))["id"]
         end = time.time() + HOLD
         while time.time() < end:
             st = await asyncio.to_thread(control, f"/internal/egress/wait/{rid}?wait=20", None, 30)
@@ -278,7 +279,8 @@ async def handle(cr, cw):
         await asyncio.to_thread(refresh)
         ok, why = decide(host, port, ips)
     if ok is None:
-        ok = await ask(host, port)
+        peer = cw.get_extra_info("peername")
+        ok = await ask(host, port, peer[1] if isinstance(peer, tuple) and len(peer) > 1 else 0)
         why = "approved" if ok else "denied"
     record(host, port, why)
     audit_note(host, port, why)

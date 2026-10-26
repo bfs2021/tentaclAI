@@ -86,7 +86,8 @@ def audit_network(a, decision, detail=""):
     """a decided request of the egress gateway (unknown destination) – svc never sees these"""
     if a.get("part") == "network":
         auditlog.write("network", a["service"], a["action"], decision, actor="claude", mode="confirm", detail=detail,
-                       approver=a.get("approver", ""), grant=a.get("grant", ""))
+                       approver=a.get("approver", ""), grant=a.get("grant", ""), origin=a.get("origin") or None,
+                       process=a.get("process", ""), requested=tclib.audit_ts(a["created"]), attempts=a.get("attempts", 1))
 
 
 def _expire():
@@ -190,6 +191,20 @@ def clean_review(diff="", flags=None, risks=None):
     return out
 
 
+def set_process(rid, found):
+    """what `svc origin-of` found for a network request: the process holding the connection and the Claude session or
+    job it belongs to (a hint – Claude controls its own processes)"""
+    a = APPROVALS.get(rid)
+    if not a or not isinstance(found, dict) or not found.get("command"):
+        return
+    user = re.sub(r"[^a-z0-9_-]", "", str(found.get("user", "")))[:32]
+    a["process"] = re.sub(r"[\x00-\x1f\x7f]+", " ", str(found["command"])).strip()[:200] + (f" ({user})" if user else "")
+    o = clean_origin(found.get("origin"))
+    if o:
+        a["origin"], a["from"] = o, origin_label(o)
+    save()
+
+
 def clean_reason(text):
     """the reason the user gives for a denial: one line, ≤ 200 characters"""
     return re.sub(r"\s+", " ", re.sub(r"[\x00-\x1f\x7f]", " ", str(text or ""))).strip()[:200]
@@ -219,6 +234,8 @@ def create(service, part, action, origin=None, review=None, cid=""):
     if part == "network":
         same = next((a for a in APPROVALS.values() if a["status"] == "pending" and a["service"] == service and a["part"] == part), None)
         if same:
+            same["attempts"] = same.get("attempts", 1) + 1  # another connection waits for the same decision
+            save()
             return same["id"]
     o = clean_origin(origin)
     same = _again(str(service)[:60], str(part)[:20], str(action)[:500], o)

@@ -1,4 +1,5 @@
 """svc's command line: parsing the arguments and dispatching to the parts."""
+import json
 import os
 import sys
 import time
@@ -54,6 +55,8 @@ def main(argv):
         return git_part.cmd_git_list(services)
     if cmd == "ssh":
         return ssh_part.cmd_ssh(argv[2:])
+    if cmd == "origin-of" and len(argv) == 3:
+        return cmd_origin_of(argv[2])
     if cmd == "mcp-proxy" and len(argv) == 3:
         return mcp_part.cmd_mcp_proxy(services, argv[2])
     if cmd == "rc-env":
@@ -92,8 +95,23 @@ def main(argv):
     return 1
 
 
+def cmd_origin_of(port):
+    """tentacontrol (root, never through sudo): which process of the sandbox holds the connection from local port
+    <port> – asked while the egress gateway holds a connection to an unknown destination → JSON {command, user, origin}"""
+    if not core.privileged() or core.via_sudo():
+        sys.exit("svc: origin-of is for tentacontrol only")
+    if not port.isdigit() or not 0 < int(port) < 65536:
+        sys.exit("svc: origin-of <port>")
+    found = core.port_socket(int(port))
+    if found:  # looked up as the socket's owner: only it may read its processes' fds and environment
+        inode, uid = found
+        res = core.as_uid(uid, lambda: (lambda pid: core.process_origin(pid) if pid else {})(core.socket_pid(inode)))
+    print(json.dumps(res if found and isinstance(res, dict) else {}))
+    return 0
+
+
 SERVICE_NAMES = set()
-NOT_LOGGED = {"-h", "--help", "help", "pending", "audit", "tool-report", "mcp-proxy", "git-credential",
+NOT_LOGGED = {"-h", "--help", "help", "pending", "audit", "tool-report", "mcp-proxy", "origin-of", "git-credential",
               "git-push-hook", "rc-env"}  # svc's own plumbing and lookups – no audit entry
 ROOT_LOGGED = {"sync", "git"}  # run by tentacontrol or the entrypoint: only these get an entry (pages poll the rest – svc test
 # for the status dots too; the Test button is an admin action of its own)

@@ -967,3 +967,14 @@ def test_limited_job_editor_shows_what_it_may_use(client, app_module, monkeypatc
                           "profile": "standard", "scope": "1"})
     html = client.get(f"/jobs/{jid}").text
     assert "This job may use: <code>demoapi</code>, <code>demomail</code>" in html
+
+
+def test_network_approval_card_shows_the_process(client, app_module, monkeypatch):
+    from app import activity
+    monkeypatch.setattr(activity, "APPROVALS", {})
+    rid = activity.create("telemetry.example.com:443", "network", "connect")
+    activity.create("telemetry.example.com:443", "network", "connect")
+    activity.set_process(rid, {"command": ".venv/bin/python worker.py", "user": "claude", "origin": {"tmux": "claude-rc"}})
+    html = client.get("/partials/approvals").text
+    assert '<span class="mono">.venv/bin/python worker.py (claude)</span> · 2 connections waiting' in html
+    activity.decide(rid, False)
