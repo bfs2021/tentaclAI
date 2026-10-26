@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Host helper for tentaclai (sandbox + service gateway for Claude Code) and tentacontrol (web admin).
-#   ./tentaclai.sh init       guided first-time setup (questions; --defaults = no questions)
+#   ./tentaclai.sh init       first-time setup: one question (how to reach tentacontrol), then build + start
+#                             (--advanced: every question – host, paths, git, remote control, resources; --defaults: none)
 #   ./tentaclai.sh            Claude in /workspace (persistent tmux session)
 #   ./tentaclai.sh <dir>      Claude in any directory inside the container
 #   ./tentaclai.sh rc         attach to the remote-control session
@@ -22,6 +23,8 @@ set -euo pipefail
 CONTAINER=tentaclai
 STACK_DIR="${TC_STACK_DIR:-$(cd "$(dirname "$(readlink -f "$0")")" && pwd)}"
 ENV_FILE="$STACK_DIR/.env"
+
+tclib_name() { printf '%s' "$1" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9_-]\+/-/g; s/^[-_]*//; s/[-_]*$//' | cut -c1-40; }  # = tclib.service_name_for
 
 env_value() { sed -n "s/^$1=//p" "$ENV_FILE" 2>/dev/null | tail -1 | tr -d "'\""; }
 
@@ -46,6 +49,13 @@ ask_yn() {  # "question" default(y/n) -> exit code 0 = yes
     ans="${ans:-$def}"; [[ "${ans,,}" == j* || "${ans,,}" == y* ]]
 }
 
+ADVANCED=0
+adv() {  # ask / ask_yn only with init --advanced – otherwise the default (or the value already in .env)
+    local save="$INTERACTIVE"; [ "$ADVANCED" = 1 ] || INTERACTIVE=0
+    local rc=0; "$@" || rc=$?
+    INTERACTIVE="$save"; return "$rc"
+}
+
 ask_choice() {  # var "question" default option...  (options "key|Text")
     local __var="$1" q="$2" def="$3"; shift 3
     if [ "$INTERACTIVE" = 1 ]; then
@@ -57,29 +67,33 @@ ask_choice() {  # var "question" default option...  (options "key|Text")
 
 cmd_init() {
     cd "$STACK_DIR"
+    [ "${1:-}" = "--advanced" ] && ADVANCED=1
     [ "${1:-}" = "--defaults" ] || [ ! -t 0 ] && INTERACTIVE=0
-    echo "🐙 tentaclai – first-time setup$( [ "$INTERACTIVE" = 0 ] && echo ' (no questions)')"
+    local note=""
+    if [ "$INTERACTIVE" = 0 ]; then note=" (no questions)"
+    elif [ "$ADVANCED" = 0 ]; then note=" – everything else has defaults (change them in Settings, or run init --advanced)"; fi
+    echo "🐙 tentaclai – first-time setup$note"
     if [ ! -f .env ]; then install -m 600 .env.example .env; echo "→ created .env from .env.example"; fi
     chmod 600 .env
     cur() { local v; v="$(env_value "$1")"; echo "${v:-$2}"; }
 
     echo; echo "1/5 Host & paths"
     set_env TC_DIR "$STACK_DIR"
-    ask v "Name of this host (how Claude refers to it)" "$(cur TC_HOSTNAME "$(hostname -s)")";     set_env TC_HOSTNAME "$v"
-    ask v "Internal domain (for service templates)" "$(cur TC_DOMAIN example.lan)";              set_env TC_DOMAIN "$v"
+    adv ask v "Name of this host (how Claude refers to it)" "$(cur TC_HOSTNAME "$(hostname -s)")";     set_env TC_HOSTNAME "$v"
+    adv ask v "Internal domain (for service templates)" "$(cur TC_DOMAIN example.lan)";              set_env TC_DOMAIN "$v"
     local tz; tz="$(cat /etc/timezone 2>/dev/null || timedatectl show -p Timezone --value 2>/dev/null || echo UTC)"
-    ask v "Time zone" "$(cur TZ "$tz")";                                                       set_env TZ "$v"
-    ask v "Docker socket of this host (for tentacontrol)" "$(cur DOCKER_SOCKET /var/run/docker.sock)"; set_env DOCKER_SOCKET "$v"
-    ask v "Host docs for Claude (markdown file, empty = none)" "$(cur HOST_DOCS '')";        set_env HOST_DOCS "$v"
-    ask v "Custom root CA (PEM, empty = none)" "$(cur CA_CERT '')";                           set_env CA_CERT "$v"
+    adv ask v "Time zone" "$(cur TZ "$tz")";                                                       set_env TZ "$v"
+    adv ask v "Docker socket of this host (for tentacontrol)" "$(cur DOCKER_SOCKET /var/run/docker.sock)"; set_env DOCKER_SOCKET "$v"
+    adv ask v "Host docs for Claude (markdown file, empty = none)" "$(cur HOST_DOCS '')";        set_env HOST_DOCS "$v"
+    adv ask v "Custom root CA (PEM, empty = none)" "$(cur CA_CERT '')";                           set_env CA_CERT "$v"
 
     echo; echo "2/5 Access to tentacontrol"
     local mode host url
-    ask_choice mode "How should the web UI be reachable?" 1 \
+    ask_choice mode "How should the web UI be reachable?" 2 \
         "1|only on this host (127.0.0.1:8484, e.g. via SSH tunnel)" \
-        "2|in the LAN on a port" "3|via nginx-proxy (VIRTUAL_HOST)" "4|via Traefik"
+        "2|in the LAN on port 8484 – keep it off the internet" "3|via nginx-proxy (VIRTUAL_HOST)" "4|via Traefik"
     case "$mode" in
-        2) ask v "Port" "$(cur CONTROL_PORT 8484)"; set_env CONTROL_BIND 0.0.0.0; set_env CONTROL_PORT "$v"
+        2) adv ask v "Port" "$(cur CONTROL_PORT 8484)"; set_env CONTROL_BIND 0.0.0.0; set_env CONTROL_PORT "$v"
            url="http://$(hostname -I 2>/dev/null | awk '{print $1}'):$v" ;;
         3|4) ask host "Hostname" "tentacontrol.$(env_value TC_DOMAIN)"; url="https://$host"
            if [ -f compose.override.yaml ]; then echo "  compose.override.yaml exists – not overwritten, please add it yourself"
@@ -95,21 +109,21 @@ cmd_init() {
     esac
     # the chosen access mode wins over an old value
     [ "$INTERACTIVE" = 0 ] && [ -n "$(env_value CONTROL_URL)" ] && url="$(env_value CONTROL_URL)"
-    ask v "URL of tentacontrol" "$url"; set_env CONTROL_URL "$v"
+    adv ask v "URL of tentacontrol" "$url"; set_env CONTROL_URL "$v"
 
     echo; echo "3/5 Claude"
-    ask v "Git name for commits" "$(cur GIT_USER_NAME '')";           set_env GIT_USER_NAME "$v"
-    ask v "Git email" "$(cur GIT_USER_EMAIL '')";                    set_env GIT_USER_EMAIL "$v"
-    ask v "Claude Code version" "$(cur CLAUDE_CODE_VERSION latest)";  set_env CLAUDE_CODE_VERSION "$v"
-    if ask_yn "Enable remote control (claude.ai/code + app)?" y; then
+    adv ask v "Git name for commits" "$(cur GIT_USER_NAME '')";           set_env GIT_USER_NAME "$v"
+    adv ask v "Git email" "$(cur GIT_USER_EMAIL '')";                    set_env GIT_USER_EMAIL "$v"
+    adv ask v "Claude Code version" "$(cur CLAUDE_CODE_VERSION latest)";  set_env CLAUDE_CODE_VERSION "$v"
+    if adv ask_yn "Enable remote control (claude.ai/code + app)?" y; then
         set_env RC_ENABLED true
-        ask v "Name of the remote session" "$(cur RC_NAME "$(env_value TC_HOSTNAME)")"; set_env RC_NAME "$v"
+        adv ask v "Name of the remote session" "$(cur RC_NAME "$(env_value TC_HOSTNAME)")"; set_env RC_NAME "$v"
     else set_env RC_ENABLED false; fi
 
     echo; echo "4/5 Resources"
     local cpus; cpus="$(nproc 2>/dev/null || echo 4)"; [ "$cpus" -gt 4 ] && cpus=4
-    ask v "CPU limit (cores)" "$(cur CLAUDE_CPUS "$cpus")";   set_env CLAUDE_CPUS "$v"
-    ask v "Memory limit" "$(cur CLAUDE_MEMORY 8g)";               set_env CLAUDE_MEMORY "$v"
+    adv ask v "CPU limit (cores)" "$(cur CLAUDE_CPUS "$cpus")";   set_env CLAUDE_CPUS "$v"
+    adv ask v "Memory limit" "$(cur CLAUDE_MEMORY 8g)";               set_env CLAUDE_MEMORY "$v"
 
     echo; echo "5/5 Files"
     mkdir -p data/home data/control workspace local services ssh/config.d ssh/keys
@@ -122,21 +136,23 @@ cmd_init() {
     [ -f local/CLAUDE.md ] || { cp local/CLAUDE.example.md local/CLAUDE.md 2>/dev/null || printf '# Site rules for Claude\n' > local/CLAUDE.md; echo "  → created local/CLAUDE.md"; }
     [ -f compose.override.yaml ] || printf '# site additions (see compose.override.example.yaml)\nservices: {}\n' > compose.override.yaml
 
-    echo; echo "Docker hosts: Claude reaches every docker host – this one too – over SSH. In tentacontrol add the host"
-    echo "  under Tentacles → SSH hosts (this host: hostname host.docker.internal), then a service from the template"
-    echo "  “Docker host (SSH)”."
     set_env COMPOSE_FILE "compose.yaml:compose.override.yaml"
     docker compose config --quiet && echo "  ✓ configuration valid"
 
     echo
-    if ask_yn "Build and start tentacontrol now?" y && [ "$INTERACTIVE" = 1 ]; then
+    if ask_yn "Build and start everything now (a few minutes)?" y && [ "$INTERACTIVE" = 1 ]; then
         docker compose up -d --build control
         for _ in $(seq 1 30); do docker logs tentacontrol 2>&1 | grep -q 'setup?token=' && break; sleep 1; done
-        echo; echo "Setup link (one-time):"; "$0" setup-url
-        echo; echo "Then in tentacontrol: Overview → Create & start → Terminal (Claude login) → Services."
-        echo "Tip: the system inventory (tentacontrol → Overview, or ./tentaclai.sh inventory) lets Claude get to know your host."
+        echo; echo "Setup link (one-time) – open it now to set your password while the sandbox builds:"; "$0" setup-url
+        echo; echo "Building the sandbox …"
+        docker compose up -d --build
+        echo
+        echo "Next, in tentacontrol:"
+        echo "  1. Overview → Sign in now        – claude auth login with your claude.ai account"
+        echo "  2. Tentacles → SSH hosts → Add host → \"This host\" – Docker on this machine, ready to use"
+        echo "  3. Ask Claude: svc docker $(tclib_name "$(env_value TC_HOSTNAME)") ps"
     else
-        echo "Next: docker compose up -d control && ./tentaclai.sh setup-url"
+        echo "Next: docker compose up -d --build && ./tentaclai.sh setup-url"
     fi
 }
 

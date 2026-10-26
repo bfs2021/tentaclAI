@@ -1,6 +1,6 @@
 {% from "_icons.html" import icon %}
 {% macro hidden(f) -%}
-  {% for k in ("alias", "hostname", "user", "port", "proxyjump", "sudo", "access") %}<input type="hidden" name="{{ k }}" value="{{ f.get(k, '') }}">{% endfor %}
+  {% for k in ("alias", "hostname", "user", "port", "proxyjump", "sudo", "access", "docker") %}<input type="hidden" name="{{ k }}" value="{{ f.get(k, '') }}">{% endfor %}
 {%- endmacro %}
 {% macro head(title, sub="") -%}
   <div class="card-head" style="margin-bottom:4px"><h2>{{ title }}</h2>
@@ -43,7 +43,13 @@
 {% if step == "form" %}
 <form hx-post="/ssh/new/scan" hx-target="#ssh-dlg-body" hx-indicator="#ssh-dlg-spin" autocomplete="off">
   {{ head("Add host", "Step 1 of 3 – where is the host?") }}
+  <div class="row small" style="margin:-6px 0 12px;gap:8px"><span class="muted">The host tentaclAI runs on?</span>
+    <button type="button" class="btn sm" title="hostname host.docker.internal – the sandbox reaches its own host there"
+      onclick="var f=this.form;f.hostname.value='host.docker.internal';if(!f.alias.value)f.alias.value={{ (this_host or 'docker-host') | lower | tojson }};if(!f.user.value)f.user.value='root'">This host</button></div>
   {{ host_fields(f, hosts) }}
+  <div class="field"><label class="check"><input type="checkbox" name="docker" value="1" {{ 'checked' if f.get('docker', '1') }}>
+    Docker host – also add a Docker service for it</label>
+    <div class="help">After the login works, tentaclAI checks Docker, finds the stacks directory and adds the service (access <em>confirm</em>: reads are free, every change waits for your approval).</div></div>
   <div class="row"><button class="btn primary">Continue – check host key</button><span id="ssh-dlg-spin" class="spinner htmx-indicator"></span></div>
 </form>
 

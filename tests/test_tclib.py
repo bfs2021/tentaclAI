@@ -386,6 +386,17 @@ def test_write_risks(part, action, expect):
     assert len(got) == len(expect) and all(any(x in g for g in got) for x in expect), got
 
 
+def test_stacks_dir_guess_and_service_name():
+    import json
+    ls = json.dumps([{"Name": "a", "ConfigFiles": "/srv/stacks/a/compose.yaml"},
+                     {"Name": "b", "ConfigFiles": "/srv/stacks/b/docker-compose.yml,/srv/stacks/b/docker-compose.override.yml"},
+                     {"Name": "mail", "ConfigFiles": "/opt/mail/docker-compose.yml"}])
+    assert tclib.stacks_dir_guess(ls) == ("/srv/stacks", 2, 3)
+    assert tclib.stacks_dir_guess("[]") == ("", 0, 0) and tclib.stacks_dir_guess("not json") == ("", 0, 0)
+    assert tclib.stacks_dir_guess(json.dumps([{"Name": "x", "ConfigFiles": "/compose.yaml"}])) == ("", 0, 1)
+    assert tclib.service_name_for("NAS.home") == "nas-home" and tclib.service_name_for("_x") == "x"
+
+
 def test_audit_hides_settled_started_entries(tmp_path):
     d = str(tmp_path)
     a = tclib.audit_entry("service", "demo", "docker rm -f web", "started", part="docker", mode="write")

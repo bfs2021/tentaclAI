@@ -257,8 +257,13 @@ def ssh_check(alias, sudo=""):
     probe = "echo $(whoami)@$(hostname)"
     if sudo:
         probe += f"; {sudo} true 2>/dev/null && echo SUDO_OK || echo SUDO_FAILED"
+    return ssh_run(alias, probe)
+
+
+def ssh_run(alias, remote):
+    """(exit code, output) of one command on an SSH host as tentaclai – our own fixed commands only, never Claude's"""
     # fresh connection (no shared ControlMaster socket), so a changed host key or revoked key shows up at once
-    cmd = ["ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=8", "-o", "ControlMaster=no", "-o", "ControlPath=none", alias, probe]
+    cmd = ["ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=8", "-o", "ControlMaster=no", "-o", "ControlPath=none", alias, remote]
     c = container()
     if c is not None and c.status == "running":
         return run(cmd)

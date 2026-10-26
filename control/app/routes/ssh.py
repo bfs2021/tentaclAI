@@ -1,12 +1,17 @@
 """Tentacles → SSH hosts: add (host key, key deployment), edit, rename, remove, status."""
 import asyncio
 import html
+import json
+import re
 import time
+
+import tclib
 
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
 
-from .. import dockerops, sshhosts, sshops
+from .. import dockerops, services_store, sshhosts, sshops
+from ..envfile import read_env
 from ..web import page, respond, sync_services, templates
 
 router = APIRouter()
@@ -18,7 +23,7 @@ async def ssh_page(request: Request):
 
 
 def _ssh_fields(form):
-    f = {k: (form.get(k) or "").strip() for k in ("alias", "hostname", "user", "port", "proxyjump", "sudo", "access")}
+    f = {k: (form.get(k) or "").strip() for k in ("alias", "hostname", "user", "port", "proxyjump", "sudo", "access", "docker")}
     f["access"] = f["access"] or "confirm"
     return f
 
@@ -27,6 +32,7 @@ def _ssh_dialog(request, step, **ctx):
     ctx.setdefault("f", {})
     ctx.setdefault("hosts", sshhosts.hosts())
     ctx.setdefault("error", None)
+    ctx.setdefault("this_host", read_env().get("TC_HOSTNAME") or "")
     return templates.TemplateResponse(request, "partials/ssh_dialog.html",
                                       {"request": request, "step": step, **ctx})
 
@@ -44,6 +50,39 @@ async def _ssh_test_results(alias):
     if sudo:
         res.append((True, f"{sudo} works") if "SUDO_OK" in lines else (None, f"Login works, but {sudo} fails – the user needs passwordless sudo"))
     return res, False
+
+
+async def _docker_host(alias):
+    """the "Docker host" box of Add host: is docker there (with the host's sudo prefix), where do its stacks live –
+    then a docker service for the alias (access confirm) → result lines"""
+    sudo = sshhosts.sudo_of(alias)
+    pre = f"{sudo} " if sudo else ""
+    code, out = await asyncio.to_thread(dockerops.ssh_run, alias, pre + "docker version --format '{{.Server.Version}}'")
+    version = out.strip().splitlines()[-1] if out.strip() else ""
+    if code != 0 or not re.fullmatch(r"[0-9][\w.+-]*", version):
+        hint = "add a sudo prefix (Edit host)" if not sudo else f"check that {sudo} docker works"
+        return [(None, f"No Docker service created: docker doesn't answer for this user ({version or 'no output'}) – {hint}, "
+                       "then add one from the template “Docker host (SSH)”")]
+    code, out = await asyncio.to_thread(dockerops.ssh_run, alias, pre + "docker compose ls --all --format json")
+    stacks, n, total = tclib.stacks_dir_guess(out if code == 0 else "")
+    name = tclib.service_name_for(alias)
+    res = [(True, f"Docker {version} answers")]
+    if any(s["name"] == name for s in services_store.load_all()):
+        return res + [(None, f"A service named {name} exists already – not changed")]
+    try:
+        services_store.create(name, "docker-ssh")
+        data = json.loads(services_store.read_raw(name))
+        data["description"] = f"Docker on {alias}"
+        data["docker"].update(ssh_host=alias, stacks_dir=stacks or data["docker"].get("stacks_dir", ""), access="confirm")
+        data["notes"] = [x for x in data.get("notes", []) if not x.startswith(("Setup:", "Default is read"))]
+        services_store.save_raw(name, json.dumps(data, ensure_ascii=False))
+    except (ValueError, OSError, KeyError) as e:
+        return res + [(False, f"Docker service not created: {e}")]
+    where = (f"stacks in {stacks} ({n} of {total} compose projects)" if stacks else
+             f"no common stacks directory found ({total} compose projects) – set stacks_dir on the service")
+    return res + [(True if stacks else None, where),
+                  (True, f"Service {name} created – access confirm: Claude reads freely, every change waits for your approval. "
+                         f"Try it: svc docker {name} ps")]
 
 
 @router.get("/ssh/new", response_class=HTMLResponse)
@@ -98,6 +137,8 @@ async def ssh_new_deploy(request: Request):
         return _ssh_dialog(request, "form", f=f, error=str(e))
     results.append((True, f"Saved as ssh/config.d/{f['alias']}.conf"))
     test, _ = await _ssh_test_results(f["alias"])
+    if form.get("docker") and test and test[0][0] is True:
+        test += await _docker_host(f["alias"])
     await sync_services()
     return _ssh_dialog(request, "result", title=f"{f['alias']} added", results=results + test)
 

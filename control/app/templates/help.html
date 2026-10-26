@@ -34,11 +34,11 @@
     <section class="card" id="start">
       <h2>Getting started</h2>
       <ol>
-        <li><strong>Settings</strong>: check paths, domain, git name/email and the remote control name.</li>
-        <li><strong>Overview → Create &amp; start</strong> (or “Apply now” if the container already runs).</li>
         <li><strong>Overview → Sign in now</strong> (terminal “Claude login”, <code>claude auth login</code>): open the link, sign in with your claude.ai account, paste the code into the terminal.</li>
         <li><strong>Terminal → Claude · RC</strong> (remote control): confirm the prompts (e.g. trust the folder). The session then shows up in <a href="https://claude.ai/code" target="_blank" rel="noopener">claude.ai/code</a> and the Claude app.</li>
-        <li><strong>Tentacles → Services</strong>: connect your Docker hosts, APIs, MCP servers and repositories from templates, add tokens, then <strong>Test connection</strong> and <strong>Onboard with Claude</strong>.</li>
+        <li><strong>Tentacles → SSH hosts → Add host</strong>: <em>This host</em> fills in the machine tentaclAI runs on; with <em>Docker host</em> ticked the dialog also checks Docker, finds the stacks directory and adds the Docker service (access <em>confirm</em>).</li>
+        <li><strong>Tentacles → Services</strong>: connect APIs, MCP servers and repositories from templates, add tokens, then <strong>Test connection</strong> and <strong>Onboard with Claude</strong>.</li>
+        <li><strong>Settings</strong>: host name, domain, git name/email, remote control name and resources have defaults from <code>init</code> – change them here.</li>
         <li><strong>Overview → System inventory</strong>: Claude gets to know your site and records it in <code>local/CLAUDE.md</code>.</li>
       </ol>
     </section>
@@ -54,10 +54,10 @@
       </table>
       <h4>Install on a new host</h4>
 <pre>git clone … tentaclai &amp;&amp; cd tentaclai
-./tentaclai.sh init                 # guided setup: paths, domain, access (port / nginx-proxy / Traefik),
-                                      # git, remote control, limits – then starts tentacontrol
-./tentaclai.sh init --defaults      # the same without questions</pre>
-      <p class="muted small">Without a reverse proxy tentacontrol listens on <code>http://127.0.0.1:8484</code> (<code>CONTROL_BIND</code>/<code>CONTROL_PORT</code>).
+./tentaclai.sh init                 # one question (access: LAN port / localhost / nginx-proxy / Traefik), then builds + starts everything
+./tentaclai.sh init --advanced      # every question: paths, domain, git, remote control, limits
+./tentaclai.sh init --defaults      # no questions</pre>
+      <p class="muted small">Without a reverse proxy tentacontrol listens on port 8484 in the LAN (<code>CONTROL_BIND</code>/<code>CONTROL_PORT</code>) – keep it off the internet.
       For a public repository, <code>.gitignore</code> keeps <code>.env</code>, <code>compose.override.yaml</code>, <code>local/</code>, <code>services/*.json</code>, <code>ssh/keys</code>, <code>ssh/config.d</code>, <code>data/</code> and <code>workspace/</code> out; the <code>*.example</code> files are their templates.</p>
     </section>
 
@@ -147,7 +147,7 @@
 
     <section class="card" id="docker">
       <h2>Docker hosts</h2>
-      <p>Docker management is a service like any other, always over SSH – the sandbox never gets a Docker socket. Template: “Docker host (SSH)”.</p>
+      <p>Docker management is a service like any other, always over SSH – the sandbox never gets a Docker socket. Quickest: <strong>SSH hosts → Add host</strong> with <em>Docker host</em> ticked (finds the stacks directory itself); or the template “Docker host (SSH)”.</p>
 <pre>"docker": { "mode": "ssh", "ssh_host": "vps1", "stacks_dir": "/opt/stacks", "access": "read" }</pre>
       <ul>
         <li><strong>ssh_host</strong>: alias from <a href="/ssh">Tentacles → SSH hosts</a>; the user there must be allowed to run <code>docker</code> (or sudo it – sudo prefix on the SSH host). Docker and compose run on that host, compose in the stack's directory. <strong>This host</strong>: an SSH host with hostname <code>host.docker.internal</code>.</li>

@@ -670,6 +670,45 @@ def test_network_seen_table_is_sortable(client, monkeypatch):
     assert 'data-count="7" data-last="200"' in html and 'data-rule="0"' in html and 'data-rule="2demo"' in html
 
 
+def test_add_host_also_adds_the_docker_service(client, app_module, monkeypatch):
+    """Add host with "Docker host" ticked: after the login works, docker is checked, the stacks directory found and a
+    docker service created (access confirm); unticked, or without docker, no service"""
+    import json
+    import os
+    import shutil
+    from app import dockerops, services_store, sshhosts
+    from conftest import ROOT, STACK
+    shutil.copy(os.path.join(ROOT, "services", "_templates", "docker-ssh.json"), os.path.join(STACK, "services", "_templates"))
+    monkeypatch.setattr(dockerops, "ssh_check", lambda alias, sudo="": (0, f"root@{alias}\n"))
+    ls = json.dumps([{"Name": "a", "ConfigFiles": "/srv/apps/a/compose.yaml"}, {"Name": "b", "ConfigFiles": "/srv/apps/b/compose.yaml"}])
+    docker_ok = {"v": True}
+
+    def ssh_run(alias, remote):
+        if "docker version" in remote:
+            return (0, "27.3.1\n") if docker_ok["v"] else (127, "bash: docker: command not found\n")
+        return 0, ls
+    monkeypatch.setattr(dockerops, "ssh_run", ssh_run)
+    form = {"alias": "Nas.home", "hostname": "nas.example.test", "user": "root", "port": "22", "access": "confirm",
+            "docker": "1", "mode": "skip"}
+    try:
+        html = client.post("/ssh/new/deploy", data=form).text
+        assert "Docker 27.3.1 answers" in html and "stacks in /srv/apps (2 of 2" in html and "svc docker nas-home ps" in html
+        d = json.loads(services_store.read_raw("nas-home"))["docker"]
+        assert d == {"mode": "ssh", "ssh_host": "Nas.home", "stacks_dir": "/srv/apps", "access": "confirm"}
+        html = client.post("/ssh/new/deploy", data=dict(form, alias="other", docker="")).text
+        assert "Docker" not in html and "other" not in [s["name"] for s in services_store.load_all()]
+        docker_ok["v"] = False
+        html = client.post("/ssh/new/deploy", data=dict(form, alias="nodocker")).text
+        assert "No Docker service created" in html and "nodocker" not in [s["name"] for s in services_store.load_all()]
+        assert "This host" in client.get("/ssh/new").text and 'name="docker" value="1" checked' in client.get("/ssh/new").text
+    finally:
+        for a in ("Nas.home", "other", "nodocker"):
+            if sshhosts.get(a):
+                sshhosts.remove(a)
+        if os.path.exists(services_store.path_of("nas-home")):
+            services_store.delete("nas-home")
+
+
 def test_network_learning_phase(client, monkeypatch, tmp_path):
     """EGRESS_MODE=learn: permissive until the phase (from the first reported connection) is over, then enforce in .env,
     a notification, and the destinations seen meanwhile without a rule offered for the allowlist"""

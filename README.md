@@ -138,22 +138,25 @@ person runs their own installation with their own account.
 ```bash
 git clone https://github.com/mwaldegg/tentaclai.git /srv/stacks/tentaclai
 cd /srv/stacks/tentaclai
-./tentaclai.sh init        # guided: paths, domain, how to reach tentacontrol (port / nginx-proxy / Traefik),
-                             # git identity, remote control, resources – then builds and starts tentacontrol
-./tentaclai.sh setup-url   # one-time link to set the tentacontrol password
+./tentaclai.sh init        # one question – how to reach tentacontrol (LAN port / localhost / nginx-proxy / Traefik) –
+                           # then builds and starts everything and prints the one-time setup link
 ```
 
-Then, in tentacontrol:
+Everything else gets a default you can change later under **Settings** (host name, domain, git identity, remote
+control, resources); `./tentaclai.sh init --advanced` asks it all, `--defaults` asks nothing. Then, in tentacontrol:
 
-1. **Settings** – check paths, domain and git identity.
-2. **Overview → Create & start** – builds and starts the tentaclAI container.
-3. **Overview → Sign in now** – `claude auth login` in a web terminal; sign in with your claude.ai account.
-4. **Overview → Remote Control** – scan the QR code or open the link; the session now shows up in claude.ai/code and the app.
-5. **Tentacles → SSH hosts** – add the machines Claude should reach: host key check, key deployment with a one-time password, test – all in one dialog.
-6. **Tentacles → Services** – connect your Docker hosts and services ([next section](#connecting-a-service)).
-7. **Overview → System inventory** – Claude scans everything read-only, interviews you and writes `local/CLAUDE.md`.
+1. **Setup link** – set your username and password.
+2. **Overview → Sign in now** – `claude auth login` in a web terminal; sign in with your claude.ai account.
+3. **Tentacles → SSH hosts → Add host** – *This host* fills in the machine tentaclAI runs on (`host.docker.internal`);
+   with *Docker host* ticked, the dialog checks the host key, puts tentaclAI's key on the host (one-time password, or a
+   line to paste), tests the login, checks Docker, finds the stacks directory and adds the Docker service – access
+   *confirm*: Claude reads freely, every change waits for your approval. Ask Claude `svc docker <host> ps`.
+4. **Overview → Remote Control** – scan the QR code or open the link; the session shows up in claude.ai/code and the app.
+5. **Tentacles → Services** – connect more services ([next section](#connecting-a-service)).
+6. **Overview → System inventory** – Claude scans everything read-only, interviews you and writes `local/CLAUDE.md`.
 
-Without a reverse proxy tentacontrol listens on `http://127.0.0.1:8484` (`CONTROL_BIND`, `CONTROL_PORT`).
+By default tentacontrol listens on port 8484 in the LAN (`CONTROL_BIND`, `CONTROL_PORT`) – keep it off the internet:
+it holds the host's Docker socket.
 
 **Updating:** `./tentaclai.sh update` – goes to the latest release: shows what's new and the upgrade steps, rebuilds and
 asks before recreating the containers (`--check` only shows, `--main` takes the newest unreleased state of `main`).

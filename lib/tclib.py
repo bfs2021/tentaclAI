@@ -473,6 +473,32 @@ def ssh_access(conf_d, alias):
     return access((ssh_host(conf_d, alias) or {}).get("access"), SSH_ACCESS_DEFAULT)
 
 
+def stacks_dir_guess(compose_ls_json):
+    """the stacks directory of a Docker host from `docker compose ls --all --format json`: the directory most
+    projects live in (parent of each project's directory) → (dir, number of projects there, all projects); ("", 0, n)
+    when there are none or they don't share one"""
+    import collections
+    try:
+        projects = json.loads(compose_ls_json or "[]")
+    except ValueError:
+        return "", 0, 0
+    parents = collections.Counter()
+    for p in projects if isinstance(projects, list) else []:
+        first = str((p or {}).get("ConfigFiles") or "").split(",")[0].strip()
+        if first.startswith("/"):
+            parents[os.path.dirname(os.path.dirname(first)) or "/"] += 1
+    if not parents:
+        return "", 0, len(projects) if isinstance(projects, list) else 0
+    best, n = parents.most_common(1)[0]
+    return (best, n, len(projects)) if best != "/" else ("", 0, len(projects))
+
+
+def service_name_for(alias):
+    """a service name (lowercase, letters, digits, - and _) for an SSH alias"""
+    n = re.sub(r"[^a-z0-9_-]+", "-", str(alias or "").lower()).strip("-_")[:40]
+    return n if n and n[0].isalnum() else ("host-" + n)[:40]
+
+
 def ssh_validate(fields, aliases=None):
     """check user input for a host; raises ValueError with a readable message"""
     if not ALIAS_RE.match(fields.get("alias", "")):

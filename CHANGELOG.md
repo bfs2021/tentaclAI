@@ -19,6 +19,11 @@ All notable changes, newest first. Every release lists **upgrade steps** from th
   `EGRESS_LEARN_MINUTES` (60) from the sandbox's first connection, then `enforce`; the Network page offers the
   destinations seen meanwhile without a rule (*Allow all*, or one by one), plus a notification (*Network learning over*).
 
+- **Faster first setup:** `./tentaclai.sh init` asks one question (how to reach tentacontrol – default now the LAN
+  on port 8484) and builds and starts everything; the rest has defaults (Settings, or `init --advanced` for every
+  question). **Add host** has *This host* and a *Docker host* box (on by default): after the login it checks Docker,
+  finds the stacks directory from `docker compose ls` and adds the Docker service with access *confirm*.
+
 ### Changes / fixes
 - Settings → Account: a user signed in through tentaclAI Enterprise gets a page of their own (no password or
   two-factor forms); whether a local profile still needs username and email is asked about the signed-in user.
