@@ -63,18 +63,33 @@ All notable changes, newest first. Every release lists **upgrade steps** from th
   badge), tabs in Settings/Logs/Claude, icons, static files, background tasks, notification events, an audit log hook,
   Help sections and parts of Export / Import. **Modules** is no longer locked in Community: it lists *built-in* modules
   (shipped, off until enabled), *third-party* ones (`local/extensions/<name>/`, off until enabled, with a warning – they
-  run with tentacontrol's rights) and signed packages. Enabling takes effect
-  after *Restart tentacontrol* (a few seconds, the sandbox keeps running), disabling at once. Third-party modules live
-  below `/x/<name>/` and can't replace tentacontrol's pages. `TC_EXTENSIONS` names packages loaded always (none by
-  default); Modules and Settings → License point to tentaclAI Enterprise, the central
-  management, instead of locked Enterprise modules.
-- **Enterprise in the sidebar** (replaces Settings → Central): with a lock while the installation runs on its own –
-  the page says what tentaclAI Enterprise adds and takes the enrollment code; once enrolled a dot shows the connection
-  (connected / connection failed / revoked) and the page the server, last contact, profile and when it arrived, the
-  audit backlog and the central jobs.
+  run with tentacontrol's rights) and signed packages. Enabling takes effect after *Restart tentacontrol* (a few
+  seconds, the sandbox keeps running), disabling at once. Third-party modules live below `/x/<name>/` and can't replace
+  tentacontrol's pages. `TC_EXTENSIONS` names packages loaded always (none by default). Guide: `docs/extensions.md`,
+  example `examples/extensions/tcx_hello`.
+- **Service-Health** – the first built-in module (Modules → enable): `svc test` of every service on a schedule
+  (1–60 minutes, default 5), a Health page with the state, a 24-hour bar and the availability over 24 hours and 7 days
+  per service and system, a sidebar badge counting services that are down, and the notifications *Service down*
+  (urgent) / *Service up again* after a set number of failed checks in a row (default 2). Settings → Health picks the
+  interval and the services; the history (7 days) stays in `data/control/ext/tentaclai_health/`.
+- **Install modules from a file** (Modules → *Install from file*): a module package (`.tcpkg.zip`) is checked – size,
+  paths, file types, SHA-256 of every file – and shows name, version and signature before anything is installed. A
+  package signed by tentaclAI gets the rights of a module named in `TC_EXTENSIONS`; an unsigned one is a third-party
+  module after *I trust this code*. Every file is checked again at each start, an update keeps the previous version
+  for *Roll back*, *Remove* deletes it. Format: `docs/extensions.md` → Packages.
+- **tentaclAI Enterprise – central management** (sidebar → **Enterprise**): tentaclAI Enterprise is a server of its
+  own; the license lives there (seats = installations), tentacontrol needs none. While the installation runs on its
+  own, the Enterprise page has a lock, says what Enterprise adds and takes the enrollment code. Once enrolled, the
+  installation is an agent: it always connects to the server, sends its status (version, modules, services – no
+  credentials) and its audit log (nothing unsent is pruned), and applies the server's signed profile – enforced items
+  are locked (marked *central*, refused in tentacontrol and in `svc config put`, reverted when changed on the host),
+  defaults may be changed locally, built-in modules and signed packages can be set. The local admin picks which parts
+  the server may manage and can change that later; credentials stay in `.env`. A dot in the sidebar shows the
+  connection (connected / connection failed / revoked); the page shows the server, last contact, the profile and when
+  it arrived, the audit backlog and the central jobs. Protocol: `docs/central.md`.
 - **From tentaclAI Enterprise:** a profile can hide parts of tentacontrol (Terminal, Jobs, Network, Modules, Claude,
-  Export / Import, Updates – part *Features*), the server can show a banner on every page (× closes it until the next
-  sign-in), and the local admin can change what the server may manage after enrolling.
+  Export / Import, Updates – part *Features*), and the server can show a banner on every page (× closes it until the
+  next sign-in).
 - **Tamper protection from tentaclAI Enterprise:** a profile can protect the management – no *Leave* button, *Managed
   by Enterprise* can only grow (or is locked completely, or set to all parts); attempts are refused, logged and shown on the central.
 - **Sign-in through tentaclAI Enterprise** (part *Sign-in*, needs `CONTROL_URL`): users of the central sign in with
@@ -82,24 +97,6 @@ All notable changes, newest first. Every release lists **upgrade steps** from th
   grants and sends back a signed assertion valid for 60 seconds. A profile can allow only these sign-ins
   (*Enterprise only*); the local admin then gets in only with the emergency access from the host:
   `./tentaclai.sh passwd` or `./tentaclai.sh passwd --open` opens the local sign-in for an hour.
-  Guide: `docs/extensions.md`, example `examples/extensions/tcx_hello`.
-- **Service-Health** – the first built-in module (Modules → enable): `svc test` of every service on a schedule
-  (1–60 minutes, default 5), a Health page with the state, a 24-hour bar and the availability over 24 hours and 7 days
-  per service and system, a sidebar badge counting services that are down, and the notifications *Service down*
-  (urgent) / *Service up again* after a set number of failed checks in a row (default 2). Settings → Health picks the
-  interval and the services; the history (7 days) stays in `data/control/ext/tentaclai_health/`.
-- **Central management** (Settings → Central): an installation joins a central server (tentaclAI Enterprise) with
-  an enrollment code and becomes an agent – it sends its status (version, modules, services – no credentials) and its
-  audit log (nothing unsent is pruned), and applies the server's signed profile: enforced items are locked (marked
-  *central*, refused in tentacontrol and in `svc config put`, reverted when changed on the host), defaults may be
-  changed locally, built-in modules and signed packages can be set. The local admin picks which parts the server may
-  manage; credentials stay in `.env`. The agent always connects to the server. Protocol: `docs/central.md`.
-- **Install modules from a file** (Modules → *Install from file*): a module package (`.tcpkg.zip`) is checked – size,
-  paths, file types, SHA-256 of every file – and shows name, version and signature before anything is installed. A
-  package signed by tentaclAI gets the rights of Enterprise (tentaclAI Enterprise can be installed offline, without
-  `TC_EXTENSIONS`); an unsigned one is a third-party module after *I trust this code*. Every file is checked again at
-  each start, an update keeps the previous version for *Roll back*, *Remove* deletes it. Format: `docs/extensions.md`
-  → Packages.
 
 ### Changes / fixes
 - `svc <name> GET …`: an HTTP error (4xx/5xx) now exits non-zero (curl 22, the body is still printed) – calls that read
