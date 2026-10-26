@@ -35,4 +35,6 @@ RUN chmod 0755 /usr/local/bin/tentacontrol-passwd /usr/local/bin/tentacontrol-ss
 
 EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=5s CMD curl -fsS http://127.0.0.1:8080/healthz || exit 1
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080", "--proxy-headers", "--forwarded-allow-ips", "*"]
+# keep idle connections longer than a reverse proxy reuses them (nginx: 60 s) – uvicorn's 5 s closed some just as the
+# proxy sent the next request ("upstream prematurely closed", the browser saw the connection drop)
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080", "--proxy-headers", "--forwarded-allow-ips", "*", "--timeout-keep-alive", "75"]

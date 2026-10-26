@@ -11,6 +11,9 @@ All notable changes, newest first. Every release lists **upgrade steps** from th
   the decision keeps them, plus when it was first requested (`requested` – the entry's time is your decision).
 
 ### Changes / fixes
+- Fix: behind a reverse proxy that keeps connections open (nginx-proxy does), a request now and then failed with
+  *the server closed the connection* – uvicorn dropped idle connections after 5 s while the proxy reused them for up to
+  60 s. tentacontrol now keeps them 75 s.
 - Logs → Audit CSV export: new columns at the end – `cid`, `process`, `requested`, `attempts`.
 
 ### Upgrade
