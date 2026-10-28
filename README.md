@@ -490,6 +490,9 @@ log and a faster first setup.
   in the audit log.
 - **AI Assist for jobs:** describe what a job should do and Claude drafts it in the editor – task, schedule,
   profile, the tentacles it names and when to warn – or improves an existing one; you check and save it.
+- **Job tabs:** sort jobs into tabs by topic (e.g. *Local installation*, *Spam handling*, *Project XY*) – an
+  optional group per job, a tab bar with counts and a warn/alert badge on the Jobs page, moving jobs between tabs
+  from the list, `svc jobs --group <name>`.
 
 ## License
 
