@@ -38,7 +38,7 @@ SETTINGS_GROUPS = [
         ("TZ", "Time zone", "e.g. Europe/Vienna", "text"),
         ("CLAUDE_CODE_VERSION", "Claude Code version", "latest or a fixed version – applied with the next update", "text"),
         ("CLAUDE_TELEMETRY", "Claude Code telemetry", "off (default): no telemetry, error reports or /bug – API, login and remote control are not affected; applied on the next start", "bool"),
-        ("GIT_USER_NAME", "Git name", "for commits in /workspace", "text"),
+        ("GIT_USER_NAME", "Git name", "default for commits in /workspace – a git service can set its own author", "text"),
         ("GIT_USER_EMAIL", "Git email", "", "text"),
     ]),
     ("Remote control", [

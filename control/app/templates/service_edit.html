@@ -117,6 +117,7 @@
       <dl class="kv">
         <dt>URL</dt><dd class="mono small" style="word-break:break-all">{{ svc.git.url }}</dd>
         <dt>Branch</dt><dd class="mono">{{ svc.git.branch or "default" }}</dd>
+        <dt>Commit author</dt><dd>{% if svc.git.author %}<span class="mono">{{ svc.git.author }}</span>{% else %}<span class="muted" title="set &quot;author&quot;: {&quot;name&quot;: …, &quot;email&quot;: …} in the git part for this repository">the installation's default (Settings → Git name / email)</span>{% endif %}</dd>
         <dt>Path in the container</dt><dd class="mono small">{{ svc.git.path }}</dd>
         <dt>Authentication</dt><dd>{{ {'token': 'token (credential helper)', 'none': 'none / SSH key'}.get(svc.git.auth, svc.git.auth) }}</dd>
         <dt>Status</dt><dd><span class="pill {{ 'ok' if svc.git.cloned else 'off' }}">{{ 'cloned' if svc.git.cloned else 'not cloned' }}</span></dd>
@@ -197,7 +198,7 @@
         <code>docker</code> {mode ssh, ssh_host, stacks_dir, access read|write|confirm}, <code>smtp</code> / <code>imap</code> {host, security, user, password, …} (see Help → Mail),
         <code>api.base_url</code>, <code>api.auth.type</code> = <code>none</code> | <code>bearer {token}</code> | <code>header {header, value}</code> | <code>basic {user, password}</code> | <code>query {param, value}</code> | <code>oauth2_client_credentials {token_url, client_id, client_secret, scope}</code>,
         <code>insecure_tls</code> (in api, mcp, git, db, web, smtp, imap), <code>api.docs</code>, <code>mcp</code> (like <code>.mcp.json</code>: <code>type</code> http/sse + <code>url</code>/<code>headers</code> or stdio + <code>command</code>/<code>args</code>/<code>env</code>),
-        <code>git</code> {url, access, branch, path, auth}, <code>examples</code>, <code>notes</code>, <code>test_path</code>, <code>enabled</code>. Secrets only as <code>${VAR}</code>.
+        <code>git</code> {url, access, branch, path, auth, author {name, email}}, <code>examples</code>, <code>notes</code>, <code>test_path</code>, <code>enabled</code>. Secrets only as <code>${VAR}</code>.
       </div>
     </details>
   </div>

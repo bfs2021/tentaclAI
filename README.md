@@ -314,7 +314,7 @@ SSH hosts: tentacontrol → Tentacles → SSH hosts, or `./ssh-host.sh list|add|
 | `TC_HOSTNAME`, `TC_DOMAIN` | name of this host for Claude; domain for the suggested tentacontrol address (templates use `example.com`) |
 | `CONTROL_URL`, `CONTROL_BIND`, `CONTROL_PORT` | where tentacontrol is reachable |
 | `CLAUDE_CPUS`, `CLAUDE_MEMORY`, `CLAUDE_CODE_VERSION` | sandbox resources, pinned Claude Code version |
-| `GIT_USER_NAME`, `GIT_USER_EMAIL` | git identity of Claude's commits |
+| `GIT_USER_NAME`, `GIT_USER_EMAIL` | default git identity of Claude's commits – a git service can set its own (`"author": {"name", "email"}` in its `git` part) |
 | `GH_TOKEN` | example token variable for the GitHub templates (`${GH_TOKEN}`) – no longer handed to `gh` in the sandbox |
 | `RC_ENABLED`, `RC_NAME`, `RC_WORKDIR`, `RC_EXTRA_ARGS`, `RC_RESTART_DELAY` | Remote Control – re-read on every restart of the session |
 | `JOB_READONLY_HELPERS` | text tools a read-only job may chain with `svc` (empty = the defaults: echo, head, tail, grep, jq, sort, uniq, wc, cut, tr, date, sleep) – shells, interpreters, awk/sed/find/xargs, network and write tools are refused |

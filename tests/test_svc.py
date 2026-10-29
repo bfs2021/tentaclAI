@@ -967,3 +967,29 @@ def test_tool_report_takes_only_known_notes(monkeypatch):
         monkeypatch.setattr(sys, "stdin", __import__("io").StringIO(json.dumps({"tool": "Read", "target": "/x.pdf", "note": note})))
         svc.cmd_tool_report([], {})
     assert [k["detail"] for k in logged] == ["PDF text not checked", "PDF text partly checked", ""]
+
+
+def test_configure_repo_sets_and_drops_the_author(monkeypatch):
+    calls, marked = [], {"v": False}
+
+    class R:
+        def __init__(self, code):
+            self.returncode = code
+
+    def fake(args, path, quiet=False):
+        calls.append(args)
+        if args[:2] == ["config", "tentaclai.author"]:
+            marked["v"] = True
+        if args[:3] == ["config", "--unset", "tentaclai.author"]:
+            marked["v"] = False
+        return R(0 if args[:3] != ["config", "--get", "tentaclai.author"] or marked["v"] else 1)
+    monkeypatch.setattr(svc, "claude_git", fake)
+    monkeypatch.setattr(svc.git_part.subprocess, "run", lambda *a, **k: R(0))
+    svc.configure_repo("repo", "/tmp/x", {"author": {"name": "Ann", "email": "ann@example.com"}})
+    assert ["config", "user.name", "Ann"] in calls and ["config", "user.email", "ann@example.com"] in calls
+    calls.clear()
+    svc.configure_repo("repo", "/tmp/x", {})  # author removed: svc drops only what it set
+    assert ["config", "--unset", "user.name"] in calls and not marked["v"]
+    calls.clear()
+    svc.configure_repo("repo", "/tmp/x", {})  # never set by svc: a local identity stays
+    assert ["config", "--unset", "user.name"] not in calls

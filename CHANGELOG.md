@@ -22,6 +22,9 @@ All notable changes, newest first. Every release lists **upgrade steps** from th
   is still a finding.
 
 ### Changes / fixes
+- Git services: `"author": {"name": …, "email": …}` in the `git` part sets the commit author of that working copy
+  (applied by `svc git sync` / `svc sync`); without it the installation's default is used (Settings → Git name /
+  email, `GIT_USER_NAME` / `GIT_USER_EMAIL`). The service page shows which one applies.
 - Jobs: a suggested better task is now a minimal change – no line or issue numbers, findings or workarounds of the
   run, lasting facts go to notes – and shows as a diff against the task the run had, with the word count
   before → after; a suggestion equal to the task is dropped (#26).

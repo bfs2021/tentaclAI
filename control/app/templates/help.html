@@ -110,7 +110,7 @@
         <tr><td><code>docker</code></td><td>Docker host – reached over SSH (this host too); Claude manages its stacks with <code>svc docker</code> / <code>svc compose</code>.</td></tr>
         <tr><td><code>api</code></td><td>REST API, called with <code>svc &lt;name&gt; GET /path</code>. <code>svc</code> injects the authentication; tokens never appear in commands. An HTTP error (4xx/5xx) exits non-zero with the body still printed – unless the call reads the status itself with <code>-w</code>; a path that repeats the base URL's prefix (<code>/api/api/…</code>) gets a hint.</td></tr>
         <tr><td><code>mcp</code></td><td>MCP server (<code>http</code> or <code>stdio</code>) – registered in Claude's configuration on “Sync” as <code>svc mcp-proxy &lt;name&gt;</code>, which adds the tokens and gates every tool call by its <code>access</code> (default <code>read</code>, see <a href="#approvals">Approvals</a>).</td></tr>
-        <tr><td><code>git</code></td><td>Repository – cloned to <code>/workspace/repos/&lt;name&gt;</code>, read only or read/write.</td></tr>
+        <tr><td><code>git</code></td><td>Repository – cloned to <code>/workspace/repos/&lt;name&gt;</code>, read only or read/write. Commits use <code>"author": {"name": …, "email": …}</code> of the git part, otherwise the installation's default (Settings → Git name / email).</td></tr>
         <tr><td><code>db</code> · <code>web</code> · <code>files</code></td><td>Database (<code>svc db</code>), web pages as text (<code>svc web</code>), directories on an SSH host (<code>svc files</code>).</td></tr>
 <tr><td><code>smtp</code> · <code>imap</code></td><td>Send mail, read a mailbox (<code>svc mail</code>).</td></tr>
       </table>

@@ -115,6 +115,14 @@ def configure_repo(name, path, git):
         claude_git(["config", "http.sslVerify", "false"], path)
     else:
         claude_git(["config", "--unset", "http.sslVerify"], path, quiet=True)
+    author = git.get("author") if isinstance(git.get("author"), dict) else {}
+    if author.get("name") and author.get("email"):  # this repo's commit author – else GIT_USER_NAME/EMAIL (global)
+        claude_git(["config", "user.name", str(author["name"])], path)
+        claude_git(["config", "user.email", str(author["email"])], path)
+        claude_git(["config", "tentaclai.author", "true"], path)
+    elif claude_git(["config", "--get", "tentaclai.author"], path, quiet=True).returncode == 0:
+        for key in ("user.name", "user.email", "tentaclai.author"):  # only what svc set itself
+            claude_git(["config", "--unset", key], path, quiet=True)
     hook = os.path.join(path, ".git", "hooks", "pre-push")
     # plain `git push` has no credentials – the hook points to svc git push
     text = f"#!/bin/sh\n{core.HOOK_MARK}\nexec svc git-push-hook {shlex.quote(name)} \"$@\"\n"
