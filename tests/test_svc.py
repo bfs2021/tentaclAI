@@ -353,7 +353,7 @@ def test_tool_report_takes_only_known_reasons(monkeypatch):
     import io
     got, logged = [], []
     monkeypatch.setattr(svc, "ENV", {})
-    monkeypatch.setattr(svc, "guard_note", lambda *a: got.append(a) or True)
+    monkeypatch.setattr(svc, "guard_note", lambda *a, **k: got.append(a) or True)
     monkeypatch.setattr(svc, "audit", lambda *a, **k: logged.append((a, k)))
     def report(d):
         monkeypatch.setattr(svc.sys, "stdin", io.StringIO(json.dumps(d)))
@@ -370,6 +370,23 @@ def test_tool_report_takes_only_known_reasons(monkeypatch):
     logged.clear()
     report({"tool": "Bash;rm", "target": "ls\n-la"})
     assert logged[0][0][:5] == ("Bashrm", "claude", "", "ls -la", "ok")
+
+
+def test_tool_report_note_survives_a_finding(monkeypatch, tmp_path):
+    import io
+    calls = []
+    monkeypatch.setattr(svc, "GUARD_STATE", str(tmp_path / "guard.json"))
+    monkeypatch.setattr(svc, "ENV", {})
+    monkeypatch.setattr(svc, "audit", lambda *a, **k: calls.append(("audit", a, k)))
+    monkeypatch.setattr(svc, "report", lambda *a: calls.append(("report", a)))
+    monkeypatch.setattr(svc.sys, "stdin", io.StringIO(json.dumps({
+        "tool": "Read", "target": "/workspace/paper.pdf", "note": "PDF text not checked",
+        "findings": [["asks to ignore instructions", "ignore all previous instructions"]]})))
+    assert svc.cmd_tool_report([]) == 0
+    assert calls[0][2]["detail"] == "asks to ignore instructions; PDF text not checked"
+    body = calls[1][1][2]
+    assert body.startswith("/workspace/paper.pdf\n– asks to ignore instructions: ignore all previous instructions")
+    assert body.endswith("PDF text not checked")
 
 
 def test_guard_note_keeps_excerpts_without_secrets(monkeypatch, tmp_path):

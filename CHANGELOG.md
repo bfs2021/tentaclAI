@@ -5,10 +5,10 @@ All notable changes, newest first. Every release lists **upgrade steps** from th
 ## Unreleased
 
 ### Highlights
-- **Job groups:** sort jobs by topic – an optional *Group* per job (editor: click an existing group or type a new
-  one; on each card a menu to move it, *New group…* included), one tab per group on the Jobs page with the number of
-  jobs and a warn/alert count, the page remembers the tab you picked. `svc jobs --group <group>` lists one group;
-  `svc config put job` takes `group` (left out, the job keeps its group).
+- **Job tabs:** sort jobs into tabs by topic – an optional *Tab* per job (editor, or the small field on each card
+  to move it), a tab bar on the Jobs page with the number of jobs and a warn/alert count per tab, the page remembers
+  the tab you picked. `svc jobs --group <tab>` lists one tab; `svc config put job` takes `group` (left out, the
+  job keeps its tab).
 
 - **Network approvals name the process:** while the gateway holds a connection to an unknown destination, tentacontrol
   asks the sandbox (`svc origin-of`, root) which process holds it – the card shows its command and user, the Claude
@@ -22,6 +22,8 @@ All notable changes, newest first. Every release lists **upgrade steps** from th
   is still a finding.
 
 ### Changes / fixes
+- tc-guard: a *PDF text not checked* / *PDF text partly checked* note now stays on a flagged tool report – the
+  audit entry and the *Possible prompt injection* notification carry it too, not only the plain `ok` entry (#50).
 - Git services: `"author": {"name": …, "email": …}` in the `git` part sets the commit author of that working copy
   (applied by `svc git sync` / `svc sync`); without it the installation's default is used (Settings → Git name /
   email, `GIT_USER_NAME` / `GIT_USER_EMAIL`). The service page shows which one applies.
