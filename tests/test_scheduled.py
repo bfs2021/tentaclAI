@@ -420,3 +420,19 @@ def test_svc_calls_name_tentacles_too(sj, monkeypatch, tmp_path):
     monkeypatch.setattr(sj, "tentacles", lambda: known)
     sj._register("r1", {"name": "a", "profile": "standard", "scope": True, "prompt": prompt})
     assert json.load(open(tmp_path / "runs.json"))["r1"]["allow"] == ["mailrelay", "mail_root", "nas", "imap_x"]
+
+
+def test_improve_asks_for_a_minimal_effective_change(sj):
+    rules = sj.SYSTEM_IMPROVE
+    for part in ("not longer", "keep the rest word for word", "line numbers", "issue or PR numbers", "workarounds",
+                 "\"knowledge\"", "Leave \"prompt\" out when the task worked"):
+        assert part in rules, part
+
+
+def test_prompt_diff_marks_insertions_and_deletions(sj):
+    d = sj.prompt_diff("Check the disks.\nReport in German.", "Check the disks of all hosts.\nReport in German.")
+    assert ("+", " of all hosts") in d or any(op == "+" and "of all hosts" in t for op, t in d)
+    assert not any(op and "German" in t for op, t in d)  # the unchanged line stays unmarked
+    assert "".join(t for op, t in d if op != "-") == "Check the disks of all hosts.\nReport in German."
+    assert "".join(t for op, t in d if op != "+") == "Check the disks.\nReport in German."
+    assert sj.prompt_diff("same", "same") == [("", "same")] and sj.words("a b\nc") == 3

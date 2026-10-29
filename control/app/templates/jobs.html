@@ -65,7 +65,9 @@
 {% macro better_prompt(r) %}{% set p = r.prompt_suggestion %}
     <div class="job-actions job-prompt" style="margin-top:8px">
       <div class="small muted" style="margin-bottom:4px">A better task{% if p.state != 'proposed' %} – {{ p.state }}{% endif %}{% if p.why %}: {{ p.why }}{% endif %}</div>
-      <details class="small"><summary class="muted">the suggested task</summary><pre class="rc" style="max-height:240px;white-space:pre-wrap">{{ p.text }}</pre></details>
+      {% if p.base %}<details class="small"{% if p.state == 'proposed' %} open{% endif %}><summary class="muted">what changes – {{ words(p.base) }} → {{ words(p.text) }} words</summary><pre class="diff">{% for op, t in prompt_diff(p.base, p.text) %}{% if op == '+' %}<ins class="diff-add">{{ t }}</ins>{% elif op == '-' %}<del class="diff-del">{{ t }}</del>{% else %}{{ t }}{% endif %}{% endfor %}</pre></details>
+      <details class="small"><summary class="muted">the whole suggested task</summary><pre class="rc" style="max-height:240px;white-space:pre-wrap">{{ p.text }}</pre></details>
+      {% else %}<details class="small"><summary class="muted">the suggested task</summary><pre class="rc" style="max-height:240px;white-space:pre-wrap">{{ p.text }}</pre></details>{% endif %}
       {% if p.state == 'proposed' %}<div class="row" style="margin-top:6px;justify-content:flex-start">
         <button class="btn sm primary" hx-post="/jobs/runs/{{ r.id }}/prompt?use=1">{{ icon('check') }}Use this task</button>
         <button class="btn sm" hx-post="/jobs/runs/{{ r.id }}/prompt?use=0">Discard</button>

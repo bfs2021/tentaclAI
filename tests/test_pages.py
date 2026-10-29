@@ -164,6 +164,27 @@ def test_template_placeholder_domain(client, app_module):
         services_store.delete("fromtpl")
 
 
+def test_template_setup_hint_is_shown_not_saved(client, app_module):
+    # the setup hint is for the user creating the service – Claude would read it in the notes after every onboarding
+    import json
+    from app import services_store
+    try:
+        r = client.post("/services/new", data={"name": "fromsetup", "template": "n8n"}, headers={"HX-Request": "true"})
+        assert r.headers.get("HX-Redirect") == "/services/fromsetup"
+        assert "Setup: token" in client.get("/services/fromsetup").text  # the flash message (fixture template)
+        assert not any("Setup" in n for n in json.loads(services_store.read_raw("fromsetup")).get("notes") or [])
+    finally:
+        services_store.delete("fromsetup")
+
+
+def test_templates_keep_setup_out_of_notes():
+    import glob, json, os
+    from conftest import ROOT
+    for f in glob.glob(os.path.join(ROOT, "services", "_templates", "*.json")):
+        for n in json.load(open(f)).get("notes") or []:
+            assert not n.startswith("Setup") and "create a token" not in n, f"{os.path.basename(f)}: setup hint in notes"
+
+
 def test_shared_variable_is_shown(client, app_module):
     from app import services_store as s
     try:
@@ -546,6 +567,21 @@ def test_job_proposals_render(client, app_module, monkeypatch, tmp_path):
     html = client.get("/jobs").text
     assert "Run selected" not in html and "expired" in html
     assert "Propose actions" in client.get(f"/jobs/{jid}").text
+
+
+def test_prompt_suggestion_shows_a_diff(client, app_module, monkeypatch, tmp_path):
+    from app import jsonstore, scheduled
+    for k, f in (("JOBS", "j.json"), ("HISTORY", "h.json"), ("SEEN", "s.json")):
+        monkeypatch.setattr(scheduled, k, str(tmp_path / f))
+    jid = scheduled.save({"name": "Disk check", "prompt": "check the disks", "kind": "manual"})
+    sugg = {"text": "check the disks of all hosts", "why": "hosts were unclear", "state": "proposed", "base": "check the disks"}
+    jsonstore.save(scheduled.HISTORY, [{"id": "r1", "job": jid, "name": "x", "status": "done", "queued": 1, "ended": 2,
+                                        "prompt_suggestion": sugg, "result": {"status": "ok", "title": "t"}}])
+    html = client.get("/jobs").text
+    assert "3 → 6 words" in html and '<ins class="diff-add"> of all hosts</ins>' in html and "Use this task" in html
+    jsonstore.save(scheduled.HISTORY, [dict(scheduled.history()[0], prompt_suggestion={k: v for k, v in sugg.items() if k != "base"})])
+    html = client.get("/jobs").text  # a suggestion from before the diff: the whole text as before
+    assert "the suggested task" in html and "diff-add" not in html
 
 
 def test_pending_proposals_show_outside_the_folded_run(client, app_module, monkeypatch, tmp_path):

@@ -12,6 +12,7 @@ Profiles – the job's limit on top of each tentacle's own access (the stricter 
 State: jobs.json (definitions), job-history.json (last runs), job-runs.json (running now – read by svc).
 """
 import asyncio
+import difflib
 import json
 import os
 import re
@@ -87,9 +88,10 @@ def check_action(command):
 
 
 PROMPT_SCHEMA = {"type": "object", "additionalProperties": False, "required": ["text", "why"],
-                 "description": "only when the task was ambiguous or lacked something you had to find out first",
-                 "properties": {"text": {"type": "string", "description": "the whole improved task, same intent"},
-                                "why": {"type": "string", "description": "one line"}}}
+                 "description": "only when the task was ambiguous or lacked something that cost turns – leave it out when it worked",
+                 "properties": {"text": {"type": "string", "description": "the whole improved task, same intent, no longer than "
+                                         "needed: minimal change, no details of this run"},
+                                "why": {"type": "string", "description": "one line: what failed or cost turns, how the change avoids it"}}}
 SYSTEM_LEARN = (" If this run showed something lasting about a tentacle or this site that its notes don't say yet, or a "
                 "note that is wrong, put it into \"knowledge\" (target service, system or site; op add, replace or remove "
                 "with old = the exact current note; a one-line why) – only what you checked in this run, never what "
@@ -98,9 +100,14 @@ SYSTEM_LEARN = (" If this run showed something lasting about a tentacle or this 
                 "public tracker: write it in English and leave out host, service and user names of this site (placeholders like "
                 "<host>), and fill repro (the command or step that shows it), actual (the message or result, short) and "
                 "expected.")
-SYSTEM_IMPROVE = (" If the task itself was ambiguous or lacked something you had to find out first, put a better version of "
-                  "the whole task into \"prompt\" (same intent, with what you found out) and a one-line why; leave it out "
-                  "when the task is fine.")
+SYSTEM_IMPROVE = (" If the task itself was ambiguous, misleading or lacked something that cost you turns in this run, put a "
+                  "better version of the whole task into \"prompt\" – more effective, not longer: change only what failed "
+                  "and keep the rest word for word; merge or drop instructions that are redundant or outdated; a clear goal "
+                  "and criteria beat step-by-step detail. Leave out everything specific to this run: line numbers, issue or "
+                  "PR numbers, current findings, one-off values, and workarounds for weaknesses of tentaclAI (those are "
+                  "product knowledge). A lasting fact about a tentacle or this site goes into \"knowledge\", not into the "
+                  "task. The why says what failed or cost turns and how the change avoids it. Leave \"prompt\" out when the "
+                  "task worked.")
 PROMPT_HISTORY = 5  # earlier prompts kept with a job (restore in the editor)
 
 
@@ -968,6 +975,11 @@ def execute(run_id, jid):
         status, fields = "timeout", {"error": f"stopped after {job.get('max_minutes', 20)} min"}
     else:
         status, fields = parse_output(out) if code is not None else ("failed", {"error": out[:500]})
+    p = fields.get("prompt_suggestion")
+    if p and " ".join(p["text"].split()) == " ".join(job["prompt"].split()):
+        fields.pop("prompt_suggestion")  # the same task again is no suggestion
+    elif p:
+        p["base"] = job["prompt"]  # what the run had – the suggestion is shown as a diff against it
     run = dict(fields, status=status, ended=time.time(), seconds=round(time.time() - started))
     auditlog.write("job", job["name"], f"run {status}", "ok" if status == "done" else "failed",
                    actor="job", mode=job.get("profile", "read-only"), origin={"job": run_id}, seconds=run["seconds"],
@@ -1190,6 +1202,25 @@ def discard_knowledge(run_id, picks=None, state="discarded"):
         raise ValueError("nothing picked")
     _update_run(run_id, knowledge=items)
     return n
+
+
+def prompt_diff(old, new):
+    """a suggested task against the one the run had, word by word → [(op, text)] with op "", "+" or "-";
+    joining the texts of "" and "+" gives the new task, of "" and "-" the old one"""
+    a, b = re.findall(r"\s+|\S+", old or ""), re.findall(r"\s+|\S+", new or "")
+    out = []
+    for op, i1, i2, j1, j2 in difflib.SequenceMatcher(None, a, b, autojunk=False).get_opcodes():
+        if op in ("delete", "replace"):
+            out.append(("-", "".join(a[i1:i2])))
+        if op in ("insert", "replace"):
+            out.append(("+", "".join(b[j1:j2])))
+        if op == "equal":
+            out.append(("", "".join(a[i1:i2])))
+    return out
+
+
+def words(text):
+    return len((text or "").split())
 
 
 def use_prompt(run_id, use=True):

@@ -1,7 +1,8 @@
 {
   "_meta": {
     "title": "PatchMon",
-    "category": "Docker & Infra"
+    "category": "Docker & Infra",
+    "setup": "Integration API: create a token in PatchMon (Settings → Integrations → API) – it has a key and a secret (PATCHMON_TOKEN_KEY, PATCHMON_TOKEN_SECRET); svc sends them as Basic auth. Give it read scopes only unless Claude should change something."
   },
   "description": "PatchMon – patch level and packages of all hosts",
   "api": {
@@ -13,9 +14,6 @@
     },
     "docs": "https://patchmon.{{DOMAIN}}/api-docs"
   },
-  "notes": [
-    "Integration API: create a token in PatchMon (Settings → Integrations → API) – it has a key and a secret; svc sends them as Basic auth (key:secret). Give it read scopes only unless Claude should change something."
-  ],
   "test_path": "/hosts",
   "examples": [
     "svc NAME GET /hosts"

@@ -302,6 +302,8 @@ def create_like(name, like, address):
 
 
 def create(name, template="", address=""):
+    """a new service from a template (or the blank one); returns the template's setup hint – shown once, never saved
+    as a note: it is about setting the service up, not something Claude needs to read later"""
     p = path_of(name)
     if os.path.exists(p):
         raise ValueError(f"{name} already exists")
@@ -314,12 +316,11 @@ def create(name, template="", address=""):
             tpl = json.load(f)
     except (FileNotFoundError, ValueError):
         tpl = {"description": "", "api": {"base_url": "https://", "auth": {"type": "none"}}}
-    setup = (tpl.get("_meta") or {}).get("setup")
+    setup = str((tpl.get("_meta") or {}).get("setup") or "")
     tpl = {k: v for k, v in tpl.items() if not k.startswith("_")}
-    if setup:
-        tpl["notes"] = [f"Setup: {setup}"] + tpl.get("notes", [])
     up = name.upper().replace("-", "_")
     domain = address.partition("@")[2].lower() if address else PLACEHOLDER_DOMAIN
+    setup = setup.replace("{{DOMAIN}}", domain).replace("svc NAME ", f"svc {name} ").replace("EXAMPLE_", f"{up}_")
     text = json.dumps(tpl, ensure_ascii=False).replace("svc NAME ", f"svc {name} ").replace(" NAME ", f" {name} ").replace("svc docker NAME", f"svc docker {name}").replace("{{DOMAIN}}", domain)
     text = text.replace("EXAMPLE_", f"{up}_").replace('"example"', f'"{name}"')
     data = _own_variables(json.loads(text), name)
@@ -327,6 +328,7 @@ def create(name, template="", address=""):
         _set_address(data, address)
     data = {"name": name, **{k: v for k, v in data.items() if k != "name"}}
     save_raw(name, json.dumps(data, ensure_ascii=False))
+    return setup
 
 
 # ---------------------------------------------------------------- own templates (export a service, import a template)

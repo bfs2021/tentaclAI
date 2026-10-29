@@ -17,6 +17,12 @@ All notable changes, newest first. Every release lists **upgrade steps** from th
   is still a finding.
 
 ### Changes / fixes
+- Jobs: a suggested better task is now a minimal change – no line or issue numbers, findings or workarounds of the
+  run, lasting facts go to notes – and shows as a diff against the task the run had, with the word count
+  before → after; a suggestion equal to the task is dropped (#26).
+- Services: a template's setup hint is shown once when the service is created instead of being saved as a note
+  Claude reads after every onboarding; the PatchMon template keeps its token hint in `_meta.setup` now (#20).
+  Existing services keep their notes – remove a copied setup hint by hand if one is there.
 - Fix: when the injection guard flagged a JSON response (e.g. GitHub issues with repro commands), svc appended its
   warning to stdout too, so `svc … | jq` failed with a parse error. For JSON the warning now goes to stderr only.
 - Fix: behind a reverse proxy that keeps connections open (nginx-proxy does), a request now and then failed with

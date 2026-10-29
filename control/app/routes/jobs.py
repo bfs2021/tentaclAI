@@ -12,6 +12,7 @@ from .. import auditlog, extensions, knowledge, scheduled
 from ..web import TC_VERSION, page, respond, sync_services, templates
 
 router = APIRouter()
+templates.env.globals.update(prompt_diff=scheduled.prompt_diff, words=scheduled.words)  # a prompt suggestion as a diff
 
 
 def _job_page(request, jid=None, job=None):

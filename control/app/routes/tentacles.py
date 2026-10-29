@@ -167,16 +167,17 @@ async def system_delete(request: Request, name: str):
 async def services_new(request: Request, name: str = Form(...), template: str = Form(""), address: str = Form(""),
                        like: str = Form("")):
     name = name.strip().lower()
+    setup = ""
     try:
         if like:
             services_store.create_like(name, like.strip(), address)
         else:
-            services_store.create(name, template.strip(), address)
+            setup = services_store.create(name, template.strip(), address)
     except (ValueError, FileNotFoundError) as e:
         return respond(request, str(e), "err")
     await sync_services()
-    return respond(request, f"{name} created – check URL/tokens, then “Test connection” and “Onboard with Claude”",
-                   redirect=f"/services/{name}")
+    msg = f"{name} created – check URL/tokens, then “Test connection” and “Onboard with Claude”"
+    return respond(request, f"{msg}. Setup: {setup}" if setup else msg, redirect=f"/services/{name}")
 
 
 @router.get("/services/{name}", response_class=HTMLResponse)
