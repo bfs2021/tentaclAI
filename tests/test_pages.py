@@ -584,6 +584,30 @@ def test_prompt_suggestion_shows_a_diff(client, app_module, monkeypatch, tmp_pat
     assert "the suggested task" in html and "diff-add" not in html
 
 
+def test_job_tabs_render_and_move(client, app_module, monkeypatch, tmp_path):
+    from app import jsonstore, scheduled
+    for k, f in (("JOBS", "j.json"), ("HISTORY", "h.json"), ("SEEN", "s.json")):
+        monkeypatch.setattr(scheduled, k, str(tmp_path / f))
+    a = scheduled.save({"name": "Spam check", "prompt": "p", "kind": "manual", "group": "Spam"})
+    b = scheduled.save({"name": "Disk check", "prompt": "p", "kind": "manual"})
+    jsonstore.save(scheduled.HISTORY, [{"id": "r1", "job": a, "name": "x", "status": "done", "queued": 1, "ended": 2,
+                                        "result": {"status": "alert", "title": "t"}}])
+    html = client.get("/jobs?tab=*").text
+    assert 'class="tabs job-tabs"' in html and "Spam check" in html and "Disk check" in html and "No tab" in html
+    assert 'title="1 job with alert in the last run"' in html
+    html = client.get("/jobs?tab=Spam").text
+    assert "Spam check" in html and "Disk check" not in html and "/jobs/new?group=Spam" in html
+    assert "Disk check" not in client.get("/jobs").text  # the picked tab is remembered
+    r = client.post(f"/jobs/{b}/group", data={"group": "spam"}, headers={"HX-Request": "true"})
+    assert scheduled.get(b)["group"] == "Spam" and r.headers.get("HX-Refresh") == "true"
+    assert "Moved to Spam" in client.get("/jobs").text  # the flash message
+    client.post(f"/jobs/{a}/group", data={"group": ""}, headers={"HX-Request": "true"})
+    client.post(f"/jobs/{b}/group", data={"group": ""}, headers={"HX-Request": "true"})
+    html = client.get("/jobs").text  # no tab in use: no tab bar, all jobs
+    assert "job-tabs" not in html and "Spam check" in html and "Disk check" in html
+    assert 'name="group"' in client.get("/jobs/new?group=Spam").text and 'value="Spam"' in client.get("/jobs/new?group=Spam").text
+
+
 def test_pending_proposals_show_outside_the_folded_run(client, app_module, monkeypatch, tmp_path):
     import time
     from app import jsonstore, scheduled

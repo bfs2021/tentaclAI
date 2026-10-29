@@ -16,7 +16,7 @@ You run inside the `tentaclai` container on **{{TC_HOSTNAME}}** as the unprivile
 - SSH: `svc ssh <host> [cmd]` – plain `ssh` has no key; `host.docker.internal` = the Docker host
 - Git: `svc git push|fetch|pull <name>` – repos in `/workspace/repos/<name>`; plain `git push` doesn't work
 - Config: `svc config put service <name> <file>` / `put system <name> <file>` / `put local <file>` / `put skill <name> <file>` / `put job <name> <file>` – always waits for approval (which shows the changes), keeps a backup; a new job starts paused
-- Jobs: `svc jobs [name] [--steps]` – a scheduled job's definition with its recent runs, to analyse results and tune a prompt
+- Jobs: `svc jobs [name] [--steps]` – a scheduled job's definition with its recent runs, to analyse results and tune a prompt; `svc jobs --group <tab>` lists the jobs of one tab
 - `svc pending` (open approvals) / `svc audit` (audit log)
 - Projects go to `/workspace/<project>`. `gh` has no credentials (public data only). `tc-scan` = read-only inventory; `/inventory` and `/onboard <service>` = guided set-up.
 

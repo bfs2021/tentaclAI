@@ -440,3 +440,39 @@ def test_prompt_diff_marks_insertions_and_deletions(sj):
     assert "".join(t for op, t in d if op != "-") == "Check the disks of all hosts.\nReport in German."
     assert "".join(t for op, t in d if op != "+") == "Check the disks.\nReport in German."
     assert sj.prompt_diff("same", "same") == [("", "same")] and sj.words("a b\nc") == 3
+
+
+def test_job_tabs(sj, monkeypatch, tmp_path):
+    monkeypatch.setattr(sj, "JOBS", str(tmp_path / "jobs.json"))
+    monkeypatch.setattr(sj, "tentacles", lambda: KNOWN)
+    a = sj.save({"name": "Spam A", "prompt": "p", "kind": "manual", "group": "  Spam   handling "})
+    b = sj.save({"name": "Spam B", "prompt": "p", "kind": "manual", "group": "spam HANDLING"})
+    c = sj.save({"name": "Other", "prompt": "p", "kind": "manual"})
+    assert sj.get(a)["group"] == sj.get(b)["group"] == "Spam handling"  # an existing tab's spelling wins
+    assert sj.groups() == ["Spam handling"] and not sj.get(c).get("group")
+    sj.put(a, {k: v for k, v in sj.definition(sj.get(a)).items() if k != "group"})  # a definition without it keeps the tab
+    assert sj.get(a)["group"] == "Spam handling"
+    assert sj.set_group(c, "Ops") == "Ops" and sj.set_group(b, "") == "" and sj.groups() == ["Ops", "Spam handling"]
+    with pytest.raises(ValueError, match="40"):
+        sj.set_group(a, "x" * 41)
+    rows = [{"group": "Ops", "last_run": {"status": "done", "result": {"status": "warn"}}},
+            {"group": "Ops", "last_run": {"status": "failed"}}, {"group": "", "last_run": None},
+            {"group": "B", "last_run": {"status": "done", "result": {"status": "ok"}}}]
+    assert sj.tabs(rows) == [("B", 1, "", 0), ("Ops", 2, "alert", 1), ("", 1, "", 0)]  # no tab last
+    assert sj.tabs([{"group": "", "last_run": None}]) == []  # nobody uses tabs: no tab bar
+
+
+def test_svc_jobs_group(monkeypatch, tmp_path, capsys):
+    import importlib
+    jp = importlib.import_module("svclib.jobs_part")
+    (tmp_path / "jobs.json").write_text(json.dumps({
+        "spam-a": {"name": "Spam A", "group": "Spam handling", "schedule": {"kind": "manual"}},
+        "disk": {"name": "Disk", "schedule": {"kind": "manual"}}}))
+    monkeypatch.setattr(jp, "JOBS_DIR", str(tmp_path))
+    assert jp.cmd_jobs(["--group", "spam HANDLING"]) == 0
+    out = capsys.readouterr().out
+    assert "spam-a" in out and "disk" not in out
+    assert jp.cmd_jobs([]) == 0
+    out = capsys.readouterr().out
+    assert "Tab" in out and "Spam handling" in out and out.index("spam-a") < out.index("disk")  # tabs first, no tab last
+    assert jp.cmd_jobs(["--group", "nope"]) == 0 and "No jobs in the tab" in capsys.readouterr().out

@@ -14,7 +14,12 @@
 {% endif %}
 <form class="card stack" hx-post="/jobs/save" style="gap:14px">
   <input type="hidden" name="jid" value="{{ jid or '' }}">
-  <div><label>Name</label><input type="text" name="name" value="{{ job.name or '' }}" maxlength="60" required></div>
+  <div class="grid2">
+    <div><label>Name</label><input type="text" name="name" value="{{ job.name or '' }}" maxlength="60" required></div>
+    <div><label for="job-group">Tab</label><input type="text" name="group" id="job-group" value="{{ job.group or '' }}" maxlength="40" list="job-groups" placeholder="none – e.g. Spam handling">
+      <datalist id="job-groups">{% for g in groups %}<option value="{{ g }}">{% endfor %}</datalist>
+      <div class="help">Sorts the job into a tab on the Jobs page – pick one or type a new name.</div></div>
+  </div>
   {% if warnings %}<div class="card flat small">{% for w in warnings %}<div><span class="pill warn">note</span> {{ w }}</div>{% endfor %}</div>{% endif %}
   <div style="position:relative"><label for="prompt">Task</label>
     <textarea name="prompt" id="prompt" style="min-height:160px;font-family:inherit" required placeholder="e.g. Check the free disk space on @docktopus and warn above 80 %.">{{ job.prompt or '' }}</textarea>

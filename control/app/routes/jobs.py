@@ -25,7 +25,7 @@ def _job_page(request, jid=None, job=None):
                 rw=[x for x in scheduled.rw_tentacles()
                     if not (job or {}).get("scope") or x.removeprefix("ssh ") in scheduled.named(job.get("prompt"), known)],
                 allowed=scheduled.named((job or {}).get("prompt"), known) if (job or {}).get("scope") else None,
-                efforts=tclib.EFFORTS, warnings=warnings, fmt=lambda ts: time.strftime("%Y-%m-%d %H:%M", time.localtime(ts)),
+                efforts=tclib.EFFORTS, warnings=warnings, groups=scheduled.groups(), fmt=lambda ts: time.strftime("%Y-%m-%d %H:%M", time.localtime(ts)),
                 tentacle_list=[{"name": n, "kind": t["kind"], "parts": ", ".join(t["parts"]), "on": t["enabled"]}
                                for n, t in sorted(known.items())])
 
@@ -77,10 +77,19 @@ async def jobs_state(v: str = ""):
 
 
 @router.get("/jobs", response_class=HTMLResponse)
-async def jobs_page(request: Request):
+async def jobs_page(request: Request, tab: str | None = None):
     new = scheduled.mark_seen()
     names = {jid: j.get("name", jid) for jid, j in scheduled.load().items()}
-    return page(request, "jobs.html", rows=scheduled.overview(), new=[dict(r, job_name=names.get(r.get("job"), r.get("name", "?"))) for r in new],
+    rows = scheduled.overview()
+    tabs = scheduled.tabs(rows)
+    if tab is None:  # the tab picked last time
+        tab = request.session.get("jobs_tab", "*")
+    if tab != "*" and tab not in [t[0] for t in tabs]:
+        tab = "*"  # all jobs – also when the tab is gone (its last job moved away)
+    request.session["jobs_tab"] = tab
+    shown = rows if tab == "*" or not tabs else [r for r in rows if (r.get("group") or "") == tab]
+    return page(request, "jobs.html", rows=shown, all_rows=rows, tabs=tabs, tab=tab, groups=scheduled.groups(),
+                new=[dict(r, job_name=names.get(r.get("job"), r.get("name", "?"))) for r in new],
                 new_ids={r["id"] for r in new}, templates=scheduled.templates(), token=scheduled.state_token(), now=time.time(),
                 issue_url=lambda x, r=None: knowledge.issue_url(x, TC_VERSION, run=r, edition=extensions.edition()),
                 fmt=lambda ts: time.strftime("%Y-%m-%d %H:%M", time.localtime(ts)) if ts else "–")
@@ -93,10 +102,10 @@ async def jobs_seen(request: Request):
 
 
 @router.get("/jobs/new", response_class=HTMLResponse)
-async def job_new(request: Request, template: int = -1):
+async def job_new(request: Request, template: int = -1, group: str = ""):
     presets = scheduled.templates()
     job = dict(presets[template]) if 0 <= template < len(presets) else {}
-    return _job_page(request, job=dict({"profile": "read-only", "notify": "findings", "max_minutes": 20,
+    return _job_page(request, job=dict({"profile": "read-only", "notify": "findings", "max_minutes": 20, "group": group,
                                         "schedule": {"kind": "daily", "time": "07:00"}}, **job))
 
 
@@ -128,6 +137,15 @@ async def job_run(request: Request, jid: str):
     except ValueError as e:
         return respond(request, f"Not started: {e}", "err")
     return respond(request, "Job started – the result shows up here", refresh=True)
+
+
+@router.post("/jobs/{jid}/group", response_class=HTMLResponse)
+async def job_group(request: Request, jid: str):
+    try:
+        g = scheduled.set_group(jid, (await request.form()).get("group", ""))
+    except ValueError as e:
+        return respond(request, f"Not moved: {e}", "err")
+    return respond(request, f"Moved to {g}" if g else "Moved out of its tab", refresh=True)
 
 
 @router.post("/jobs/{jid}/toggle", response_class=HTMLResponse)

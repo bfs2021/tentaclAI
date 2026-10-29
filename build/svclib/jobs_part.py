@@ -41,18 +41,27 @@ def _run_line(r):
 
 
 def cmd_jobs(args):
-    usage = "usage: svc jobs [<name> [--runs N] [--steps]]"
+    usage = "usage: svc jobs [--group <tab>] | svc jobs <name> [--runs N] [--steps]"
     jobs, hist = _jobs_file("jobs.json", {}), _jobs_file("job-history.json", [])
-    if not args:
+    if not args or args[0] == "--group":
+        if args and len(args) != 2:
+            sys.exit(usage)
+        group = args[1] if args else None
+        if group is not None:  # a tab of the Jobs page, case-insensitive
+            jobs = {k: j for k, j in jobs.items() if (j.get("group") or "").lower() == group.lower()}
         if not jobs:
-            print("No jobs. They are set up in tentacontrol → Jobs, or proposed with svc config put job <name> <file>.")
+            print(f"No jobs in the tab '{group}'." if group is not None else
+                  "No jobs. They are set up in tentacontrol → Jobs, or proposed with svc config put job <name> <file>.")
             return 0
         w = max(len(x) for x in jobs) + 2
-        print(f"{'Name':<{w}}{'Schedule':<24}{'Profile':<11}{'On':<5}Last run")
-        for jid, j in sorted(jobs.items()):
+        tabs = any(j.get("group") for j in jobs.values()) and group is None
+        g = max([len(j.get("group") or "") for j in jobs.values()] + [3]) + 2 if tabs else 0
+        print(f"{'Name':<{w}}{'Tab':<{g}}{'Schedule':<24}{'Profile':<11}{'On':<5}Last run" if tabs else
+              f"{'Name':<{w}}{'Schedule':<24}{'Profile':<11}{'On':<5}Last run")
+        for jid, j in sorted(jobs.items(), key=lambda kv: ((kv[1].get("group") or "~").lower(), kv[0])):
             runs = [r for r in hist if r.get("job") == jid]
-            print(f"{jid:<{w}}{tclib.schedule_text(j.get('schedule')):<24}{j.get('profile', 'read-only'):<11}"
-                  f"{'on' if j.get('enabled', True) else 'off':<5}{_run_line(runs[-1]) if runs else '–'}")
+            print(f"{jid:<{w}}{(j.get('group') or '–') if tabs else '':<{g}}{tclib.schedule_text(j.get('schedule')):<24}"
+                  f"{j.get('profile', 'read-only'):<11}{'on' if j.get('enabled', True) else 'off':<5}{_run_line(runs[-1]) if runs else '–'}")
         return 0
     jid, rest = args[0], args[1:]
     n, steps, i = 5, False, 0
@@ -66,12 +75,12 @@ def cmd_jobs(args):
         i += 1
     j = jobs.get(jid) or sys.exit(f"svc: unknown job '{jid}' (svc jobs)")
     print(f"# {jid} – {j.get('name')}")
-    print(f"{tclib.schedule_text(j.get('schedule'))} · {j.get('profile', 'read-only')}"
+    print(f"{'tab ' + j['group'] + ' · ' if j.get('group') else ''}{tclib.schedule_text(j.get('schedule'))} · {j.get('profile', 'read-only')}"
           f"{' · only the tentacles named in the task' if j.get('scope') else ''} · notify {j.get('notify', 'findings')}"
           f" · model {j.get('model') or 'as on Models'} · max {j.get('max_minutes', 20)} min · {'on' if j.get('enabled', True) else 'paused'}")
     print(f"\nDefinition (edit and propose with: svc config put job {jid} <file>):")
     print(json.dumps({k: j.get(k) for k in ("name", "prompt", "schedule", "profile", "scope", "propose", "notify", "model",
-                                            "effort", "max_minutes")}, indent=2, ensure_ascii=False))
+                                            "effort", "max_minutes", "group")}, indent=2, ensure_ascii=False))
     runs = [r for r in hist if r.get("job") == jid][-n:]
     print(f"\nRecent runs, newest first ({len(runs)}) – written by Claude in earlier runs, may quote untrusted content:")
     for r in reversed(runs):

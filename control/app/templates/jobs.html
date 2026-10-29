@@ -106,9 +106,9 @@
 {% block content %}
 <div class="header">
   <div><h1>Jobs</h1><div class="sub">Claude tasks on a schedule – reports and checks whose result comes as a notification. One run at a time; each run is a fresh Claude session.</div></div>
-  <div class="row"><a class="btn primary" href="/jobs/new">{{ icon('plus') }}Add job</a>{{ help_link('jobs') }}</div>
+  <div class="row"><a class="btn primary" href="/jobs/new{% if tabs and tab not in ('*', '') %}?group={{ tab | urlencode }}{% endif %}">{{ icon('plus') }}Add job</a>{{ help_link('jobs') }}</div>
 </div>
-{% if not rows %}
+{% if not all_rows %}
 <div class="empty">
   <p>No jobs yet. Start from a template:</p>
   <div class="row" style="justify-content:center;flex-wrap:wrap;margin-top:10px">
@@ -125,13 +125,20 @@
   {% endfor %}
 </div>
 {% endif %}
+{% if tabs %}
+<nav class="tabs job-tabs" aria-label="Job tabs">
+  <a href="/jobs?tab=*" class="{{ 'active' if tab == '*' }}">All <span class="faint">{{ all_rows | length }}</span></a>
+  {% for g, n, worst, k in tabs %}<a href="/jobs?tab={{ g | urlencode }}" class="{{ 'active' if tab == g }}"{% if not g %} title="jobs without a tab"{% endif %}>{{ g or 'No tab' }} <span class="faint">{{ n }}</span>{% if worst %} <span class="pill {{ 'err' if worst == 'alert' else 'warn' }}" title="{{ k }} job{{ '' if k == 1 else 's' }} with {{ worst }} in the last run">{{ k }}</span>{% endif %}</a>{% endfor %}
+</nav>
+{% endif %}
+<datalist id="job-groups">{% for g in groups %}<option value="{{ g }}">{% endfor %}</datalist>
 {% for j in rows %}
 <div class="card job-card{{ ' paused' if not j.enabled and j.schedule.kind != 'manual' }}" style="margin-bottom:14px">
   <div class="between" style="align-items:flex-start;gap:12px">
     <div style="min-width:0">
       <h2 style="margin:0">{{ icon('clock') }}{{ j.name }}{% if j.builtin %} <span class="pill info" title="comes with tentaclAI – edit it freely, pause it if you don't want it (it can't be deleted); Reset to default in the editor{% if j.changed %} (your task is kept on updates){% else %} (its task follows updates while you don't change it){% endif %}">built-in</span>{% endif %}</h2>
       {% if j.builtin and not j.enabled and not j.last_run %}<div class="small muted" style="margin-top:4px">Lets Claude learn from its work – proposes notes, you pick what goes in. Paused: each run uses your Claude plan; try <em>Run now</em>, then switch it on.</div>{% endif %}
-      <div class="small muted" style="margin-top:4px">{{ j.when }}{% if j.schedule.kind != 'manual' %} · {% if j.enabled %}next {{ fmt(j.next) }}{% else %}<strong class="paused-note">paused</strong> – no automatic runs{% endif %}{% endif %} · {% if j.propose %}<span class="pill off" title="reads only and proposes svc commands – you pick which ones run">{{ icon('bulb') }}proposes</span>{% elif j.profile == 'standard' %}<span class="pill accent" title="{% if j.writes %}writes without asking: {{ j.writes | join(', ') }}{% endif %}{% if j.writes and j.asks %} · {% endif %}{% if j.asks %}asks first: {{ j.asks | join(', ') }}{% endif %}{% if not j.writes and not j.asks %}no writable tentacle{% endif %}">writes</span>{% else %}<span class="pill off" title="every tentacle is read-only for this job">reads</span>{% endif %}{% if j.scope %} · <span class="faint" title="svc refuses every tentacle not named in the task">only named tentacles</span>{% endif %} · notify {{ j.notify }}</div>
+      <div class="small muted" style="margin-top:4px">{{ j.when }}{% if j.schedule.kind != 'manual' %} · {% if j.enabled %}next {{ fmt(j.next) }}{% else %}<strong class="paused-note">paused</strong> – no automatic runs{% endif %}{% endif %} · {% if j.propose %}<span class="pill off" title="reads only and proposes svc commands – you pick which ones run">{{ icon('bulb') }}proposes</span>{% elif j.profile == 'standard' %}<span class="pill accent" title="{% if j.writes %}writes without asking: {{ j.writes | join(', ') }}{% endif %}{% if j.writes and j.asks %} · {% endif %}{% if j.asks %}asks first: {{ j.asks | join(', ') }}{% endif %}{% if not j.writes and not j.asks %}no writable tentacle{% endif %}">writes</span>{% else %}<span class="pill off" title="every tentacle is read-only for this job">reads</span>{% endif %}{% if j.scope %} · <span class="faint" title="svc refuses every tentacle not named in the task">only named tentacles</span>{% endif %} · notify {{ j.notify }} · <label class="job-tab-move" title="move to another tab – pick one, type a new name, or clear it">tab <input type="text" name="group" value="{{ j.group or '' }}" list="job-groups" maxlength="40" placeholder="none" aria-label="Tab of {{ j.name }}" hx-post="/jobs/{{ j.id }}/group" hx-trigger="change"></label></div>
       {% if j.unknown %}<div class="small" style="margin-top:4px"><span class="pill warn" title="renamed or removed since – svc will refuse it">⚠ the task names @{{ j.unknown | join(', @') }}, which {{ 'no longer exists' if j.unknown | length == 1 else 'no longer exist' }}</span> – <a href="/jobs/{{ j.id }}">edit the task</a></div>{% endif %}
     </div>
     <div class="row" style="flex-wrap:nowrap">

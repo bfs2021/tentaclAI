@@ -567,8 +567,57 @@ def validate(form, known=None):
     errors, _ = check_mentions({"prompt": prompt, "profile": profile, "scope": scope}, known)
     if errors:
         raise ValueError("; ".join(errors))
-    return {"name": name, "prompt": prompt, "profile": profile, "notify": rule, "model": model, "effort": effort,
-            "scope": scope, "propose": propose, "improve": improve, "max_minutes": minutes, "schedule": sched}
+    fields = {"name": name, "prompt": prompt, "profile": profile, "notify": rule, "model": model, "effort": effort,
+              "scope": scope, "propose": propose, "improve": improve, "max_minutes": minutes, "schedule": sched}
+    if "group" in form:  # a definition without it (svc config put job) keeps the job's tab
+        fields["group"] = clean_group(form.get("group"))
+    return fields
+
+
+def clean_group(value):
+    """a job's tab: free text, max 40 characters; the spelling of an existing tab wins (ops → Ops)"""
+    g = " ".join(str(value or "").split())
+    if len(g) > 40:
+        raise ValueError("tab: max. 40 characters")
+    return next((x for x in groups() if x.lower() == g.lower()), g)
+
+
+def groups():
+    """the tabs in use, sorted"""
+    return sorted({j.get("group") for j in load().values() if j.get("group")}, key=str.lower)
+
+
+def set_group(jid, group):
+    """move a job to another tab ("" = no tab) – from the Jobs list"""
+    check_write("jobs", jid)
+    g = clean_group(group)
+    jobs = load()
+    if jid not in jobs:
+        raise ValueError("unknown job")
+    jobs[jid]["group"] = g
+    jsonstore.save(JOBS, jobs)
+    return g
+
+
+def tabs(rows):
+    """the tab bar of the Jobs page: [(name, jobs, worst light of their last runs, how many have it)];
+    "" collects the jobs without a tab; empty when no job has one"""
+    names = sorted({r.get("group") or "" for r in rows}, key=lambda g: (g == "", g.lower()))
+    if names in ([], [""]):
+        return []
+    out = []
+    for g in names:
+        lights = [_light(r["last_run"]) for r in rows if (r.get("group") or "") == g and r.get("last_run")]
+        worst = "alert" if "alert" in lights else "warn" if "warn" in lights else ""
+        out.append((g, sum(1 for r in rows if (r.get("group") or "") == g), worst, lights.count(worst) if worst else 0))
+    return out
+
+
+def _light(run):
+    """ok / warn / alert of a finished run – a failed or timed-out run counts as alert"""
+    if run.get("status") == "done":
+        return (run.get("result") or {}).get("status") or "warn"
+    return "alert" if run.get("status") in ("failed", "timeout") else ""
 
 
 def save(form, jid=None, new_id=None, enabled=True):
@@ -605,7 +654,7 @@ def form_from_definition(d):
     """a job definition as JSON (svc config put job) → form values: the schedule object is flattened"""
     if not isinstance(d, dict):
         raise ValueError("a job is a JSON object")
-    unknown = set(d) - {"name", "prompt", "schedule", "profile", "scope", "propose", "improve", "notify", "model", "effort", "max_minutes"}
+    unknown = set(d) - {"name", "prompt", "schedule", "profile", "scope", "propose", "improve", "notify", "model", "effort", "max_minutes", "group"}
     if unknown:
         raise ValueError(f"unknown fields: {', '.join(sorted(unknown))}")
     sched = d.get("schedule") or {"kind": "manual"}
@@ -622,7 +671,7 @@ def form_from_definition(d):
 
 def definition(job):
     """the editable fields of a job as JSON – what `svc jobs <name>` shows and `svc config put job` takes"""
-    return dict({k: job.get(k) for k in ("name", "prompt", "schedule", "profile", "scope", "propose", "notify", "model", "effort", "max_minutes")},
+    return dict({k: job.get(k) for k in ("name", "prompt", "schedule", "profile", "scope", "propose", "notify", "model", "effort", "max_minutes", "group")},
                 improve=improves(job))
 
 
