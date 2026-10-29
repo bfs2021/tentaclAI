@@ -126,19 +126,21 @@
 </div>
 {% endif %}
 {% if tabs %}
-<nav class="tabs job-tabs" aria-label="Job tabs">
+<nav class="tabs job-tabs" aria-label="Job groups">
   <a href="/jobs?tab=*" class="{{ 'active' if tab == '*' }}">All <span class="faint">{{ all_rows | length }}</span></a>
-  {% for g, n, worst, k in tabs %}<a href="/jobs?tab={{ g | urlencode }}" class="{{ 'active' if tab == g }}"{% if not g %} title="jobs without a tab"{% endif %}>{{ g or 'No tab' }} <span class="faint">{{ n }}</span>{% if worst %} <span class="pill {{ 'err' if worst == 'alert' else 'warn' }}" title="{{ k }} job{{ '' if k == 1 else 's' }} with {{ worst }} in the last run">{{ k }}</span>{% endif %}</a>{% endfor %}
+  {% for g, n, worst, k in tabs %}<a href="/jobs?tab={{ g | urlencode }}" class="{{ 'active' if tab == g }}"{% if not g %} title="jobs without a group"{% endif %}>{{ g or 'No group' }} <span class="faint">{{ n }}</span>{% if worst %} <span class="pill {{ 'err' if worst == 'alert' else 'warn' }}" title="{{ k }} job{{ '' if k == 1 else 's' }} with {{ worst }} in the last run">{{ k }}</span>{% endif %}</a>{% endfor %}
 </nav>
 {% endif %}
-<datalist id="job-groups">{% for g in groups %}<option value="{{ g }}">{% endfor %}</datalist>
 {% for j in rows %}
 <div class="card job-card{{ ' paused' if not j.enabled and j.schedule.kind != 'manual' }}" style="margin-bottom:14px">
   <div class="between" style="align-items:flex-start;gap:12px">
     <div style="min-width:0">
       <h2 style="margin:0">{{ icon('clock') }}{{ j.name }}{% if j.builtin %} <span class="pill info" title="comes with tentaclAI – edit it freely, pause it if you don't want it (it can't be deleted); Reset to default in the editor{% if j.changed %} (your task is kept on updates){% else %} (its task follows updates while you don't change it){% endif %}">built-in</span>{% endif %}</h2>
       {% if j.builtin and not j.enabled and not j.last_run %}<div class="small muted" style="margin-top:4px">Lets Claude learn from its work – proposes notes, you pick what goes in. Paused: each run uses your Claude plan; try <em>Run now</em>, then switch it on.</div>{% endif %}
-      <div class="small muted" style="margin-top:4px">{{ j.when }}{% if j.schedule.kind != 'manual' %} · {% if j.enabled %}next {{ fmt(j.next) }}{% else %}<strong class="paused-note">paused</strong> – no automatic runs{% endif %}{% endif %} · {% if j.propose %}<span class="pill off" title="reads only and proposes svc commands – you pick which ones run">{{ icon('bulb') }}proposes</span>{% elif j.profile == 'standard' %}<span class="pill accent" title="{% if j.writes %}writes without asking: {{ j.writes | join(', ') }}{% endif %}{% if j.writes and j.asks %} · {% endif %}{% if j.asks %}asks first: {{ j.asks | join(', ') }}{% endif %}{% if not j.writes and not j.asks %}no writable tentacle{% endif %}">writes</span>{% else %}<span class="pill off" title="every tentacle is read-only for this job">reads</span>{% endif %}{% if j.scope %} · <span class="faint" title="svc refuses every tentacle not named in the task">only named tentacles</span>{% endif %} · notify {{ j.notify }} · <label class="job-tab-move" title="move to another tab – pick one, type a new name, or clear it">tab <input type="text" name="group" value="{{ j.group or '' }}" list="job-groups" maxlength="40" placeholder="none" aria-label="Tab of {{ j.name }}" hx-post="/jobs/{{ j.id }}/group" hx-trigger="change"></label></div>
+      <div class="small muted" style="margin-top:4px">{{ j.when }}{% if j.schedule.kind != 'manual' %} · {% if j.enabled %}next {{ fmt(j.next) }}{% else %}<strong class="paused-note">paused</strong> – no automatic runs{% endif %}{% endif %} · {% if j.propose %}<span class="pill off" title="reads only and proposes svc commands – you pick which ones run">{{ icon('bulb') }}proposes</span>{% elif j.profile == 'standard' %}<span class="pill accent" title="{% if j.writes %}writes without asking: {{ j.writes | join(', ') }}{% endif %}{% if j.writes and j.asks %} · {% endif %}{% if j.asks %}asks first: {{ j.asks | join(', ') }}{% endif %}{% if not j.writes and not j.asks %}no writable tentacle{% endif %}">writes</span>{% else %}<span class="pill off" title="every tentacle is read-only for this job">reads</span>{% endif %}{% if j.scope %} · <span class="faint" title="svc refuses every tentacle not named in the task">only named tentacles</span>{% endif %} · notify {{ j.notify }} · <form class="job-group-move" hx-post="/jobs/{{ j.id }}/group" title="move the job to another group"><select name="group" aria-label="Group of {{ j.name }}" data-current="{{ j.group or '' }}">
+        <option value=""{{ ' selected' if not j.group }}>No group</option>
+        {% for g in groups %}<option value="{{ g }}"{{ ' selected' if j.group == g }}>{{ g }}</option>{% endfor %}
+        <option value="__new__">New group…</option></select></form></div>
       {% if j.unknown %}<div class="small" style="margin-top:4px"><span class="pill warn" title="renamed or removed since – svc will refuse it">⚠ the task names @{{ j.unknown | join(', @') }}, which {{ 'no longer exists' if j.unknown | length == 1 else 'no longer exist' }}</span> – <a href="/jobs/{{ j.id }}">edit the task</a></div>{% endif %}
     </div>
     <div class="row" style="flex-wrap:nowrap">
@@ -168,6 +170,16 @@
 document.body.addEventListener("htmx:afterSwap", function (e) {  // live steps: keep the newest one in view
   if (!e.target.classList || !e.target.classList.contains("job-live")) return;
   var l = e.target.querySelector(".job-log"); if (l) l.scrollTop = l.scrollHeight;
+});
+document.querySelectorAll(".job-group-move select").forEach(function (sel) {  // move a job: pick a group or name a new one
+  sel.addEventListener("change", function () {
+    if (sel.value === "__new__") {
+      var name = (prompt("Name of the new group") || "").trim();
+      if (!name) { sel.value = sel.dataset.current; return; }
+      var o = document.createElement("option"); o.value = o.textContent = name; sel.insertBefore(o, sel.lastElementChild); sel.value = name;
+    }
+    htmx.trigger(sel.form, "submit");
+  });
 });
 (function () {  // running time of a run, ticking
   function tick() {

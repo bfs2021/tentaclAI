@@ -16,9 +16,9 @@
   <input type="hidden" name="jid" value="{{ jid or '' }}">
   <div class="grid2">
     <div><label>Name</label><input type="text" name="name" value="{{ job.name or '' }}" maxlength="60" required></div>
-    <div><label for="job-group">Tab</label><input type="text" name="group" id="job-group" value="{{ job.group or '' }}" maxlength="40" list="job-groups" placeholder="none – e.g. Spam handling">
-      <datalist id="job-groups">{% for g in groups %}<option value="{{ g }}">{% endfor %}</datalist>
-      <div class="help">Sorts the job into a tab on the Jobs page – pick one or type a new name.</div></div>
+    <div><label for="job-group">Group</label><input type="text" name="group" id="job-group" value="{{ job.group or '' }}" maxlength="40" placeholder="none – e.g. Spam handling">
+      {% if groups %}<div class="svc-chips job-group-chips" style="margin-top:6px">{% for g in groups %}<button type="button" class="pill off" data-group="{{ g }}">{{ g }}</button>{% endfor %}</div>{% endif %}
+      <div class="help">Sorts the job into a group – the Jobs page shows one tab per group. Click one or type a new name; empty = no group.</div></div>
   </div>
   {% if warnings %}<div class="card flat small">{% for w in warnings %}<div><span class="pill warn">note</span> {{ w }}</div>{% endfor %}</div>{% endif %}
   <div style="position:relative"><label for="prompt">Task</label>
@@ -120,6 +120,9 @@
 })();
 </script>
 <script>
+document.querySelectorAll("[data-group]").forEach(function (b) {  // a group chip fills the field
+  b.addEventListener("click", function () { document.getElementById("job-group").value = b.dataset.group; });
+});
 document.querySelectorAll("[data-restore-prompt]").forEach(function (b) {
   b.addEventListener("click", function () { var t = document.getElementById("prompt"); t.value = b.dataset.restorePrompt; t.focus(); });
 });

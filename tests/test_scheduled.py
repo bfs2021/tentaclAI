@@ -474,5 +474,5 @@ def test_svc_jobs_group(monkeypatch, tmp_path, capsys):
     assert "spam-a" in out and "disk" not in out
     assert jp.cmd_jobs([]) == 0
     out = capsys.readouterr().out
-    assert "Tab" in out and "Spam handling" in out and out.index("spam-a") < out.index("disk")  # tabs first, no tab last
-    assert jp.cmd_jobs(["--group", "nope"]) == 0 and "No jobs in the tab" in capsys.readouterr().out
+    assert "Group" in out and "Spam handling" in out and out.index("spam-a") < out.index("disk")  # groups first, none last
+    assert jp.cmd_jobs(["--group", "nope"]) == 0 and "No jobs in the group" in capsys.readouterr().out

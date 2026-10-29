@@ -85,7 +85,7 @@ async def jobs_page(request: Request, tab: str | None = None):
     if tab is None:  # the tab picked last time
         tab = request.session.get("jobs_tab", "*")
     if tab != "*" and tab not in [t[0] for t in tabs]:
-        tab = "*"  # all jobs – also when the tab is gone (its last job moved away)
+        tab = "*"  # all jobs – also when the group is gone (its last job moved away)
     request.session["jobs_tab"] = tab
     shown = rows if tab == "*" or not tabs else [r for r in rows if (r.get("group") or "") == tab]
     return page(request, "jobs.html", rows=shown, all_rows=rows, tabs=tabs, tab=tab, groups=scheduled.groups(),
@@ -145,7 +145,7 @@ async def job_group(request: Request, jid: str):
         g = scheduled.set_group(jid, (await request.form()).get("group", ""))
     except ValueError as e:
         return respond(request, f"Not moved: {e}", "err")
-    return respond(request, f"Moved to {g}" if g else "Moved out of its tab", refresh=True)
+    return respond(request, f"Moved to the group {g}" if g else "Moved out of its group", refresh=True)
 
 
 @router.post("/jobs/{jid}/toggle", response_class=HTMLResponse)

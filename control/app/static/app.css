@@ -165,7 +165,8 @@ th[aria-sort="descending"] .sort-ind::after { content: "↓"; opacity: 1; color:
 .tabs a.active { background: var(--accent-soft); border-color: transparent; color: var(--accent); }
 .tabs a:hover { text-decoration: none; color: var(--text); }
 .job-tabs .pill { margin-left: 2px; padding: 0 6px; }
-.job-tab-move input { display: inline-block; width: 9em; padding: 1px 6px; font-size: 12px; height: auto; }
+.job-group-move { display: inline; } .job-group-move select { display: inline-block; width: auto; max-width: 14em; padding: 1px 22px 1px 6px; font-size: 12px; height: auto; }
+.job-group-chips .pill { cursor: pointer; border: 0; } .job-group-chips .pill:hover { color: var(--text); }
 pre.console { background: #0b0e14; color: #d6dbe5; border: 1px solid var(--border); border-radius: var(--radius); padding: 14px; margin: 0;
   overflow: auto; max-height: calc(100vh - 230px); min-height: 300px; white-space: pre-wrap; word-break: break-word; }
 pre.rc { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px; margin: 0; max-height: 190px; overflow: auto; white-space: pre-wrap; color: var(--muted); }

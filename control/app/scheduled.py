@@ -569,26 +569,26 @@ def validate(form, known=None):
         raise ValueError("; ".join(errors))
     fields = {"name": name, "prompt": prompt, "profile": profile, "notify": rule, "model": model, "effort": effort,
               "scope": scope, "propose": propose, "improve": improve, "max_minutes": minutes, "schedule": sched}
-    if "group" in form:  # a definition without it (svc config put job) keeps the job's tab
+    if "group" in form:  # a definition without it (svc config put job) keeps the job's group
         fields["group"] = clean_group(form.get("group"))
     return fields
 
 
 def clean_group(value):
-    """a job's tab: free text, max 40 characters; the spelling of an existing tab wins (ops → Ops)"""
+    """a job's group (a tab on the Jobs page): free text, max 40 characters; an existing group's spelling wins (ops → Ops)"""
     g = " ".join(str(value or "").split())
     if len(g) > 40:
-        raise ValueError("tab: max. 40 characters")
+        raise ValueError("group: max. 40 characters")
     return next((x for x in groups() if x.lower() == g.lower()), g)
 
 
 def groups():
-    """the tabs in use, sorted"""
+    """the groups in use, sorted"""
     return sorted({j.get("group") for j in load().values() if j.get("group")}, key=str.lower)
 
 
 def set_group(jid, group):
-    """move a job to another tab ("" = no tab) – from the Jobs list"""
+    """move a job to another group ("" = none) – from the Jobs list"""
     check_write("jobs", jid)
     g = clean_group(group)
     jobs = load()
@@ -600,8 +600,8 @@ def set_group(jid, group):
 
 
 def tabs(rows):
-    """the tab bar of the Jobs page: [(name, jobs, worst light of their last runs, how many have it)];
-    "" collects the jobs without a tab; empty when no job has one"""
+    """the tab bar of the Jobs page, one tab per group: [(name, jobs, worst light of their last runs, how many have it)];
+    "" collects the jobs without a group; empty when no job has one"""
     names = sorted({r.get("group") or "" for r in rows}, key=lambda g: (g == "", g.lower()))
     if names in ([], [""]):
         return []
